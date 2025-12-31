@@ -1,0 +1,11 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "An app that aggregates Chicago newsletters"
+requires-python = ">=3.13"
+dependencies = [
+    "html2text>=2025.4.15",
+    "imap-tools>=1.11.0",
+    "python-dotenv>=1.2.1",
+    "supabase>=2.27.0",
+]
