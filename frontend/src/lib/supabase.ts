@@ -11,13 +11,13 @@ export interface Newsletter {
   received_date: string;
   subject: string;
   from_email: string;
-  source_name: string | null;
-  source_type: string | null;
-  source_metadata: any;
+  source_id: number | null;
   plain_text: string;
+  raw_html: string | null;
   summary: string | null;
   topics: string[] | null;
   entities: any;
+  sources?: Source;
 }
 
 export interface Source {
@@ -26,5 +26,7 @@ export interface Source {
   name: string;
   email_address: string | null;
   website: string | null;
-  metadata: any;
+  signup_url: string | null;
+  ward_number: string | null;
+  phone: string | null;
 }
