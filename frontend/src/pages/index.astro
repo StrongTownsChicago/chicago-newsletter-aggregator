@@ -1,0 +1,82 @@
+---
+export const prerender = false;
+
+import { supabase } from '../lib/supabase';
+
+// Fetch recent newsletters
+const { data: newsletters, error } = await supabase
+  .from('newsletters')
+  .select('*')
+  .order('received_date', { ascending: false })
+  .limit(20);
+
+if (error) {
+  console.error('Error fetching newsletters:', error);
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Chicago Alderman Newsletters</title>
+  </head>
+  <body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+      <header class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">
+          Chicago Newsletters
+        </h1>
+        <p class="text-gray-600">
+          Searchable archive of newsletters from Chicago aldermen, city agencies, and elected officials
+        </p>
+      </header>
+
+      <nav class="mb-8 flex gap-4">
+        <a href="/" class="text-blue-600 hover:underline">Recent</a>
+        <a href="/search" class="text-blue-600 hover:underline">Search</a>
+        <a href="/sources" class="text-blue-600 hover:underline">By Source</a>
+        <a href="/topics" class="text-blue-600 hover:underline">By Topic</a>
+      </nav>
+
+      <main>
+        <div class="space-y-6">
+          {newsletters?.map((newsletter) => (
+            <article class="bg-white rounded-lg shadow p-6">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <h2 class="text-xl font-semibold text-gray-900 mb-1">
+                    <a href={`/newsletter/${newsletter.id}`} class="hover:text-blue-600">
+                      {newsletter.subject}
+                    </a>
+                  </h2>
+                  <p class="text-sm text-gray-600">
+                    {newsletter.source_name && newsletter.source_name}
+                    {newsletter.source_type && ` (${newsletter.source_type})`}
+                    {newsletter.source_metadata?.ward_number && ` • Ward ${newsletter.source_metadata.ward_number}`}
+                    {' • '}
+                    {new Date(newsletter.received_date).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {newsletter.summary && (
+                <p class="text-gray-700 mb-3">{newsletter.summary}</p>
+              )}
+
+              {newsletter.topics && newsletter.topics.length > 0 && (
+                <div class="flex flex-wrap gap-2">
+                  {newsletter.topics.map((topic: string) => (
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
