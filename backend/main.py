@@ -91,7 +91,7 @@ def process_new_newsletters():
                 if ENABLE_LLM:
                     try:
                         from llm_processor import process_with_ollama
-                        OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+                        OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
                         llm_result = process_with_ollama(newsletter, OLLAMA_MODEL)
                         newsletter.update(llm_result)
                         print(f"  LLM processing complete")

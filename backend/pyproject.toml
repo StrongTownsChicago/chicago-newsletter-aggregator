@@ -6,6 +6,8 @@ requires-python = ">=3.13"
 dependencies = [
     "html2text>=2025.4.15",
     "imap-tools>=1.11.0",
+    "ollama>=0.6.1",
+    "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
     "supabase>=2.27.0",
 ]

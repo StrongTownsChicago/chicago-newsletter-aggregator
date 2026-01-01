@@ -16,6 +16,7 @@ export interface Newsletter {
   raw_html: string | null;
   summary: string | null;
   topics: string[] | null;
+  relevance_score: number | null;
   entities: any;
   sources?: Source;
 }

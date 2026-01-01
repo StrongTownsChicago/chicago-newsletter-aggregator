@@ -53,6 +53,19 @@ if (error || !newsletter) {
           </time>
         </div>
 
+        {newsletter.relevance_score !== null && (
+        <div class="flex items-center gap-2 mb-4">
+            <span class="text-sm font-semibold text-gray-700">Relevance:</span>
+            <span class={`px-3 py-1 rounded-full text-sm font-bold ${
+            newsletter.relevance_score >= 8 ? 'bg-green-100 text-green-800' :
+            newsletter.relevance_score >= 5 ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-600'
+            }`}>
+            {newsletter.relevance_score}/10
+            </span>
+        </div>
+        )}
+
         {newsletter.topics && newsletter.topics.length > 0 && (
           <div class="flex flex-wrap gap-2 mb-4">
             {newsletter.topics.map((topic: string) => (
