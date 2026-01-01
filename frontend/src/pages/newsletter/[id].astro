@@ -17,7 +17,7 @@ if (error || !newsletter) {
 }
 ---
 
-<Layout title={`${newsletter.subject} - Chicago Newsletters`}>
+<Layout title={`${newsletter.subject} - Chicago Newsletter Aggregator`}>
   <div class="container mx-auto px-4 py-8 max-w-4xl">
     <a href="/" class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium">
       ← Back to newsletters
@@ -29,28 +29,39 @@ if (error || !newsletter) {
           {newsletter.subject}
         </h1>
         
-        <div class="flex flex-wrap items-center gap-3 text-gray-600 mb-4">
-          {newsletter.sources?.name && (
-            <span class="text-lg font-medium text-gray-800">{newsletter.sources.name}</span>
-          )}
-          {newsletter.sources?.ward_number && (
-            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-              Ward {newsletter.sources.ward_number}
-            </span>
-          )}
-          {newsletter.sources?.phone && (
-            <a href={`tel:${newsletter.sources.phone}`} class="text-blue-600 hover:text-blue-800">
-              {newsletter.sources.phone}
-            </a>
-          )}
-          <span class="text-gray-400">•</span>
-          <time datetime={newsletter.received_date} class="text-gray-700">
-            {new Date(newsletter.received_date).toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </time>
+        <div class="space-y-2 mb-4">
+          <!-- Source info row -->
+          <div class="flex flex-wrap items-center gap-3 text-gray-600">
+            {newsletter.sources?.name && (
+              <span class="text-lg font-medium text-gray-800">{newsletter.sources.name}</span>
+            )}
+            {newsletter.sources?.ward_number && (
+              <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                Ward {newsletter.sources.ward_number}
+              </span>
+            )}
+            {newsletter.sources?.phone && (
+              <a href=`tel:${newsletter.sources.phone}`} class="text-blue-600 hover:text-blue-800 hover:underline">
+                📞 {newsletter.sources.phone}
+              </a>
+            )}
+            {newsletter.sources?.email_address && (
+              <a href=`mailto:${newsletter.sources.email_address}`} class="text-blue-600 hover:text-blue-800 hover:underline">
+                ✉️ {newsletter.sources.email_address}
+              </a>
+            )}
+          </div>
+          
+          <!-- Date row -->
+          <div class="flex items-center gap-2 text-sm text-gray-500">
+            <time datetime={newsletter.received_date}>
+              {new Date(newsletter.received_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </time>
+          </div>
         </div>
 
         {newsletter.relevance_score !== null && (
