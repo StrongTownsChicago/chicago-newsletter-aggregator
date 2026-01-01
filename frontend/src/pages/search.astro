@@ -184,14 +184,6 @@ const uniqueWards = [...new Set(
                 Ward {newsletter.sources.ward_number}
               </span>
             )}
-            {newsletter.sources?.phone && (
-              <a 
-                href={`tel:${newsletter.sources.phone}`} 
-                class="text-blue-600 hover:text-blue-800 text-xs"
-              >
-                {newsletter.sources.phone}
-              </a>
-            )}
             <span class="text-gray-400">•</span>
             <time datetime={newsletter.received_date}>
               {new Date(newsletter.received_date).toLocaleDateString('en-US', { 
