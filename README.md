@@ -137,15 +137,14 @@ frontend/
 
 Three separate Ollama queries per newsletter:
 
-1. **Topic extraction** (temp=0): Classifies into 23 predefined topics, filters hallucinations
-2. **Summarization** (temp=0.3): Generates 2-3 sentence summary
-3. **Relevance scoring** (temp=0): Scores 0-10 for Strong Towns Chicago priorities
+1. **Topic extraction**: Classifies into 23 predefined topics, filters hallucinations
+2. **Summarization**: Generates 2-3 sentence summary
+3. **Relevance scoring**: Scores 0-10 for Strong Towns Chicago priorities
 
 ## Deployment
 
-- **Backend**: Cron job running `main.py` every 15 minutes
+- **Backend**: Cron job locally running `main.py` every 15 minutes
 - **Frontend**: Auto-deploy via Cloudflare Pages
-- **Cost**: ~$1/month (domain only)
 
 ## Environment Variables
 
