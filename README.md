@@ -143,7 +143,7 @@ Three separate Ollama queries per newsletter:
 
 ## Deployment
 
-- **Backend**: Cron job locally running `main.py` every 15 minutes
+- **Backend**: Local processing of newsletters. Currently done manually by running `uv run python main.py`
 - **Frontend**: Auto-deploy via Cloudflare Pages
 
 ## Environment Variables
