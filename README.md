@@ -1,6 +1,6 @@
 # Chicago Newsletter Aggregator
 
-Searchable archive of newsletters from Chicago aldermen, city agencies, and elected officials. Built for [Strong Towns Chicago](https://www.strongtownschicago.org/).
+Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns Chicago](https://www.strongtownschicago.org/).
 
 ## Tech Stack
 
@@ -14,13 +14,12 @@ Searchable archive of newsletters from Chicago aldermen, city agencies, and elec
 
 - Email ingestion via IMAP with source auto-matching
 - LLM processing: topic extraction, summarization, relevance scoring (0-10)
-- Full-text search with filters (ward, source type, topic)
-- Real-time updates (no rebuild needed)
+- Full-text search with filters (ward, topic)
 
 ## Database Schema
 
 ```sql
--- Sources: aldermen, agencies, elected officials
+-- Sources: currently alderman, but could expand to agencies and other elected officials
 CREATE TABLE public.sources (
   id SERIAL PRIMARY KEY,
   source_type TEXT NOT NULL,
