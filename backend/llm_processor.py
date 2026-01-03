@@ -1,6 +1,7 @@
 from ollama import chat
 from pydantic import BaseModel, Field
 from typing import List
+import time
 
 TOPICS = [
     "housing_density",
@@ -38,26 +39,49 @@ class RelevanceScore(BaseModel):
     reasoning: str = Field(max_length=1000, description="Brief explanation")
 
 
-def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0) -> str:
+def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = 3) -> str:
     """
-    Central LLM calling method with structured output.
+    Central LLM calling method with structured output and retry logic.
     
     Args:
         model: Ollama model name
         prompt: User prompt
         schema: Pydantic model JSON schema
         temperature: Temperature for generation
+        max_retries: Maximum number of retry attempts
         
     Returns:
         JSON string response
+        
+    Raises:
+        Exception: If all retries fail
     """
-    response = chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        format=schema,
-        options={"temperature": temperature}
-    )
-    return response.message.content
+    for attempt in range(max_retries):
+        try:
+            response = chat(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                format=schema,
+                options={
+                    "temperature": temperature,
+                    "num_ctx": 32768  # Ollama defaults to a small context window. We want more for processing newsletters.
+                    }
+            )
+            content = response.message.content
+            
+            # Validate it's not empty
+            if not content or content.strip() == "":
+                raise ValueError("LLM returned empty response")
+                
+            return content
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Simple exponential backoff: 1s, 2s, 4s
+                print(f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
 
 
 def extract_topics(content: str, model: str) -> List[str]:
@@ -75,14 +99,18 @@ Select only topics clearly discussed. Return empty list if none apply.
 Newsletter:
 {content}
 """
-    print("  → Extracting topics...")
-    response = call_llm(model, prompt, TopicsExtraction.model_json_schema())
-    data = TopicsExtraction.model_validate_json(response)
-    # Filter to only valid topics
-    valid_topics = [t for t in data.topics if t in TOPICS]
-    
-    print(f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}")
-    return valid_topics
+    try:
+        print("  → Extracting topics...")
+        response = call_llm(model, prompt, TopicsExtraction.model_json_schema())
+        data = TopicsExtraction.model_validate_json(response)
+        # Filter to only valid topics
+        valid_topics = [t for t in data.topics if t in TOPICS]
+        
+        print(f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}")
+        return valid_topics
+    except Exception as e:
+        print(f"  ✗ Topic extraction failed: {e}")
+        return []
 
 
 def generate_summary(content: str, model: str) -> str:
@@ -95,14 +123,18 @@ Newsletter:
 {content}
 """
     
-    print("  → Generating summary...")
-    response = call_llm(model, prompt, Summary.model_json_schema())
-    data = Summary.model_validate_json(response)
-    print(f"  ✓ Summary: {data.summary}")
-    return data.summary
+    try:
+        print("  → Generating summary...")
+        response = call_llm(model, prompt, Summary.model_json_schema())
+        data = Summary.model_validate_json(response)
+        print(f"  ✓ Summary: {data.summary}")
+        return data.summary
+    except Exception as e:
+        print(f"  ✗ Summary generation failed: {e}")
+        return ""
 
 
-def score_relevance(content: str, model: str) -> int:
+def score_relevance(content: str, model: str) -> int | None:
     """Score newsletter relevance to urban planning/policy topics."""
     
     prompt = f"""Rate this newsletter's relevance to Strong Towns Chicago (0-10).
@@ -125,27 +157,35 @@ Newsletter:
 {content}
 """
     
-    response = call_llm(model, prompt, RelevanceScore.model_json_schema())
-    data = RelevanceScore.model_validate_json(response)
-    print(f"  ✓ Score: {data.score}/10 ({data.reasoning})")
-    return data.score
+    try:
+        response = call_llm(model, prompt, RelevanceScore.model_json_schema())
+        data = RelevanceScore.model_validate_json(response)
+        print(f"  ✓ Score: {data.score}/10 ({data.reasoning})")
+        return data.score
+    except Exception as e:
+        print(f"  ✗ Relevance scoring failed: {e}")
+        return None
 
 
 def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b") -> dict:
     """
-    Process newsletter with LLM.
+    Process newsletter with LLM. Each operation is independent - if one fails, others continue.
     
     Args:
         newsletter: Dict with subject, plain_text
         model: Ollama model name
         
     Returns:
-        Dict with summary, topics, relevance_score
+        Dict with summary, topics, relevance_score (failed fields will have default values)
     """
     content = f"Subject: {newsletter['subject']}\n\n{newsletter['plain_text']}"
     
+    topics = extract_topics(content, model)
+    summary = generate_summary(content, model)
+    relevance_score = score_relevance(content, model)
+    
     return {
-        "topics": extract_topics(content, model),
-        "summary": generate_summary(content, model),
-        "relevance_score": score_relevance(content, model)
+        "topics": topics,
+        "summary": summary,
+        "relevance_score": relevance_score
     }
