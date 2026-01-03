@@ -3,6 +3,7 @@ Main newsletter scraper - fetches newsletter archives and individual newsletters
 """
 
 import requests
+import random
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 import time
@@ -13,13 +14,19 @@ from ingest.scraper.scraper_strategies import get_strategy_for_url
 class NewsletterScraper:
     """Scrapes newsletter archives and fetches individual newsletters"""
     
-    def __init__(self, max_retries: int = 3, delay_between_requests: float = 1.0):
+    def __init__(self, max_retries: int = 3, base_delay: float = 2.0, delay_variance: float = 1.0):
         self.max_retries = max_retries
-        self.delay = delay_between_requests
+        self.base_delay = base_delay
+        self.delay_variance = delay_variance
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+    
+    def _get_random_delay(self) -> float:
+        """Get randomized delay: base_delay ± variance"""
+        return self.base_delay + random.uniform(-self.delay_variance, self.delay_variance)
+    
     
     def fetch_archive_page(self, url: str) -> Optional[str]:
         """Fetch HTML content of newsletter archive page"""
@@ -67,7 +74,7 @@ class NewsletterScraper:
         """
         for attempt in range(self.max_retries):
             try:
-                time.sleep(self.delay)  # Rate limiting
+                time.sleep(self._get_random_delay())
                 
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()

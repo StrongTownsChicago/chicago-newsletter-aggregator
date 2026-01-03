@@ -1,21 +1,19 @@
 import os
 from datetime import datetime
 from imap_tools import MailBox, AND, MailMessageFlags
-from supabase import create_client
 from dotenv import load_dotenv
 from ingest.email.email_parser import parse_newsletter
+from shared.db import get_supabase_client
+from shared.utils import print_summary
 
 load_dotenv()
 
 # Configuration
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 
-# Initialize Supabase client
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = get_supabase_client()
 
 def newsletter_exists(email_uid: str) -> bool:
     """Check if newsletter already processed"""
@@ -116,14 +114,7 @@ def process_new_newsletters():
         if unmapped_emails:
             save_unmapped_report(unmapped_emails)
 
-        # Summary report
-        print(f"\n{'='*60}")
-        print(f"[{datetime.now()}] Processing Complete!")
-        print(f"{'='*60}")
-        print(f"✓ Processed & Stored: {processed_count}")
-        print(f"⊘ Skipped (duplicates): {skipped_count}")
-        print(f"✗ Unmapped (no source): {unmapped_count}")
-        print(f"{'='*60}")
+        print_summary(processed_count, skipped_count, unmapped_count)
         
 
 if __name__ == "__main__":

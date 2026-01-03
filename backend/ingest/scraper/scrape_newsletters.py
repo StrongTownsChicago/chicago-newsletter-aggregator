@@ -4,24 +4,22 @@ Scrape newsletters from alderman websites and save to database.
 
 import os
 from datetime import datetime
-from supabase import create_client
 from dotenv import load_dotenv
 from ingest.scraper.process_scraped import NewsletterScraper
-from dateutil import parser as date_parser
+from shared.db import get_supabase_client
+from shared.utils import parse_date_string, print_summary
 
 load_dotenv()
 
 # Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 
 # Initialize clients
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = get_supabase_client()
 scraper = NewsletterScraper()
 
 
-def newsletter_exists(source_id: int, subject: str, received_date: str) -> bool:
+def newsletter_exists(source_id: int, subject: str) -> bool:
     """Check if newsletter already processed using source_id + subject + date"""
     result = supabase.table("newsletters") \
         .select("id") \
@@ -29,19 +27,6 @@ def newsletter_exists(source_id: int, subject: str, received_date: str) -> bool:
         .eq("subject", subject) \
         .execute()
     return len(result.data) > 0
-
-
-def parse_date_string(date_str: str) -> str | None:
-    """Try to parse various date formats into ISO format"""
-    if not date_str:
-        return None
-    
-    try:
-        dt = date_parser.parse(date_str, fuzzy=True)
-        return dt.isoformat()
-    except:
-        return None
-
 
 def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | None = None):
     """
@@ -70,7 +55,7 @@ def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | N
             url = newsletter_content['url']
             
             # Skip if already processed
-            if newsletter_exists(source_id, newsletter_content['subject'], received_date):
+            if newsletter_exists(source_id, newsletter_content['subject']):
                 print(f"⊘ Duplicate: {url}")
                 skipped_count += 1
                 continue
@@ -115,15 +100,7 @@ def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | N
             failed_count += 1
             continue
     
-    # Summary
-    print(f"\n{'='*60}")
-    print(f"[{datetime.now()}] Scraping Complete!")
-    print(f"{'='*60}")
-    print(f"✓ Processed & Stored: {processed_count}")
-    print(f"⊘ Skipped (duplicates): {skipped_count}")
-    print(f"✗ Failed: {failed_count}")
-    print(f"{'='*60}\n")
-
+    print_summary(processed_count, skipped_count, failed_count)
 
 def scrape_all_sources():
     """Scrape newsletters from all sources that have archive_url set"""
