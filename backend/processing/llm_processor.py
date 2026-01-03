@@ -170,7 +170,7 @@ Newsletter:
         return None
 
 
-def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = 200000) -> dict:
+def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = 100000) -> dict:
     """
     Process newsletter with LLM.
     
