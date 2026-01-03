@@ -6,8 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 import time
-from email_parser import clean_html_content
-from scraper_strategies import get_strategy_for_url
+from ingest.email.email_parser import clean_html_content
+from ingest.scraper.scraper_strategies import get_strategy_for_url
 
 
 class NewsletterScraper:

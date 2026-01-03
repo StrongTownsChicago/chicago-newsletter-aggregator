@@ -3,7 +3,7 @@ from datetime import datetime
 from imap_tools import MailBox, AND, MailMessageFlags
 from supabase import create_client
 from dotenv import load_dotenv
-from email_parser import parse_newsletter
+from ingest.email.email_parser import parse_newsletter
 
 load_dotenv()
 
@@ -90,7 +90,7 @@ def process_new_newsletters():
                 # Optional: Process with LLM if enabled
                 if ENABLE_LLM:
                     try:
-                        from llm_processor import process_with_ollama
+                        from processing.llm_processor import process_with_ollama
                         OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
                         llm_result = process_with_ollama(newsletter, OLLAMA_MODEL)
                         newsletter.update(llm_result)

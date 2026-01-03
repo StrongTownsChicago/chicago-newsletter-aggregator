@@ -29,6 +29,7 @@ CREATE TABLE public.sources (
   signup_url TEXT,
   ward_number TEXT,
   phone TEXT,
+  newsletter_archive_url TEXT NULL,
   UNIQUE(source_type, name)
 );
 
@@ -89,14 +90,31 @@ CREATE POLICY "Public read mappings" ON email_source_mappings FOR SELECT USING (
 
 ```bash
 cd backend
-uv add imap-tools supabase python-dotenv html2text ollama pydantic
+uv sync
 
 # Create .env with:
 # GMAIL_ADDRESS, GMAIL_APP_PASSWORD
 # SUPABASE_URL, SUPABASE_SERVICE_KEY
 # ENABLE_LLM=true, OLLAMA_MODEL=gpt-oss:20b
+```
 
-uv run python main.py
+### Backend Scripts
+
+#### Email Ingestion
+
+```
+# Process unread Gmail newsletters
+uv run python -m ingest.email.process_emails
+```
+
+#### Web Scraping
+
+```
+# Scrape all aldermen with newsletter_archive_url set
+uv run python -m ingest.scraper.process_scraped
+
+# Scrape specific alderman (with optional limit)
+uv run python -m ingest.scraper.process_scraped 1 "https://..." 10
 ```
 
 ### Frontend Setup
@@ -120,9 +138,17 @@ ollama pull gpt-oss:20b
 
 ```
 backend/
-  ├── main.py              # Email ingestion
-  ├── email_parser.py      # Email → database
-  └── llm_processor.py     # Topic/summary/scoring
+  ├── ingest/
+  │   ├── email/
+  │   │   ├── email_parser.py      # Email → database
+  │   │   └── process_emails.py    # Gmail IMAP ingestion
+  │   └── scraper/
+  │       ├── scraper_strategies.py   # MailChimp archive parsing
+  │       ├── scrape_newsletters.py   # Web scraper
+  │       └── process_scraped.py      # Scraping orchestration
+  ├── processing/
+  │   └── llm_processor.py         # Topic/summary/scoring
+  └── shared/                      # Shared utilities
 
 frontend/
   ├── src/pages/
@@ -142,7 +168,7 @@ Three separate Ollama queries per newsletter:
 
 ## Deployment
 
-- **Backend**: Local processing of newsletters. Currently done manually by running `uv run python main.py`
+- **Backend**: Local processing of newsletters. Currently done manually by running the scripts referenced above.
 - **Frontend**: Auto-deploy via Cloudflare Pages
 
 ## Environment Variables

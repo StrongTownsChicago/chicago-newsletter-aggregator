@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from supabase import create_client
 from dotenv import load_dotenv
-from newsletter_scraper import NewsletterScraper
+from ingest.scraper.process_scraped import NewsletterScraper
 from dateutil import parser as date_parser
 
 load_dotenv()
@@ -93,7 +93,7 @@ def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | N
             # Optional: LLM processing
             if ENABLE_LLM:
                 try:
-                    from llm_processor import process_with_ollama
+                    from processing.llm_processor import process_with_ollama
                     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
                     
                     print(f"Processing: {newsletter_data['subject']}")
