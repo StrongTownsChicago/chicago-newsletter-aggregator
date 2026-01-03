@@ -68,7 +68,6 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
                 format=schema,
                 options={
                     "temperature": temperature,
-                    "num_ctx": 32768  # Ollama defaults to a small context window. We want more for processing newsletters.
                     }
             )
             content = response.message.content
@@ -171,18 +170,20 @@ Newsletter:
         return None
 
 
-def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b") -> dict:
+def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = 200000) -> dict:
     """
-    Process newsletter with LLM. Each operation is independent - if one fails, others continue.
+    Process newsletter with LLM.
     
     Args:
-        newsletter: Dict with subject, plain_text
-        model: Ollama model name
-        
-    Returns:
-        Dict with summary, topics, relevance_score (failed fields will have default values)
+        max_chars: Max characters to send to LLM (truncates to prevent passing in more chars than the token limit
     """
-    content = f"Subject: {newsletter['subject']}\n\n{newsletter['plain_text']}"
+    plain_text = newsletter['plain_text']
+    
+    if len(plain_text) > max_chars:
+        plain_text = plain_text[:max_chars]
+        print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
+    
+    content = f"Subject: {newsletter['subject']}\n\n{plain_text}"
     
     topics = extract_topics(content, model)
     summary = generate_summary(content, model)
