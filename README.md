@@ -51,10 +51,10 @@ CREATE INDEX idx_email_source_mappings_pattern ON email_source_mappings(email_pa
 CREATE TABLE public.newsletters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  email_uid TEXT NOT NULL UNIQUE,
+  email_uid TEXT NULL UNIQUE,
   received_date TIMESTAMPTZ NOT NULL,
   subject TEXT NOT NULL,
-  from_email TEXT NOT NULL,
+  from_email TEXT NULL,
   to_email TEXT,
   raw_html TEXT,
   plain_text TEXT,
