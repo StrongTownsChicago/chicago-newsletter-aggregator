@@ -1,4 +1,4 @@
-from ollama import chat
+from ollama import Client
 from pydantic import BaseModel, Field
 from typing import List
 import time
@@ -39,6 +39,10 @@ class RelevanceScore(BaseModel):
     reasoning: str = Field(max_length=1000, description="Brief explanation")
 
 
+# Sometimes Ollama calls hang indefinitely. We create a global client with a set timeout to avoid this breaking things.
+ollama_client = Client(timeout=120.0)
+
+
 def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = 3) -> str:
     """
     Central LLM calling method with structured output and retry logic.
@@ -58,7 +62,7 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
     """
     for attempt in range(max_retries):
         try:
-            response = chat(
+            response = ollama_client.chat(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 format=schema,
