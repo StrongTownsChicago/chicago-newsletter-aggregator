@@ -75,6 +75,9 @@ def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | N
             if newsletter_exists(source_id, content['subject']):
                 print(f"  ⊘ Duplicate")
                 skipped_count += 1
+                # Add delay to avoid overly aggressive scraping if we are seeing many duplicates
+                delay = random.uniform(1.0, 7.0)
+                time.sleep(delay)
                 continue
             
             # Build newsletter record
