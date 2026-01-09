@@ -32,11 +32,33 @@ def newsletter_exists(source_id: int, subject: str) -> bool:
     return len(result.data) > 0
 
 
-def process_scraped_newsletters(source_id: int, archive_url: str, limit: int | None = None):
+def get_source_archive_url(source_id: int) -> tuple[str, str]:
+    """Fetch source info and archive URL from database"""
+    result = supabase.table("sources") \
+        .select("name, newsletter_archive_url") \
+        .eq("id", source_id) \
+        .execute()
+    
+    if not result.data:
+        raise ValueError(f"Source ID {source_id} not found in database")
+    
+    source = result.data[0]
+    
+    if not source.get('newsletter_archive_url'):
+        raise ValueError(f"Source '{source['name']}' (ID: {source_id}) has no newsletter_archive_url configured")
+    
+    return source['name'], source['newsletter_archive_url']
+
+
+def process_scraped_newsletters(source_id: int, limit: int | None = None):
     """Scrape and process newsletters for a specific source"""
+    
+    # Fetch archive URL from database
+    source_name, archive_url = get_source_archive_url(source_id)
     
     print(f"\n{'='*60}")
     print(f"[{datetime.now()}] Scraping newsletters for source ID: {source_id}")
+    print(f"Source: {source_name}")
     print(f"Archive URL: {archive_url}")
     print(f"{'='*60}\n")
     
@@ -145,7 +167,6 @@ def scrape_all_sources():
         try:
             process_scraped_newsletters(
                 source_id=source['id'],
-                archive_url=source['newsletter_archive_url'],
                 limit=None
             )
         except Exception as e:
@@ -158,9 +179,8 @@ if __name__ == "__main__":
     
     if len(sys.argv) > 1:
         source_id = int(sys.argv[1])
-        archive_url = sys.argv[2]
-        limit = int(sys.argv[3]) if len(sys.argv) > 3 else None
+        limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
         
-        process_scraped_newsletters(source_id, archive_url, limit)
+        process_scraped_newsletters(source_id, limit)
     else:
         scrape_all_sources()
