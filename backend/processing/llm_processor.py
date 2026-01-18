@@ -4,28 +4,40 @@ from typing import List
 import time
 
 TOPICS = [
-    "housing_density",
-    "parking_reform", 
-    "zoning_reform",
-    "zoning",
-    "bike_infrastructure",
-    "pedestrian_safety",
-    "transit_improvement",
-    "bus_rapid_transit",
-    "transit_funding",
-    "highway_opposition",
-    "traffic_calming",
-    "budget_transparency",
-    "community_meeting",
+    # Incremental Housing
     "4_flats_legalization",
-    "parking_minimums",
-    "walkability",
     "missing_middle_housing",
-    "street_design",
-    "fiscal_resilience",
+    "zoning_reform",
+    "adu_coach_house",
+    "housing_development",
+    "single_stair_reform",
+
+    # Ending Parking Mandates
+    "parking_minimums_elimination",
+
+    # Safe & Productive Streets
+    "pedestrian_safety",
+    "bike_infrastructure",
+    "tactical_urbanism",
+    "traffic_calming",
+    "street_redesign",
+
+    # Transit
+    "transit_improvement",
+    "cta_metra_funding",
+    "transit_service_expansion",
+
+    # Transparent Local Accounting
+    "budget_transparency",
+    "fiscal_sustainability",
+    "tax_policy",
+
+    # Governance & Community Engagement
+    "community_meeting",
+    "development_approval",
+    "ordinance_debate",
+    "public_hearing",
     "city_charter",
-    "city_budget",
-    "accessory_dwelling_unit"
 ]
 
 class TopicsExtraction(BaseModel):
@@ -40,7 +52,7 @@ class RelevanceScore(BaseModel):
 
 
 # Sometimes Ollama calls hang indefinitely. We create a global client with a set timeout to avoid this breaking things.
-ollama_client = Client(timeout=120.0)
+ollama_client = Client(timeout=240.0)
 
 
 def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = 3) -> str:
@@ -89,15 +101,16 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
 
 def extract_topics(content: str, model: str) -> List[str]:
     """Extract relevant topics from newsletter content."""
-    
-    prompt = f"""Analyze this Chicago newsletter and identify relevant topics.
 
-Focus on: housing, zoning, parking, transit, bike/pedestrian infrastructure, 
-budget/fiscal policy, community development, and urban planning.
+    prompt = f"""Identify topics from this Chicago alderman newsletter relevant to Strong Towns Chicago.
 
-Available topics: {', '.join(TOPICS)}
+STC focuses on: Housing (4-flats, zoning, ADUs), Parking Reform, Safe Streets (bike/ped, traffic calming), Transit (CTA/Metra/bus), Budget/Fiscal Policy, Governance (meetings, development approvals, ordinances).
 
-Select only topics clearly discussed. Return empty list if none apply.
+Topics: {', '.join(TOPICS)}
+
+Select ONLY explicitly discussed topics. Prioritize: zoning/development approvals, housing/transit/budget meetings, parking/transit policy.
+
+Return empty list if none apply.
 
 Newsletter:
 {content}
@@ -118,9 +131,19 @@ Newsletter:
 
 def generate_summary(content: str, model: str) -> str:
     """Generate concise summary of newsletter."""
-    
-    prompt = f"""Summarize this newsletter in 2-3 sentences. Focus on key announcements, 
-events, or policy changes. Be concise and factual.
+
+    prompt = f"""Summarize this alderman's newsletter in 2-3 sentences.
+
+PRIORITIZE mentioning (in order of importance):
+1. Meetings/hearings about zoning, development, housing, transit, or budget
+2. Policy changes or ordinances related to housing, parking, transit, or streets
+3. Development approvals or zoning changes
+4. Budget/infrastructure spending decisions
+5. Transit service changes or funding
+6. Street safety or redesign projects
+
+Then briefly mention other major announcements or events. Be concise and factual.
+Reference the name of the alderman and ward if they are mentioned.
 
 Newsletter:
 {content}
@@ -139,22 +162,50 @@ Newsletter:
 
 def score_relevance(content: str, model: str) -> int | None:
     """Score newsletter relevance to urban planning/policy topics."""
-    
+
     prompt = f"""Rate this newsletter's relevance to Strong Towns Chicago (0-10).
 
-Strong Towns Chicago advocates for:
-- Housing: Zoning reform, gentle density, eliminating parking minimums, legalizing 4-flats
-- Transit: CTA/Metra improvements, bus rapid transit
-- Streets: Bike lanes, pedestrian safety, traffic calming
-- Fiscal: Budget transparency
-- Governance Reform: Establishing a city charter
-- Anti-sprawl: Opposing highway expansion
+Strong Towns Chicago's 5 Priority Campaigns:
+1. Incremental Housing: Re-legalizing 4-flats, missing middle housing, ADUs, zoning reform
+2. Ending Parking Mandates: Eliminating parking minimums, reducing parking subsidies
+3. Safe & Productive Streets: Bike lanes, pedestrian safety, tactical urbanism, traffic calming
+4. Transit: CTA/Metra funding, bus network improvements, L maintenance, stopping Lake Shore Drive expansion
+5. Transparent Local Accounting: Budget transparency, fiscal sustainability, infrastructure ROI
 
-Scoring:
-0-2: Not relevant (routine announcements, unrelated topics)
-3-5: Tangentially relevant (mentions topics but not focus)
-6-8: Relevant (addresses Strong Towns priorities)
-9-10: Highly relevant (major campaign, policy change, or advocacy opportunity)
+SCORING:
+
+9-10 = Major action opportunity OR multiple high-impact announcements:
+• Upcoming votes on housing/parking/transit ordinances
+• Public feedback periods on zoning changes
+• Budget hearings on infrastructure/transit
+• Multiple significant STC-related projects announced together
+• Major policy changes (eliminating parking minimums, legalizing 4-flats)
+Example: "Feedback open until Jan 19 on zoning change + multiple bike lane projects announced"
+
+7-8 = Multiple relevant announcements OR single significant project:
+• 2+ street safety projects (bike lanes, traffic calming, etc.)
+• 2+ housing developments or zoning changes
+• Significant transit service/funding changes
+• Detailed budget allocations for infrastructure
+Example: "New bike medians on Pratt + resurfacing Ashland + Lincoln streetscape complete"
+
+5-6 = Single relevant announcement:
+• One street safety improvement
+• One housing development or zoning change
+• Minor transit updates
+• Brief budget mention
+Example: "New bike lane installed on Main Street"
+
+3-4 = Vague mention of STC topics:
+• General community meeting that might touch on housing/transit
+• Economic development mentioning transit access
+Example: "Town hall on neighborhood priorities"
+
+0-2 = Not relevant:
+• Holidays, office hours, festivals, constituent services
+Example: "Annual neighborhood BBQ Saturday"
+
+Weight public feedback periods and upcoming meetings/votes highly.
 
 Newsletter:
 {content}
