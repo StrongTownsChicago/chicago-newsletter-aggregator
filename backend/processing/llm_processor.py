@@ -143,7 +143,7 @@ def score_relevance(content: str, model: str) -> int | None:
     prompt = f"""Rate this newsletter's relevance to Strong Towns Chicago (0-10).
 
 Strong Towns Chicago advocates for:
-- Housing: Zoning reform, density, eliminating parking minimums, legalizing 4-flats
+- Housing: Zoning reform, gentle density, eliminating parking minimums, legalizing 4-flats
 - Transit: CTA/Metra improvements, bus rapid transit
 - Streets: Bike lanes, pedestrian safety, traffic calming
 - Fiscal: Budget transparency
