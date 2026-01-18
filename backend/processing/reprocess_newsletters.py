@@ -5,6 +5,9 @@ Usage:
     # Reprocess latest 10 newsletters
     uv run python -m processing.reprocess_newsletters --latest 10
 
+    # Skip first 20, process next 10 (newsletters 21-30)
+    uv run python -m processing.reprocess_newsletters --latest 10 --skip 20
+
     # Reprocess all newsletters from source_id 5
     uv run python -m processing.reprocess_newsletters --source-id 5
 
@@ -44,9 +47,14 @@ def fetch_newsletters(supabase, args):
     # Order by date for consistency
     query = query.order("received_date", desc=True)
 
-    # Apply limit if specified
+    # Apply limit and skip using range
     if args.latest and not args.all:
-        query = query.limit(args.latest)
+        start = args.skip
+        end = args.skip + args.latest - 1
+        query = query.range(start, end)
+    elif args.skip > 0:
+        # If only skip is specified (no limit), skip and get everything after
+        query = query.range(args.skip, args.skip + 9999)
 
     result = query.execute()
     return result.data
@@ -109,6 +117,13 @@ def main():
         "--latest",
         type=int,
         help="Process the N most recent newsletters"
+    )
+
+    parser.add_argument(
+        "--skip",
+        type=int,
+        default=0,
+        help="Skip the first N newsletters (useful with --latest to process next batch)"
     )
 
     parser.add_argument(

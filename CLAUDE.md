@@ -30,8 +30,9 @@ uv run python -m ingest.scraper.process_scraped_newsletters
 # Scrape specific source (source_id, archive_url, optional limit)
 uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
 
-# Reprocess existing newsletters with updated LLM prompts
+# Reprocess existing newsletters with LLM prompts
 uv run python -m processing.reprocess_newsletters --latest 10
+uv run python -m processing.reprocess_newsletters --latest 10 --skip 20  # Skip first 20, process next 10
 uv run python -m processing.reprocess_newsletters --source-id 5
 uv run python -m processing.reprocess_newsletters --all
 uv run python -m processing.reprocess_newsletters --latest 20 --source-id 3
@@ -119,16 +120,19 @@ frontend/src/
 ### Key Design Patterns
 
 **Email Source Matching**: Uses flexible pattern matching in `email_parser.py:lookup_source_by_email()`:
+
 - SQL wildcards (`%`) converted to regex for matching
 - Exact and substring matching as fallback
 - Returns full source record with joined data
 
 **Web Scraping Strategy Pattern**: `scraper_strategies.py` defines:
+
 - `MailChimpArchiveStrategy` for MailChimp archives (most aldermen use this)
 - `GenericListStrategy` as fallback
 - `get_strategy_for_url()` selects strategy based on URL
 
 **LLM Processing**: `llm_processor.py:process_with_ollama()` orchestrates three separate calls:
+
 - Uses Pydantic models for structured output validation
 - Truncates content to 100k chars to avoid token limits
 - Filters extracted topics against predefined `TOPICS` list to prevent hallucinations
@@ -139,6 +143,7 @@ frontend/src/
 ## Environment Variables
 
 **Backend** (`.env` in `backend/`):
+
 ```
 GMAIL_ADDRESS=
 GMAIL_APP_PASSWORD=
@@ -149,6 +154,7 @@ OLLAMA_MODEL=gpt-oss:20b
 ```
 
 **Frontend** (`.env` in `frontend/`):
+
 ```
 PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_ANON_KEY=

@@ -175,23 +175,24 @@ Strong Towns Chicago's 5 Priority Campaigns:
 SCORING:
 
 9-10 = Major announcements (rare and exciting):
-• Major policy changes (eliminating parking minimums, legalizing 4-flats)
+• Major policy changes (eliminating parking minimums, legalizing 4-flats, upzoning)
 • Citywide or major public feedback periods on housing/transit/parking
 • NEW transit service routes or frequency expansion
-Example: "Alderman Smith announces support for upzoning of major corridor" or "City ordiance passed to eliminate parking minimums"
+Example: "City Council passes ordinance eliminating parking minimums" or "Alderman announces support for upzoning major corridor"
 
-7-8 = Action opportunities and significant updates:
-• Public feedback periods on zoning changes or development (single site or ward-level)
+7-8 = Action opportunities and significant housing/transit announcements:
+• Large housing developments approved (many units) or moving to committee
+• Public feedback periods on zoning changes or development
 • Public hearings/meetings on housing, transit, budget, or street design
-• Multiple smaller street safety improvements announced
-• Significant budget allocations for safe street, bike, or transit infrastructure
+• Multiple street safety improvements announced
+• Significant budget allocations for bike/transit infrastructure
 • NEW bike lanes or protected bike infrastructure announced
-Example: "Public feedback open until Jan 19 on zoning change for 4-flat" or "Meeting on proposed street redesign"
+Example: "Plan Commission approves 500-unit development, moves to Zoning Committee" or "Public feedback open on zoning change"
 
 5-6 = Minor relevant announcements:
+• Small housing developments (several units)
 • Single plot zoning approval or variance
 • Minor street design project (crosswalk, signage)
-• Small housing development announcement (one building)
 • Brief transit/budget mentions
 Example: "Zoning approved for 4-unit building at 2415 W Peterson"
 
