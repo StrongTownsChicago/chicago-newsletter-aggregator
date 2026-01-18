@@ -1,0 +1,106 @@
+---
+interface Props {
+  currentPage: number;
+  totalPages: number;
+  baseUrl: string; // URL with query params (without page param)
+}
+
+const { currentPage, totalPages, baseUrl } = Astro.props;
+
+const buildPaginationUrl = (page: number) => {
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}page=${page}`;
+};
+
+const generatePageNumbersToDisplay = () => {
+  const pages: (number | string)[] = [];
+  const maxVisible = 7; // Maximum page numbers to show
+
+  if (totalPages <= maxVisible) {
+    // Show all pages if there aren't many
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i);
+    }
+  } else {
+    // Always show first page
+    pages.push(1);
+
+    if (currentPage > 3) {
+      pages.push('...');
+    }
+
+    // Show pages around current page
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (currentPage < totalPages - 2) {
+      pages.push('...');
+    }
+
+    // Always show last page
+    pages.push(totalPages);
+  }
+
+  return pages;
+};
+
+const pageNumbers = generatePageNumbersToDisplay();
+---
+
+{totalPages > 1 && (
+  <nav class="flex items-center justify-center gap-2 mt-8" aria-label="Pagination">
+    <!-- Previous Button -->
+    {currentPage > 1 ? (
+      <a
+        href={buildPaginationUrl(currentPage - 1)}
+        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+      >
+        Previous
+      </a>
+    ) : (
+      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed">
+        Previous
+      </span>
+    )}
+
+    <!-- Page Numbers -->
+    <div class="flex gap-1">
+      {pageNumbers.map((page) => (
+        typeof page === 'number' ? (
+          page === currentPage ? (
+            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold">
+              {page}
+            </span>
+          ) : (
+            <a
+              href={buildPaginationUrl(page)}
+              class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              {page}
+            </a>
+          )
+        ) : (
+          <span class="px-4 py-2 text-gray-400">...</span>
+        )
+      ))}
+    </div>
+
+    <!-- Next Button -->
+    {currentPage < totalPages ? (
+      <a
+        href={buildPaginationUrl(currentPage + 1)}
+        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+      >
+        Next
+      </a>
+    ) : (
+      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed">
+        Next
+      </span>
+    )}
+  </nav>
+)}

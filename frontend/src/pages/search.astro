@@ -3,6 +3,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
+import Pagination from '../components/Pagination.astro';
 import { supabase } from '../lib/supabase';
 
 const searchQuery = Astro.url.searchParams.get('q') || '';
@@ -10,38 +11,59 @@ const sourceTypeFilter = Astro.url.searchParams.get('source_type');
 const topicFilter = Astro.url.searchParams.get('topic');
 const wardFilter = Astro.url.searchParams.get('ward');
 
+// Pagination setup
+const page = parseInt(Astro.url.searchParams.get('page') || '1');
+const PAGE_SIZE = 20;
+const start = (page - 1) * PAGE_SIZE;
+const end = start + PAGE_SIZE - 1;
+
 // Use !inner when we need to filter on sources table
 const sourcesJoin = (wardFilter || sourceTypeFilter) ? 'sources!inner(*)' : 'sources(*)';
 
+// Build count query with same filters
+let countQuery = supabase
+  .from('newsletters')
+  .select(`*, ${sourcesJoin}`, { count: 'exact', head: true });
+
+// Build data query
 let query = supabase
   .from('newsletters')
   .select(`*, ${sourcesJoin}`)
   .order('received_date', { ascending: false });
 
-// Full-text search (case-insensitive)
+// Apply filters to both queries
 if (searchQuery) {
+  countQuery = countQuery.textSearch('search_vector', searchQuery, {
+    type: 'websearch',
+    config: 'english'
+  });
   query = query.textSearch('search_vector', searchQuery, {
     type: 'websearch',
     config: 'english'
   });
 }
 
-// Source type filter
 if (sourceTypeFilter) {
+  countQuery = countQuery.eq('sources.source_type', sourceTypeFilter);
   query = query.eq('sources.source_type', sourceTypeFilter);
 }
 
-// Ward filter
 if (wardFilter) {
+  countQuery = countQuery.eq('sources.ward_number', wardFilter);
   query = query.eq('sources.ward_number', wardFilter);
 }
 
-// Topic filter
 if (topicFilter) {
+  countQuery = countQuery.contains('topics', [topicFilter]);
   query = query.contains('topics', [topicFilter]);
 }
 
-const { data: newsletters } = await query.limit(50);
+// Get total count
+const { count } = await countQuery;
+const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
+
+// Get paginated data
+const { data: newsletters } = await query.range(start, end);
 
 // Get unique topics
 const { data: allTopics } = await supabase
@@ -73,6 +95,20 @@ const { data: wardData } = await supabase
 const uniqueWards = [...new Set(
   wardData?.map((s: any) => s.ward_number).filter(Boolean) || []
 )].sort((a, b) => parseInt(a) - parseInt(b));
+
+// Build base URL with all query params except 'page' for pagination
+const buildBaseUrl = () => {
+  const params = new URLSearchParams();
+  if (searchQuery) params.set('q', searchQuery);
+  if (wardFilter) params.set('ward', wardFilter);
+  if (topicFilter) params.set('topic', topicFilter);
+  if (sourceTypeFilter) params.set('source_type', sourceTypeFilter);
+
+  const queryString = params.toString();
+  return queryString ? `/search?${queryString}` : '/search';
+};
+
+const baseUrl = buildBaseUrl();
 ---
 
 <Layout title="Search - Chicago Alderman Newsletter Tracker">
@@ -148,16 +184,18 @@ const uniqueWards = [...new Set(
     <div class="mb-4 text-gray-600">
       {newsletters?.length === 0 ? (
         <p>No newsletters found matching your criteria.</p>
-      ) : (
-        <p>Found {newsletters?.length} newsletter{newsletters?.length !== 1 ? 's' : ''}</p>
+      ) : count !== null && (
+        <p>Found {count} newsletter{count !== 1 ? 's' : ''}</p>
       )}
     </div>
 
-     <div class="space-y-4">
-          {newsletters?.map((newsletter) => (
-            <NewsletterCard newsletter={newsletter} />
-          ))}
-      </div>
+    <div class="space-y-4">
+      {newsletters?.map((newsletter) => (
+        <NewsletterCard newsletter={newsletter} />
+      ))}
     </div>
+
+    <!-- Pagination -->
+    <Pagination currentPage={page} totalPages={totalPages} baseUrl={baseUrl} />
   </div>
 </Layout>

@@ -3,13 +3,28 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
+import Pagination from '../components/Pagination.astro';
 import { supabase } from '../lib/supabase';
 
+// Pagination setup
+const page = parseInt(Astro.url.searchParams.get('page') || '1');
+const PAGE_SIZE = 20;
+const start = (page - 1) * PAGE_SIZE;
+const end = start + PAGE_SIZE - 1;
+
+// Get total count
+const { count } = await supabase
+  .from('newsletters')
+  .select('*', { count: 'exact', head: true });
+
+const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
+
+// Get paginated newsletters
 const { data: newsletters, error } = await supabase
   .from('newsletters')
   .select('*, sources(*)')
   .order('received_date', { ascending: false })
-  .limit(20);
+  .range(start, end);
 
 if (error) {
   console.error('Error fetching newsletters:', error);
@@ -59,5 +74,9 @@ if (error) {
           <NewsletterCard newsletter={newsletter} />
         ))}
       </div>
+
+      <!-- Pagination -->
+      <Pagination currentPage={page} totalPages={totalPages} baseUrl="/" />
     </main>
+  </div>
 </Layout>
