@@ -1,3 +1,15 @@
+"""
+LLM-based newsletter processing for Strong Towns Chicago.
+
+This module uses Ollama with local LLM inference to analyze alderman newsletters and extract:
+- Relevant topics from a predefined list aligned with STC's 5 priority campaigns
+- Concise summaries that prioritize STC-relevant content
+- Relevance scores (0-10) indicating how important the newsletter is to STC members
+
+The processing pipeline runs three sequential LLM calls per newsletter, with each step
+building on the previous one for better accuracy.
+"""
+
 from ollama import Client
 from pydantic import BaseModel, Field
 from typing import List
@@ -57,20 +69,23 @@ ollama_client = Client(timeout=240.0)
 
 def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = 3) -> str:
     """
-    Central LLM calling method with structured output and retry logic.
-    
+    Call Ollama LLM with structured output validation and exponential backoff retry logic.
+
+    Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s)
+    on failure. Validates that responses are non-empty before returning.
+
     Args:
-        model: Ollama model name
-        prompt: User prompt
-        schema: Pydantic model JSON schema
-        temperature: Temperature for generation
-        max_retries: Maximum number of retry attempts
-        
+        model: Ollama model name (e.g., "gpt-oss:20b")
+        prompt: Prompt text to send to the LLM
+        schema: Pydantic model JSON schema for structured output format
+        temperature: Sampling temperature (0 = deterministic, higher = more random)
+        max_retries: Maximum retry attempts on failure (default: 3)
+
     Returns:
-        JSON string response
-        
+        JSON string response from LLM
+
     Raises:
-        Exception: If all retries fail
+        Exception: If all retry attempts fail or LLM returns empty response
     """
     for attempt in range(max_retries):
         try:
@@ -100,7 +115,20 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
 
 
 def extract_topics(content: str, model: str) -> List[str]:
-    """Extract relevant topics from newsletter content."""
+    """
+    Extract STC-relevant topics from newsletter content.
+
+    Uses LLM to identify which predefined topics (from TOPICS constant) are explicitly discussed
+    in the newsletter. Filters results to only valid topics. Prioritizes housing, transit, parking,
+    and governance-related content.
+
+    Args:
+        content: Newsletter text (subject + body)
+        model: Ollama model name to use
+
+    Returns:
+        List of topic strings from TOPICS that are relevant (empty list if none found or on error)
+    """
 
     prompt = f"""Identify topics from this Chicago alderman newsletter relevant to Strong Towns Chicago.
 
@@ -130,7 +158,20 @@ Newsletter:
 
 
 def generate_summary(content: str, model: str) -> str:
-    """Generate concise summary of newsletter."""
+    """
+    Generate a 2-3 sentence summary prioritizing STC-relevant content.
+
+    Uses LLM to create a concise summary that leads with the most relevant content (meetings,
+    policy changes, development approvals, budget decisions, transit/street projects) before
+    mentioning other announcements. Includes alderman and ward information when available.
+
+    Args:
+        content: Newsletter text (subject + body)
+        model: Ollama model name to use
+
+    Returns:
+        2-3 sentence summary string (empty string on error)
+    """
 
     prompt = f"""Summarize this alderman's newsletter in 2-3 sentences.
 
@@ -160,8 +201,32 @@ Newsletter:
         return ""
 
 
-def score_relevance(content: str, model: str) -> int | None:
-    """Score newsletter relevance to urban planning/policy topics."""
+def score_relevance(content: str, model: str, topics: List[str] = None, summary: str = None) -> int | None:
+    """
+    Score newsletter relevance to Strong Towns Chicago priorities on a 0-10 scale.
+
+    Uses previously extracted topics and summary as context to score how relevant the newsletter
+    is to STC members. Higher scores indicate action opportunities (9-10: major policy changes,
+    new bike lanes, citywide initiatives), while most routine newsletters score 0-2.
+
+    Args:
+        content: Newsletter text (subject + body)
+        model: Ollama model name to use
+        topics: Previously extracted topic list (optional, improves accuracy)
+        summary: Previously generated summary (optional, improves accuracy)
+
+    Returns:
+        Integer score 0-10, or None on error
+    """
+
+    # Build context from previously extracted info
+    context_section = ""
+    if topics or summary:
+        context_section = "\nFor context, here is what was already extracted from this newsletter:\n"
+        if topics and len(topics) > 0:
+            context_section += f"Topics identified: {', '.join(topics)}\n"
+        if summary:
+            context_section += f"Summary: {summary}\n"
 
     prompt = f"""Rate this newsletter's relevance to Strong Towns Chicago (0-10).
 
@@ -206,8 +271,7 @@ Example: "Town hall to discuss neighborhood priorities"
 • Bridge/viaduct/road construction or maintenance
 • Police/crime updates, poll workers, volunteer opportunities
 Example: "CAPS meeting Tuesday" or "Lake St bridge work continues"
-
-
+{context_section}
 Newsletter:
 {content}
 """
@@ -224,10 +288,19 @@ Newsletter:
 
 def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = 100000) -> dict:
     """
-    Process newsletter with LLM.
-    
+    Process a newsletter through the complete LLM pipeline.
+
+    Runs three sequential LLM calls to extract topics, generate summary, and score relevance.
+    Each step builds on the previous for better accuracy. Truncates content to max_chars to
+    prevent token limit issues.
+
     Args:
-        max_chars: Max characters to send to LLM (truncates to prevent passing in more chars than the token limit
+        newsletter: Newsletter dict with 'subject' and 'plain_text' keys
+        model: Ollama model name (default: "gpt-oss:20b")
+        max_chars: Maximum characters to send to LLM (truncates plain_text if exceeded)
+
+    Returns:
+        Dict with keys: 'topics' (List[str]), 'summary' (str), 'relevance_score' (int|None)
     """
     plain_text = newsletter['plain_text']
     
@@ -236,10 +309,10 @@ def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars:
         print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
     
     content = f"Subject: {newsletter['subject']}\n\n{plain_text}"
-    
+
     topics = extract_topics(content, model)
     summary = generate_summary(content, model)
-    relevance_score = score_relevance(content, model)
+    relevance_score = score_relevance(content, model, topics, summary)
     
     return {
         "topics": topics,
