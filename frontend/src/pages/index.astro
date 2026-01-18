@@ -64,6 +64,13 @@ if (error) {
       <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
     </nav>
 
+    <!-- Results count -->
+    <div class="mb-4 text-gray-600">
+      {count !== null && (
+        <p>Browse through {count} newsletter{count !== 1 ? 's' : ''}</p>
+      )}
+    </div>
+
     <!-- Newsletter List -->
     <main>
       <div class="space-y-4">
