@@ -6,8 +6,8 @@ This module uses Ollama with local LLM inference to analyze alderman newsletters
 - Concise summaries that prioritize STC-relevant content
 - Relevance scores (0-10) indicating how important the newsletter is to STC members
 
-The processing pipeline runs three sequential LLM calls per newsletter, with each step
-building on the previous one for better accuracy.
+The processing pipeline runs three sequential LLM calls per newsletter, with the relevance scoring
+step building on the previous ones for better accuracy.
 """
 
 from ollama import Client
