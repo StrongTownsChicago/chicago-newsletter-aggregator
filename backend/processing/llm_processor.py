@@ -143,7 +143,7 @@ PRIORITIZE mentioning (in order of importance):
 6. Street safety or redesign projects
 
 Then briefly mention other major announcements or events. Be concise and factual.
-Reference the name of the alderman and ward if they are mentioned.
+Reference the name of the alderman and ward if they are mentioned. Do not assume an alderman's first name is Alfred.
 
 Newsletter:
 {content}
@@ -174,38 +174,38 @@ Strong Towns Chicago's 5 Priority Campaigns:
 
 SCORING:
 
-9-10 = Major action opportunity OR multiple high-impact announcements:
-• Upcoming votes on housing/parking/transit ordinances
-• Public feedback periods on zoning changes
-• Budget hearings on infrastructure/transit
-• Multiple significant STC-related projects announced together
+9-10 = Major announcements (rare and exciting):
 • Major policy changes (eliminating parking minimums, legalizing 4-flats)
-Example: "Feedback open until Jan 19 on zoning change + multiple bike lane projects announced"
+• Citywide or major public feedback periods on housing/transit/parking
+• NEW transit service routes or frequency expansion
+Example: "Alderman Smith announces support for upzoning of major corridor" or "City ordiance passed to eliminate parking minimums"
 
-7-8 = Multiple relevant announcements OR single significant project:
-• 2+ street safety projects (bike lanes, traffic calming, etc.)
-• 2+ housing developments or zoning changes
-• Significant transit service/funding changes
-• Detailed budget allocations for infrastructure
-Example: "New bike medians on Pratt + resurfacing Ashland + Lincoln streetscape complete"
+7-8 = Action opportunities and significant updates:
+• Public feedback periods on zoning changes or development (single site or ward-level)
+• Public hearings/meetings on housing, transit, budget, or street design
+• Multiple smaller street safety improvements announced
+• Significant budget allocations for safe street, bike, or transit infrastructure
+• NEW bike lanes or protected bike infrastructure announced
+Example: "Public feedback open until Jan 19 on zoning change for 4-flat" or "Meeting on proposed street redesign"
 
-5-6 = Single relevant announcement:
-• One street safety improvement
-• One housing development or zoning change
-• Minor transit updates
-• Brief budget mention
-Example: "New bike lane installed on Main Street"
+5-6 = Minor relevant announcements:
+• Single plot zoning approval or variance
+• Minor street design project (crosswalk, signage)
+• Small housing development announcement (one building)
+• Brief transit/budget mentions
+Example: "Zoning approved for 4-unit building at 2415 W Peterson"
 
-3-4 = Vague mention of STC topics:
-• General community meeting that might touch on housing/transit
-• Economic development mentioning transit access
-Example: "Town hall on neighborhood priorities"
+3-4 = Vague mentions:
+• General community meetings that might touch on STC topics
+• Economic development mentioning transit
+Example: "Town hall to discuss neighborhood priorities"
 
-0-2 = Not relevant:
-• Holidays, office hours, festivals, constituent services
-Example: "Annual neighborhood BBQ Saturday"
+0-2 = Not relevant (many newsletters fall here):
+• Holidays, office hours, festivals, constituent services, CAPS meetings
+• Bridge/viaduct/road construction or maintenance
+• Police/crime updates, poll workers, volunteer opportunities
+Example: "CAPS meeting Tuesday" or "Lake St bridge work continues"
 
-Weight public feedback periods and upcoming meetings/votes highly.
 
 Newsletter:
 {content}
