@@ -29,6 +29,13 @@ uv run python -m ingest.scraper.process_scraped_newsletters
 
 # Scrape specific source (source_id, archive_url, optional limit)
 uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
+
+# Reprocess existing newsletters with updated LLM prompts
+uv run python -m processing.reprocess_newsletters --latest 10
+uv run python -m processing.reprocess_newsletters --source-id 5
+uv run python -m processing.reprocess_newsletters --all
+uv run python -m processing.reprocess_newsletters --latest 20 --source-id 3
+uv run python -m processing.reprocess_newsletters --dry-run --latest 10
 ```
 
 ### Frontend (from `frontend/` directory)

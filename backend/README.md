@@ -39,6 +39,13 @@ uv run python -m ingest.scraper.process_scraped <source_id> <archive_url> [limit
 
 # Example: Scrape Ward 1, limit 10 newsletters
 uv run python -m ingest.scraper.process_scraped 1 "https://us4.campaign-archive.com/home/?u=e4d2e8115e36fe98f1fbf8f5f&id=218af5f0b5" 10
+
+# Reprocess existing newsletters with LLM prompts
+uv run python -m processing.reprocess_newsletters --latest 10
+uv run python -m processing.reprocess_newsletters --source-id 5
+uv run python -m processing.reprocess_newsletters --all
+uv run python -m processing.reprocess_newsletters --latest 20 --source-id 3
+uv run python -m processing.reprocess_newsletters --dry-run --latest 10
 ```
 
 ## LLM Processing
