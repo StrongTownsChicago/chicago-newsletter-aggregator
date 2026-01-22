@@ -99,11 +99,36 @@ def process_new_newsletters():
                         print(f"  Warning: LLM processing failed: {e}")
                 
                 # Insert into Supabase
-                supabase.table("newsletters").insert(newsletter).execute()
-                
+                insert_response = supabase.table("newsletters").insert(newsletter).execute()
+
+                # Queue notifications for matched rules
+                if insert_response.data and len(insert_response.data) > 0:
+                    newsletter_id = insert_response.data[0]['id']
+
+                    try:
+                        from notifications.rule_matcher import match_newsletter_to_rules, queue_notifications
+
+                        # Prepare newsletter data for matching
+                        newsletter_data = {
+                            'topics': newsletter.get('topics', []),
+                            'plain_text': newsletter.get('plain_text', ''),
+                            'source_id': newsletter.get('source_id'),
+                            'ward_number': None,  # Can be joined from sources table if needed in Phase 2
+                            'relevance_score': newsletter.get('relevance_score')
+                        }
+
+                        # Match and queue
+                        matched = match_newsletter_to_rules(newsletter_id, newsletter_data)
+                        if matched:
+                            queued = queue_notifications(newsletter_id, matched)
+                            print(f"  ✓ Queued {queued} notification(s)")
+                    except Exception as e:
+                        # Don't fail newsletter ingestion if notification queuing fails
+                        print(f"  ⚠️  Notification queuing failed: {e}")
+
                 # Mark as read
                 mailbox.flag(msg.uid, MailMessageFlags.SEEN, True)
-                
+
                 processed_count += 1
                 print(f"  ✓ Stored in database")
                 

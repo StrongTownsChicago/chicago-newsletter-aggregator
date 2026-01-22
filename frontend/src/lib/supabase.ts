@@ -3,7 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create Supabase client with auth enabled
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 export interface Newsletter {
   id: string;
@@ -30,4 +36,29 @@ export interface Source {
   signup_url: string | null;
   ward_number: string | null;
   phone: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+  notification_preferences: {
+    enabled: boolean;
+    delivery_frequency: string;
+  };
+}
+
+export interface NotificationRule {
+  id: string;
+  user_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  topics: string[];
+  keywords?: string[];
+  min_relevance_score?: number;
+  source_ids?: number[];
+  ward_numbers?: string[]; // TEXT[] to match sources.ward_number TEXT type
 }

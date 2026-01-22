@@ -4,6 +4,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
+import AuthButton from '../components/AuthButton.astro';
 import { supabase } from '../lib/supabase';
 
 const searchQuery = Astro.url.searchParams.get('q') || '';
@@ -113,9 +114,13 @@ const baseUrl = buildBaseUrl();
 
 <Layout title="Search - Chicago Alderman Newsletter Tracker">
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <a href="/" class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6 font-medium">
-      ← Home
-    </a>
+    <!-- Top Bar with Auth -->
+    <div class="mb-6 flex justify-between items-center">
+      <a href="/" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
+        ← Home
+      </a>
+      <AuthButton />
+    </div>
 
     <h1 class="text-4xl font-bold mb-6 text-gray-900">Search Newsletters</h1>
 
