@@ -155,11 +155,12 @@ CREATE POLICY "Users can view own notification history"
 CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO user_profiles (id, email)
+    INSERT INTO public.user_profiles (id, email)
     VALUES (NEW.id, NEW.email);
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
 -- Trigger on auth.users table
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
