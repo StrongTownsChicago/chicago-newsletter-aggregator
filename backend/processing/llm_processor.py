@@ -15,6 +15,14 @@ from pydantic import BaseModel, Field
 from typing import List
 import time
 
+# LLM processing limits
+MAX_NEWSLETTER_CHARS = 100000  # Maximum newsletter content length before truncation
+MAX_LLM_RETRIES = 4  # Maximum retry attempts for failed LLM calls
+
+# Retry truncation limits for prompts that fail due to length/token issues
+RETRY_TRUNCATE_MODERATE = 50000  # Third attempt truncation length
+RETRY_TRUNCATE_AGGRESSIVE = 20000  # Fourth attempt truncation length
+
 TOPICS = [
     # Incremental Housing
     "4_flats_legalization",
@@ -67,19 +75,21 @@ class RelevanceScore(BaseModel):
 ollama_client = Client(timeout=240.0)
 
 
-def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = 3) -> str:
+def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = MAX_LLM_RETRIES) -> str:
     """
     Call Ollama LLM with structured output validation and exponential backoff retry logic.
 
     Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s)
-    on failure. Validates that responses are non-empty before returning.
+    on failure. On the third attempt, truncates prompt to RETRY_TRUNCATE_MODERATE chars. On the
+    fourth attempt, truncates to RETRY_TRUNCATE_AGGRESSIVE chars. Validates that responses are
+    non-empty before returning.
 
     Args:
         model: Ollama model name (e.g., "gpt-oss:20b")
         prompt: Prompt text to send to the LLM
         schema: Pydantic model JSON schema for structured output format
         temperature: Sampling temperature (0 = deterministic, higher = more random)
-        max_retries: Maximum retry attempts on failure (default: 3)
+        max_retries: Maximum retry attempts on failure (default: MAX_LLM_RETRIES)
 
     Returns:
         JSON string response from LLM
@@ -87,8 +97,20 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
     Raises:
         Exception: If all retry attempts fail or LLM returns empty response
     """
+    original_prompt = prompt
+
     for attempt in range(max_retries):
         try:
+            # Truncate prompt on later attempts to avoid token limit issues
+            if attempt == 2:  # Third attempt
+                if len(original_prompt) > RETRY_TRUNCATE_MODERATE:
+                    prompt = original_prompt[:RETRY_TRUNCATE_MODERATE]
+                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_MODERATE} chars")
+            elif attempt == 3:  # Fourth attempt
+                if len(original_prompt) > RETRY_TRUNCATE_AGGRESSIVE:
+                    prompt = original_prompt[:RETRY_TRUNCATE_AGGRESSIVE]
+                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_AGGRESSIVE} chars")
+
             response = ollama_client.chat(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -98,13 +120,13 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
                     }
             )
             content = response.message.content
-            
+
             # Validate it's not empty
             if not content or content.strip() == "":
                 raise ValueError("LLM returned empty response")
-                
+
             return content
-            
+
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2 ** attempt  # Simple exponential backoff: 1s, 2s, 4s
@@ -286,7 +308,7 @@ Newsletter:
         return None
 
 
-def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = 100000) -> dict:
+def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = MAX_NEWSLETTER_CHARS) -> dict:
     """
     Process a newsletter through the complete LLM pipeline.
 
@@ -297,7 +319,7 @@ def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars:
     Args:
         newsletter: Newsletter dict with 'subject' and 'plain_text' keys
         model: Ollama model name (default: "gpt-oss:20b")
-        max_chars: Maximum characters to send to LLM (truncates plain_text if exceeded)
+        max_chars: Maximum characters to send to LLM (default: MAX_NEWSLETTER_CHARS)
 
     Returns:
         Dict with keys: 'topics' (List[str]), 'summary' (str), 'relevance_score' (int|None)
