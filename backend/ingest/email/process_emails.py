@@ -12,6 +12,7 @@ load_dotenv()
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
+ENABLE_NOTIFICATIONS = os.getenv("ENABLE_NOTIFICATIONS", "false").lower() == "true"
 
 supabase = get_supabase_client()
 
@@ -102,7 +103,7 @@ def process_new_newsletters():
                 insert_response = supabase.table("newsletters").insert(newsletter).execute()
 
                 # Queue notifications for matched rules
-                if insert_response.data and len(insert_response.data) > 0:
+                if ENABLE_NOTIFICATIONS and insert_response.data and len(insert_response.data) > 0:
                     newsletter_id = insert_response.data[0]['id']
 
                     try:

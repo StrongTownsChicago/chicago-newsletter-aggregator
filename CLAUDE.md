@@ -150,7 +150,11 @@ GMAIL_APP_PASSWORD=
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
 ENABLE_LLM=true
+ENABLE_NOTIFICATIONS=true
 OLLAMA_MODEL=gpt-oss:20b
+RESEND_API_KEY=
+NOTIFICATION_FROM_EMAIL=
+FRONTEND_BASE_URL=  # Optional, defaults to https://chicago-newsletter-aggregator.open-advocacy.com
 ```
 
 **Frontend** (`.env` in `frontend/`):

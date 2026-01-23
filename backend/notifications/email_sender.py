@@ -13,11 +13,14 @@ import resend
 # Initialize Resend with API key from environment
 resend.api_key = os.getenv('RESEND_API_KEY')
 
+# Frontend base URL for links in emails
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://chicago-newsletter-aggregator.open-advocacy.com')
+
 
 def send_daily_digest(
     user_email: str,
     notifications: List[Dict[str, Any]],
-    preferences_url: str = "http://localhost:4321/preferences"
+    preferences_url: str = None
 ) -> Dict[str, Any]:
     """
     Send a daily digest email with all matched newsletters.
@@ -32,6 +35,10 @@ def send_daily_digest(
     """
     if not notifications:
         return {'success': False, 'error': 'No notifications to send'}
+
+    # Use default preferences URL if not provided
+    if preferences_url is None:
+        preferences_url = f"{FRONTEND_BASE_URL}/preferences"
 
     # Get from email from environment
     from_email = os.getenv('NOTIFICATION_FROM_EMAIL', 'newsletter-notifications@open-advocacy.com')
@@ -218,7 +225,7 @@ def _build_digest_html(notifications: List[Dict[str, Any]], preferences_url: str
         newsletter_id = newsletter.get('id', '')
 
         # Build newsletter link (assuming frontend URL pattern)
-        newsletter_url = f"http://localhost:4321/newsletter/{newsletter_id}"
+        newsletter_url = f"{FRONTEND_BASE_URL}/newsletter/{newsletter_id}"
 
         html += f"""
         <div class="newsletter">
@@ -321,7 +328,7 @@ You have {len(sorted_newsletters)} newsletters to review:
         summary = newsletter.get('summary', '')
         topics = newsletter.get('topics', [])
         newsletter_id = newsletter.get('id', '')
-        newsletter_url = f"http://localhost:4321/newsletter/{newsletter_id}"
+        newsletter_url = f"{FRONTEND_BASE_URL}/newsletter/{newsletter_id}"
 
         text += f"""{i}. {title}
 From: {source_name}{ward_text}

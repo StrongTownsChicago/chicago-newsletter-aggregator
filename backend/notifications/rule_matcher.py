@@ -167,38 +167,21 @@ def queue_notifications(
             'digest_batch_id': today
         })
 
-    # Insert notifications (duplicates will be ignored due to unique constraint)
-    try:
-        response = supabase.table('notification_queue') \
-            .insert(notifications, returning='minimal') \
-            .execute()
+    # Insert notifications individually to handle duplicates gracefully
+    # Unique constraint on (user_id, newsletter_id, rule_id) will prevent duplicates
+    queued_count = 0
+    for notification in notifications:
+        try:
+            supabase.table('notification_queue') \
+                .insert(notification, returning='minimal') \
+                .execute()
+            queued_count += 1
+        except Exception as e:
+            # Skip duplicate entries silently (unique constraint violation)
+            # All other errors are also caught to prevent ingestion failures
+            pass
 
-        # Count successful inserts
-        # Note: Supabase doesn't return count with returning='minimal', so we assume all succeeded
-        # if no exception was raised
-        return len(notifications)
-
-    except Exception as e:
-        # Handle unique constraint violations gracefully
-        # This can happen if the same newsletter matches the same rule multiple times
-        # (e.g., during testing or if ingestion runs multiple times)
-        error_msg = str(e).lower()
-        if 'unique' in error_msg or 'duplicate' in error_msg:
-            # Try inserting one by one to count successes
-            queued_count = 0
-            for notification in notifications:
-                try:
-                    supabase.table('notification_queue') \
-                        .insert(notification, returning='minimal') \
-                        .execute()
-                    queued_count += 1
-                except Exception:
-                    # Skip duplicates
-                    pass
-            return queued_count
-        else:
-            # Re-raise unexpected errors
-            raise
+    return queued_count
 
 
 def get_pending_notifications_by_user(digest_batch_id: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
