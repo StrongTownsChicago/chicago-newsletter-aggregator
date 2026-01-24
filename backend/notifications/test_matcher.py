@@ -19,7 +19,7 @@ def test_matching():
     # Fetch most recent newsletter with topics
     response = supabase.table('newsletters') \
         .select('id, subject, topics, plain_text, source_id, relevance_score, sources(ward_number)') \
-        .not_('topics', 'is', None) \
+        .not_.is_('topics', None) \
         .order('created_at', desc=True) \
         .limit(1) \
         .execute()
