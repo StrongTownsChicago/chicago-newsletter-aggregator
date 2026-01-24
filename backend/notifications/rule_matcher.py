@@ -231,9 +231,8 @@ def get_pending_notifications_by_user(digest_batch_id: Optional[str] = None) -> 
     """
     supabase = get_supabase_client()
 
-    # Build query
     query = supabase.table('notification_queue') \
-        .select('*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, relevance_score, source:sources(name, ward_number))') \
+        .select('*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, relevance_score, source:sources(name, ward_number)), rule:notification_rules(name)') \
         .eq('status', 'pending') \
         .order('created_at', desc=False)
 

@@ -21,7 +21,7 @@ def test_matching(should_queue: bool = False):
     Test notification matching with a recent newsletter.
 
     Args:
-        should_queue: If True, actually queue the notifications (same as production)
+        should_queue: If True, actually queue the notifications
     """
     supabase = get_supabase_client()
 
