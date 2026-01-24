@@ -17,11 +17,10 @@ import time
 
 # LLM processing limits
 MAX_NEWSLETTER_CHARS = 100000  # Maximum newsletter content length before truncation
-MAX_LLM_RETRIES = 4  # Maximum retry attempts for failed LLM calls
+MAX_LLM_RETRIES = 3  # Maximum retry attempts for failed LLM calls
 
 # Retry truncation limits for prompts that fail due to length/token issues
-RETRY_TRUNCATE_MODERATE = 50000  # Third attempt truncation length
-RETRY_TRUNCATE_AGGRESSIVE = 20000  # Fourth attempt truncation length
+RETRY_TRUNCATE_THRESHOLD = 50000  # Third attempt truncation length
 
 TOPICS = [
     # Incremental Housing
@@ -103,13 +102,9 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
         try:
             # Truncate prompt on later attempts to avoid token limit issues
             if attempt == 2:  # Third attempt
-                if len(original_prompt) > RETRY_TRUNCATE_MODERATE:
-                    prompt = original_prompt[:RETRY_TRUNCATE_MODERATE]
-                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_MODERATE} chars")
-            elif attempt == 3:  # Fourth attempt
-                if len(original_prompt) > RETRY_TRUNCATE_AGGRESSIVE:
-                    prompt = original_prompt[:RETRY_TRUNCATE_AGGRESSIVE]
-                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_AGGRESSIVE} chars")
+                if len(original_prompt) > RETRY_TRUNCATE_THRESHOLD:
+                    prompt = original_prompt[:RETRY_TRUNCATE_THRESHOLD]
+                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_THRESHOLD} chars")
 
             response = ollama_client.chat(
                 model=model,
@@ -129,7 +124,7 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
 
         except Exception as e:
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # Simple exponential backoff: 1s, 2s, 4s
+                wait_time = 2 ** attempt  # Simple exponential backoff: 1s, 2s
                 print(f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
             else:
