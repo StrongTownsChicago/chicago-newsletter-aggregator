@@ -214,6 +214,7 @@ PRIVACY_STRIP_PHRASES=           # Comma-separated phrases to redact (e.g., "Joh
 ```
 PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_ANON_KEY=
+PUBLIC_ENABLE_NOTIFICATIONS=
 ```
 
 ## Testing
@@ -352,11 +353,13 @@ Catch exceptions at appropriate boundaries. Log errors with context for debuggin
 Documentation should be concise and point to source code instead of duplicating implementation details.
 
 **Avoid**:
+
 - Specific counts that change ("23 topics", "40+ tests", "max 5 rules")
 - Implementation details duplicated from code (topic lists, pattern counts, exact scoring ranges)
 - File-by-file structure listings
 
 **Prefer**:
+
 - High-level descriptions with references ("See `llm_processor.py:TOPICS` for topic definitions")
 - Directory-level structure explanations
 - Links to actual code files for details

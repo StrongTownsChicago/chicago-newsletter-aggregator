@@ -1,8 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
-import { supabase } from "../../../lib/supabase";
+import { supabase, notificationsEnabled } from "../../../lib/supabase";
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+  if (!notificationsEnabled()) {
+    return new Response("Notifications are disabled", { status: 404 });
+  }
+
   const formData = await request.formData();
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();

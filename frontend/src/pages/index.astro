@@ -5,7 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import AuthButton from '../components/AuthButton.astro';
-import { supabase } from '../lib/supabase';
+import { supabase, notificationsEnabled } from '../lib/supabase';
 
 // Pagination setup
 const page = parseInt(Astro.url.searchParams.get('page') || '1');
@@ -68,7 +68,7 @@ if (error) {
     <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
       <a href="/" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Recent</a>
       <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
-      {Astro.locals.user && (
+      {notificationsEnabled() && Astro.locals.user && (
         <a href="/preferences" class="text-gray-600 hover:text-blue-600 pb-3">Preferences</a>
       )}
     </nav>

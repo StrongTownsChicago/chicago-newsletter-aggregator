@@ -3,7 +3,13 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import AuthButton from '../components/AuthButton.astro';
+import { notificationsEnabled } from '../lib/supabase';
 import type { UserProfile, NotificationRule } from '../lib/supabase';
+
+// Redirect if notifications are disabled
+if (!notificationsEnabled()) {
+  return Astro.redirect('/');
+}
 
 const user = Astro.locals.user;
 

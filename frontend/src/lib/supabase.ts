@@ -11,6 +11,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Check if notifications are enabled via env var
+export const notificationsEnabled = () => {
+  return import.meta.env.PUBLIC_ENABLE_NOTIFICATIONS === "true";
+};
+
 export interface Newsletter {
   id: string;
   created_at: string;

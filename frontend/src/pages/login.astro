@@ -2,6 +2,12 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
+import { notificationsEnabled } from '../lib/supabase';
+
+// Redirect if notifications are disabled
+if (!notificationsEnabled()) {
+  return Astro.redirect('/');
+}
 
 // Redirect to home if already logged in
 const user = Astro.locals.user;

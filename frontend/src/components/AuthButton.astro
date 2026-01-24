@@ -1,40 +1,43 @@
 ---
+import { notificationsEnabled } from '../lib/supabase';
 const user = Astro.locals.user;
 ---
 
-{user ? (
-  <div class="flex items-center gap-4">
-    <span class="text-sm text-gray-700">
-      {user.email}
-    </span>
-    <a
-      href="/preferences"
-      class="text-sm font-medium text-blue-600 hover:text-blue-500"
-    >
-      Preferences
-    </a>
-    <form action="/api/auth/signout" method="POST" enctype="application/x-www-form-urlencoded" class="inline">
-      <button
-        type="submit"
+{notificationsEnabled() && (
+  user ? (
+    <div class="flex items-center gap-4">
+      <span class="text-sm text-gray-700">
+        {user.email}
+      </span>
+      <a
+        href="/preferences"
+        class="text-sm font-medium text-blue-600 hover:text-blue-500"
+      >
+        Preferences
+      </a>
+      <form action="/api/auth/signout" method="POST" enctype="application/x-www-form-urlencoded" class="inline">
+        <button
+          type="submit"
+          class="text-sm font-medium text-gray-700 hover:text-gray-900"
+        >
+          Sign out
+        </button>
+      </form>
+    </div>
+  ) : (
+    <div class="flex items-center gap-4">
+      <a
+        href="/login"
         class="text-sm font-medium text-gray-700 hover:text-gray-900"
       >
-        Sign out
-      </button>
-    </form>
-  </div>
-) : (
-  <div class="flex items-center gap-4">
-    <a
-      href="/login"
-      class="text-sm font-medium text-gray-700 hover:text-gray-900"
-    >
-      Sign in
-    </a>
-    <a
-      href="/signup"
-      class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
-    >
-      Sign up
-    </a>
-  </div>
+        Sign in
+      </a>
+      <a
+        href="/signup"
+        class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
+      >
+        Sign up
+      </a>
+    </div>
+  )
 )}

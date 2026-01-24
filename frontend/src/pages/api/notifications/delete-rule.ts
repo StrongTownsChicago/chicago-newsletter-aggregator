@@ -1,7 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
+import { notificationsEnabled } from "../../../lib/supabase";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
+  if (!notificationsEnabled()) {
+    return new Response("Notifications are disabled", { status: 404 });
+  }
+
   const user = locals.user;
 
   if (!user) {

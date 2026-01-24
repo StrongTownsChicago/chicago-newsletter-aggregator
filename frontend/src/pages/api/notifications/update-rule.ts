@@ -1,7 +1,12 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
+import { notificationsEnabled } from "../../../lib/supabase";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
+  if (!notificationsEnabled()) {
+    return new Response("Notifications are disabled", { status: 404 });
+  }
+
   const user = locals.user;
 
   if (!user) {
@@ -14,7 +19,10 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const ruleType = formData.get("rule_type")?.toString() || "search";
   let topics = formData.getAll("topics").map((t) => t.toString());
   let searchTerm = formData.get("search_term")?.toString().trim();
-  const wards = formData.getAll("wards").map((w) => w.toString().trim()).filter(w => w.length > 0);
+  const wards = formData
+    .getAll("wards")
+    .map((w) => w.toString().trim())
+    .filter((w) => w.length > 0);
   const isActive = formData.get("is_active") === "on";
 
   if (!ruleId || !name) {
@@ -29,7 +37,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       return redirect("/preferences?error=Search phrase is required");
     }
     if (searchTerm.length > 100) {
-      return redirect("/preferences?error=Search phrase must be under 100 characters");
+      return redirect(
+        "/preferences?error=Search phrase must be under 100 characters",
+      );
     }
   } else {
     // Topic Mode: Clear search term, require topics
