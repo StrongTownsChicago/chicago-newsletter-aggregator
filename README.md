@@ -37,6 +37,15 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 **Full schema details:** See [backend/SCHEMA.md](backend/SCHEMA.md)
 
+## Content Storage
+
+Newsletters are stored in dual formats in the `newsletters` table:
+
+- **`plain_text`** - Primary format used for search indexing, LLM processing (topics, summaries, scoring), and notification keyword matching
+- **`raw_html`** - Preserves formatting for frontend display
+
+Both formats are independently sanitized during ingestion to remove tracking links and privacy-sensitive content.
+
 ## Quick Start
 
 ### Backend Setup

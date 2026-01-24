@@ -183,6 +183,21 @@ frontend/src/
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.json` (URL patterns, text patterns, CSS selectors). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
+**Newsletter Content Storage** (`newsletters` table): Both `plain_text` and `raw_html` columns serve distinct, critical purposes:
+
+- **`plain_text`** - Primary format for all processing:
+  - Powers full-text search via generated `search_vector` column (combined with subject)
+  - Required input for all LLM operations (topic extraction, summarization, relevance scoring via `llm_processor.py`)
+  - Used for notification rule keyword matching (`rule_matcher.py`)
+  - Fallback display when HTML unavailable
+  - Generated from email plain text body or HTML-to-text conversion (`html2text`)
+
+- **`raw_html`** - Display-only format:
+  - Used solely for formatted frontend presentation (`newsletter/[id].astro`)
+  - Preserves original newsletter styling and layout
+
+Both formats are independently sanitized during ingestion for privacy protection. Without `plain_text`, search, LLM features, and notification matching would be non-functional.
+
 ## Environment Variables
 
 **Backend** (`.env` in `backend/`):
