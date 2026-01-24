@@ -12,77 +12,30 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 ## Features
 
-- Email ingestion via IMAP with source auto-matching
-- LLM processing: topic extraction, summarization, relevance scoring (0-10)
-- Full-text search with filters (ward, topic)
+- **Email Ingestion**: Gmail IMAP polling with automatic source matching
+- **Web Scraping**: MailChimp archive scraping for historical newsletters
+- **LLM Processing**: Topic extraction, summarization, relevance scoring
+- **Full-Text Search**: Search with filters (ward, topic, relevance score)
+- **User Notifications**: Daily digest emails for newsletters matching user-defined rules (topics, search phrases, wards)
+- **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
+- **Testing Suite**: Privacy sanitization test coverage
 
 ## Database Schema
 
-```sql
--- Sources: currently alderman, but could expand to agencies and other elected officials
-CREATE TABLE public.sources (
-  id SERIAL PRIMARY KEY,
-  source_type TEXT NOT NULL,
-  name TEXT NOT NULL,
-  email_address TEXT,
-  website TEXT,
-  signup_url TEXT,
-  ward_number TEXT,
-  phone TEXT,
-  newsletter_archive_url TEXT NULL,
-  UNIQUE(source_type, name)
-);
+**Core Tables:**
 
-CREATE INDEX idx_sources_ward_number ON sources(ward_number);
-CREATE INDEX idx_sources_phone ON sources(phone);
+- `sources` - Aldermen and officials (name, ward, email, archive URLs)
+- `email_source_mappings` - Pattern matching for email → source identification
+- `newsletters` - Full newsletter content with LLM-extracted metadata (topics, summary, relevance)
 
--- Email pattern matching for source identification
-CREATE TABLE public.email_source_mappings (
-  id SERIAL PRIMARY KEY,
-  email_pattern TEXT NOT NULL,
-  source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+**Notification Tables:**
 
-CREATE INDEX idx_email_source_mappings_pattern ON email_source_mappings(email_pattern);
+- `user_profiles` - User settings and notification preferences
+- `notification_rules` - User-defined alert criteria (topics, search terms, wards)
+- `notification_queue` - Pending notifications awaiting delivery
+- `notification_history` - Audit log of sent emails
 
--- Newsletters
-CREATE TABLE public.newsletters (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  email_uid TEXT NULL UNIQUE,
-  received_date TIMESTAMPTZ NOT NULL,
-  subject TEXT NOT NULL,
-  from_email TEXT NULL,
-  to_email TEXT,
-  raw_html TEXT,
-  plain_text TEXT,
-  summary TEXT,
-  topics TEXT[],
-  entities JSONB,
-  source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE SET NULL,
-  relevance_score INTEGER CHECK (relevance_score >= 0 AND relevance_score <= 10),
-  search_vector TSVECTOR GENERATED ALWAYS AS (
-    to_tsvector('english', COALESCE(subject, '') || ' ' || COALESCE(plain_text, ''))
-  ) STORED
-);
-
-CREATE INDEX newsletters_received_date_idx ON newsletters(received_date DESC);
-CREATE INDEX newsletters_topics_idx ON newsletters USING GIN(topics);
-CREATE INDEX idx_newsletters_source_id ON newsletters(source_id);
-CREATE INDEX idx_newsletters_search ON newsletters USING GIN(search_vector);
-CREATE INDEX idx_newsletters_relevance ON newsletters(relevance_score);
-
--- Row Level Security (for public read access)
-ALTER TABLE sources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE newsletters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE email_source_mappings ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public read sources" ON sources FOR SELECT USING (true);
-CREATE POLICY "Public read newsletters" ON newsletters FOR SELECT USING (true);
-CREATE POLICY "Public read mappings" ON email_source_mappings FOR SELECT USING (true);
-```
+**Full schema details:** See [backend/SCHEMA.md](backend/SCHEMA.md)
 
 ## Quick Start
 
@@ -102,19 +55,57 @@ uv sync
 
 #### Email Ingestion
 
-```
-# Process unread Gmail newsletters
+```bash
+# Process unread Gmail newsletters (queues notifications if ENABLE_NOTIFICATIONS=true)
 uv run python -m ingest.email.process_emails
 ```
 
 #### Web Scraping
 
-```
+```bash
 # Scrape all aldermen with newsletter_archive_url set
-uv run python -m ingest.scraper.process_scraped
+uv run python -m ingest.scraper.process_scraped_newsletters
 
-# Scrape specific alderman (with optional limit)
-uv run python -m ingest.scraper.process_scraped 1 "https://..." 10
+# Scrape specific source (source_id, archive_url, optional limit)
+uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
+```
+
+#### Utilities
+
+```bash
+# Reprocess newsletters with current LLM prompts
+uv run python utils/reprocess_newsletters.py --latest 10
+
+# Reapply privacy sanitization to existing newsletters
+uv run python utils/reprocess_newsletters_privacy.py --all --update --quiet
+```
+
+#### Notifications
+
+```bash
+# Test rule matching against recent newsletters (dry run)
+uv run python -m notifications.test_matcher
+
+# Test and queue notifications
+uv run python -m notifications.test_matcher --queue
+
+# Send daily digest (dry run)
+uv run python -m notifications.process_notification_queue --daily-digest --dry-run
+
+# Send today's digest
+uv run python -m notifications.process_notification_queue --daily-digest
+
+# Send specific date's digest
+uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
+```
+
+#### Testing
+
+```bash
+# Run privacy sanitization tests
+uv run python -m unittest tests.test_sanitization
+uv run python -m unittest tests.test_sanitization_comprehensive
+uv run python -m unittest tests.test_user_cases
 ```
 
 ### Frontend Setup
@@ -138,33 +129,43 @@ ollama pull gpt-oss:20b
 
 ```
 backend/
-  ├── ingest/
-  │   ├── email/
-  │   │   ├── email_parser.py      # Email → database
-  │   │   └── process_emails.py    # Gmail IMAP ingestion
-  │   └── scraper/
-  │       ├── scraper_strategies.py   # MailChimp archive parsing
-  │       ├── scrape_newsletters.py   # Web scraper
-  │       └── process_scraped.py      # Scraping orchestration
-  ├── processing/
-  │   └── llm_processor.py         # Topic/summary/scoring
-  └── shared/                      # Shared utilities
+  ├── ingest/           # Email and web scraping ingestion
+  ├── processing/       # LLM topic extraction, summarization, scoring
+  ├── notifications/    # User alerts and daily digest delivery
+  ├── utils/            # Maintenance scripts (reprocess, migrate, privacy reapply)
+  ├── tests/            # Privacy sanitization test suite
+  ├── config/           # Privacy patterns configuration
+  ├── shared/           # Shared database client and utilities
+  └── migrations/       # Database migration SQL files
 
 frontend/
-  ├── src/pages/
-  │   ├── index.astro           # Homepage
-  │   ├── search.astro          # Search
-  │   └── newsletter/[id].astro # Detail
-  └── lib/supabase.ts
+  ├── src/pages/        # Astro pages (index, search, preferences, newsletter detail)
+  ├── src/pages/api/    # API routes for notification management
+  └── src/lib/          # Supabase client
 ```
 
 ## LLM Processing
 
-Three separate Ollama queries per newsletter:
+Three separate Ollama queries per newsletter for topic extraction, summarization, and relevance scoring. See `backend/processing/llm_processor.py` for implementation details and topic definitions.
 
-1. **Topic extraction**: Classifies into 23 predefined topics, filters hallucinations
-2. **Summarization**: Generates 2-3 sentence summary
-3. **Relevance scoring**: Scores 0-10 for Strong Towns Chicago priorities
+## Notification System
+
+Users create alert rules to receive daily digest emails for matching newsletters. Rules support topic-based matching, search phrase matching, and ward filtering.
+
+Email ingestion automatically queues matching notifications when `ENABLE_NOTIFICATIONS=true`. Daily digest sending is handled by `backend/notifications/process_notification_queue.py`.
+
+**Key files:**
+
+- `backend/notifications/rule_matcher.py` - Matching logic
+- `backend/notifications/email_sender.py` - Email delivery via Resend
+- `frontend/src/pages/preferences.astro` - User preference management
+
+## Privacy & Content Sanitization
+
+Newsletter content is automatically sanitized to remove tracking links, unsubscribe URLs, and sensitive content. Privacy rules are defined in `backend/config/privacy_patterns.json` with URL patterns, text patterns, and CSS selectors.
+
+**Implementation:** `backend/ingest/email/email_parser.py:sanitize_content()`
+**Tests:** `backend/tests/test_sanitization*.py` and `test_user_cases.py`
 
 ## Deployment
 
@@ -176,12 +177,26 @@ Three separate Ollama queries per newsletter:
 **Backend (.env)**:
 
 ```
+# Gmail IMAP
 GMAIL_ADDRESS=
 GMAIL_APP_PASSWORD=
+
+# Supabase
 SUPABASE_URL=
 SUPABASE_SERVICE_KEY=
+
+# LLM Processing (optional)
 ENABLE_LLM=true
 OLLAMA_MODEL=gpt-oss:20b
+
+# Notifications (optional)
+ENABLE_NOTIFICATIONS=true
+RESEND_API_KEY=re_xxxxx
+NOTIFICATION_FROM_EMAIL=noreply@yourdomain.com
+FRONTEND_BASE_URL=yourbaseurl  # Optional
+
+# Privacy (optional)
+PRIVACY_STRIP_PHRASES=  # Comma-separated phrases to redact
 ```
 
 **Frontend (.env)**:
