@@ -202,6 +202,32 @@ Write code that's easy to test. Pure functions (same input = same output) are id
 **Testable**: `rule_matches_newsletter(rule_data, newsletter_data)` - pure function
 **Hard to test**: Function that queries DB, checks rules, and sends email all in one
 
+### Testing & Validation Requirements
+All new features must have clear, useful tests that validate correctness. Tests are not optional - they're part of the feature. Always run tests to validate changes before considering work complete.
+
+**Backend**: Write unit tests for business logic, integration tests for data flows. Tests live in `backend/tests/`.
+
+**Frontend**: Write unit tests for logic (utilities, data transforms, component behavior). Use ChromeDevTools MCP server to validate UI/styling changes (snapshots, layouts, interactions).
+
+**Pattern**: Feature isn't done until tests prove it works. Use tests to prevent regressions, not just to check boxes.
+
+### Production-Grade Code Quality
+Code must be maintainable, readable, and understandable. Always choose production-grade patterns over quick hacks. Code is read far more than it's written - optimize for the next developer.
+
+**Never**:
+- Ship hacky solutions or temporary workarounds
+- Leave TODOs or commented-out code in production
+- Use magic numbers or unclear abbreviations
+- Write code only you can understand
+
+**Always**:
+- Use clear, self-documenting code with meaningful names
+- Follow established patterns in the codebase
+- Write code that's easy to debug and modify
+- Consider maintainability and long-term consequences
+
+**Standard**: Every line of code should be production-ready. No shortcuts, no "fix it later", no clever tricks that obscure intent.
+
 ### Meaningful Names
 Function names should be verbs. Variables should describe their content. Be specific.
 
