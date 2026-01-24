@@ -19,6 +19,7 @@ from typing import Dict, List, Any
 from shared.db import get_supabase_client
 from notifications.rule_matcher import get_pending_notifications_by_user
 from notifications.email_sender import send_daily_digest
+from notifications.error_logger import log_notification_error
 
 
 def process_daily_digests(batch_id: str = None, dry_run: bool = False) -> Dict[str, int]:
@@ -112,15 +113,30 @@ def process_daily_digests(batch_id: str = None, dry_run: bool = False) -> Dict[s
                 }).execute()
 
             else:
-                print(f"  ✗ Failed to send to {user_email}: {result.get('error')}")
+                error_msg = result.get('error')
+                print(f"  ✗ Failed to send to {user_email}: {error_msg}")
                 stats['failed'] += 1
+
+                # Log error to file
+                error_file = log_notification_error(
+                    error_type='sending',
+                    error_message=error_msg,
+                    context={
+                        'user_id': user_id,
+                        'user_email': user_email,
+                        'batch_id': batch_id,
+                        'notification_count': len(notifications),
+                        'newsletter_ids': [n['newsletter_id'] for n in notifications]
+                    }
+                )
+                print(f"    Error details logged to: {error_file}")
 
                 # Update notification queue with error
                 notification_ids = [n['id'] for n in notifications]
                 supabase.table('notification_queue') \
                     .update({
                         'status': 'failed',
-                        'error_message': result.get('error')
+                        'error_message': error_msg
                     }) \
                     .in_('id', notification_ids) \
                     .execute()
@@ -136,7 +152,7 @@ def process_daily_digests(batch_id: str = None, dry_run: bool = False) -> Dict[s
                     'digest_batch_id': batch_id,
                     'delivery_type': 'daily_digest',
                     'success': False,
-                    'error_message': result.get('error')
+                    'error_message': error_msg
                 }).execute()
 
         # Rate limiting: max 10 emails/second
