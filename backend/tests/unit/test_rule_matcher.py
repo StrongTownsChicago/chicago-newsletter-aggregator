@@ -19,7 +19,6 @@ from notifications.rule_matcher import (
     queue_notifications,
     get_pending_notifications_by_user,
 )
-from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 from tests.fixtures.user_factory import (
     create_test_user,
     create_test_rule,
@@ -34,7 +33,9 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
     def test_topic_match_single(self):
         """Rule with single topic matches newsletter"""
         rule = create_test_rule(topics=["bike_lanes"])
-        newsletter_data = {"topics": ["bike_lanes", "zoning_or_development_meeting_or_approval"]}
+        newsletter_data = {
+            "topics": ["bike_lanes", "zoning_or_development_meeting_or_approval"]
+        }
 
         result = _rule_matches_newsletter(rule, newsletter_data)
 
@@ -82,7 +83,10 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
     def test_search_term_no_match(self):
         """Keyword not found returns False"""
         rule = create_test_rule(search_term="parking")
-        newsletter_data = {"topics": [], "plain_text": "Newsletter about zoning changes."}
+        newsletter_data = {
+            "topics": [],
+            "plain_text": "Newsletter about zoning changes.",
+        }
 
         result = _rule_matches_newsletter(rule, newsletter_data)
 
@@ -196,9 +200,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
     def test_match_single_rule(self, mock_print, mock_get_supabase):
         """One rule matches newsletter"""
         user = create_test_user(user_id="user1", notifications_enabled=True)
-        rule = create_test_rule(
-            user_id="user1", topics=["bike_lanes"], is_active=True
-        )
+        rule = create_test_rule(user_id="user1", topics=["bike_lanes"], is_active=True)
 
         mock_supabase = create_mock_supabase()
         # First call returns rules, second returns users
@@ -242,12 +244,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         result = match_newsletter_to_rules("newsletter_id", newsletter_data)
 
         self.assertEqual(len(result), 2)
-        self.assertIn(
-            "user1", [match["user_id"] for match in result]
-        )
-        self.assertIn(
-            "user2", [match["user_id"] for match in result]
-        )
+        self.assertIn("user1", [match["user_id"] for match in result])
+        self.assertIn("user2", [match["user_id"] for match in result])
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
@@ -371,7 +369,9 @@ class TestQueueNotifications(unittest.TestCase):
         mock_supabase = create_mock_supabase()
         mock_get_supabase.return_value = mock_supabase
 
-        matched_rules = [{"user_id": "user1", "rule_id": "rule1", "rule_name": "Test Rule"}]
+        matched_rules = [
+            {"user_id": "user1", "rule_id": "rule1", "rule_name": "Test Rule"}
+        ]
 
         result = queue_notifications("newsletter_id", matched_rules)
 
@@ -382,7 +382,9 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.date")
     @patch("builtins.print")
-    def test_queue_multiple_notifications(self, mock_print, mock_date, mock_get_supabase):
+    def test_queue_multiple_notifications(
+        self, mock_print, mock_date, mock_get_supabase
+    ):
         """Batch insert of multiple notifications"""
         mock_date.today.return_value.isoformat.return_value = "2026-01-24"
 
@@ -441,7 +443,11 @@ class TestQueueNotifications(unittest.TestCase):
 
         matched_rules = [
             {"user_id": "user1", "rule_id": "rule1", "rule_name": "Rule 1"},
-            {"user_id": "user1", "rule_id": "rule1", "rule_name": "Rule 1"},  # Duplicate
+            {
+                "user_id": "user1",
+                "rule_id": "rule1",
+                "rule_name": "Rule 1",
+            },  # Duplicate
         ]
 
         result = queue_notifications("newsletter_id", matched_rules)
@@ -539,9 +545,9 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
 
         # Verify query was filtered by batch_id
         # eq() should be called with digest_batch_id
-        eq_calls = [call for call in mock_supabase.eq.call_args_list]
-        # Should have calls for status='pending' and digest_batch_id='2026-01-24'
         self.assertEqual(mock_supabase.eq.call_count, 2)
+        mock_supabase.eq.assert_any_call("status", "pending")
+        mock_supabase.eq.assert_any_call("digest_batch_id", "2026-01-24")
 
     @patch("notifications.rule_matcher.get_supabase_client")
     def test_filters_pending_status(self, mock_get_supabase):
