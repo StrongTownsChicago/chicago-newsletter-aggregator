@@ -286,7 +286,7 @@ def _build_digest_html(prepared_newsletters: List[Dict[str, Any]], preferences_u
 <body>
     <div class="container">
         <div class="header">
-            <h1>📬 Daily Newsletter Digest</h1>
+            <h1>Daily Chicago Aldermen Newsletter Digest</h1>
             <p class="subtitle">Chicago aldermen newsletters matching your interests</p>
         </div>
 """
@@ -371,7 +371,7 @@ You have {len(prepared_newsletters)} newsletters to review:
 
 """
 
-    # Add each newsletter (all data already extracted and formatted)
+    # Add each newsletter
     for i, newsletter in enumerate(prepared_newsletters, 1):
         text += f"""{i}. {newsletter['title']}
 From: {newsletter['source_name']}{newsletter['ward_text']}

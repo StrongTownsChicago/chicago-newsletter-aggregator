@@ -14,6 +14,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const ruleType = formData.get("rule_type")?.toString() || "search";
   let topics = formData.getAll("topics").map((t) => t.toString());
   let searchTerm = formData.get("search_term")?.toString().trim();
+  const wards = formData.getAll("wards").map((w) => w.toString().trim()).filter(w => w.length > 0);
   const isActive = formData.get("is_active") === "on";
 
   if (!ruleId || !name) {
@@ -45,6 +46,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       name,
       topics,
       search_term: searchTerm || null,
+      ward_numbers: wards.length > 0 ? wards : null,
       is_active: isActive,
     })
     .eq("id", ruleId)

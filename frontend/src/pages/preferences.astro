@@ -28,6 +28,21 @@ const { data: rules, error: rulesError } = await supabase
   .eq('user_id', user.id)
   .order('created_at', { ascending: false });
 
+// Fetch distinct wards for filtering options
+const { data: sources, error: sourcesError } = await supabase
+  .from('sources')
+  .select('ward_number')
+  .not('ward_number', 'is', null)
+  .order('ward_number');
+
+// Unique sorted wards
+const availableWards = Array.from(new Set(
+  (sources || [])
+    .map(s => s.ward_number)
+    .filter(w => w) // Filter out empty strings
+    .sort((a, b) => parseInt(a as string) - parseInt(b as string))
+));
+
 const userProfile = profile as UserProfile | null;
 const notificationRules = (rules as NotificationRule[]) || [];
 
@@ -259,6 +274,18 @@ const message = Astro.url.searchParams.get('message');
                        <span>Matches: <strong>"{rule.search_term}"</strong></span>
                     </div>
                   )}
+                  {rule.ward_numbers && rule.ward_numbers.length > 0 && (
+                    <div class="mt-2 text-sm text-gray-600 flex flex-wrap gap-1 items-center">
+                      <svg class="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                      <span>Limited to Wards:</span>
+                      {rule.ward_numbers.map((ward, i) => (
+                        <span class="font-medium">{ward}{i < rule.ward_numbers.length - 1 ? ',' : ''}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div class="flex gap-2 flex-shrink-0">
                   <button
@@ -266,6 +293,7 @@ const message = Astro.url.searchParams.get('message');
                     data-rule-id={rule.id}
                     data-rule-name={rule.name}
                     data-rule-topics={JSON.stringify(rule.topics)}
+                    data-rule-ward-numbers={JSON.stringify(rule.ward_numbers || [])}
                     data-rule-search-term={rule.search_term || ''}
                     data-rule-active={rule.is_active}
                   >
@@ -405,6 +433,43 @@ const message = Astro.url.searchParams.get('message');
             </p>
           </div>
 
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-semibold text-gray-900">
+                Filter by Ward (Optional)
+              </label>
+              <button
+                type="button"
+                id="toggleWardsBtn"
+                class="text-sm text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+              >
+                Show Wards
+              </button>
+            </div>
+            
+            <div id="wardSelectionContainer" class="hidden mt-3">
+              <p class="text-xs text-gray-500 mb-3">
+                Only notify if the newsletter comes from a specific Ward. If none selected, all Wards are included.
+              </p>
+              <div class="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                {availableWards.map((ward) => (
+                  <label class="flex items-center justify-center p-2 rounded border border-gray-200 bg-white hover:bg-blue-50 cursor-pointer transition-colors text-sm">
+                    <input
+                      type="checkbox"
+                      name="wards"
+                      value={ward}
+                      class="sr-only peer"
+                    />
+                    <span class="text-gray-700 peer-checked:text-blue-600 peer-checked:font-bold">
+                      {ward}
+                    </span>
+                    <div class="absolute inset-0 border-2 border-transparent peer-checked:border-blue-500 rounded pointer-events-none"></div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <label class="flex items-start gap-3 cursor-pointer">
               <input
@@ -457,6 +522,20 @@ const message = Astro.url.searchParams.get('message');
     const cancelBtn = document.getElementById('cancelBtn');
     const addRuleBtns = document.querySelectorAll('#addRuleBtn, #addRuleBtn2');
     const editRuleBtns = document.querySelectorAll('.edit-rule-btn');
+    const toggleWardsBtn = document.getElementById('toggleWardsBtn');
+    const wardSelectionContainer = document.getElementById('wardSelectionContainer');
+
+    // Toggle Ward Section
+    toggleWardsBtn?.addEventListener('click', () => {
+      const isHidden = wardSelectionContainer?.classList.contains('hidden');
+      if (isHidden) {
+        wardSelectionContainer?.classList.remove('hidden');
+        toggleWardsBtn.textContent = 'Hide Wards';
+      } else {
+        wardSelectionContainer?.classList.add('hidden');
+        toggleWardsBtn.textContent = 'Show Wards';
+      }
+    });
 
     // Toggle sections based on rule type
     function toggleSections() {
@@ -484,6 +563,11 @@ const message = Astro.url.searchParams.get('message');
         searchTermInput.value = '';
         // Reset to default (search)
         ruleTypeRadios[0].checked = true;
+        
+        // Reset wards UI
+        wardSelectionContainer?.classList.add('hidden');
+        if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
+        
         toggleSections();
         modal?.classList.remove('hidden');
       });
@@ -496,6 +580,7 @@ const message = Astro.url.searchParams.get('message');
         const ruleId = target.dataset.ruleId;
         const ruleName = target.dataset.ruleName;
         const ruleTopics = JSON.parse(target.dataset.ruleTopics || '[]');
+        const ruleWards = JSON.parse(target.dataset.ruleWardNumbers || '[]');
         const ruleSearchTerm = target.dataset.ruleSearchTerm;
         const ruleActive = target.dataset.ruleActive === 'true';
 
@@ -519,6 +604,24 @@ const message = Astro.url.searchParams.get('message');
         topicCheckboxes.forEach(checkbox => {
           checkbox.checked = ruleTopics.includes(checkbox.value);
         });
+
+        // Check the appropriate ward checkboxes
+        const wardCheckboxes = ruleForm.querySelectorAll('input[name="wards"]') as NodeListOf<HTMLInputElement>;
+        let hasSelectedWards = false;
+        wardCheckboxes.forEach(checkbox => {
+          const isChecked = ruleWards.includes(checkbox.value);
+          checkbox.checked = isChecked;
+          if (isChecked) hasSelectedWards = true;
+        });
+
+        // Expand ward section if wards are selected
+        if (hasSelectedWards) {
+          wardSelectionContainer?.classList.remove('hidden');
+          if (toggleWardsBtn) toggleWardsBtn.textContent = 'Hide Wards';
+        } else {
+          wardSelectionContainer?.classList.add('hidden');
+          if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
+        }
 
         modal?.classList.remove('hidden');
       });
