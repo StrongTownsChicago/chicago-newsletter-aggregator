@@ -26,36 +26,22 @@ TOPICS = [
     # Incremental Housing
     "4_flats_legalization",
     "missing_middle_housing",
-    "zoning_reform",
-    "adu_coach_house",
-    "housing_development",
+    "accessory_dwelling_units",
     "single_stair_reform",
 
-    # Ending Parking Mandates
-    "parking_minimums_elimination",
-
     # Safe & Productive Streets
-    "pedestrian_safety",
-    "bike_infrastructure",
-    "tactical_urbanism",
-    "traffic_calming",
+    "bike_lanes",
     "street_redesign",
 
     # Transit
-    "transit_improvement",
-    "cta_metra_funding",
-    "transit_service_expansion",
+    "transit_funding",
 
     # Transparent Local Accounting
-    "budget_transparency",
-    "fiscal_sustainability",
+    "city_budget",
     "tax_policy",
 
     # Governance & Community Engagement
-    "community_meeting",
-    "development_approval",
-    "ordinance_debate",
-    "public_hearing",
+    "zoning_or_development_meeting_or_approval",
     "city_charter",
 ]
 
@@ -190,14 +176,15 @@ def generate_summary(content: str, model: str) -> str:
         2-3 sentence summary string (empty string on error)
     """
 
+    # The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
     prompt = f"""Summarize this alderman's newsletter in 2-3 sentences.
 
 PRIORITIZE mentioning (in order of importance):
 1. Meetings/hearings about zoning, development, housing, transit, or budget
-2. Policy changes or ordinances related to housing, parking, transit, or streets
+2. Policy changes or ordinances related to housing, parking reform, transit, or streets
 3. Development approvals or zoning changes
 4. Budget/infrastructure spending decisions
-5. Transit service changes or funding
+5. Long term transit service changes or funding (not routine maintenance or temporary changes)
 6. Street safety or redesign projects
 
 Then briefly mention other major announcements or events. Be concise and factual.
