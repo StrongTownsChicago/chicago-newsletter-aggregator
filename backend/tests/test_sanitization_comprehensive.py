@@ -32,6 +32,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
             ("Constant Contact track", "https://zsabxyiab.cc.rs6.net/tn.jsp?f=123", True),
             ("Constant Contact Marketing", "https://www.constantcontact.com/landing1/vr/home?cc=nge&utm_campaign=nge&rmc=VF21_CPE&utm_medium=VF21_CPE&utm_source=viral&nav=ae0af980-9211-45e7-b6f6-4732794b18e5", True),
             ("Mailchimp Referral", "https://login.mailchimp.com/signup/email-referral/?aid=8b318f91a566aafb49537c87f", True),
+            ("Mailchimp Archive", "https://us20.campaign-archive.com/?e=2e35bed8c6&u=15bbb3d16e48313aee73541bb&id=ee9edab2e3", True),
             # False Positives (Should NOT be removed)
             ("Chicago Gov", "https://www.chicago.gov/city/en/depts/mayor.html", False),
             ("Google Maps", "https://www.google.com/maps/dir/...", False),

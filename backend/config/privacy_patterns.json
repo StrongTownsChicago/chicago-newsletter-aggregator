@@ -14,7 +14,8 @@
     "forward-to-friend\\.com",
     "rs6\\.net/tn\\.jsp",
     "constantcontact\\.com/landing1/vr/home",
-    "login\\.mailchimp\\.com/signup"
+    "login\\.mailchimp\\.com/signup",
+    "campaign-archive\\.com"
   ],
   "text_patterns": [
     "unsubscribe",
@@ -24,6 +25,7 @@
     "update.*preferences",
     "forward.*friend",
     "view.*browser",
+    "read.*browser",
     "address.*book"
   ],
   "selectors": [
