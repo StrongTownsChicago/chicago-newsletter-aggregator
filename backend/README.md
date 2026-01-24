@@ -14,7 +14,11 @@ GMAIL_APP_PASSWORD=your-app-password
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-key
 ENABLE_LLM=true
+ENABLE_NOTIFICATIONS=true
 OLLAMA_MODEL=gpt-oss:20b
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx
+NOTIFICATION_FROM_EMAIL=notifications@yourdomain.com
+FRONTEND_BASE_URL=https://chicago-newsletter-aggregator.open-advocacy.com  # Optional, defaults to production
 ```
 
 ## Email Ingestion

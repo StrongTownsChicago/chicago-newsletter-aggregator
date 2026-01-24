@@ -1,4 +1,33 @@
+"""
+Gmail IMAP Email Ingestion
+
+Processes unread newsletters from Gmail inbox, matches them to sources, and stores in database.
+
+Usage:
+    Run from the backend/ directory:
+
+    $ uv run python -m ingest.email.process_emails
+
+Required environment variables (.env file):
+    - GMAIL_ADDRESS: Gmail account email address
+    - GMAIL_APP_PASSWORD: Gmail app-specific password (not regular password)
+    - SUPABASE_URL: Supabase project URL
+    - SUPABASE_SERVICE_KEY: Supabase service role key
+
+Optional environment variables:
+    - ENABLE_LLM=true: Process newsletters with Ollama for topic extraction (default: false)
+    - ENABLE_NOTIFICATIONS=true: Queue notifications for matched rules (default: false)
+    - OLLAMA_MODEL: LLM model name (default: gpt-oss:20b)
+
+Output:
+    - Processes unread emails and marks them as read
+    - Generates unmapped_emails_TIMESTAMP.txt report if any emails couldn't be matched to sources
+    - Prints summary of processed/skipped/unmapped counts
+"""
+
 import os
+import json
+from pathlib import Path
 from datetime import datetime
 from imap_tools import MailBox, AND, MailMessageFlags
 from dotenv import load_dotenv
@@ -12,6 +41,12 @@ load_dotenv()
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
+ENABLE_NOTIFICATIONS = os.getenv("ENABLE_NOTIFICATIONS", "false").lower() == "true"
+
+# Load privacy patterns
+privacy_config_path = Path(__file__).parent.parent.parent / 'config' / 'privacy_patterns.json'
+with open(privacy_config_path, 'r', encoding='utf-8') as f:
+    PRIVACY_PATTERNS = json.load(f)
 
 supabase = get_supabase_client()
 
@@ -40,7 +75,36 @@ def save_unmapped_report(unmapped_emails):
     print(f"\n  Report saved to: {filename}")
 
 def process_new_newsletters():
-    """Main processing function"""
+    """
+    Process unread newsletters from Gmail inbox via IMAP.
+
+    This function connects to Gmail, fetches unread emails, matches them to sources,
+    optionally processes with LLM, and stores them in the database. Emails are marked
+    as read after processing to prevent reprocessing.
+
+    Usage:
+        Run from the backend/ directory:
+
+        $ uv run python -m ingest.email.process_emails
+
+    Required environment variables:
+        - GMAIL_ADDRESS: Gmail account email address
+        - GMAIL_APP_PASSWORD: Gmail app password (not regular password)
+        - SUPABASE_URL: Supabase project URL
+        - SUPABASE_SERVICE_KEY: Supabase service role key
+
+    Optional environment variables:
+        - ENABLE_LLM: Set to "true" to process with Ollama (default: "false")
+        - ENABLE_NOTIFICATIONS: Set to "true" to queue notifications (default: "false")
+        - OLLAMA_MODEL: LLM model name (default: "gpt-oss:20b")
+
+    Behavior:
+        - Fetches only unread emails to avoid duplicates
+        - Skips emails already in database (by email_uid)
+        - Logs unmapped emails to a timestamped report file
+        - Marks emails as read after processing (even unmapped ones)
+        - Continues processing even if individual emails fail
+    """
     
     print(f"[{datetime.now()}] Starting newsletter ingestion...")
     
@@ -67,7 +131,7 @@ def process_new_newsletters():
                 
                 # Parse email
                 print(f"Processing: {msg.subject}")
-                newsletter = parse_newsletter(msg, supabase)
+                newsletter = parse_newsletter(msg, supabase, PRIVACY_PATTERNS)
                 
                 # Check if source was matched
                 if newsletter['source_id'] is None:
@@ -99,11 +163,36 @@ def process_new_newsletters():
                         print(f"  Warning: LLM processing failed: {e}")
                 
                 # Insert into Supabase
-                supabase.table("newsletters").insert(newsletter).execute()
-                
+                insert_response = supabase.table("newsletters").insert(newsletter).execute()
+
+                # Queue notifications for matched rules
+                if ENABLE_NOTIFICATIONS and insert_response.data and len(insert_response.data) > 0:
+                    newsletter_id = insert_response.data[0]['id']
+
+                    try:
+                        from notifications.rule_matcher import match_newsletter_to_rules, queue_notifications
+
+                        # Prepare newsletter data for matching
+                        newsletter_data = {
+                            'topics': newsletter.get('topics', []),
+                            'plain_text': newsletter.get('plain_text', ''),
+                            'source_id': newsletter.get('source_id'),
+                            'ward_number': None,  # Can be joined from sources table if needed in Phase 2
+                            'relevance_score': newsletter.get('relevance_score')
+                        }
+
+                        # Match and queue
+                        matched = match_newsletter_to_rules(newsletter_id, newsletter_data)
+                        if matched:
+                            queued = queue_notifications(newsletter_id, matched)
+                            print(f"  ✓ Queued {queued} notification(s)")
+                    except Exception as e:
+                        # Don't fail newsletter ingestion if notification queuing fails
+                        print(f"  ⚠️  Notification queuing failed: {e}")
+
                 # Mark as read
                 mailbox.flag(msg.uid, MailMessageFlags.SEEN, True)
-                
+
                 processed_count += 1
                 print(f"  ✓ Stored in database")
                 

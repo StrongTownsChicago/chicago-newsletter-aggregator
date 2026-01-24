@@ -1,0 +1,648 @@
+---
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import AuthButton from '../components/AuthButton.astro';
+import { notificationsEnabled } from '../lib/supabase';
+import type { UserProfile, NotificationRule } from '../lib/supabase';
+
+// Redirect if notifications are disabled
+if (!notificationsEnabled()) {
+  return Astro.redirect('/');
+}
+
+const user = Astro.locals.user;
+
+// Protect this route - require authentication
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const supabase = Astro.locals.supabase;
+
+// Fetch user profile
+const { data: profile, error: profileError } = await supabase
+  .from('user_profiles')
+  .select('*')
+  .eq('id', user.id)
+  .single();
+
+// Fetch notification rules
+const { data: rules, error: rulesError } = await supabase
+  .from('notification_rules')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false });
+
+// Fetch distinct wards for filtering options
+const { data: sources, error: sourcesError } = await supabase
+  .from('sources')
+  .select('ward_number')
+  .not('ward_number', 'is', null)
+  .order('ward_number');
+
+// Unique sorted wards
+const availableWards = Array.from(new Set(
+  (sources || [])
+    .map(s => s.ward_number)
+    .filter(w => w) // Filter out empty strings
+    .sort((a, b) => parseInt(a as string) - parseInt(b as string))
+));
+
+const userProfile = profile as UserProfile | null;
+const notificationRules = (rules as NotificationRule[]) || [];
+
+// Topics grouped by category (from backend/processing/llm_processor.py)
+const TOPIC_CATEGORIES = {
+  "Incremental Housing": [
+    "4_flats_legalization",
+    "missing_middle_housing",
+    "accessory_dwelling_units",
+    "single_stair_reform"
+  ],
+  "Streets": [
+    "bike_lanes",
+    "street_redesign"
+  ],
+  "Transit": [
+    "transit_funding"
+  ],
+  "Transparency": [
+    "city_budget",
+    "tax_policy"
+  ],
+  "Governance": [
+    "zoning_or_development_meeting_or_approval",
+    "city_charter"
+  ]
+};
+
+// Format topic for display
+function formatTopic(topic: string): string {
+  return topic
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+const maxRules = 5;
+const canCreateRule = notificationRules.length < maxRules;
+
+const error = Astro.url.searchParams.get('error');
+const message = Astro.url.searchParams.get('message');
+---
+
+<Layout title="Notification Preferences - Chicago Newsletter Aggregator">
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
+    <!-- Top Bar with Auth -->
+    <div class="mb-6 flex justify-end">
+      <AuthButton />
+    </div>
+
+    <!-- Header -->
+    <header class="mb-8">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+            Notification Preferences
+          </h1>
+          <p class="text-base text-gray-600">
+            Manage your notification rules and email preferences
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
+      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
+      <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
+      <a href="/preferences" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Preferences</a>
+    </nav>
+
+    {error && (
+      <div class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        </svg>
+        <span>{error}</span>
+      </div>
+    )}
+
+    {message && (
+      <div class="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span>{message}</span>
+      </div>
+    )}
+
+    <!-- Global Settings -->
+    <div class="bg-white shadow-sm border border-gray-200 rounded-xl p-6 sm:p-8 mb-6">
+      <div class="flex items-center gap-3 mb-6">
+        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <h2 class="text-xl sm:text-2xl font-bold text-gray-900">Global Settings</h2>
+      </div>
+
+      <form action="/api/notifications/update-preferences" method="POST" enctype="application/x-www-form-urlencoded" class="space-y-6">
+        <div class="bg-gray-50 rounded-lg p-5 border border-gray-100">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <label for="enabled" class="text-base font-semibold text-gray-900 block mb-1">
+                Enable Email Notifications
+              </label>
+              <p class="text-sm text-gray-600">
+                Receive daily digest emails when newsletters match your rules
+              </p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input
+                type="checkbox"
+                id="enabled"
+                name="enabled"
+                checked={userProfile?.notification_preferences?.enabled ?? true}
+                class="sr-only peer"
+              />
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+          >
+            Save Preferences
+          </button>
+          <span class="text-sm text-gray-500">Changes take effect immediately</span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Notification Rules -->
+    <div class="bg-white shadow-sm border border-gray-200 rounded-xl p-6 sm:p-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-3">
+          <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          <div>
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-900">Notification Rules</h2>
+            <p class="text-sm text-gray-600 mt-0.5">
+              {notificationRules.length} of {maxRules} rules used
+            </p>
+          </div>
+        </div>
+        {canCreateRule ? (
+          <button
+            id="addRuleBtn"
+            class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-5 rounded-lg transition-colors shadow-sm"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Rule
+          </button>
+        ) : (
+          <span class="inline-flex items-center gap-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-lg">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            Maximum rules reached
+          </span>
+        )}
+      </div>
+
+      {notificationRules.length === 0 ? (
+        <div class="text-center py-16 px-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+          <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">No notification rules yet</h3>
+          <p class="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+            Create rules to get notified when newsletters match your interests. You can filter by topics, keywords, and more.
+          </p>
+          {canCreateRule && (
+            <button
+              id="addRuleBtn2"
+              class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Create Your First Rule
+            </button>
+          )}
+        </div>
+      ) : (
+        <div class="space-y-4">
+          {notificationRules.map((rule) => (
+            <div class="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-3">
+                    <h3 class="text-lg font-semibold text-gray-900">{rule.name}</h3>
+                    {rule.is_active ? (
+                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Active
+                      </span>
+                    ) : (
+                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"/>
+                        </svg>
+                        Disabled
+                      </span>
+                    )}
+                  </div>
+                  {rule.topics && rule.topics.length > 0 && (
+                    <div class="flex flex-wrap gap-2">
+                      {rule.topics.map((topic) => (
+                        <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          {formatTopic(topic)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {rule.search_term && (
+                    <div class="mt-2 text-sm text-gray-700 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200 inline-flex items-center gap-2">
+                       <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                       </svg>
+                       <span>Matches: <strong>"{rule.search_term}"</strong></span>
+                    </div>
+                  )}
+                  {rule.ward_numbers && rule.ward_numbers.length > 0 && (
+                    <div class="mt-2 text-sm text-gray-600 flex flex-wrap gap-1 items-center">
+                      <svg class="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      </svg>
+                      <span>Limited to Wards:</span>
+                      {rule.ward_numbers.map((ward, i) => (
+                        <span class="font-medium">{ward}{i < rule.ward_numbers.length - 1 ? ',' : ''}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                  <button
+                    class="edit-rule-btn inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
+                    data-rule-id={rule.id}
+                    data-rule-name={rule.name}
+                    data-rule-topics={JSON.stringify(rule.topics)}
+                    data-rule-ward-numbers={JSON.stringify(rule.ward_numbers || [])}
+                    data-rule-search-term={rule.search_term || ''}
+                    data-rule-active={rule.is_active}
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                    Edit
+                  </button>
+                  <form action="/api/notifications/delete-rule" method="POST" enctype="application/x-www-form-urlencoded" class="inline">
+                    <input type="hidden" name="rule_id" value={rule.id} />
+                    <button
+                      type="submit"
+                      class="inline-flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+                      onclick="return confirm('Are you sure you want to delete this rule?')"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+
+  <!-- Add/Edit Rule Modal -->
+  <div id="ruleModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+        <h3 id="modalTitle" class="text-2xl font-bold text-gray-900">Add Notification Rule</h3>
+        <p class="text-sm text-gray-600 mt-1">Configure when you want to receive email notifications</p>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="overflow-y-auto flex-1 px-6 py-5">
+        <form id="ruleForm" method="POST" enctype="application/x-www-form-urlencoded" class="space-y-6">
+          <input type="hidden" id="ruleId" name="rule_id" />
+
+          <div>
+            <label for="ruleName" class="block text-sm font-semibold text-gray-900 mb-2">
+              Rule Name
+            </label>
+            <input
+              type="text"
+              id="ruleName"
+              name="name"
+              required
+              placeholder="e.g., Housing and Zoning Updates"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+            />
+          </div>
+
+          <!-- Rule Type Selection -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-2">Match By</label>
+            <div class="flex items-center space-x-4">
+              <label class="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="rule_type"
+                  value="search"
+                  checked
+                  class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span class="ml-2 text-gray-700">Search Phrase</span>
+              </label>
+              <label class="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="rule_type"
+                  value="topic"
+                  class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span class="ml-2 text-gray-700">Topics</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="topicSection" class="hidden">
+            <label class="block text-sm font-semibold text-gray-900 mb-3">
+              Topics (select at least one)
+            </label>
+            <div class="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+              {Object.entries(TOPIC_CATEGORIES).map(([category, topics]) => (
+                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                  <p class="font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    {category}
+                  </p>
+                  <div class="space-y-2 ml-1">
+                    {topics.map((topic) => (
+                      <label class="flex items-center hover:bg-blue-50 p-2 rounded-md cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          name="topics"
+                          value={topic}
+                          class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopic(topic)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div id="searchSection">
+            <label for="searchTerm" class="block text-sm font-semibold text-gray-900 mb-2">
+              Search Phrase
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input
+                type="text"
+                id="searchTerm"
+                name="search_term"
+                placeholder="e.g., Lincoln Yards"
+                maxlength="100"
+                class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+              />
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              Notify if the newsletter contains this exact phrase
+            </p>
+          </div>
+
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-semibold text-gray-900">
+                Filter by Ward (Optional)
+              </label>
+              <button
+                type="button"
+                id="toggleWardsBtn"
+                class="text-sm text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+              >
+                Show Wards
+              </button>
+            </div>
+            
+            <div id="wardSelectionContainer" class="hidden mt-3">
+              <p class="text-xs text-gray-500 mb-3">
+                Only notify if the newsletter comes from a specific Ward. If none selected, all Wards are included.
+              </p>
+              <div class="grid grid-cols-5 sm:grid-cols-8 gap-2">
+                {availableWards.map((ward) => (
+                  <label class="flex items-center justify-center p-2 rounded border border-gray-200 bg-white hover:bg-blue-50 cursor-pointer transition-colors text-sm">
+                    <input
+                      type="checkbox"
+                      name="wards"
+                      value={ward}
+                      class="sr-only peer"
+                    />
+                    <span class="text-gray-700 peer-checked:text-blue-600 peer-checked:font-bold">
+                      {ward}
+                    </span>
+                    <div class="absolute inset-0 border-2 border-transparent peer-checked:border-blue-500 rounded pointer-events-none"></div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                id="isActive"
+                name="is_active"
+                checked
+                class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-0.5"
+              />
+              <div>
+                <span class="text-sm font-semibold text-gray-900 block">Enable this rule</span>
+                <span class="text-xs text-gray-600">Receive notifications when newsletters match this rule</span>
+              </div>
+            </label>
+          </div>
+        </form>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+        <button
+          type="button"
+          id="cancelBtn"
+          class="flex-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-2.5 px-4 rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="ruleForm"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors shadow-sm"
+        >
+          Save Rule
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('ruleModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const ruleForm = document.getElementById('ruleForm') as HTMLFormElement;
+    const ruleIdInput = document.getElementById('ruleId') as HTMLInputElement;
+    const ruleNameInput = document.getElementById('ruleName') as HTMLInputElement;
+    const searchTermInput = document.getElementById('searchTerm') as HTMLInputElement;
+    const isActiveInput = document.getElementById('isActive') as HTMLInputElement;
+    const topicSection = document.getElementById('topicSection');
+    const searchSection = document.getElementById('searchSection');
+    const ruleTypeRadios = document.querySelectorAll('input[name="rule_type"]') as NodeListOf<HTMLInputElement>;
+    const cancelBtn = document.getElementById('cancelBtn');
+    const addRuleBtns = document.querySelectorAll('#addRuleBtn, #addRuleBtn2');
+    const editRuleBtns = document.querySelectorAll('.edit-rule-btn');
+    const toggleWardsBtn = document.getElementById('toggleWardsBtn');
+    const wardSelectionContainer = document.getElementById('wardSelectionContainer');
+
+    // Toggle Ward Section
+    toggleWardsBtn?.addEventListener('click', () => {
+      const isHidden = wardSelectionContainer?.classList.contains('hidden');
+      if (isHidden) {
+        wardSelectionContainer?.classList.remove('hidden');
+        toggleWardsBtn.textContent = 'Hide Wards';
+      } else {
+        wardSelectionContainer?.classList.add('hidden');
+        toggleWardsBtn.textContent = 'Show Wards';
+      }
+    });
+
+    // Toggle sections based on rule type
+    function toggleSections() {
+      const selectedType = document.querySelector('input[name="rule_type"]:checked') as HTMLInputElement;
+      if (selectedType.value === 'topic') {
+        topicSection?.classList.remove('hidden');
+        searchSection?.classList.add('hidden');
+      } else {
+        topicSection?.classList.add('hidden');
+        searchSection?.classList.remove('hidden');
+      }
+    }
+
+    ruleTypeRadios.forEach(radio => {
+      radio.addEventListener('change', toggleSections);
+    });
+
+    // Open modal for new rule
+    addRuleBtns.forEach(btn => {
+      btn?.addEventListener('click', () => {
+        modalTitle!.textContent = 'Add Notification Rule';
+        ruleForm.action = '/api/notifications/create-rule';
+        ruleForm.reset();
+        ruleIdInput.value = '';
+        searchTermInput.value = '';
+        // Reset to default (search)
+        ruleTypeRadios[0].checked = true;
+        
+        // Reset wards UI
+        wardSelectionContainer?.classList.add('hidden');
+        if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
+        
+        toggleSections();
+        modal?.classList.remove('hidden');
+      });
+    });
+
+    // Open modal for editing rule
+    editRuleBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = e.target as HTMLButtonElement;
+        const ruleId = target.dataset.ruleId;
+        const ruleName = target.dataset.ruleName;
+        const ruleTopics = JSON.parse(target.dataset.ruleTopics || '[]');
+        const ruleWards = JSON.parse(target.dataset.ruleWardNumbers || '[]');
+        const ruleSearchTerm = target.dataset.ruleSearchTerm;
+        const ruleActive = target.dataset.ruleActive === 'true';
+
+        modalTitle!.textContent = 'Edit Notification Rule';
+        ruleForm.action = '/api/notifications/update-rule';
+        ruleIdInput.value = ruleId || '';
+        ruleNameInput.value = ruleName || '';
+        searchTermInput.value = ruleSearchTerm || '';
+        isActiveInput.checked = ruleActive;
+
+        // Set correct rule type
+        if (ruleSearchTerm) {
+          ruleTypeRadios[0].checked = true; // Search
+        } else {
+          ruleTypeRadios[1].checked = true; // Topic
+        }
+        toggleSections();
+
+        // Check the appropriate topic checkboxes
+        const topicCheckboxes = ruleForm.querySelectorAll('input[name="topics"]') as NodeListOf<HTMLInputElement>;
+        topicCheckboxes.forEach(checkbox => {
+          checkbox.checked = ruleTopics.includes(checkbox.value);
+        });
+
+        // Check the appropriate ward checkboxes
+        const wardCheckboxes = ruleForm.querySelectorAll('input[name="wards"]') as NodeListOf<HTMLInputElement>;
+        let hasSelectedWards = false;
+        wardCheckboxes.forEach(checkbox => {
+          const isChecked = ruleWards.includes(checkbox.value);
+          checkbox.checked = isChecked;
+          if (isChecked) hasSelectedWards = true;
+        });
+
+        // Expand ward section if wards are selected
+        if (hasSelectedWards) {
+          wardSelectionContainer?.classList.remove('hidden');
+          if (toggleWardsBtn) toggleWardsBtn.textContent = 'Hide Wards';
+        } else {
+          wardSelectionContainer?.classList.add('hidden');
+          if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
+        }
+
+        modal?.classList.remove('hidden');
+      });
+    });
+
+    // Close modal
+    cancelBtn?.addEventListener('click', () => {
+      modal?.classList.add('hidden');
+    });
+
+    // Close on background click
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
+    });
+  </script>
+</Layout>

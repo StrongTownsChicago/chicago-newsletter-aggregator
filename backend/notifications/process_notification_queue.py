@@ -1,0 +1,223 @@
+"""
+CLI script for processing notification queue and sending emails.
+
+Usage:
+    # Send daily digest emails (run once per day)
+    uv run python -m notifications.process_notification_queue --daily-digest
+
+    # Process specific batch ID
+    uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
+
+    # Dry run (don't actually send emails)
+    uv run python -m notifications.process_notification_queue --daily-digest --dry-run
+"""
+
+import argparse
+import time
+from datetime import date
+from typing import Dict, List, Any
+from shared.db import get_supabase_client
+from notifications.rule_matcher import get_pending_notifications_by_user
+from notifications.email_sender import send_daily_digest
+from notifications.error_logger import log_notification_error
+
+
+def process_daily_digests(batch_id: str = None, dry_run: bool = False) -> Dict[str, int]:
+    """
+    Process daily digest notifications.
+
+    Groups all pending notifications by user and sends ONE email per user
+    with all matched newsletters from the specified batch (default: today).
+
+    Args:
+        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to today.
+        dry_run: If True, don't actually send emails (for testing)
+
+    Returns:
+        Dictionary with stats: sent, failed, skipped
+    """
+    # Default to today if no batch ID specified
+    if not batch_id:
+        batch_id = date.today().isoformat()
+
+    print(f"Processing daily digest for batch: {batch_id}")
+
+    # Get pending notifications grouped by user
+    notifications_by_user = get_pending_notifications_by_user(batch_id)
+
+    if not notifications_by_user:
+        print("No pending notifications to process.")
+        return {'sent': 0, 'failed': 0, 'skipped': 0}
+
+    print(f"Found notifications for {len(notifications_by_user)} users")
+
+    supabase = get_supabase_client()
+    stats = {'sent': 0, 'failed': 0, 'skipped': 0}
+
+    # Process each user
+    for user_id, notifications in notifications_by_user.items():
+        print(f"\nProcessing user {user_id} ({len(notifications)} notifications)...")
+
+        # Get user email
+        user_response = supabase.table('user_profiles') \
+            .select('email, notification_preferences') \
+            .eq('id', user_id) \
+            .single() \
+            .execute()
+
+        if not user_response.data:
+            print(f"  ⚠️  User profile not found, skipping")
+            stats['skipped'] += 1
+            continue
+
+        user_email = user_response.data['email']
+        preferences = user_response.data.get('notification_preferences', {})
+
+        # Double-check notifications are enabled (should be filtered already, but be safe)
+        if not preferences.get('enabled', True):
+            print(f"  ⚠️  Notifications disabled for user, skipping")
+            stats['skipped'] += 1
+            _mark_notifications_skipped(supabase, notifications)
+            continue
+
+        # Send digest email
+        if dry_run:
+            print(f"  [DRY RUN] Would send digest to {user_email}")
+            stats['sent'] += 1
+        else:
+            result = send_daily_digest(user_email, notifications)
+
+            if result['success']:
+                print(f"  ✓ Sent digest to {user_email}")
+                stats['sent'] += 1
+
+                # Update notification queue status
+                notification_ids = [n['id'] for n in notifications]
+                supabase.table('notification_queue') \
+                    .update({'status': 'sent', 'sent_at': 'now()'}) \
+                    .in_('id', notification_ids) \
+                    .execute()
+
+                # Record in history
+                newsletter_ids = list(set([n['newsletter_id'] for n in notifications]))
+                rule_ids = list(set([n['rule_id'] for n in notifications]))
+
+                supabase.table('notification_history').insert({
+                    'user_id': user_id,
+                    'newsletter_ids': newsletter_ids,
+                    'rule_ids': rule_ids,
+                    'digest_batch_id': batch_id,
+                    'delivery_type': 'daily_digest',
+                    'success': True,
+                    'resend_email_id': result.get('email_id')
+                }).execute()
+
+            else:
+                error_msg = result.get('error')
+                print(f"  ✗ Failed to send to {user_email}: {error_msg}")
+                stats['failed'] += 1
+
+                # Log error to file
+                error_file = log_notification_error(
+                    error_type='sending',
+                    error_message=error_msg,
+                    context={
+                        'user_id': user_id,
+                        'user_email': user_email,
+                        'batch_id': batch_id,
+                        'notification_count': len(notifications),
+                        'newsletter_ids': [n['newsletter_id'] for n in notifications]
+                    }
+                )
+                print(f"    Error details logged to: {error_file}")
+
+                # Update notification queue with error
+                notification_ids = [n['id'] for n in notifications]
+                supabase.table('notification_queue') \
+                    .update({
+                        'status': 'failed',
+                        'error_message': error_msg
+                    }) \
+                    .in_('id', notification_ids) \
+                    .execute()
+
+                # Record failure in history
+                newsletter_ids = list(set([n['newsletter_id'] for n in notifications]))
+                rule_ids = list(set([n['rule_id'] for n in notifications]))
+
+                supabase.table('notification_history').insert({
+                    'user_id': user_id,
+                    'newsletter_ids': newsletter_ids,
+                    'rule_ids': rule_ids,
+                    'digest_batch_id': batch_id,
+                    'delivery_type': 'daily_digest',
+                    'success': False,
+                    'error_message': error_msg
+                }).execute()
+
+        # Rate limiting: max 10 emails/second
+        time.sleep(0.1)
+
+    # Print summary
+    print(f"\n{'=' * 60}")
+    print(f"Daily Digest Processing Complete")
+    print(f"{'=' * 60}")
+    print(f"Batch ID: {batch_id}")
+    print(f"Sent:     {stats['sent']}")
+    print(f"Failed:   {stats['failed']}")
+    print(f"Skipped:  {stats['skipped']}")
+    print(f"Total:    {sum(stats.values())}")
+
+    return stats
+
+
+def _mark_notifications_skipped(supabase, notifications: List[Dict[str, Any]]) -> None:
+    """Mark notifications as failed (user has notifications disabled)."""
+    notification_ids = [n['id'] for n in notifications]
+    supabase.table('notification_queue') \
+        .update({
+            'status': 'failed',
+            'error_message': 'User notifications disabled'
+        }) \
+        .in_('id', notification_ids) \
+        .execute()
+
+
+def main():
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(
+        description='Process notification queue and send emails'
+    )
+
+    parser.add_argument(
+        '--daily-digest',
+        action='store_true',
+        help='Send daily digest emails'
+    )
+
+    parser.add_argument(
+        '--batch-id',
+        type=str,
+        help='Specific batch ID to process (YYYY-MM-DD format, defaults to today)'
+    )
+
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Dry run mode (don\'t actually send emails)'
+    )
+
+    args = parser.parse_args()
+
+    if not args.daily_digest:
+        parser.error('Must specify --daily-digest')
+
+    if args.daily_digest:
+        process_daily_digests(
+            batch_id=args.batch_id,
+            dry_run=args.dry_run
+        )
+
+
+if __name__ == '__main__':
+    main()
