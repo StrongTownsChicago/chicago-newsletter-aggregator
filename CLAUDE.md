@@ -58,6 +58,10 @@ uv run python -m notifications.process_notification_queue --daily-digest --batch
 uv run python -m unittest tests.test_sanitization
 uv run python -m unittest tests.test_sanitization_comprehensive
 uv run python -m unittest tests.test_user_cases
+
+# Lint and format (run after making Python changes)
+uv run ruff check --fix  # Fix auto-fixable issues, manually fix remaining
+uv run ruff format       # Format code
 ```
 
 ### Frontend (from `frontend/` directory)
@@ -327,6 +331,8 @@ All new features must have clear, useful tests that validate correctness. Tests 
 ### Production-Grade Code Quality
 
 Code must be maintainable, readable, and understandable. Always choose production-grade patterns over quick hacks. Code is read far more than it's written - optimize for the next developer.
+
+**Python Code Quality**: After making any Python changes, run `uv run ruff check --fix` and `uv run ruff format`. Fix any issues flagged by the checker before considering work complete.
 
 **Never**:
 
