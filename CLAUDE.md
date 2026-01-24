@@ -174,35 +174,41 @@ PUBLIC_SUPABASE_ANON_KEY=
 When writing or refactoring code in this repository, follow these core principles:
 
 ### Single Responsibility Principle (SRP)
+
 Each function should do one thing well. Separate data extraction from transformation from presentation. If a function has "and" in its description, it probably does too much.
 
 **Bad**: `process_and_send_newsletter()` - fetches data, transforms it, AND sends email
 **Good**: Separate functions for fetching, transforming, sending
 
 ### DRY (Don't Repeat Yourself)
+
 Never duplicate logic. If you're extracting/formatting the same data in multiple places, create a shared helper function. Process data once, pass the result to consumers.
 
 **Bad**: Parsing dates in 5 different functions
 **Good**: One `parse_newsletter_date()` function used everywhere
 
 ### Separation of Concerns
+
 Data access, business logic, and presentation should be separate layers. Database code shouldn't know about email templates. Email templates shouldn't contain rule matching logic.
 
 **Example**: Ingestion fetches data → LLM processes it → Notification rules match it → Email renderer presents it (separate files, clear boundaries)
 
 ### Performance Matters
+
 Fetch what you need in one query, not in a loop. Group operations. Avoid processing the same data multiple times.
 
 **Bad**: Loop over 100 newsletters, fetch source for each (101 queries)
 **Good**: Join with sources table (1 query)
 
 ### Testability First
+
 Write code that's easy to test. Pure functions (same input = same output) are ideal. Extract business logic from I/O operations so you can test without databases/APIs.
 
 **Testable**: `rule_matches_newsletter(rule_data, newsletter_data)` - pure function
 **Hard to test**: Function that queries DB, checks rules, and sends email all in one
 
 ### Testing & Validation Requirements
+
 All new features must have clear, useful tests that validate correctness. Tests are not optional - they're part of the feature. Always run tests to validate changes before considering work complete.
 
 **Backend**: Write unit tests for business logic, integration tests for data flows. Tests live in `backend/tests/`.
@@ -212,15 +218,19 @@ All new features must have clear, useful tests that validate correctness. Tests 
 **Pattern**: Feature isn't done until tests prove it works. Use tests to prevent regressions, not just to check boxes.
 
 ### Production-Grade Code Quality
+
 Code must be maintainable, readable, and understandable. Always choose production-grade patterns over quick hacks. Code is read far more than it's written - optimize for the next developer.
 
 **Never**:
+
 - Ship hacky solutions or temporary workarounds
 - Leave TODOs or commented-out code in production
 - Use magic numbers or unclear abbreviations
 - Write code only you can understand
+- Don't overengineer things when a cleaner pattern exists
 
 **Always**:
+
 - Use clear, self-documenting code with meaningful names
 - Follow established patterns in the codebase
 - Write code that's easy to debug and modify
@@ -229,17 +239,20 @@ Code must be maintainable, readable, and understandable. Always choose productio
 **Standard**: Every line of code should be production-ready. No shortcuts, no "fix it later", no clever tricks that obscure intent.
 
 ### Meaningful Names
+
 Function names should be verbs. Variables should describe their content. Be specific.
 
 **Good**: `match_newsletter_to_rules()`, `active_rules`, `newsletter_url`
 **Bad**: `process()`, `data`, `temp`, `x`
 
 ### Declarative Over Imperative
+
 Use declarative patterns when they improve clarity. Strategy pattern over if/else chains. List comprehensions over loops with append. Pydantic models over manual validation.
 
 **Example**: Scraping uses strategy pattern - URL determines strategy, not a long if/elif chain checking URL patterns.
 
 ### Error Handling
+
 Catch exceptions at appropriate boundaries. Log errors with context for debugging. Don't let one failure break the entire pipeline. Return meaningful errors, not generic "failed" messages.
 
 **Pattern**: Ingestion catches errors per newsletter, logs details, continues processing remaining newsletters.

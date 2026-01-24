@@ -1,40 +1,30 @@
 import re
-import json
 import os
 from bs4 import BeautifulSoup
 from html2text import html2text
 from typing import Dict, Optional
 
-# Cache for patterns
-_PRIVACY_PATTERNS = None
-
-def load_privacy_patterns() -> dict:
-    """Load and cache privacy patterns from config file"""
-    global _PRIVACY_PATTERNS
-    if _PRIVACY_PATTERNS is not None:
-        return _PRIVACY_PATTERNS
-    
-    config_path = os.path.join(os.path.dirname(__file__), '../../config/privacy_patterns.json')
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            _PRIVACY_PATTERNS = json.load(f)
-    except Exception as e:
-        print(f"  ⚠️  Could not load privacy patterns: {e}")
-        _PRIVACY_PATTERNS = {"url_patterns": [], "selectors": []}
-    
-    return _PRIVACY_PATTERNS
-
-def sanitize_content(content: str, content_type: str, source_id: Optional[int] = None) -> str:
+def sanitize_content(content: str, content_type: str, privacy_patterns: dict) -> str:
     """
-    Remove privacy-sensitive elements based on URL patterns, CSS selectors, and link text.
+    Remove privacy-sensitive elements from newsletter content.
+
+    Filters out unsubscribe links, tracking URLs, and sensitive text based on
+    provided patterns and PRIVACY_STRIP_PHRASES env var.
+
+    Args:
+        content: Raw HTML or plain text content
+        content_type: Either 'html' or 'text'
+        privacy_patterns: Dict with keys: url_patterns, text_patterns, selectors
+
+    Returns:
+        Sanitized content with privacy elements removed
     """
     if not content:
         return ""
 
-    patterns = load_privacy_patterns()
-    url_patterns = patterns.get('url_patterns', [])
-    text_patterns = patterns.get('text_patterns', [])
-    selectors = patterns.get('selectors', [])
+    url_patterns = privacy_patterns.get('url_patterns', [])
+    text_patterns = privacy_patterns.get('text_patterns', [])
+    selectors = privacy_patterns.get('selectors', [])
 
     if content_type == 'html':
         try:
@@ -116,12 +106,12 @@ def sanitize_content(content: str, content_type: str, source_id: Optional[int] =
 
     return result
 
-    return content
-
 def lookup_source_by_email(from_email: str, supabase_client) -> dict | None:
     """
-    Find source by matching email against mappings table with wildcard support.
-    Returns the full source record if found, None otherwise.
+    Match sender email to source using email_source_mappings table.
+
+    Supports SQL wildcard patterns (e.g., '%@40thward.org') and exact matches.
+    Returns full source record with joined data, or None if no match found.
     """
     from_email_lower = from_email.lower()
     
@@ -152,8 +142,10 @@ def lookup_source_by_email(from_email: str, supabase_client) -> dict | None:
 
 def extract_name_from_sender(from_address: str) -> Optional[str]:
     """
-    Attempt to extract name from email sender field.
+    Extract display name from email sender field.
+
     Example: "Alderman John Smith <ward01@example.com>" -> "John Smith"
+    Returns None if no display name present.
     """
     # Try parsing display name from email header
     match = re.match(r'^(.+?)\s*<', from_address)
@@ -166,7 +158,7 @@ def extract_name_from_sender(from_address: str) -> Optional[str]:
     return None
 
 def clean_html_content(html: str) -> str:
-    """Convert HTML to clean plain text"""
+    """Convert HTML to clean plain text using html2text, removing excessive whitespace."""
     if not html:
         return ""
     
@@ -175,14 +167,15 @@ def clean_html_content(html: str) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
-def parse_newsletter(msg, supabase_client) -> Dict:
+def parse_newsletter(msg, supabase_client, privacy_patterns: dict) -> Dict:
     """
     Parse email message into structured newsletter data.
-    
+
     Args:
         msg: MailMessage object from imap_tools
         supabase_client: Supabase client for database lookups
-        
+        privacy_patterns: Dict with privacy filtering patterns (url_patterns, text_patterns, selectors)
+
     Returns:
         Dictionary with newsletter data ready for database insertion
     """
@@ -207,10 +200,10 @@ def parse_newsletter(msg, supabase_client) -> Dict:
     # Sanitize content for Privacy (remove unsubscribe links, etc.)
     # We do this BEFORE converting HTML to text, so the text version is also clean
     if html_content:
-        html_content = sanitize_content(html_content, 'html', source_id)
-        
+        html_content = sanitize_content(html_content, 'html', privacy_patterns)
+
     if plain_text:
-        plain_text = sanitize_content(plain_text, 'text', source_id)
+        plain_text = sanitize_content(plain_text, 'text', privacy_patterns)
     
     # If we have HTML but no plain text, convert HTML (now sanitized) to plain text
     if html_content and not plain_text:

@@ -26,6 +26,8 @@ Output:
 """
 
 import os
+import json
+from pathlib import Path
 from datetime import datetime
 from imap_tools import MailBox, AND, MailMessageFlags
 from dotenv import load_dotenv
@@ -40,6 +42,11 @@ GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 ENABLE_NOTIFICATIONS = os.getenv("ENABLE_NOTIFICATIONS", "false").lower() == "true"
+
+# Load privacy patterns
+privacy_config_path = Path(__file__).parent.parent.parent / 'config' / 'privacy_patterns.json'
+with open(privacy_config_path, 'r', encoding='utf-8') as f:
+    PRIVACY_PATTERNS = json.load(f)
 
 supabase = get_supabase_client()
 
@@ -124,7 +131,7 @@ def process_new_newsletters():
                 
                 # Parse email
                 print(f"Processing: {msg.subject}")
-                newsletter = parse_newsletter(msg, supabase)
+                newsletter = parse_newsletter(msg, supabase, PRIVACY_PATTERNS)
                 
                 # Check if source was matched
                 if newsletter['source_id'] is None:
