@@ -87,7 +87,7 @@ def _prepare_newsletter_data(
             try:
                 date_obj = datetime.fromisoformat(received_date.replace("Z", "+00:00"))
                 date_formatted = date_obj.strftime("%B %d, %Y")
-            except:
+            except (ValueError, TypeError):
                 date_formatted = received_date[:10]
         else:
             date_formatted = "Unknown date"

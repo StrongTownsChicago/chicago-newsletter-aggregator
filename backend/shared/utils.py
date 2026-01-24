@@ -9,7 +9,7 @@ def parse_date_string(date_str: str) -> str | None:
     try:
         dt = date_parser.parse(date_str, fuzzy=True)
         return dt.isoformat()
-    except:
+    except (ValueError, OverflowError, TypeError):
         return None
 
 
