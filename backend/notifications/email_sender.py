@@ -51,7 +51,7 @@ def send_daily_digest(
     try:
         # Send email via Resend
         response = resend.Emails.send({
-            "from": from_email,
+            "from": f"Chicago Alderman Newsletter Tracker <{from_email}>",
             "to": user_email,
             "subject": subject,
             "html": html_body,
@@ -266,7 +266,7 @@ def _build_digest_html(notifications: List[Dict[str, Any]], preferences_url: str
                 <a href="{preferences_url}">Manage your notification preferences</a>
             </p>
             <p style="margin-top: 15px; color: #9ca3af; font-size: 12px;">
-                Chicago Newsletter Aggregator • Built for Strong Towns Chicago
+                <a href="https://www.strongtownschicago.org/chicago-alderman-newsletters">Chicago Newsletter Aggregator</a> • Built for <a href="https://strongtownschicago.org">Strong Towns Chicago</a>
             </p>
         </div>
     </div>
@@ -350,7 +350,7 @@ Manage your notification preferences: {preferences_url}
 
 ---
 Chicago Newsletter Aggregator
-Built for Strong Towns Chicago
+Built for Strong Towns Chicago - https://strongtownschicago.org
 """
 
     return text
