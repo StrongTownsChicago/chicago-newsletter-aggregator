@@ -29,30 +29,29 @@ TOPICS = [
     "missing_middle_housing",
     "accessory_dwelling_units",
     "single_stair_reform",
-
     # Safe & Productive Streets
     "bike_lanes",
     "street_redesign",
-
     # Transit
     "transit_funding",
-
     # Transparent Local Accounting
     "city_budget",
     "tax_policy",
-
     # Governance & Community Engagement
     "zoning_or_development_meeting_or_approval",
     "city_charter",
 ]
 
 
-
 class TopicsExtraction(BaseModel):
-    topics: List[str] = Field(description="List of relevant topics from predefined list")
+    topics: List[str] = Field(
+        description="List of relevant topics from predefined list"
+    )
+
 
 class Summary(BaseModel):
     summary: str = Field(max_length=2000, description="2-3 sentence summary")
+
 
 class RelevanceScore(BaseModel):
     score: int = Field(ge=0, le=10, description="Relevance score 0-10")
@@ -63,7 +62,13 @@ class RelevanceScore(BaseModel):
 ollama_client = Client(timeout=240.0)
 
 
-def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_retries: int = MAX_LLM_RETRIES) -> str:
+def call_llm(
+    model: str,
+    prompt: str,
+    schema: dict,
+    temperature: float = 0,
+    max_retries: int = MAX_LLM_RETRIES,
+) -> str:
     """
     Call Ollama LLM with structured output validation and exponential backoff retry logic.
 
@@ -93,7 +98,9 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
             if attempt == 2:  # Third attempt
                 if len(original_prompt) > RETRY_TRUNCATE_THRESHOLD:
                     prompt = original_prompt[:RETRY_TRUNCATE_THRESHOLD]
-                    print(f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_THRESHOLD} chars")
+                    print(
+                        f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_THRESHOLD} chars"
+                    )
 
             response = ollama_client.chat(
                 model=model,
@@ -101,7 +108,7 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
                 format=schema,
                 options={
                     "temperature": temperature,
-                    }
+                },
             )
             content = response.message.content
 
@@ -113,8 +120,10 @@ def call_llm(model: str, prompt: str, schema: dict, temperature: float = 0, max_
 
         except Exception as e:
             if attempt < max_retries - 1:
-                wait_time = 2 ** attempt  # Simple exponential backoff: 1s, 2s
-                print(f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                wait_time = 2**attempt  # Simple exponential backoff: 1s, 2s
+                print(
+                    f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
+                )
                 time.sleep(wait_time)
             else:
                 raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
@@ -140,7 +149,7 @@ def extract_topics(content: str, model: str) -> List[str]:
 
 STC focuses on: Housing (4-flats, zoning, ADUs), Parking Reform, Safe Streets (bike/ped, traffic calming), Transit (CTA/Metra/bus), Budget/Fiscal Policy, Governance (meetings, development approvals, ordinances).
 
-Topics: {', '.join(TOPICS)}
+Topics: {", ".join(TOPICS)}
 
 Select ONLY explicitly discussed topics. Prioritize: zoning/development approvals, housing/transit/budget meetings, parking/transit policy.
 
@@ -155,8 +164,10 @@ Newsletter:
         data = TopicsExtraction.model_validate_json(response)
         # Filter to only valid topics
         valid_topics = [t for t in data.topics if t in TOPICS]
-        
-        print(f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}")
+
+        print(
+            f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}"
+        )
         return valid_topics
     except Exception as e:
         print(f"  ✗ Topic extraction failed: {e}")
@@ -179,7 +190,7 @@ def generate_summary(content: str, model: str) -> str:
         2-3 sentence summary string (empty string on error)
     """
 
-# The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
+    # The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
     prompt = f"""Summarize this alderman's newsletter in 2-3 sentences.
 
 PRIORITIZE mentioning (in order of importance):
@@ -196,7 +207,7 @@ Reference the name of the alderman and ward if they are mentioned. Do not assume
 Newsletter:
 {content}
 """
-    
+
     try:
         print("  → Generating summary...")
         response = call_llm(model, prompt, Summary.model_json_schema())
@@ -208,7 +219,9 @@ Newsletter:
         return ""
 
 
-def score_relevance(content: str, model: str, topics: List[str] = None, summary: str = None) -> int | None:
+def score_relevance(
+    content: str, model: str, topics: List[str] = None, summary: str = None
+) -> int | None:
     """
     Score newsletter relevance to Strong Towns Chicago priorities on a 0-10 scale.
 
@@ -229,7 +242,9 @@ def score_relevance(content: str, model: str, topics: List[str] = None, summary:
     # Build context from previously extracted info
     context_section = ""
     if topics or summary:
-        context_section = "\nFor context, here is what was already extracted from this newsletter:\n"
+        context_section = (
+            "\nFor context, here is what was already extracted from this newsletter:\n"
+        )
         if topics and len(topics) > 0:
             context_section += f"Topics identified: {', '.join(topics)}\n"
         if summary:
@@ -282,7 +297,7 @@ Example: "CAPS meeting Tuesday" or "Lake St bridge work continues"
 Newsletter:
 {content}
 """
-    
+
     try:
         response = call_llm(model, prompt, RelevanceScore.model_json_schema())
         data = RelevanceScore.model_validate_json(response)
@@ -293,7 +308,9 @@ Newsletter:
         return None
 
 
-def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = MAX_NEWSLETTER_CHARS) -> dict:
+def process_with_ollama(
+    newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = MAX_NEWSLETTER_CHARS
+) -> dict:
     """
     Process a newsletter through the complete LLM pipeline.
 
@@ -309,21 +326,19 @@ def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars:
     Returns:
         Dict with keys: 'topics' (List[str]), 'summary' (str), 'relevance_score' (int|None)
     """
-    plain_text = newsletter['plain_text']
+    plain_text = newsletter["plain_text"]
 
     if len(plain_text) > max_chars:
         plain_text = plain_text[:max_chars]
         print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
 
     today = datetime.now().strftime("%Y-%m-%d")
-    content = f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
+    content = (
+        f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
+    )
 
     topics = extract_topics(content, model)
     summary = generate_summary(content, model)
     relevance_score = score_relevance(content, model, topics, summary)
-    
-    return {
-        "topics": topics,
-        "summary": summary,
-        "relevance_score": relevance_score
-    }
+
+    return {"topics": topics, "summary": summary, "relevance_score": relevance_score}

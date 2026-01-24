@@ -26,19 +26,23 @@ def test_matching(should_queue: bool = False):
     supabase = get_supabase_client()
 
     # Fetch most recent newsletters with topics
-    response = supabase.table('newsletters') \
-        .select('id, subject, topics, plain_text, source_id, relevance_score, sources(ward_number)') \
-        .not_.is_('topics', None) \
-        .order('created_at', desc=True) \
-        .limit(10) \
+    response = (
+        supabase.table("newsletters")
+        .select(
+            "id, subject, topics, plain_text, source_id, relevance_score, sources(ward_number)"
+        )
+        .not_.is_("topics", None)
+        .order("created_at", desc=True)
+        .limit(10)
         .execute()
+    )
 
     if not response.data:
         print("No newsletters found in database")
         return
 
     for newsletter in response.data:
-        newsletter_id = newsletter['id']
+        newsletter_id = newsletter["id"]
 
         print("Testing Notification Matching")
         print("=" * 60)
@@ -48,13 +52,15 @@ def test_matching(should_queue: bool = False):
         print(f"Relevance: {newsletter.get('relevance_score')}")
         print()
 
-        # Prepare newsletter data 
+        # Prepare newsletter data
         newsletter_data = {
-            'topics': newsletter.get('topics', []),
-            'plain_text': newsletter.get('plain_text', ''),
-            'source_id': newsletter.get('source_id'),
-            'ward_number': newsletter.get('sources', {}).get('ward_number') if newsletter.get('sources') else None,
-            'relevance_score': newsletter.get('relevance_score')
+            "topics": newsletter.get("topics", []),
+            "plain_text": newsletter.get("plain_text", ""),
+            "source_id": newsletter.get("source_id"),
+            "ward_number": newsletter.get("sources", {}).get("ward_number")
+            if newsletter.get("sources")
+            else None,
+            "relevance_score": newsletter.get("relevance_score"),
         }
 
         # Find matching rules
@@ -85,7 +91,9 @@ def test_matching(should_queue: bool = False):
             else:
                 print("Dry run mode - would queue the following:")
                 for match in matched_rules:
-                    print(f"  - User {match['user_id']} would be notified for rule '{match['rule_name']}'")
+                    print(
+                        f"  - User {match['user_id']} would be notified for rule '{match['rule_name']}'"
+                    )
                 print()
                 print("(Use --queue flag to actually queue these notifications)")
 
@@ -95,19 +103,17 @@ def test_matching(should_queue: bool = False):
 
 def main():
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description='Test notification matching logic'
-    )
+    parser = argparse.ArgumentParser(description="Test notification matching logic")
 
     parser.add_argument(
-        '--queue',
-        action='store_true',
-        help='Actually queue the notifications (not just a dry run)'
+        "--queue",
+        action="store_true",
+        help="Actually queue the notifications (not just a dry run)",
     )
 
     args = parser.parse_args()
     test_matching(should_queue=args.queue)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

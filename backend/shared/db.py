@@ -4,6 +4,7 @@ import os
 
 load_dotenv()
 
+
 def get_supabase_client():
     """Get initialized Supabase client"""
     url = os.getenv("SUPABASE_URL")

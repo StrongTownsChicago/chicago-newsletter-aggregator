@@ -12,8 +12,7 @@ from notifications.error_logger import log_notification_error
 
 
 def match_newsletter_to_rules(
-    newsletter_id: str,
-    newsletter_data: Dict[str, Any]
+    newsletter_id: str, newsletter_data: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
     """
     Find all notification rules that match a given newsletter.
@@ -33,10 +32,14 @@ def match_newsletter_to_rules(
         supabase = get_supabase_client()
 
         # Fetch all active notification rules with user preferences
-        response = supabase.table('notification_rules') \
-            .select('id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers') \
-            .eq('is_active', True) \
+        response = (
+            supabase.table("notification_rules")
+            .select(
+                "id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers"
+            )
+            .eq("is_active", True)
             .execute()
+        )
 
         if not response.data:
             return []
@@ -44,55 +47,60 @@ def match_newsletter_to_rules(
         active_rules = response.data
 
         # Also fetch user preferences to check if notifications are enabled
-        user_ids = [rule['user_id'] for rule in active_rules]
-        users_response = supabase.table('user_profiles') \
-            .select('id, notification_preferences') \
-            .in_('id', user_ids) \
+        user_ids = [rule["user_id"] for rule in active_rules]
+        users_response = (
+            supabase.table("user_profiles")
+            .select("id, notification_preferences")
+            .in_("id", user_ids)
             .execute()
+        )
 
         # Create lookup for enabled users
         enabled_users = set()
         if users_response.data:
             for user in users_response.data:
-                prefs = user.get('notification_preferences', {})
-                if prefs.get('enabled', True):  # Default to enabled if not set
-                    enabled_users.add(user['id'])
+                prefs = user.get("notification_preferences", {})
+                if prefs.get("enabled", True):  # Default to enabled if not set
+                    enabled_users.add(user["id"])
 
         # Filter and match rules
         matched_rules = []
         for rule in active_rules:
             # Skip if user has notifications disabled
-            if rule['user_id'] not in enabled_users:
+            if rule["user_id"] not in enabled_users:
                 continue
 
             # Check if rule matches newsletter
             if _rule_matches_newsletter(rule, newsletter_data):
-                matched_rules.append({
-                    'user_id': rule['user_id'],
-                    'rule_id': rule['id'],
-                    'rule_name': rule['name']
-                })
+                matched_rules.append(
+                    {
+                        "user_id": rule["user_id"],
+                        "rule_id": rule["id"],
+                        "rule_name": rule["name"],
+                    }
+                )
 
         return matched_rules
 
     except Exception as e:
         error_file = log_notification_error(
-            error_type='matching',
+            error_type="matching",
             error_message=str(e),
             context={
-                'newsletter_id': newsletter_id,
-                'newsletter_topics': newsletter_data.get('topics', []),
-                'newsletter_source_id': newsletter_data.get('source_id')
-            }
+                "newsletter_id": newsletter_id,
+                "newsletter_topics": newsletter_data.get("topics", []),
+                "newsletter_source_id": newsletter_data.get("source_id"),
+            },
         )
-        print(f"  ⚠️  Error matching newsletter to rules. Details logged to: {error_file}")
+        print(
+            f"  ⚠️  Error matching newsletter to rules. Details logged to: {error_file}"
+        )
         # Return empty list to avoid breaking ingestion
         return []
 
 
 def _rule_matches_newsletter(
-    rule: Dict[str, Any],
-    newsletter_data: Dict[str, Any]
+    rule: Dict[str, Any], newsletter_data: Dict[str, Any]
 ) -> bool:
     """
     Check if a single rule matches a newsletter.
@@ -108,27 +116,26 @@ def _rule_matches_newsletter(
         True if the rule matches the newsletter
     """
     # Extract newsletter data
-    newsletter_topics = set(newsletter_data.get('topics', []))
-    newsletter_text = newsletter_data.get('plain_text', '').lower()
-    newsletter_ward = newsletter_data.get('ward_number')
+    newsletter_topics = set(newsletter_data.get("topics", []))
+    newsletter_text = newsletter_data.get("plain_text", "").lower()
+    newsletter_ward = newsletter_data.get("ward_number")
 
     # Topics filter (at least one topic must match)
-    rule_topics = rule.get('topics', [])
+    rule_topics = rule.get("topics", [])
     if rule_topics:
         # At least one rule topic must be in newsletter topics
         if not any(topic in newsletter_topics for topic in rule_topics):
             return False
 
     # Search Term filter (phrase match)
-    search_term = rule.get('search_term')
+    search_term = rule.get("search_term")
     if search_term:
         # Search term must appear in newsletter text (case-insensitive)
         if search_term.lower() not in newsletter_text:
             return False
 
-
     # Phase 2: Ward filter (newsletter must be from alderman in one of specified wards)
-    rule_wards = rule.get('ward_numbers', [])
+    rule_wards = rule.get("ward_numbers", [])
     if rule_wards:
         if newsletter_ward not in rule_wards:
             return False
@@ -137,10 +144,7 @@ def _rule_matches_newsletter(
     return True
 
 
-def queue_notifications(
-    newsletter_id: str,
-    matched_rules: List[Dict[str, Any]]
-) -> int:
+def queue_notifications(newsletter_id: str, matched_rules: List[Dict[str, Any]]) -> int:
     """
     Queue notifications for matched rules.
 
@@ -163,13 +167,15 @@ def queue_notifications(
         # Prepare notifications for batch insert
         notifications = []
         for match in matched_rules:
-            notifications.append({
-                'user_id': match['user_id'],
-                'newsletter_id': newsletter_id,
-                'rule_id': match['rule_id'],
-                'status': 'pending',
-                'digest_batch_id': today
-            })
+            notifications.append(
+                {
+                    "user_id": match["user_id"],
+                    "newsletter_id": newsletter_id,
+                    "rule_id": match["rule_id"],
+                    "status": "pending",
+                    "digest_batch_id": today,
+                }
+            )
 
         # Insert notifications individually to handle duplicates gracefully
         # Unique constraint on (user_id, newsletter_id, rule_id) will prevent duplicates
@@ -178,47 +184,53 @@ def queue_notifications(
 
         for notification in notifications:
             try:
-                supabase.table('notification_queue') \
-                    .insert(notification, returning='minimal') \
-                    .execute()
+                supabase.table("notification_queue").insert(
+                    notification, returning="minimal"
+                ).execute()
                 queued_count += 1
             except Exception as e:
                 # Track failures that aren't just duplicates
                 error_str = str(e)
-                if 'duplicate' not in error_str.lower() and 'unique' not in error_str.lower():
-                    failed_notifications.append({
-                        'notification': notification,
-                        'error': error_str
-                    })
-                print(f"  ⚠ Could not queue notification for user {notification['user_id']}: {e}")
+                if (
+                    "duplicate" not in error_str.lower()
+                    and "unique" not in error_str.lower()
+                ):
+                    failed_notifications.append(
+                        {"notification": notification, "error": error_str}
+                    )
+                print(
+                    f"  ⚠ Could not queue notification for user {notification['user_id']}: {e}"
+                )
 
         # Log non-duplicate failures
         if failed_notifications:
             log_notification_error(
-                error_type='queuing',
-                error_message=f'Failed to queue {len(failed_notifications)} notification(s)',
+                error_type="queuing",
+                error_message=f"Failed to queue {len(failed_notifications)} notification(s)",
                 context={
-                    'newsletter_id': newsletter_id,
-                    'failures': failed_notifications
-                }
+                    "newsletter_id": newsletter_id,
+                    "failures": failed_notifications,
+                },
             )
 
         return queued_count
 
     except Exception as e:
         error_file = log_notification_error(
-            error_type='queuing',
+            error_type="queuing",
             error_message=str(e),
             context={
-                'newsletter_id': newsletter_id,
-                'matched_rules_count': len(matched_rules)
-            }
+                "newsletter_id": newsletter_id,
+                "matched_rules_count": len(matched_rules),
+            },
         )
         print(f"  ⚠️  Error queuing notifications. Details logged to: {error_file}")
         return 0
 
 
-def get_pending_notifications_by_user(digest_batch_id: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+def get_pending_notifications_by_user(
+    digest_batch_id: Optional[str] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     Get all pending notifications grouped by user.
 
@@ -231,13 +243,17 @@ def get_pending_notifications_by_user(digest_batch_id: Optional[str] = None) -> 
     """
     supabase = get_supabase_client()
 
-    query = supabase.table('notification_queue') \
-        .select('*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, relevance_score, source:sources(name, ward_number)), rule:notification_rules(name)') \
-        .eq('status', 'pending') \
-        .order('created_at', desc=False)
+    query = (
+        supabase.table("notification_queue")
+        .select(
+            "*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, relevance_score, source:sources(name, ward_number)), rule:notification_rules(name)"
+        )
+        .eq("status", "pending")
+        .order("created_at", desc=False)
+    )
 
     if digest_batch_id:
-        query = query.eq('digest_batch_id', digest_batch_id)
+        query = query.eq("digest_batch_id", digest_batch_id)
 
     response = query.execute()
 
@@ -247,7 +263,7 @@ def get_pending_notifications_by_user(digest_batch_id: Optional[str] = None) -> 
     # Group by user_id
     notifications_by_user = {}
     for notification in response.data:
-        user_id = notification['user_id']
+        user_id = notification["user_id"]
         if user_id not in notifications_by_user:
             notifications_by_user[user_id] = []
         notifications_by_user[user_id].append(notification)

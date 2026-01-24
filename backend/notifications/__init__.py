@@ -12,7 +12,7 @@ from .rule_matcher import match_newsletter_to_rules, queue_notifications
 from .email_sender import send_daily_digest
 
 __all__ = [
-    'match_newsletter_to_rules',
-    'queue_notifications',
-    'send_daily_digest',
+    "match_newsletter_to_rules",
+    "queue_notifications",
+    "send_daily_digest",
 ]

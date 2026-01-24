@@ -10,9 +10,7 @@ from typing import Optional, Dict, Any
 
 
 def log_notification_error(
-    error_type: str,
-    error_message: str,
-    context: Optional[Dict[str, Any]] = None
+    error_type: str, error_message: str, context: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Log a notification error to a timestamped file.
@@ -26,7 +24,7 @@ def log_notification_error(
         Path to the log file created
     """
     # Create logs directory if it doesn't exist
-    log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    log_dir = os.path.join(os.path.dirname(__file__), "logs")
     os.makedirs(log_dir, exist_ok=True)
 
     # Generate timestamped filename
@@ -34,7 +32,7 @@ def log_notification_error(
     filename = os.path.join(log_dir, f"notification_error_{timestamp}.txt")
 
     # Write error to file
-    with open(filename, 'w', encoding='utf-8') as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write(f"Notification Error Report - {datetime.now()}\n")
         f.write("=" * 60 + "\n\n")
         f.write(f"Error Type: {error_type}\n")

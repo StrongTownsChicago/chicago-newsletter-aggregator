@@ -32,6 +32,7 @@ from processing.llm_processor import process_with_ollama
 
 load_dotenv()
 
+
 def fetch_newsletters(supabase, args):
     """Fetch newsletters based on filter arguments."""
 
@@ -63,8 +64,8 @@ def fetch_newsletters(supabase, args):
 def reprocess_newsletter(supabase, newsletter, model, dry_run=False):
     """Reprocess a single newsletter with LLM."""
 
-    newsletter_id = newsletter['id']
-    subject = newsletter['subject']
+    newsletter_id = newsletter["id"]
+    subject = newsletter["subject"]
 
     print(f"\nProcessing: {subject}")
     print(f"  ID: {newsletter_id}")
@@ -76,7 +77,7 @@ def reprocess_newsletter(supabase, newsletter, model, dry_run=False):
         return True
 
     # Check if newsletter has content to process
-    if not newsletter.get('plain_text'):
+    if not newsletter.get("plain_text"):
         print("  ⚠️  No plain_text content, skipping")
         return False
 
@@ -85,19 +86,28 @@ def reprocess_newsletter(supabase, newsletter, model, dry_run=False):
         llm_data = process_with_ollama(newsletter, model)
 
         # Update database
-        update_result = supabase.table("newsletters").update({
-            "topics": llm_data["topics"],
-            "summary": llm_data["summary"],
-            "relevance_score": llm_data["relevance_score"]
-        }).eq("id", newsletter_id).execute()
+        update_result = (
+            supabase.table("newsletters")
+            .update(
+                {
+                    "topics": llm_data["topics"],
+                    "summary": llm_data["summary"],
+                    "relevance_score": llm_data["relevance_score"],
+                }
+            )
+            .eq("id", newsletter_id)
+            .execute()
+        )
 
         if update_result.data:
-            print(f"  ✓ Updated successfully")
-            print(f"    Topics: {', '.join(llm_data['topics']) if llm_data['topics'] else 'none'}")
+            print("  ✓ Updated successfully")
+            print(
+                f"    Topics: {', '.join(llm_data['topics']) if llm_data['topics'] else 'none'}"
+            )
             print(f"    Score: {llm_data['relevance_score']}/10")
             return True
         else:
-            print(f"  ✗ Update failed")
+            print("  ✗ Update failed")
             return False
 
     except Exception as e:
@@ -109,39 +119,31 @@ def main():
     parser = argparse.ArgumentParser(
         description="Reprocess existing newsletters with updated LLM processor",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     # Filter options
     parser.add_argument(
-        "--latest",
-        type=int,
-        help="Process the N most recent newsletters"
+        "--latest", type=int, help="Process the N most recent newsletters"
     )
 
     parser.add_argument(
         "--skip",
         type=int,
         default=0,
-        help="Skip the first N newsletters (useful with --latest to process next batch)"
+        help="Skip the first N newsletters (useful with --latest to process next batch)",
     )
 
     parser.add_argument(
-        "--source-id",
-        type=int,
-        help="Only process newsletters from this source ID"
+        "--source-id", type=int, help="Only process newsletters from this source ID"
     )
 
     parser.add_argument(
-        "--newsletter-id",
-        type=str,
-        help="Process a specific newsletter by ID"
+        "--newsletter-id", type=str, help="Process a specific newsletter by ID"
     )
 
     parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Process ALL newsletters (use with caution!)"
+        "--all", action="store_true", help="Process ALL newsletters (use with caution!)"
     )
 
     # Processing options
@@ -149,20 +151,22 @@ def main():
         "--model",
         type=str,
         default=os.getenv("OLLAMA_MODEL", "gpt-oss:20b"),
-        help="Ollama model to use (default: from OLLAMA_MODEL env var)"
+        help="Ollama model to use (default: from OLLAMA_MODEL env var)",
     )
 
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Preview what would be processed without actually running LLM"
+        help="Preview what would be processed without actually running LLM",
     )
 
     args = parser.parse_args()
 
     # Validate arguments
     if not any([args.latest, args.source_id, args.newsletter_id, args.all]):
-        parser.error("Must specify at least one filter: --latest, --source-id, --newsletter-id, or --all")
+        parser.error(
+            "Must specify at least one filter: --latest, --source-id, --newsletter-id, or --all"
+        )
 
     if args.all and args.latest:
         parser.error("Cannot use --all with --latest (--all processes everything)")
@@ -194,8 +198,10 @@ def main():
 
     # Confirm if processing many newsletters
     if len(newsletters) > 10 and not args.dry_run:
-        confirm = input(f"\nAbout to process {len(newsletters)} newsletters. Continue? (y/N): ")
-        if confirm.lower() != 'y':
+        confirm = input(
+            f"\nAbout to process {len(newsletters)} newsletters. Continue? (y/N): "
+        )
+        if confirm.lower() != "y":
             print("Cancelled")
             return
 
@@ -205,7 +211,9 @@ def main():
 
     for newsletter in newsletters:
         try:
-            success = reprocess_newsletter(supabase, newsletter, args.model, args.dry_run)
+            success = reprocess_newsletter(
+                supabase, newsletter, args.model, args.dry_run
+            )
             if success:
                 success_count += 1
             else:
@@ -218,9 +226,9 @@ def main():
             fail_count += 1
 
     # Summary
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("SUMMARY")
-    print("="*50)
+    print("=" * 50)
     if args.dry_run:
         print(f"Would process: {len(newsletters)} newsletter(s)")
     else:
