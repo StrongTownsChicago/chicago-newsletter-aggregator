@@ -10,13 +10,31 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   const formData = await request.formData();
   const name = formData.get("name")?.toString();
-  const topics = formData.getAll("topics").map((t) => t.toString());
+  const ruleType = formData.get("rule_type")?.toString() || "search";
+  let topics = formData.getAll("topics").map((t) => t.toString());
+  let searchTerm = formData.get("search_term")?.toString().trim();
   const isActive = formData.get("is_active") === "on";
 
-  if (!name || topics.length === 0) {
-    return redirect(
-      "/preferences?error=Rule name and at least one topic are required",
-    );
+  if (!name) {
+    return redirect("/preferences?error=Rule name is required");
+  }
+
+  // Handle Mutual Exclusivity based on rule type
+  if (ruleType === "search") {
+    // Search Mode: Clear topics, require search term
+    topics = [];
+    if (!searchTerm) {
+      return redirect("/preferences?error=Search phrase is required");
+    }
+    if (searchTerm.length > 100) {
+      return redirect("/preferences?error=Search phrase must be under 100 characters");
+    }
+  } else {
+    // Topic Mode: Clear search term, require topics
+    searchTerm = undefined;
+    if (topics.length === 0) {
+      return redirect("/preferences?error=At least one topic is required");
+    }
   }
 
   // Check rule limit (max 5 rules per user)
@@ -40,6 +58,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     user_id: user.id,
     name,
     topics,
+    search_term: searchTerm || null,
     is_active: isActive,
   });
 

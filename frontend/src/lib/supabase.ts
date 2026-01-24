@@ -57,7 +57,7 @@ export interface NotificationRule {
   created_at: string;
   updated_at: string;
   topics: string[];
-  keywords?: string[];
+  search_term?: string;
   min_relevance_score?: number;
   source_ids?: number[];
   ward_numbers?: string[]; // TEXT[] to match sources.ward_number TEXT type

@@ -251,6 +251,14 @@ const message = Astro.url.searchParams.get('message');
                       ))}
                     </div>
                   )}
+                  {rule.search_term && (
+                    <div class="mt-2 text-sm text-gray-700 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200 inline-flex items-center gap-2">
+                       <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                       </svg>
+                       <span>Matches: <strong>"{rule.search_term}"</strong></span>
+                    </div>
+                  )}
                 </div>
                 <div class="flex gap-2 flex-shrink-0">
                   <button
@@ -258,6 +266,7 @@ const message = Astro.url.searchParams.get('message');
                     data-rule-id={rule.id}
                     data-rule-name={rule.name}
                     data-rule-topics={JSON.stringify(rule.topics)}
+                    data-rule-search-term={rule.search_term || ''}
                     data-rule-active={rule.is_active}
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -315,7 +324,33 @@ const message = Astro.url.searchParams.get('message');
             />
           </div>
 
+          <!-- Rule Type Selection -->
           <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-2">Match By</label>
+            <div class="flex items-center space-x-4">
+              <label class="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="rule_type"
+                  value="search"
+                  checked
+                  class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span class="ml-2 text-gray-700">Search Phrase</span>
+              </label>
+              <label class="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="rule_type"
+                  value="topic"
+                  class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span class="ml-2 text-gray-700">Topics</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="topicSection" class="hidden">
             <label class="block text-sm font-semibold text-gray-900 mb-3">
               Topics (select at least one)
             </label>
@@ -344,6 +379,30 @@ const message = Astro.url.searchParams.get('message');
                 </div>
               ))}
             </div>
+          </div>
+
+          <div id="searchSection">
+            <label for="searchTerm" class="block text-sm font-semibold text-gray-900 mb-2">
+              Search Phrase
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input
+                type="text"
+                id="searchTerm"
+                name="search_term"
+                placeholder="e.g., Lincoln Yards"
+                maxlength="100"
+                class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+              />
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              Notify if the newsletter contains this exact phrase
+            </p>
           </div>
 
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -390,10 +449,30 @@ const message = Astro.url.searchParams.get('message');
     const ruleForm = document.getElementById('ruleForm') as HTMLFormElement;
     const ruleIdInput = document.getElementById('ruleId') as HTMLInputElement;
     const ruleNameInput = document.getElementById('ruleName') as HTMLInputElement;
+    const searchTermInput = document.getElementById('searchTerm') as HTMLInputElement;
     const isActiveInput = document.getElementById('isActive') as HTMLInputElement;
+    const topicSection = document.getElementById('topicSection');
+    const searchSection = document.getElementById('searchSection');
+    const ruleTypeRadios = document.querySelectorAll('input[name="rule_type"]') as NodeListOf<HTMLInputElement>;
     const cancelBtn = document.getElementById('cancelBtn');
     const addRuleBtns = document.querySelectorAll('#addRuleBtn, #addRuleBtn2');
     const editRuleBtns = document.querySelectorAll('.edit-rule-btn');
+
+    // Toggle sections based on rule type
+    function toggleSections() {
+      const selectedType = document.querySelector('input[name="rule_type"]:checked') as HTMLInputElement;
+      if (selectedType.value === 'topic') {
+        topicSection?.classList.remove('hidden');
+        searchSection?.classList.add('hidden');
+      } else {
+        topicSection?.classList.add('hidden');
+        searchSection?.classList.remove('hidden');
+      }
+    }
+
+    ruleTypeRadios.forEach(radio => {
+      radio.addEventListener('change', toggleSections);
+    });
 
     // Open modal for new rule
     addRuleBtns.forEach(btn => {
@@ -402,6 +481,10 @@ const message = Astro.url.searchParams.get('message');
         ruleForm.action = '/api/notifications/create-rule';
         ruleForm.reset();
         ruleIdInput.value = '';
+        searchTermInput.value = '';
+        // Reset to default (search)
+        ruleTypeRadios[0].checked = true;
+        toggleSections();
         modal?.classList.remove('hidden');
       });
     });
@@ -413,13 +496,23 @@ const message = Astro.url.searchParams.get('message');
         const ruleId = target.dataset.ruleId;
         const ruleName = target.dataset.ruleName;
         const ruleTopics = JSON.parse(target.dataset.ruleTopics || '[]');
+        const ruleSearchTerm = target.dataset.ruleSearchTerm;
         const ruleActive = target.dataset.ruleActive === 'true';
 
         modalTitle!.textContent = 'Edit Notification Rule';
         ruleForm.action = '/api/notifications/update-rule';
         ruleIdInput.value = ruleId || '';
         ruleNameInput.value = ruleName || '';
+        searchTermInput.value = ruleSearchTerm || '';
         isActiveInput.checked = ruleActive;
+
+        // Set correct rule type
+        if (ruleSearchTerm) {
+          ruleTypeRadios[0].checked = true; // Search
+        } else {
+          ruleTypeRadios[1].checked = true; // Topic
+        }
+        toggleSections();
 
         // Check the appropriate topic checkboxes
         const topicCheckboxes = ruleForm.querySelectorAll('input[name="topics"]') as NodeListOf<HTMLInputElement>;

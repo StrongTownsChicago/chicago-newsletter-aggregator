@@ -134,7 +134,7 @@ User-defined notification rules.
 | created_at | timestamptz | NOT NULL, DEFAULT now() | Rule creation time |
 | updated_at | timestamptz | NOT NULL, DEFAULT now() | Last update time |
 | topics | text[] | NOT NULL, DEFAULT '{}' | Topics to match (MVP) |
-| keywords | text[] | DEFAULT '{}' | Keywords to match (Phase 2) |
+| search_term | text | | Search word or phrase to match (Phase 2) |
 | min_relevance_score | integer | | Minimum relevance score (Phase 2) |
 | source_ids | integer[] | | Specific sources to match (Phase 2) |
 | ward_numbers | text[] | | Specific wards to match (Phase 2) |
@@ -144,7 +144,10 @@ User-defined notification rules.
 
 **Application Constraint**: Maximum 5 rules per user (enforced in API)
 
-**Matching Logic**: All filters are AND-ed together. Within each filter type (topics, keywords), matches are OR-ed.
+**Matching Logic**: All filters are AND-ed together.
+- `topics`: Matches if newsletter has ANY of the selected topics.
+- `search_term`: Matches if newsletter contains the exact search phrase (case-insensitive substring).
+- If both are present, newsletter must match BOTH criteria.
 
 **Row-Level Security**:
 - ✅ Users can view their own rules
@@ -287,6 +290,7 @@ Audit log of sent notifications.
 | Version | File | Description | Date |
 |---------|------|-------------|------|
 | 001 | `001_notification_system.sql` | Added notification system (4 tables, triggers, RLS) | 2026-01-21 |
+| 002 | `002_add_search_term.sql` | Replaced keywords array with single search_term column | 2026-01-23 |
 
 ---
 

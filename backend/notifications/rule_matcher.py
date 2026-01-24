@@ -34,7 +34,7 @@ def match_newsletter_to_rules(
 
         # Fetch all active notification rules with user preferences
         response = supabase.table('notification_rules') \
-            .select('id, user_id, name, topics, keywords, min_relevance_score, source_ids, ward_numbers') \
+            .select('id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers') \
             .eq('is_active', True) \
             .execute()
 
@@ -112,18 +112,18 @@ def _rule_matches_newsletter(
     newsletter_text = newsletter_data.get('plain_text', '').lower()
     newsletter_ward = newsletter_data.get('ward_number')
 
-    # MVP: Topics filter (at least one topic must match)
+    # Topics filter (at least one topic must match)
     rule_topics = rule.get('topics', [])
     if rule_topics:
         # At least one rule topic must be in newsletter topics
         if not any(topic in newsletter_topics for topic in rule_topics):
             return False
 
-    # Phase 2: Keywords filter (at least one keyword must be found)
-    rule_keywords = rule.get('keywords', [])
-    if rule_keywords:
-        # At least one keyword must appear in newsletter text (case-insensitive)
-        if not any(keyword.lower() in newsletter_text for keyword in rule_keywords):
+    # Search Term filter (phrase match)
+    search_term = rule.get('search_term')
+    if search_term:
+        # Search term must appear in newsletter text (case-insensitive)
+        if search_term.lower() not in newsletter_text:
             return False
 
 

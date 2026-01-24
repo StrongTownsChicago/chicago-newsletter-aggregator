@@ -110,7 +110,7 @@ create table public.notification_rules (
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now(),
   topics text[] not null default '{}',
-  keywords text[] default '{}',
+  search_term text null,
   min_relevance_score integer null,
   source_ids integer[] null,
   ward_numbers text[] null,
