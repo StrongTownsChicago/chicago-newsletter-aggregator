@@ -101,7 +101,8 @@ class GenericListStrategy(NewsletterArchiveStrategy):
 def get_strategy_for_url(url: str) -> NewsletterArchiveStrategy:
     """Select the appropriate scraping strategy based on URL"""
 
-    if "mailchi.mp" in url or "campaign-archive.com" in url:
+    url_lower = url.lower()
+    if "mailchi.mp" in url_lower or "campaign-archive.com" in url_lower:
         return MailChimpArchiveStrategy()
     else:
         return GenericListStrategy()
