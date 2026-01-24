@@ -150,9 +150,10 @@ frontend/src/
 │       ├── delete-rule.ts        # Delete rule
 │       └── update-preferences.ts # Toggle notifications on/off
 ├── components/
-│   └── NewsletterCard.astro      # Reusable card component
+│   ├── NewsletterCard.astro      # Reusable card component
+│   └── AuthButton.astro          # Auth UI
 └── lib/
-    └── supabase.ts               # Supabase client + TypeScript interfaces
+    └── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
 ```
 
 ### Database Schema
@@ -369,3 +370,15 @@ Documentation should be concise and point to source code instead of duplicating 
 **Bad**: "Tests validate 18 URL patterns, 9 text patterns, and 6 CSS selectors for privacy filtering"
 
 **Reason**: Numbers and implementation details go stale. References to actual code always stay accurate.
+
+### Documentation Updates
+
+Update documentation when making significant changes. Be concise - only document what's necessary, avoid redundant explanations.
+
+**Files to update:**
+
+- **CLAUDE.md** - Architecture changes, new env vars, new patterns
+- **README.md** - User-facing setup/feature changes
+- **backend/SCHEMA.md** - **REQUIRED** for any database changes
+
+**Principle**: Keep docs synchronized with reality. Update immediately after changes while context is fresh. Don't add fluff - if it doesn't add clarity, don't write it.
