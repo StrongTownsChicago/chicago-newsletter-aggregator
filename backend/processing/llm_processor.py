@@ -45,6 +45,8 @@ TOPICS = [
     "city_charter",
 ]
 
+
+
 class TopicsExtraction(BaseModel):
     topics: List[str] = Field(description="List of relevant topics from predefined list")
 
@@ -176,7 +178,7 @@ def generate_summary(content: str, model: str) -> str:
         2-3 sentence summary string (empty string on error)
     """
 
-    # The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
+# The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
     prompt = f"""Summarize this alderman's newsletter in 2-3 sentences.
 
 PRIORITIZE mentioning (in order of importance):
