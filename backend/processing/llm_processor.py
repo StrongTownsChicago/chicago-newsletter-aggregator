@@ -14,6 +14,7 @@ from ollama import Client
 from pydantic import BaseModel, Field
 from typing import List
 import time
+from datetime import datetime
 
 # LLM processing limits
 MAX_NEWSLETTER_CHARS = 100000  # Maximum newsletter content length before truncation
@@ -309,12 +310,13 @@ def process_with_ollama(newsletter: dict, model: str = "gpt-oss:20b", max_chars:
         Dict with keys: 'topics' (List[str]), 'summary' (str), 'relevance_score' (int|None)
     """
     plain_text = newsletter['plain_text']
-    
+
     if len(plain_text) > max_chars:
         plain_text = plain_text[:max_chars]
         print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
-    
-    content = f"Subject: {newsletter['subject']}\n\n{plain_text}"
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    content = f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
 
     topics = extract_topics(content, model)
     summary = generate_summary(content, model)
