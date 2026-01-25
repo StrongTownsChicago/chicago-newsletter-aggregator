@@ -22,23 +22,14 @@ Usage Examples:
 import os
 import argparse
 import sys
-import json
 import difflib
-from pathlib import Path
-from dotenv import load_dotenv
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.db import get_supabase_client
 from ingest.email.email_parser import sanitize_content
-
-load_dotenv()
-
-# Load privacy patterns
-privacy_config_path = Path(__file__).parent.parent / "config" / "privacy_patterns.json"
-with open(privacy_config_path, "r", encoding="utf-8") as f:
-    PRIVACY_PATTERNS = json.load(f)
+from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 def fetch_newsletter(supabase, newsletter_id):
@@ -107,12 +98,12 @@ def process_single_newsletter(newsletter, supabase, update=False, quiet=False):
 
     # Sanitize HTML
     original_html = newsletter.get("raw_html") or ""
-    sanitized_html = sanitize_content(original_html, "html", PRIVACY_PATTERNS)
+    sanitized_html = sanitize_content(original_html, "html", PRIVACY_PATTERNS_DICT)
     html_changed = show_diff(original_html, sanitized_html, "HTML", quiet=quiet)
 
     # Sanitize Text
     original_text = newsletter.get("plain_text") or ""
-    sanitized_text = sanitize_content(original_text, "text", PRIVACY_PATTERNS)
+    sanitized_text = sanitize_content(original_text, "text", PRIVACY_PATTERNS_DICT)
     text_changed = show_diff(original_text, sanitized_text, "Plain Text", quiet=quiet)
 
     modified = html_changed or text_changed

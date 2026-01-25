@@ -1,18 +1,14 @@
 import unittest
 import sys
 import os
-import json
-from pathlib import Path
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from ingest.email.email_parser import sanitize_content
-
-# Load privacy patterns for tests
-privacy_config_path = Path(__file__).parent.parent / "config" / "privacy_patterns.json"
-with open(privacy_config_path, "r", encoding="utf-8") as f:
-    PRIVACY_PATTERNS = json.load(f)
+from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestSanitizationComprehensive(unittest.TestCase):
@@ -113,7 +109,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
         for name, url, should_remove in cases:
             with self.subTest(name=name):
                 html = f'<p>Check <a href="{url}">this link</a> for info.</p>'
-                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
                 if should_remove:
                     self.assertNotIn(
                         url, sanitized, f"URL {url} should have been removed"
@@ -154,7 +150,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
                 # Using a generic tracking-looking URL that doesn't match any domain pattern
                 url = "https://t.co/random-tracking-id"
                 html = f'<p>To quit, <a href="{url}">{text}</a> here.</p>'
-                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
                 if should_remove:
                     self.assertNotIn(
                         text,
@@ -203,7 +199,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
         for name, snippet, should_remove in cases:
             with self.subTest(name=name):
                 html = f"<body><div>Content</div>{snippet}</body>"
-                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+                sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
                 if should_remove:
                     # We look for a fragment of the snippet that shouldn't be there
                     # (Simple check: find a unique attribute or the text)
@@ -220,7 +216,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
         <p>I want to update my profile picture today.</p>
         <a href="http://tracked.com">Unsubscribe and Manage Preferences</a>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertIn(
             "If you want to unsubscribe",
             sanitized,
@@ -244,7 +240,7 @@ http://list-manage.com/unsubscribe
 Manage Preferences
 Keep this sentence: I will not unsubscribe from your great news.
 """
-        sanitized = sanitize_content(text, "text", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(text, "text", PRIVACY_PATTERNS_DICT)
         self.assertIn("Keep this line.", sanitized)
         self.assertIn("I will not unsubscribe from your great news.", sanitized)
         self.assertNotIn("\nUnsubscribe\n", sanitized)
@@ -263,7 +259,7 @@ Keep this sentence: I will not unsubscribe from your great news.
             html = """
             <div>Contact John Doe at <a href="mailto:personal@example.com">personal@example.com</a></div>
             """
-            sanitized_html = sanitize_content(html, "html", PRIVACY_PATTERNS)
+            sanitized_html = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
             self.assertNotIn("personal@example.com", sanitized_html)
             self.assertNotIn("John Doe", sanitized_html)
             self.assertIn("[REDACTED]", sanitized_html)
@@ -272,7 +268,7 @@ Keep this sentence: I will not unsubscribe from your great news.
 
             # Test Text
             text = "My name is John Doe and my email is personal@example.com"
-            sanitized_text = sanitize_content(text, "text", PRIVACY_PATTERNS)
+            sanitized_text = sanitize_content(text, "text", PRIVACY_PATTERNS_DICT)
             self.assertNotIn("personal@example.com", sanitized_text)
             self.assertNotIn("John Doe", sanitized_text)
             self.assertIn("[REDACTED]", sanitized_text)
@@ -281,7 +277,7 @@ Keep this sentence: I will not unsubscribe from your great news.
     def test_tracking_link_unwrap_with_image(self):
         """Verify that tracking links wrapping images are unwrapped (tag removed, image kept)."""
         html = '<a href="https://zsabxyiab.cc.rs6.net/tn.jsp?f=123"><img src="news_image.jpg"></a>'
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("rs6.net", sanitized)
         self.assertNotIn("<a", sanitized)
         self.assertIn('<img src="news_image.jpg"', sanitized)
@@ -289,7 +285,7 @@ Keep this sentence: I will not unsubscribe from your great news.
     def test_unsubscribe_link_decomposition(self):
         """Verify that purely functional privacy links are still completely removed (not unwrapped)."""
         html = '<a href="http://tracked.com">Unsubscribe</a>'
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("<a", sanitized)
 

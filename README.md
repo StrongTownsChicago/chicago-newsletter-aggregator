@@ -171,7 +171,7 @@ Email ingestion automatically queues matching notifications when `ENABLE_NOTIFIC
 
 ## Privacy & Content Sanitization
 
-Newsletter content is automatically sanitized to remove tracking links, unsubscribe URLs, and sensitive content. Privacy rules are defined in `backend/config/privacy_patterns.json` with URL patterns, text patterns, and CSS selectors.
+Newsletter content is automatically sanitized to remove tracking links, unsubscribe URLs, and sensitive content. Privacy rules are defined as Python constants in `backend/config/privacy_patterns.py` with URL patterns, text patterns, and CSS selectors.
 
 **Implementation:** `backend/ingest/email/email_parser.py:sanitize_content()`
 **Tests:** `backend/tests/test_sanitization*.py` and `test_user_cases.py`

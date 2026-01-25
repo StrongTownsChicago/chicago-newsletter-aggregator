@@ -130,7 +130,7 @@ backend/
 │   ├── test_sanitization_comprehensive.py  # Comprehensive privacy tests
 │   └── test_user_cases.py        # Real-world newsletter test cases
 ├── config/
-│   └── privacy_patterns.json     # URL patterns, text patterns, CSS selectors for privacy filtering
+│   └── privacy_patterns.py     # URL patterns, text patterns, CSS selectors for privacy filtering
 ├── shared/
 │   ├── db.py                     # Supabase client singleton
 │   └── utils.py                  # Shared utilities
@@ -185,7 +185,7 @@ frontend/src/
 - `process_notification_queue.py` - Orchestrates digest sending, groups by user, updates queue status, records in history
 - Integration: Email ingestion queues notifications when `ENABLE_NOTIFICATIONS=true`. Web scraping does NOT trigger notifications (intentional). Failures don't break ingestion.
 
-**Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.json` (URL patterns, text patterns, CSS selectors). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
+**Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
 **Newsletter Content Storage** (`newsletters` table): Both `plain_text` and `raw_html` columns serve distinct, critical purposes:
 
@@ -247,7 +247,7 @@ PUBLIC_ENABLE_NOTIFICATIONS=
 - `test_sanitization_comprehensive.py` - Comprehensive coverage (URL patterns, link text, CSS selectors, false positive prevention)
 - `test_user_cases.py` - Real-world integration tests (Mailchimp, Constant Contact, various newsletter formats)
 
-All tests validate privacy patterns defined in `backend/config/privacy_patterns.json`.
+All tests validate privacy patterns defined in `backend/config/privacy_patterns.py`.
 
 **Run tests:**
 
@@ -278,7 +278,7 @@ uv run python -m notifications.test_matcher --queue  # Actually queue notificati
 - **[README.md](../README.md)** - Project overview, quick start, commands
 - **[backend/SCHEMA.md](backend/SCHEMA.md)** - Complete database schema with RLS policies, migrations, useful queries
 - **Topic definitions**: See `backend/processing/llm_processor.py:TOPICS`
-- **Privacy patterns**: See `backend/config/privacy_patterns.json`
+- **Privacy patterns**: See `backend/config/privacy_patterns.py`
 
 ## Engineering Best Practices
 

@@ -1,18 +1,14 @@
 import unittest
 import sys
 import os
-import json
-from pathlib import Path
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from ingest.email.email_parser import sanitize_content
-
-# Load privacy patterns for tests
-privacy_config_path = Path(__file__).parent.parent / "config" / "privacy_patterns.json"
-with open(privacy_config_path, "r", encoding="utf-8") as f:
-    PRIVACY_PATTERNS = json.load(f)
+from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestSanitization(unittest.TestCase):
@@ -33,7 +29,7 @@ class TestSanitization(unittest.TestCase):
             </body>
         </html>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("list-manage.com/unsubscribe", sanitized)
         self.assertIn("Here is some content", sanitized)
 
@@ -44,7 +40,7 @@ class TestSanitization(unittest.TestCase):
             <a href="http://mailchimpsites.com/manage/preferences">Manage Preferences</a>
         </div>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("mailchimpsites.com/manage/preferences", sanitized)
 
     def test_sanitize_html_manage_profile(self):
@@ -54,13 +50,13 @@ class TestSanitization(unittest.TestCase):
              <a href="http://list-manage.com/profile">Update Profile</a>
         </div>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("list-manage.com/profile", sanitized)
 
     def test_sanitize_text_regex(self):
         """Test removal of standalone unsubscribe lines in plain text content."""
         text = "Some content.\nUnsubscribe\nMore content."
-        sanitized = sanitize_content(text, "text", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(text, "text", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertIn("Some content", sanitized)
 
@@ -71,7 +67,7 @@ class TestSanitization(unittest.TestCase):
             <a href="foo">Some link</a>
         </div>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("footer-links", sanitized)  # Div should be removed
         self.assertNotIn("Some link", sanitized)
 
@@ -87,7 +83,7 @@ class TestSanitization(unittest.TestCase):
             </tr>
         </table>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("complianceLinks", sanitized)
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("Update Profile", sanitized)
@@ -100,7 +96,7 @@ class TestSanitization(unittest.TestCase):
             <a href="https://49thward.us18.list-manage.com/profile?u=...">update subscription preferences</a>
         </p>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("unsubscribe from this list", sanitized)
         self.assertNotIn("update subscription preferences", sanitized)
 

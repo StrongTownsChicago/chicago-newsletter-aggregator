@@ -1,18 +1,14 @@
 import unittest
 import sys
 import os
-import json
-from pathlib import Path
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from ingest.email.email_parser import sanitize_content
-
-# Load privacy patterns for tests
-privacy_config_path = Path(__file__).parent.parent / "config" / "privacy_patterns.json"
-with open(privacy_config_path, "r", encoding="utf-8") as f:
-    PRIVACY_PATTERNS = json.load(f)
+from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestUserCases(unittest.TestCase):
@@ -36,7 +32,7 @@ class TestUserCases(unittest.TestCase):
             You can <a href="https://1st-ward-alderman-daniel-la-spata.mailchimpsites.com/manage/preferences?u=e4d2e8115e36fe98f1fbf8f5f&id=218af5f0b5&e=a6f6131d3d&c=2f7c309981">update your preferences</a> or <a href="https://the1stward.us4.list-manage.com/unsubscribe?u=e4d2e8115e36fe98f1fbf8f5f&id=218af5f0b5&t=b&e=a6f6131d3d&c=2f7c309981">unsubscribe from this list</a>.
         </td>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
 
         # Ensure sensitive links are removed based on their URL patterns
         self.assertNotIn(
@@ -65,7 +61,7 @@ class TestUserCases(unittest.TestCase):
             </tr> 
         </table>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
 
         # The container and specific links should be removed
         self.assertNotIn("complianceLinks", sanitized)
@@ -89,7 +85,7 @@ class TestUserCases(unittest.TestCase):
             </tr> 
         </table>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         # No specific removal assertion required for generic logos unless they become a privacy issue.
         self.assertIsNotNone(sanitized)
 
@@ -102,7 +98,7 @@ class TestUserCases(unittest.TestCase):
             <a href="https://mailchi.mp/example?e=123">View this email in your browser</a>
         </p>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
 
         # Both the link URL and the anchor tag should be removed
         self.assertNotIn("mailchi.mp", sanitized)
@@ -118,7 +114,7 @@ class TestUserCases(unittest.TestCase):
         html = """
         <p>You can <a href="http://list-manage.com/profile">update your preferences</a> or <a href="http://list-manage.com/unsubscribe">unsubscribe</a></p>
         """
-        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS)
+        sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
 
         # Sensitive URLs must be gone
         self.assertNotIn("list-manage.com/profile", sanitized)

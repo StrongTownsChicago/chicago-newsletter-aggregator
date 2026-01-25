@@ -1,13 +1,12 @@
 """Unit tests for email parsing and source matching logic."""
 
-import json
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 # Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from ingest.email.email_parser import (
     clean_html_content,
@@ -20,11 +19,7 @@ from tests.fixtures.newsletter_factory import (
     create_test_email_mapping,
     create_test_source,
 )
-
-# Load privacy patterns for tests
-config_path = Path(__file__).parent.parent.parent / "config" / "privacy_patterns.json"
-with open(config_path, encoding="utf-8") as f:
-    PRIVACY_PATTERNS = json.load(f)
+from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestLookupSourceByEmail(unittest.TestCase):
@@ -243,7 +238,7 @@ class TestParseNewsletter(unittest.TestCase):
             html="<p>Test content</p>",
         )
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertEqual(result["source_id"], 1)
         self.assertEqual(result["subject"], "Test Subject")
@@ -256,7 +251,7 @@ class TestParseNewsletter(unittest.TestCase):
             from_="unknown@example.com", subject="Test"
         )
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertIsNone(result["source_id"])
 
@@ -268,7 +263,7 @@ class TestParseNewsletter(unittest.TestCase):
             html="<p>Test content in HTML</p>", text=""
         )
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertIn("Test content", result["plain_text"])
         self.assertIn("<p>", result["raw_html"])
@@ -279,7 +274,7 @@ class TestParseNewsletter(unittest.TestCase):
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(html="", text="Plain text content only")
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertEqual(result["plain_text"], "Plain text content only")
         self.assertEqual(result["raw_html"], "")
@@ -292,7 +287,7 @@ class TestParseNewsletter(unittest.TestCase):
             html="<p>HTML version</p>", text="Text version"
         )
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertIn("HTML", result["raw_html"])
         self.assertEqual(result["plain_text"], "Text version")
@@ -307,7 +302,7 @@ class TestParseNewsletter(unittest.TestCase):
         """
         mock_message = create_mock_mail_message(html=html_with_unsubscribe)
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         # Unsubscribe link should be removed
         self.assertNotIn("list-manage.com/unsubscribe", result["raw_html"])
@@ -318,7 +313,7 @@ class TestParseNewsletter(unittest.TestCase):
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(subject=None)
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertEqual(result["subject"], "(No subject)")
 
@@ -329,7 +324,7 @@ class TestParseNewsletter(unittest.TestCase):
         mock_message = create_mock_mail_message()
         mock_message.date = None  # Explicitly set to None
 
-        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS)
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertIsNone(result["received_date"])
 
