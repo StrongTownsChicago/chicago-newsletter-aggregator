@@ -185,7 +185,7 @@ def process_new_newsletters():
                             "topics": newsletter.get("topics", []),
                             "plain_text": newsletter.get("plain_text", ""),
                             "source_id": newsletter.get("source_id"),
-                            "ward_number": None,  # Can be joined from sources table if needed in Phase 2
+                            "ward_number": None,  # Will be joined from sources table if needed in Phase 2
                             "relevance_score": newsletter.get("relevance_score"),
                         }
 

@@ -51,10 +51,10 @@ CREATE TABLE IF NOT EXISTS notification_rules (
 
     -- Filter criteria (MVP: topics only)
     topics TEXT[] NOT NULL DEFAULT '{}', -- At least one required for MVP
-    keywords TEXT[] DEFAULT '{}', -- Future: Phase 2
-    min_relevance_score INTEGER, -- Future: Phase 2 (0-10)
-    source_ids INTEGER[], -- Future: Phase 2 (specific aldermen)
-    ward_numbers TEXT[] -- Future: Phase 2 (matches sources.ward_number TEXT type)
+    keywords TEXT[] DEFAULT '{}', --
+    min_relevance_score INTEGER, -- (0-10)
+    source_ids INTEGER[], -- (specific aldermen)
+    ward_numbers TEXT[] -- (matches sources.ward_number TEXT type)
 );
 
 -- Indexes for faster lookups

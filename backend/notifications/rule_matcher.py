@@ -21,9 +21,9 @@ def match_newsletter_to_rules(
         newsletter_id: UUID of the newsletter
         newsletter_data: Dictionary containing:
             - topics: List of extracted topics
-            - plain_text: Full text content (for keyword matching in Phase 2)
-            - source_id: UUID of the source (for source filtering in Phase 2)
-            - ward_number: Ward number (for ward filtering in Phase 2)
+            - plain_text: Full text content
+            - source_id: UUID of the source
+            - ward_number: Ward number
 
     Returns:
         List of matching rules (each rule dict includes user_id, rule_id, rule_name)
@@ -134,7 +134,7 @@ def _rule_matches_newsletter(
         if search_term.lower() not in newsletter_text:
             return False
 
-    # Phase 2: Ward filter (newsletter must be from alderman in one of specified wards)
+    # Ward filter (newsletter must be from alderman in one of specified wards)
     rule_wards = rule.get("ward_numbers", [])
     if rule_wards:
         if newsletter_ward not in rule_wards:
