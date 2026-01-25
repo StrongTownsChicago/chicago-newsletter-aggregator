@@ -192,12 +192,14 @@ def parse_newsletter(msg, supabase_client, privacy_patterns: dict) -> Dict:
     # Look up source using the mapping table
     source = lookup_source_by_email(msg.from_, supabase_client)
 
-    # Extract source_id (or None if no match)
+    # Extract source_id and ward_number (or None if no match)
     if source:
         source_id = source.get("id")
+        ward_number = source.get("ward_number")
         print(f"  ✓ Matched to: {source.get('name')} ({source.get('source_type')})")
     else:
         source_id = None
+        ward_number = None
         print(f"  ⚠️  No mapping found for: {msg.from_}")
 
     # Get HTML content (prefer HTML over plain text)
@@ -223,6 +225,7 @@ def parse_newsletter(msg, supabase_client, privacy_patterns: dict) -> Dict:
         "from_email": msg.from_,
         "to_email": to_email,
         "source_id": source_id,
+        "ward_number": ward_number,
         "raw_html": html_content,
         "plain_text": plain_text,
     }

@@ -161,6 +161,9 @@ def process_new_newsletters():
                     except Exception as e:
                         print(f"  Warning: LLM processing failed: {e}")
 
+                # Extract ward_number for notifications, but remove from dict for DB insertion
+                ward_number = newsletter.pop("ward_number", None)
+
                 # Insert into Supabase
                 insert_response = (
                     supabase.table("newsletters").insert(newsletter).execute()
@@ -185,7 +188,7 @@ def process_new_newsletters():
                             "topics": newsletter.get("topics", []),
                             "plain_text": newsletter.get("plain_text", ""),
                             "source_id": newsletter.get("source_id"),
-                            "ward_number": None,  # Will be joined from sources table if needed in Phase 2
+                            "ward_number": ward_number,
                             "relevance_score": newsletter.get("relevance_score"),
                         }
 

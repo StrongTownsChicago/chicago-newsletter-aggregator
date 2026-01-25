@@ -244,6 +244,21 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["subject"], "Test Subject")
 
     @patch("builtins.print")
+    def test_parse_includes_ward_number(self, mock_print):
+        """Verify ward_number is included in parsed data from source."""
+        source = create_test_source(source_id=1, name="Ward 10", ward_number="10")
+        mapping = create_test_email_mapping(email_pattern="%@ward10.org", source_id=1)
+        mapping["sources"] = source
+
+        mock_supabase = create_mock_supabase(return_data=[mapping])
+        mock_message = create_mock_mail_message(from_="alderman@ward10.org")
+
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(result["source_id"], 1)
+        self.assertEqual(result["ward_number"], "10")
+
+    @patch("builtins.print")
     def test_parse_with_unmapped_source(self, mock_print):
         """Email without source match sets source_id=None."""
         mock_supabase = create_mock_supabase(return_data=[])
