@@ -18,7 +18,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **Full-Text Search**: Search with filters (ward, topic, relevance score)
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules (topics, search phrases, wards)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
-- **Testing Suite**: Privacy sanitization test coverage
+- **Testing Suite**: Backend unit/integration tests, frontend unit tests
 
 ## Database Schema
 
@@ -111,10 +111,13 @@ uv run python -m notifications.process_notification_queue --daily-digest --batch
 #### Testing
 
 ```bash
-# Run privacy sanitization tests
-uv run python -m unittest tests.test_sanitization
-uv run python -m unittest tests.test_sanitization_comprehensive
-uv run python -m unittest tests.test_user_cases
+# Backend tests
+uv run python -m unittest discover -s tests
+
+# Frontend tests
+cd ../frontend
+npm run test
+npm run lint
 ```
 
 ### Frontend Setup
@@ -142,7 +145,10 @@ backend/
   ├── processing/       # LLM topic extraction, summarization, scoring
   ├── notifications/    # User alerts and daily digest delivery
   ├── utils/            # Maintenance scripts (reprocess, migrate, privacy reapply)
-  ├── tests/            # Privacy sanitization test suite
+  ├── tests/            # Test suite
+  │   ├── unit/         # Unit tests
+  │   ├── integration/  # Integration tests
+  │   └── fixtures/     # Test data and fixtures
   ├── config/           # Privacy patterns configuration
   ├── shared/           # Shared database client and utilities
   └── migrations/       # Database migration SQL files
@@ -150,7 +156,8 @@ backend/
 frontend/
   ├── src/pages/        # Astro pages (index, search, preferences, newsletter detail)
   ├── src/pages/api/    # API routes for notification management
-  └── src/lib/          # Supabase client
+  ├── src/lib/          # Supabase client
+  └── tests/            # Frontend unit tests
 ```
 
 ## LLM Processing
@@ -178,8 +185,12 @@ Newsletter content is automatically sanitized to remove tracking links, unsubscr
 
 ## Deployment
 
-- **Backend**: Local processing of newsletters. Currently done manually by running the scripts referenced above.
-- **Frontend**: Auto-deploy via Cloudflare Pages
+- **Email Ingestion**: Automated via GitHub Actions (see `.github/workflows/email_ingestion.yml`)
+- **Notification Sending**: Automated via GitHub Actions (see `.github/workflows/send_notifications.yml`)
+- **LLM Processing**: Manual local execution with Ollama (see `backend/docs/LOCAL_LLM_PROCESSING.md`)
+- **Frontend**: Auto-deploy via Cloudflare Pages on push to main
+
+**GitHub Actions**: Both workflows support manual triggering and require secrets configured in repository Settings → Secrets (see workflow files for details).
 
 ## Environment Variables
 

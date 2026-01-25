@@ -54,10 +54,8 @@ uv run python -m notifications.process_notification_queue --daily-digest
 # Send specific date's digest
 uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
 
-# Run tests
-uv run python -m unittest tests.test_sanitization
-uv run python -m unittest tests.test_sanitization_comprehensive
-uv run python -m unittest tests.test_user_cases
+# Run all tests
+uv run python -m unittest discover -s tests
 
 # Lint and format (run after making Python changes)
 uv run ruff check --fix  # Fix auto-fixable issues, manually fix remaining
@@ -102,6 +100,22 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gpt-oss:20b
 ```
 
+## Automation
+
+**GitHub Actions Workflows:**
+- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters without LLM metadata, queues notifications
+- Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
+
+Both workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
+
+**Local LLM Processing:**
+```bash
+# Process newsletters with Ollama (runs locally, not in GitHub Actions)
+uv run python utils/reprocess_newsletters.py --latest 50
+```
+
+See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
+
 ## Architecture
 
 ### Data Flow
@@ -138,7 +152,10 @@ backend/
 │   ├── migrate_topics.py         # Topic migration utility
 │   └── download_samples.py       # Download sample newsletters for testing
 ├── tests/
-│   ├── test_sanitization.py      # Basic privacy sanitization tests
+│   ├── unit/                     # Unit tests
+│   ├── integration/              # Integration tests
+│   ├── fixtures/                 # Test data and fixtures
+│   ├── test_sanitization.py      # Privacy sanitization tests
 │   ├── test_sanitization_comprehensive.py  # Comprehensive privacy tests
 │   └── test_user_cases.py        # Real-world newsletter test cases
 ├── config/
