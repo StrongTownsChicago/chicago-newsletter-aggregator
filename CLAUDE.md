@@ -78,6 +78,15 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Run unit tests
+npm run test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
 ```
 
 ### LLM Setup (one-time)
@@ -153,6 +162,12 @@ frontend/src/
 │       ├── update-rule.ts        # Update existing rule
 │       ├── delete-rule.ts        # Delete rule
 │       └── update-preferences.ts # Toggle notifications on/off
+├── tests/                        # Vitest unit tests
+│   ├── unit/                     # Utility tests (supabase.test.ts)
+│   ├── api/                      # API route tests (auth.test.ts, notifications.test.ts)
+│   ├── middleware.test.ts        # Middleware logic tests
+│   ├── helpers.ts                # Test factories for mocking Astro context
+│   └── mocks/                    # Global mocks (astro:middleware)
 ├── components/
 │   ├── NewsletterCard.astro      # Reusable card component
 │   └── AuthButton.astro          # Auth UI

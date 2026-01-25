@@ -6,7 +6,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.8",
@@ -15,6 +18,9 @@
     "astro": "^5.16.6"
   },
   "devDependencies": {
-    "tailwindcss": "^4.1.18"
+    "@vitest/coverage-v8": "^4.0.18",
+    "happy-dom": "^20.3.7",
+    "tailwindcss": "^4.1.18",
+    "vitest": "^4.0.18"
   }
 }

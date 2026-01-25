@@ -167,26 +167,23 @@ For each implementation step in `plan.md`:
 
 ### Phase 5: Comprehensive Testing
 
-**Run the full test suite:**
+**Run relevant tests based on affected areas:**
 
-1. **Unit tests**
-
+1. **Backend tests** (if backend changed)
    ```bash
    cd backend
    uv run python -m unittest discover tests
    ```
 
-   - All tests must pass
+2. **Frontend tests** (if frontend changed)
+   ```bash
+   cd frontend
+   npm run test
+   ```
+
+3. **All relevant tests must pass**
    - Fix any failures before proceeding
-
-2. **Integration tests** (if written)
-   - Run end-to-end tests
-   - Verify workflows work correctly
-
-3. **Edge case verification**
-   - Reference the "Edge Cases & Error Handling" section in plan.md
-   - Manually test each scenario
-   - Verify error handling works as specified
+   - Verify integration tests and edge cases
 
 4. **Linting (final check)**
    ```bash
@@ -229,8 +226,8 @@ Before declaring implementation complete, verify:
 Implementation Checklist:
 [ ] All steps from plan.md implemented
 [ ] All tests from test_plan.md written
-[ ] All unit tests passing
-[ ] All integration tests passing (if applicable)
+[ ] Relevant unit tests passing (backend and/or frontend)
+[ ] Integration tests passing (if applicable)
 [ ] Edge cases handled and tested
 [ ] Linting clean (ruff check + format)
 [ ] Frontend validated with browser/DevTools (if applicable)
