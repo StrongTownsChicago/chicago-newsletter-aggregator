@@ -19,7 +19,7 @@ from tests.fixtures.newsletter_factory import (
     create_test_email_mapping,
     create_test_source,
 )
-from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestLookupSourceByEmail(unittest.TestCase):

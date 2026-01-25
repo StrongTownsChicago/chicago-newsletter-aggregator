@@ -31,7 +31,7 @@ from imap_tools import MailBox, AND, MailMessageFlags
 from ingest.email.email_parser import parse_newsletter
 from shared.db import get_supabase_client
 from shared.utils import print_summary
-from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from dotenv import load_dotenv
 
 load_dotenv()

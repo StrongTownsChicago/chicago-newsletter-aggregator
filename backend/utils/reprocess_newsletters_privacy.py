@@ -29,7 +29,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.db import get_supabase_client
 from ingest.email.email_parser import sanitize_content
-from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 def fetch_newsletter(supabase, newsletter_id):

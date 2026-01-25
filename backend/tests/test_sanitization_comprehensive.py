@@ -8,7 +8,7 @@ sys.path.append(
 )
 
 from ingest.email.email_parser import sanitize_content
-from backend.config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestSanitizationComprehensive(unittest.TestCase):
