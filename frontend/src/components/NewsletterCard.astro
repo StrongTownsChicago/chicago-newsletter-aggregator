@@ -1,6 +1,8 @@
 ---
+import type { Newsletter } from '../lib/supabase';
+
 interface Props {
-  newsletter: any;
+  newsletter: Newsletter;
 }
 const { newsletter } = Astro.props;
 const summaryId = `summary-${newsletter.id}`;

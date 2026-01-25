@@ -1,7 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+interface MockSupabase {
+  auth: {
+    setSession: ReturnType<typeof vi.fn>;
+    getSession: ReturnType<typeof vi.fn>;
+  };
+}
+
 // Mock Supabase
-const mockSupabase = {
+const mockSupabase: MockSupabase = {
   auth: {
     setSession: vi.fn(),
     getSession: vi.fn(),
@@ -39,8 +46,10 @@ describe('Middleware', () => {
   it('restores session from cookies if present', async () => {
     const context = createMockContext();
     // Simulate cookies being present
-    vi.mocked(context.cookies.get).mockImplementation((key) => {
+    vi.mocked(context.cookies.get).mockImplementation((key: string) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (key === 'sb-access-token') return { value: 'access-123' } as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (key === 'sb-refresh-token') return { value: 'refresh-123' } as any;
         return undefined;
     });

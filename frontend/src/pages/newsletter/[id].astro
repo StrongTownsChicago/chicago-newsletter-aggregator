@@ -46,12 +46,12 @@ if (error || !newsletter) {
               </span>
             )}
             {newsletter.sources?.phone && (
-              <a href=`tel:${newsletter.sources.phone}`} class="text-blue-600 hover:text-blue-800 hover:underline">
+              <a href={`tel:${newsletter.sources.phone}`} class="text-blue-600 hover:text-blue-800 hover:underline">
                 📞 {newsletter.sources.phone}
               </a>
             )}
             {newsletter.sources?.email_address && (
-              <a href=`mailto:${newsletter.sources.email_address}`} class="text-blue-600 hover:text-blue-800 hover:underline">
+              <a href={`mailto:${newsletter.sources.email_address}`} class="text-blue-600 hover:text-blue-800 hover:underline">
                 ✉️ {newsletter.sources.email_address}
               </a>
             )}

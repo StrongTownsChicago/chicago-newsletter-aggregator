@@ -13,7 +13,14 @@ import { createMockContext } from '../helpers';
 import { notificationsEnabled } from '../../lib/supabase';
 
 describe('Notifications API Routes', () => {
-  let mockSupabase: any;
+  let mockSupabase: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();

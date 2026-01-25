@@ -1,15 +1,14 @@
 import { vi } from 'vitest';
-import type { APIRoute } from 'astro';
+import type { APIContext } from 'astro';
 
 export const createMockCookies = () => {
-  const store = new Map<string, any>();
+  const store = new Map<string, unknown>();
   return {
-    get: vi.fn((key) => store.get(key)),
-    set: vi.fn((key, value, options) => store.set(key, { value, ...options })),
-    delete: vi.fn((key) => store.delete(key)),
-    has: vi.fn((key) => store.has(key)),
+    get: vi.fn((key: string) => store.get(key)),
+    set: vi.fn((key: string, value: string) => store.set(key, { value })),
+    delete: vi.fn((key: string) => store.delete(key)),
+    has: vi.fn((key: string) => store.has(key)),
     getAll: vi.fn(() => Array.from(store.values())),
-    store, // Expose store for assertions if needed
   };
 };
 
@@ -31,7 +30,7 @@ export const createMockRequest = (formData?: Record<string, string | string[]>, 
   } as unknown as Request;
 };
 
-export const mockRedirect = vi.fn((url, status = 302) => {
+export const mockRedirect = vi.fn((url: string, status = 302) => {
   return new Response(null, {
     status,
     headers: { Location: url },
@@ -39,14 +38,18 @@ export const mockRedirect = vi.fn((url, status = 302) => {
 });
 
 export const createMockContext = (options: {
-  formData?: Record<string, string>;
+  formData?: Record<string, string | string[]>;
   method?: string;
-  locals?: any;
+  locals?: Record<string, unknown>;
 } = {}) => {
   return {
     request: createMockRequest(options.formData, options.method),
     cookies: createMockCookies(),
     redirect: mockRedirect,
     locals: options.locals || {},
-  } as any;
+    url: new URL('http://localhost:4321'),
+    params: {},
+    site: undefined,
+    generator: 'Astro',
+  } as unknown as APIContext;
 };

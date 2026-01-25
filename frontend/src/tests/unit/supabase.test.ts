@@ -21,7 +21,7 @@ describe('supabase utilities', () => {
   describe('notificationsEnabled', () => {
     it('returns true when PUBLIC_ENABLE_NOTIFICATIONS is "true"', () => {
       vi.stubEnv('PUBLIC_ENABLE_NOTIFICATIONS', 'true');
-      // @ts-ignore - Vitest stubEnv doesn't always reflect in import.meta.env immediately in all setups
+      // @ts-expect-error - Vitest stubEnv doesn't always reflect in import.meta.env immediately in all setups
       // but let's see how it behaves here
       expect(notificationsEnabled()).toBe(true);
     });

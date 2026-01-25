@@ -87,6 +87,9 @@ npm run test:coverage
 
 # Run tests in watch mode
 npm run test:watch
+
+# Run linting
+npm run lint
 ```
 
 ### LLM Setup (one-time)
@@ -339,7 +342,7 @@ All new features must have clear, useful tests that validate correctness. Tests 
 
 **Backend**: Write unit tests for business logic, integration tests for data flows. Tests live in `backend/tests/`.
 
-**Frontend**: Write unit tests for logic (utilities, data transforms, component behavior). Use ChromeDevTools MCP server to validate UI/styling changes (snapshots, layouts, interactions).
+**Frontend**: Write unit tests for logic (utilities, data transforms, component behavior). Use ChromeDevTools MCP server to validate UI/styling changes (snapshots, layouts, interactions). Run `npm run lint` to validate code quality.
 
 **Pattern**: Feature isn't done until tests prove it works. Use tests to prevent regressions, not just to check boxes.
 
@@ -348,6 +351,8 @@ All new features must have clear, useful tests that validate correctness. Tests 
 Code must be maintainable, readable, and understandable. Always choose production-grade patterns over quick hacks. Code is read far more than it's written - optimize for the next developer.
 
 **Python Code Quality**: After making any Python changes, run `uv run ruff check --fix` and `uv run ruff format`. Fix any issues flagged by the checker before considering work complete.
+
+**Frontend Code Quality**: After making any frontend changes, run `npm run lint`. Fix any issues flagged by ESLint before considering work complete.
 
 **Never**:
 

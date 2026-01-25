@@ -6,6 +6,7 @@ import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import AuthButton from '../components/AuthButton.astro';
 import { supabase, notificationsEnabled } from '../lib/supabase';
+import type { Newsletter, Source } from '../lib/supabase';
 
 const searchQuery = Astro.url.searchParams.get('q') || '';
 const sourceTypeFilter = Astro.url.searchParams.get('source_type');
@@ -73,17 +74,7 @@ const { data: allTopics } = await supabase
   .not('topics', 'is', null);
 
 const uniqueTopics = [...new Set(
-  allTopics?.flatMap((n: any) => n.topics || []) || []
-)].sort();
-
-// Get unique source types
-const { data: sourceTypes } = await supabase
-  .from('sources')
-  .select('source_type')
-  .not('source_type', 'is', null);
-
-const uniqueSourceTypes = [...new Set(
-  sourceTypes?.map((s: any) => s.source_type).filter(Boolean) || []
+  allTopics?.flatMap((n: Pick<Newsletter, 'topics'>) => n.topics || []) || []
 )].sort();
 
 // Get unique ward numbers
@@ -94,8 +85,8 @@ const { data: wardData } = await supabase
   .not('ward_number', 'is', null);
 
 const uniqueWards = [...new Set(
-  wardData?.map((s: any) => s.ward_number).filter(Boolean) || []
-)].sort((a, b) => parseInt(a) - parseInt(b));
+  wardData?.map((s: Pick<Source, 'ward_number'>) => s.ward_number).filter(Boolean) || []
+)].sort((a, b) => parseInt(a as string) - parseInt(b as string));
 
 // Build base URL with all query params except 'page' for pagination
 const buildBaseUrl = () => {

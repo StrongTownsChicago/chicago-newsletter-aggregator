@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Session, AuthError } from '@supabase/supabase-js';
+
+type MockAuthResponse = Promise<{
+  data: { session: Partial<Session> | null; user: unknown | null };
+  error: Partial<AuthError> | null;
+}>;
 
 // Mock Supabase
 vi.mock('../../lib/supabase', () => ({
@@ -27,9 +33,9 @@ describe('Auth API Routes', () => {
   describe('POST /api/auth/signin', () => {
     it('redirects to / on successful signin', async () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { session: { access_token: 'access', refresh_token: 'refresh' } },
+        data: { session: { access_token: 'access', refresh_token: 'refresh' }, user: {} },
         error: null,
-      } as any);
+      } as MockAuthResponse);
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'password123' },
@@ -45,9 +51,9 @@ describe('Auth API Routes', () => {
 
     it('redirects to /login with error on failure', async () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { session: null },
+        data: { session: null, user: null },
         error: { message: 'Invalid credentials' },
-      } as any);
+      } as MockAuthResponse);
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'wrong' },
@@ -59,11 +65,13 @@ describe('Auth API Routes', () => {
       expect(response.headers.get('Location')).toContain('error=Invalid%20credentials');
     });
 
-    it('returns 404 if notifications are disabled', async () => {
+
+
+    it("returns 404 if notifications are disabled", async () => {
       vi.mocked(notificationsEnabled).mockReturnValue(false);
-      
+
       const context = createMockContext({
-        formData: { email: 'test@example.com', password: 'password123' },
+        formData: { email: "test@example.com", password: "password123" },
       });
 
       const response = await signinPOST(context);
@@ -79,7 +87,7 @@ describe('Auth API Routes', () => {
           session: { access_token: 'access', refresh_token: 'refresh' } 
         },
         error: null,
-      } as any);
+      } as MockAuthResponse);
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'password123' },
@@ -99,40 +107,48 @@ describe('Auth API Routes', () => {
           session: null 
         },
         error: null,
-      } as any);
+      } as MockAuthResponse);
 
       const context = createMockContext({
-        formData: { email: 'test@example.com', password: 'password123' },
+        formData: { email: "test@example.com", password: "password123" },
       });
 
       const response = await signupPOST(context);
 
       expect(response.status).toBe(302);
-      expect(response.headers.get('Location')).toContain('message=Check your email');
+      expect(response.headers.get("Location")).toContain(
+        "message=Check your email",
+      );
     });
 
-    it('redirects to /signup with error on validation failure (short password)', async () => {
+    it("redirects to /signup with error on validation failure (short password)", async () => {
       const context = createMockContext({
-        formData: { email: 'test@example.com', password: '123' },
+        formData: { email: "test@example.com", password: "123" },
       });
 
       const response = await signupPOST(context);
 
       expect(response.status).toBe(302);
-      expect(response.headers.get('Location')).toContain('error=Password must be at least 6 characters');
+      expect(response.headers.get("Location")).toContain(
+        "error=Password must be at least 6 characters",
+      );
     });
   });
 
-  describe('POST /api/auth/signout', () => {
-    it('clears cookies and redirects to /', async () => {
+  describe("POST /api/auth/signout", () => {
+    it("clears cookies and redirects to /", async () => {
       const context = createMockContext();
 
       const response = await signoutPOST(context);
 
       expect(response.status).toBe(302);
-      expect(response.headers.get('Location')).toBe('/');
-      expect(context.cookies.delete).toHaveBeenCalledWith('sb-access-token', { path: '/' });
-      expect(context.cookies.delete).toHaveBeenCalledWith('sb-refresh-token', { path: '/' });
+      expect(response.headers.get("Location")).toBe("/");
+      expect(context.cookies.delete).toHaveBeenCalledWith("sb-access-token", {
+        path: "/",
+      });
+      expect(context.cookies.delete).toHaveBeenCalledWith("sb-refresh-token", {
+        path: "/",
+      });
     });
   });
 });

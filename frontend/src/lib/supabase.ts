@@ -28,7 +28,7 @@ export interface Newsletter {
   summary: string | null;
   topics: string[] | null;
   relevance_score: number | null;
-  entities: any;
+  entities: Record<string, unknown> | null;
   sources?: Source;
 }
 

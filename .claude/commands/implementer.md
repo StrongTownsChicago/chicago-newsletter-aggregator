@@ -80,20 +80,13 @@ For each implementation step in `plan.md`:
    - Edge case coverage
 
 5. **Validate immediately**
-   - Run new tests: `uv run python -m unittest tests.test_[module]`
+   - Run new tests: `uv run python -m unittest tests.test_[module]` (backend) or `npm run test` (frontend)
    - Verify they pass
    - If failures, debug and fix before continuing
 
-6. **Run linting** (for Python code)
-
-   ```bash
-   cd backend
-   uv run ruff check --fix
-   uv run ruff format
-   ```
-
-   - Fix any issues flagged
-   - Do NOT proceed with linting errors
+6. **Run linting**
+   - Run the project-specific linting commands (see Standards section)
+   - Fix any issues flagged; do NOT proceed with linting errors
 
 7. **Checkpoint**
    ```
@@ -167,30 +160,27 @@ For each implementation step in `plan.md`:
 
 ### Phase 5: Comprehensive Testing
 
-**Run relevant tests based on affected areas:**
+**Run relevant tests and linting based on affected areas:**
 
-1. **Backend tests** (if backend changed)
+1. **Backend** (if changed)
+
    ```bash
    cd backend
    uv run python -m unittest discover tests
-   ```
-
-2. **Frontend tests** (if frontend changed)
-   ```bash
-   cd frontend
-   npm run test
-   ```
-
-3. **All relevant tests must pass**
-   - Fix any failures before proceeding
-   - Verify integration tests and edge cases
-
-4. **Linting (final check)**
-   ```bash
-   cd backend
    uv run ruff check --fix
    uv run ruff format
    ```
+
+2. **Frontend** (if changed)
+
+   ```bash
+   cd frontend
+   npm test
+   npm run lint
+   ```
+
+3. **All relevant checks must pass** before proceeding.
+   - Fix any failures before proceeding
 
 ### Phase 6: Documentation Updates
 
@@ -304,11 +294,19 @@ class TestFeatureName(unittest.TestCase):
 
 ### Linting Standards
 
-**Python code must pass:**
+**Backend (Python)**:
 
 ```bash
+cd backend
 uv run ruff check --fix  # Fix auto-fixable issues
 uv run ruff format       # Format code
+```
+
+**Frontend (TypeScript/Astro)**:
+
+```bash
+cd frontend
+npm run lint             # Fix issues before proceeding
 ```
 
 **Fix all issues before proceeding:**
@@ -317,6 +315,7 @@ uv run ruff format       # Format code
 - No undefined names
 - No line length violations (after format)
 - No complexity violations
+- No `any` types in frontend (use proper interfaces)
 
 ## Debugging and Self-Correction
 

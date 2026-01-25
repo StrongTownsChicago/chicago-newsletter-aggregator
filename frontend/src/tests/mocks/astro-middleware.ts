@@ -1,1 +1,1 @@
-export const defineMiddleware = (fn: any) => fn;
+export const defineMiddleware = (fn: unknown) => fn;

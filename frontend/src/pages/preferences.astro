@@ -21,25 +21,37 @@ if (!user) {
 const supabase = Astro.locals.supabase;
 
 // Fetch user profile
-const { data: profile, error: profileError } = await supabase
+const { data: profile, error: profileErr } = await supabase
   .from('user_profiles')
   .select('*')
   .eq('id', user.id)
   .single();
 
+if (profileErr) {
+  return Astro.redirect(`/?error=${encodeURIComponent(profileErr.message)}`);
+}
+
 // Fetch notification rules
-const { data: rules, error: rulesError } = await supabase
+const { data: rules, error: rulesErr } = await supabase
   .from('notification_rules')
   .select('*')
   .eq('user_id', user.id)
   .order('created_at', { ascending: false });
 
+if (rulesErr) {
+  return Astro.redirect(`/?error=${encodeURIComponent(rulesErr.message)}`);
+}
+
 // Fetch distinct wards for filtering options
-const { data: sources, error: sourcesError } = await supabase
+const { data: sources, error: sourcesErr } = await supabase
   .from('sources')
   .select('ward_number')
   .not('ward_number', 'is', null)
   .order('ward_number');
+
+if (sourcesErr) {
+    console.error('Error fetching sources:', sourcesErr);
+}
 
 // Unique sorted wards
 const availableWards = Array.from(new Set(
@@ -288,7 +300,7 @@ const message = Astro.url.searchParams.get('message');
                       </svg>
                       <span>Limited to Wards:</span>
                       {rule.ward_numbers.map((ward, i) => (
-                        <span class="font-medium">{ward}{i < rule.ward_numbers.length - 1 ? ',' : ''}</span>
+                        <span class="font-medium">{ward}{i < rule?.ward_numbers.length - 1 ? ',' : ''}</span>
                       ))}
                     </div>
                   )}
