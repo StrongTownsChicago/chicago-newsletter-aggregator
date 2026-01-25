@@ -143,6 +143,24 @@ class TestPrepareNewsletterData(unittest.TestCase):
 class TestSendDailyDigest(unittest.TestCase):
     """Tests for send_daily_digest() function."""
 
+    def setUp(self):
+        """Set up test environment with secret key."""
+        import os
+
+        self.original_secret = os.environ.get("UNSUBSCRIBE_SECRET_KEY")
+        os.environ["UNSUBSCRIBE_SECRET_KEY"] = (
+            "test-secret-key-for-testing-must-be-at-least-32-chars-long"
+        )
+
+    def tearDown(self):
+        """Restore original environment."""
+        import os
+
+        if self.original_secret:
+            os.environ["UNSUBSCRIBE_SECRET_KEY"] = self.original_secret
+        else:
+            os.environ.pop("UNSUBSCRIBE_SECRET_KEY", None)
+
     @patch("notifications.email_sender.resend.Emails.send")
     def test_send_success(self, mock_send):
         """Email sent successfully via Resend API."""
@@ -151,7 +169,7 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = send_daily_digest("user@example.com", notifications)
+        result = send_daily_digest("user-123", "user@example.com", notifications)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["email_id"], "email_123")
@@ -165,14 +183,14 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = send_daily_digest("user@example.com", notifications)
+        result = send_daily_digest("user-123", "user@example.com", notifications)
 
         self.assertFalse(result["success"])
         self.assertIn("API Error", result["error"])
 
     def test_empty_notifications_returns_error(self):
         """Empty notifications list returns error."""
-        result = send_daily_digest("user@example.com", [])
+        result = send_daily_digest("user-123", "user@example.com", [])
 
         self.assertFalse(result["success"])
         self.assertIn("No notifications", result["error"])
@@ -185,7 +203,7 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        send_daily_digest("user@example.com", notifications)
+        send_daily_digest("user-123", "user@example.com", notifications)
 
         # Check that HTML contains preferences link
         call_args = mock_send.call_args[0][0]
@@ -200,6 +218,7 @@ class TestSendDailyDigest(unittest.TestCase):
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
         send_daily_digest(
+            "user-123",
             "user@example.com",
             notifications,
             preferences_url="https://custom.com/prefs",
@@ -220,7 +239,7 @@ class TestSendDailyDigest(unittest.TestCase):
             {"newsletter": newsletter2, "rule": {"name": "Rule 1"}},
         ]
 
-        send_daily_digest("user@example.com", notifications)
+        send_daily_digest("user-123", "user@example.com", notifications)
 
         call_args = mock_send.call_args[0][0]
         self.assertIn("2 newsletters", call_args["subject"])
@@ -233,7 +252,7 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        send_daily_digest("user@example.com", notifications)
+        send_daily_digest("user-123", "user@example.com", notifications)
 
         self.assertTrue(mock_send.called)
         call_args = mock_send.call_args[0][0]
@@ -272,7 +291,9 @@ class TestBuildDigestHtml(unittest.TestCase):
             },
         ]
 
-        html = _build_digest_html(prepared, "http://example.com/prefs")
+        html = _build_digest_html(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("Newsletter 1", html)
         self.assertIn("Newsletter 2", html)
@@ -292,7 +313,9 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(prepared, "http://example.com/prefs")
+        html = _build_digest_html(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("Zoning Updates", html)
         self.assertIn("Bike Lanes", html)
@@ -312,7 +335,9 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(prepared, "http://example.com/prefs")
+        html = _build_digest_html(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("zoning", html)
         self.assertIn("transit", html)
@@ -333,7 +358,9 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(prepared, "http://example.com/prefs")
+        html = _build_digest_html(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("topic5", html)
         self.assertNotIn("topic6", html)
@@ -353,7 +380,9 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(prepared, "http://example.com/preferences")
+        html = _build_digest_html(
+            prepared, "http://example.com/preferences", "http://example.com/unsub"
+        )
 
         self.assertIn("http://example.com/preferences", html)
 
@@ -376,7 +405,9 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(prepared, "http://example.com/prefs")
+        text = _build_digest_text(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("DAILY NEWSLETTER DIGEST", text)
         self.assertIn("1.", text)
@@ -407,7 +438,9 @@ class TestBuildDigestText(unittest.TestCase):
             },
         ]
 
-        text = _build_digest_text(prepared, "http://example.com/prefs")
+        text = _build_digest_text(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("1. Newsletter 1", text)
         self.assertIn("2. Newsletter 2", text)
@@ -427,7 +460,9 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(prepared, "http://example.com/prefs")
+        text = _build_digest_text(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("Zoning Updates", text)
 
@@ -446,7 +481,9 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(prepared, "http://example.com/prefs")
+        text = _build_digest_text(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("zoning", text)
         self.assertIn("transit", text)
@@ -466,7 +503,9 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(prepared, "http://example.com/prefs")
+        text = _build_digest_text(
+            prepared, "http://example.com/prefs", "http://example.com/unsub"
+        )
 
         self.assertIn("http://example.com/prefs", text)
 

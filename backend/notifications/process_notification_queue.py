@@ -89,7 +89,7 @@ def process_daily_digests(
             print(f"  [DRY RUN] Would send digest to user {user_id}")
             stats["sent"] += 1
         else:
-            result = send_daily_digest(user_email, notifications)
+            result = send_daily_digest(user_id, user_email, notifications)
 
             if result["success"]:
                 print(f"  ✓ Sent digest to user {user_id}")

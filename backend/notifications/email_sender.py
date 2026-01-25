@@ -8,15 +8,33 @@ import os
 from typing import List, Dict, Any
 from datetime import datetime
 import resend
+from notifications.unsubscribe_tokens import generate_unsubscribe_token
 
 
 # Initialize Resend with API key from environment
 resend.api_key = os.getenv("RESEND_API_KEY")
 
-# Frontend base URL for links in emails
-FRONTEND_BASE_URL = os.getenv(
-    "FRONTEND_BASE_URL", "https://chicago-newsletter-aggregator.open-advocacy.com"
-)
+
+def _get_frontend_base_url() -> str:
+    """Get frontend base URL from environment (allows runtime override for tests)."""
+    return os.getenv(
+        "FRONTEND_BASE_URL", "https://chicago-newsletter-aggregator.open-advocacy.com"
+    )
+
+
+def _build_unsubscribe_url(user_id: str) -> str:
+    """
+    Build unsubscribe URL with signed token.
+
+    Args:
+        user_id: User's unique identifier
+
+    Returns:
+        Complete unsubscribe URL with token parameter
+    """
+    token = generate_unsubscribe_token(user_id)
+    base_url = _get_frontend_base_url()
+    return f"{base_url}/unsubscribe?token={token}"
 
 
 def _prepare_newsletter_data(
@@ -94,7 +112,8 @@ def _prepare_newsletter_data(
 
         # Build newsletter URL
         newsletter_id = newsletter.get("id", "")
-        newsletter_url = f"{FRONTEND_BASE_URL}/newsletter/{newsletter_id}"
+        base_url = _get_frontend_base_url()
+        newsletter_url = f"{base_url}/newsletter/{newsletter_id}"
 
         # Prepare complete newsletter data
         prepared_newsletters.append(
@@ -114,12 +133,16 @@ def _prepare_newsletter_data(
 
 
 def send_daily_digest(
-    user_email: str, notifications: List[Dict[str, Any]], preferences_url: str = None
+    user_id: str,
+    user_email: str,
+    notifications: List[Dict[str, Any]],
+    preferences_url: str = None,
 ) -> Dict[str, Any]:
     """
     Send a daily digest email with all matched newsletters.
 
     Args:
+        user_id: User's unique identifier (for generating unsubscribe token)
         user_email: Recipient email address
         notifications: List of notification records (from notification_queue)
         preferences_url: URL to preferences page for managing notifications
@@ -130,24 +153,32 @@ def send_daily_digest(
     if not notifications:
         return {"success": False, "error": "No notifications to send"}
 
-    # Use default preferences URL if not provided
-    if preferences_url is None:
-        preferences_url = f"{FRONTEND_BASE_URL}/preferences"
-
-    # Get from email from environment
-    from_email = os.getenv(
-        "NOTIFICATION_FROM_EMAIL", "newsletter-notifications@open-advocacy.com"
-    )
-
-    # Prepare all newsletter data once (grouping, extraction, formatting)
-    prepared_newsletters = _prepare_newsletter_data(notifications)
-
-    # Build email content (formatters only handle presentation)
-    subject = f"Your Daily Chicago Alderman Newsletter Digest ({len(prepared_newsletters)} newsletters)"
-    html_body = _build_digest_html(prepared_newsletters, preferences_url)
-    text_body = _build_digest_text(prepared_newsletters, preferences_url)
-
     try:
+        # Use default preferences URL if not provided
+        if preferences_url is None:
+            base_url = _get_frontend_base_url()
+            preferences_url = f"{base_url}/preferences"
+
+        # Generate one-click unsubscribe URL (RFC 8058)
+        unsubscribe_url = _build_unsubscribe_url(user_id)
+
+        # Get from email from environment
+        from_email = os.getenv(
+            "NOTIFICATION_FROM_EMAIL", "newsletter-notifications@open-advocacy.com"
+        )
+
+        # Prepare all newsletter data once (grouping, extraction, formatting)
+        prepared_newsletters = _prepare_newsletter_data(notifications)
+
+        # Build email content (formatters only handle presentation)
+        subject = f"Your Daily Chicago Alderman Newsletter Digest ({len(prepared_newsletters)} newsletters)"
+        html_body = _build_digest_html(
+            prepared_newsletters, preferences_url, unsubscribe_url
+        )
+        text_body = _build_digest_text(
+            prepared_newsletters, preferences_url, unsubscribe_url
+        )
+
         # Send email via Resend
         response = resend.Emails.send(
             {
@@ -156,6 +187,10 @@ def send_daily_digest(
                 "subject": subject,
                 "html": html_body,
                 "text": text_body,
+                "headers": {
+                    "List-Unsubscribe": f"<{unsubscribe_url}>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
             }
         )
 
@@ -166,7 +201,9 @@ def send_daily_digest(
 
 
 def _build_digest_html(
-    prepared_newsletters: List[Dict[str, Any]], preferences_url: str
+    prepared_newsletters: List[Dict[str, Any]],
+    preferences_url: str,
+    unsubscribe_url: str,
 ) -> str:
     """
     Build HTML email body for daily digest.
@@ -174,6 +211,7 @@ def _build_digest_html(
     Args:
         prepared_newsletters: List of dicts with all newsletter data pre-extracted and formatted
         preferences_url: URL to preferences page
+        unsubscribe_url: One-click unsubscribe URL with signed token
 
     Returns:
         HTML string
@@ -347,6 +385,8 @@ def _build_digest_html(
                 You received this email because you have active notification rules.
                 <br>
                 <a href="{preferences_url}">Manage your notification preferences</a>
+                •
+                <a href="{unsubscribe_url}">Unsubscribe</a>
             </p>
             <p style="margin-top: 15px; color: #9ca3af; font-size: 12px;">
                 <a href="https://www.strongtownschicago.org/chicago-alderman-newsletters">Chicago Alderman Newsletter Tracker</a> • Built for <a href="https://strongtownschicago.org">Strong Towns Chicago</a>
@@ -361,7 +401,9 @@ def _build_digest_html(
 
 
 def _build_digest_text(
-    prepared_newsletters: List[Dict[str, Any]], preferences_url: str
+    prepared_newsletters: List[Dict[str, Any]],
+    preferences_url: str,
+    unsubscribe_url: str,
 ) -> str:
     """
     Build plain text email body for daily digest.
@@ -369,6 +411,7 @@ def _build_digest_text(
     Args:
         prepared_newsletters: List of dicts with all newsletter data pre-extracted and formatted
         preferences_url: URL to preferences page
+        unsubscribe_url: One-click unsubscribe URL with signed token
 
     Returns:
         Plain text string
@@ -405,6 +448,7 @@ Date: {newsletter["date_formatted"]}
     # Add footer
     text += f"""
 Manage your notification preferences: {preferences_url}
+Unsubscribe: {unsubscribe_url}
 
 ---
 Chicago Alderman Newsletter Tracker

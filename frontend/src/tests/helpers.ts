@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { APIContext } from 'astro';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const createMockCookies = () => {
   const store = new Map<string, unknown>();
@@ -12,7 +13,12 @@ export const createMockCookies = () => {
   };
 };
 
-export const createMockRequest = (formData?: Record<string, string | string[]>, method = 'POST') => {
+export const createMockRequest = (options: {
+  formData?: Record<string, string | string[]>;
+  json?: unknown;
+  method?: string;
+} = {}) => {
+  const { formData, json, method = 'POST' } = options;
   return {
     method,
     formData: vi.fn(async () => ({
@@ -25,9 +31,31 @@ export const createMockRequest = (formData?: Record<string, string | string[]>, 
         return Array.isArray(val) ? val : (val ? [val] : []);
       },
     })),
+    json: vi.fn(async () => json || {}),
     headers: new Headers(),
     url: 'http://localhost:4321',
   } as unknown as Request;
+};
+
+export const createMockSupabase = () => {
+  const mock = {
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    in_: vi.fn().mockReturnThis(),
+    auth: {
+      getSession: vi.fn(),
+      setSession: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+  };
+  return mock as unknown as SupabaseClient;
 };
 
 export const mockRedirect = vi.fn((url: string, status = 302) => {
@@ -39,11 +67,12 @@ export const mockRedirect = vi.fn((url: string, status = 302) => {
 
 export const createMockContext = (options: {
   formData?: Record<string, string | string[]>;
+  json?: unknown;
   method?: string;
   locals?: Record<string, unknown>;
 } = {}) => {
   return {
-    request: createMockRequest(options.formData, options.method),
+    request: createMockRequest({ formData: options.formData, json: options.json, method: options.method }),
     cookies: createMockCookies(),
     redirect: mockRedirect,
     locals: options.locals || {},

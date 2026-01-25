@@ -1,0 +1,157 @@
+---
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+
+// Parse token from query string
+const token = Astro.url.searchParams.get('token');
+const method = Astro.request.method;
+const confirm = Astro.url.searchParams.get('confirm');
+
+// State variables for UI
+let success = false;
+let error: string | null = null;
+let alreadyUnsubscribed = false;
+
+if (!token) {
+  error = 'Invalid unsubscribe link. Please use the link from your email.';
+} else {
+  try {
+    // Validate token and get user_id
+    const validateResponse = await fetch(`${Astro.url.origin}/api/notifications/validate-unsubscribe-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    if (!validateResponse.ok) {
+      error = 'This unsubscribe link is invalid or has expired.';
+    } else {
+      const { user_id } = await validateResponse.json();
+
+      // Check if already unsubscribed
+      const profileResponse = await fetch(`${Astro.url.origin}/api/notifications/get-user-preferences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id })
+      });
+
+      if (profileResponse.ok) {
+        const { enabled } = await profileResponse.json();
+        if (!enabled) {
+          alreadyUnsubscribed = true;
+        }
+      }
+
+      // If POST request (one-click) or GET with explicit confirmation, disable notifications
+      if (!alreadyUnsubscribed && (method === 'POST' || confirm === 'true')) {
+        const unsubscribeResponse = await fetch(`${Astro.url.origin}/api/notifications/unsubscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id })
+        });
+
+        if (unsubscribeResponse.ok) {
+          success = true;
+        } else {
+          error = 'Failed to unsubscribe. Please try again later.';
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Unsubscribe error:', err);
+    error = 'An error occurred. Please try again later.';
+  }
+}
+---
+
+<Layout title="Unsubscribe - Chicago Alderman Newsletter Tracker">
+  <div class="container mx-auto px-4 py-16 max-w-2xl">
+    <div class="bg-white shadow-lg border border-gray-200 rounded-xl p-8">
+
+      {error && (
+        <>
+          <div class="text-center mb-6">
+            <svg class="w-16 h-16 mx-auto text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Unsubscribe Error</h1>
+          </div>
+          <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        </>
+      )}
+
+      {alreadyUnsubscribed && !error && (
+        <>
+          <div class="text-center mb-6">
+            <svg class="w-16 h-16 mx-auto text-blue-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Already Unsubscribed</h1>
+          </div>
+          <p class="text-gray-700 mb-6 text-center">
+            You have already unsubscribed from email notifications.
+          </p>
+        </>
+      )}
+
+      {success && (
+        <>
+          <div class="text-center mb-6">
+            <svg class="w-16 h-16 mx-auto text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">Successfully Unsubscribed</h1>
+          </div>
+          <p class="text-gray-700 mb-6 text-center">
+            You will no longer receive email notifications from Chicago Alderman Newsletter Tracker.
+          </p>
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-gray-700">
+            <p class="font-semibold mb-2">Want to re-subscribe?</p>
+            <p>
+              You can re-enable notifications anytime by logging into your account and visiting your
+              <a href="/preferences" class="text-blue-600 hover:text-blue-800 underline">notification preferences</a>.
+            </p>
+          </div>
+        </>
+      )}
+
+      {!error && !success && !alreadyUnsubscribed && (
+        <>
+          <div class="text-center mb-6">
+            <svg class="w-16 h-16 mx-auto text-amber-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 mb-4">Confirm Unsubscribe</h1>
+            <p class="text-gray-700 mb-6">
+              Are you sure you want to unsubscribe from Chicago Alderman Newsletter notifications?
+            </p>
+          </div>
+
+          <div class="flex gap-4 justify-center">
+            <a
+              href="/"
+              class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors"
+            >
+              Cancel
+            </a>
+            <a
+              href={`/unsubscribe?token=${token}&confirm=true`}
+              class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Yes, Unsubscribe
+            </a>
+          </div>
+        </>
+      )}
+
+      <div class="mt-8 text-center">
+        <a href="/" class="text-sm text-gray-600 hover:text-blue-600">
+          Return to Home
+        </a>
+      </div>
+    </div>
+  </div>
+</Layout>
