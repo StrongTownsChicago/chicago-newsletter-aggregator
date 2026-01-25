@@ -1,4 +1,4 @@
-# Chicago Newsletter Aggregator
+# Chicago Alderman Newsletter Tracker
 
 Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns Chicago](https://www.strongtownschicago.org/).
 

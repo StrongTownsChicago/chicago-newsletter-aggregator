@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "An app that aggregates Chicago newsletters"
+description = "An app that tracks Chicago alderman newsletters"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",

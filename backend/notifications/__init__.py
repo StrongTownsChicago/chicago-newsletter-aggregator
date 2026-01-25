@@ -1,5 +1,5 @@
 """
-Notification system for Chicago Newsletter Aggregator.
+Notification system for Chicago Alderman Newsletter Tracker.
 
 This module handles:
 - Matching newsletters against user-defined notification rules

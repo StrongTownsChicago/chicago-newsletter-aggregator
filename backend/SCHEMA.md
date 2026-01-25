@@ -1,6 +1,6 @@
 # Database Schema Documentation
 
-Complete reference for the Chicago Newsletter Aggregator database schema.
+Complete reference for the Chicago Alderman Newsletter Tracker database schema.
 
 > **Authoritative Schema**: See `sql/schema.sql` for the exact SQL definitions.
 

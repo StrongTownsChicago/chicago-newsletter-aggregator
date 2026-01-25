@@ -143,7 +143,7 @@ def send_daily_digest(
     prepared_newsletters = _prepare_newsletter_data(notifications)
 
     # Build email content (formatters only handle presentation)
-    subject = f"Your Daily Chicago Newsletter Digest ({len(prepared_newsletters)} newsletters)"
+    subject = f"Your Daily Chicago Alderman Newsletter Digest ({len(prepared_newsletters)} newsletters)"
     html_body = _build_digest_html(prepared_newsletters, preferences_url)
     text_body = _build_digest_text(prepared_newsletters, preferences_url)
 
@@ -349,7 +349,7 @@ def _build_digest_html(
                 <a href="{preferences_url}">Manage your notification preferences</a>
             </p>
             <p style="margin-top: 15px; color: #9ca3af; font-size: 12px;">
-                <a href="https://www.strongtownschicago.org/chicago-alderman-newsletters">Chicago Newsletter Aggregator</a> • Built for <a href="https://strongtownschicago.org">Strong Towns Chicago</a>
+                <a href="https://www.strongtownschicago.org/chicago-alderman-newsletters">Chicago Alderman Newsletter Tracker</a> • Built for <a href="https://strongtownschicago.org">Strong Towns Chicago</a>
             </p>
         </div>
     </div>
@@ -407,7 +407,7 @@ Date: {newsletter["date_formatted"]}
 Manage your notification preferences: {preferences_url}
 
 ---
-Chicago Newsletter Aggregator
+Chicago Alderman Newsletter Tracker
 Built for Strong Towns Chicago - https://strongtownschicago.org
 """
 

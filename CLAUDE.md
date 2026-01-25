@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chicago Newsletter Aggregator: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and relevance scoring, and presents them through an Astro frontend.
+Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and relevance scoring, and presents them through an Astro frontend.
 
 ## Tech Stack
 
@@ -105,12 +105,14 @@ ollama pull gpt-oss:20b
 ## Automation
 
 **GitHub Actions Workflows:**
+
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters without LLM metadata, queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
 Both workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
 **Local LLM Processing:**
+
 ```bash
 # Process newsletters with Ollama (runs locally, not in GitHub Actions)
 uv run python utils/reprocess_newsletters.py --latest 50
