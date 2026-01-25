@@ -1,27 +1,33 @@
 """
-Reprocess existing newsletters with updated LLM processor.
+Process newsletters with LLM to add or update metadata (topics, summary, relevance score).
 
 Usage:
-    # Reprocess latest 10 newsletters
-    uv run python -m utils.reprocess_newsletters --latest 10
+    # Process latest 10 newsletters
+    uv run python -m utils.process_llm_metadata --latest 10
 
     # Skip first 20, process next 10 (newsletters 21-30)
-    uv run python -m utils.reprocess_newsletters --latest 10 --skip 20
+    uv run python -m utils.process_llm_metadata --latest 10 --skip 20
 
-    # Reprocess all newsletters from source_id 5
-    uv run python -m utils.reprocess_newsletters --source-id 5
+    # Process all newsletters from source_id 5
+    uv run python -m utils.process_llm_metadata --source-id 5
 
-    # Reprocess all newsletters
-    uv run python -m utils.reprocess_newsletters --all
+    # Process only newsletters missing LLM metadata
+    uv run python -m utils.process_llm_metadata --missing-metadata
 
-    # Reprocess specific newsletter by ID
-    uv run python -m utils.reprocess_newsletters --newsletter-id abc-123-def
+    # Process and queue notifications for matched rules
+    uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
+
+    # Process all newsletters
+    uv run python -m utils.process_llm_metadata --all
+
+    # Process specific newsletter by ID
+    uv run python -m utils.process_llm_metadata --newsletter-id abc-123-def
 
     # Combine filters: latest 20 from source 3
-    uv run python -m utils.reprocess_newsletters --latest 20 --source-id 3
+    uv run python -m utils.process_llm_metadata --latest 20 --source-id 3
 
     # Dry run (preview what would be processed)
-    uv run python -m utils.reprocess_newsletters --latest 10 --dry-run
+    uv run python -m utils.process_llm_metadata --latest 10 --dry-run
 """
 
 import os
@@ -36,7 +42,8 @@ load_dotenv()
 def fetch_newsletters(supabase, args):
     """Fetch newsletters based on filter arguments."""
 
-    query = supabase.table("newsletters").select("*")
+    # Join with sources table to get ward_number
+    query = supabase.table("newsletters").select("*, sources(ward_number)")
 
     # Apply filters
     if args.newsletter_id:
@@ -44,6 +51,12 @@ def fetch_newsletters(supabase, args):
 
     if args.source_id:
         query = query.eq("source_id", args.source_id)
+
+    # Filter for missing metadata
+    if args.missing_metadata:
+        # Filter for newsletters where ANY metadata is missing
+        # Using OR logic: topics is null OR summary is null OR relevance_score is null
+        query = query.or_("topics.is.null,summary.is.null,relevance_score.is.null")
 
     # Order by date for consistency
     query = query.order("received_date", desc=True)
@@ -55,13 +68,15 @@ def fetch_newsletters(supabase, args):
         query = query.range(start, end)
     elif args.skip > 0:
         # If only skip is specified (no limit), skip and get everything after
-        query = query.range(args.skip, args.skip + 9999)
+        query = query.range(args.skip, args.skip + 999999)
 
     result = query.execute()
     return result.data
 
 
-def reprocess_newsletter(supabase, newsletter, model, dry_run=False):
+def reprocess_newsletter(
+    supabase, newsletter, model, dry_run=False, queue_notifications_flag=False
+):
     """Reprocess a single newsletter with LLM."""
 
     newsletter_id = newsletter["id"]
@@ -105,6 +120,38 @@ def reprocess_newsletter(supabase, newsletter, model, dry_run=False):
                 f"    Topics: {', '.join(llm_data['topics']) if llm_data['topics'] else 'none'}"
             )
             print(f"    Score: {llm_data['relevance_score']}/10")
+
+            # Queue notifications if enabled
+            if queue_notifications_flag:
+                try:
+                    from notifications.rule_matcher import (
+                        match_newsletter_to_rules,
+                        queue_notifications as queue_notifs,
+                    )
+
+                    # Prepare newsletter data for matching
+                    newsletter_data = {
+                        "topics": llm_data.get("topics", []),
+                        "plain_text": newsletter.get("plain_text", ""),
+                        "source_id": newsletter.get("source_id"),
+                        "ward_number": newsletter.get("sources", {}).get("ward_number")
+                        if newsletter.get("sources")
+                        else None,
+                        "relevance_score": llm_data.get("relevance_score"),
+                    }
+
+                    # Match and queue
+                    matched = match_newsletter_to_rules(newsletter_id, newsletter_data)
+                    if matched:
+                        queued = queue_notifs(newsletter_id, matched)
+                        print(f"    ✓ Queued {queued} notification(s)")
+                    else:
+                        print("    - No matching notification rules")
+
+                except Exception as e:
+                    # Don't fail LLM processing if notification queuing fails
+                    print(f"    ⚠️  Notification queuing failed: {e}")
+
             return True
         else:
             print("  ✗ Update failed")
@@ -143,6 +190,12 @@ def main():
     )
 
     parser.add_argument(
+        "--missing-metadata",
+        action="store_true",
+        help="Only process newsletters that are missing LLM metadata (topics, summary, or relevance_score)",
+    )
+
+    parser.add_argument(
         "--all", action="store_true", help="Process ALL newsletters (use with caution!)"
     )
 
@@ -160,12 +213,26 @@ def main():
         help="Preview what would be processed without actually running LLM",
     )
 
+    parser.add_argument(
+        "--queue-notifications",
+        action="store_true",
+        help="Queue notifications for matched rules after processing (default: false)",
+    )
+
     args = parser.parse_args()
 
     # Validate arguments
-    if not any([args.latest, args.source_id, args.newsletter_id, args.all]):
+    if not any(
+        [
+            args.latest,
+            args.source_id,
+            args.newsletter_id,
+            args.all,
+            args.missing_metadata,
+        ]
+    ):
         parser.error(
-            "Must specify at least one filter: --latest, --source-id, --newsletter-id, or --all"
+            "Must specify at least one filter: --latest, --source-id, --newsletter-id, --all, or --missing-metadata"
         )
 
     if args.all and args.latest:
@@ -212,7 +279,11 @@ def main():
     for newsletter in newsletters:
         try:
             success = reprocess_newsletter(
-                supabase, newsletter, args.model, args.dry_run
+                supabase,
+                newsletter,
+                args.model,
+                args.dry_run,
+                args.queue_notifications,
             )
             if success:
                 success_count += 1

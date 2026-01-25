@@ -86,13 +86,13 @@ def process_daily_digests(
 
         # Send digest email
         if dry_run:
-            print(f"  [DRY RUN] Would send digest to {user_email}")
+            print(f"  [DRY RUN] Would send digest to user {user_id}")
             stats["sent"] += 1
         else:
             result = send_daily_digest(user_email, notifications)
 
             if result["success"]:
-                print(f"  ✓ Sent digest to {user_email}")
+                print(f"  ✓ Sent digest to user {user_id}")
                 stats["sent"] += 1
 
                 # Update notification queue status
@@ -119,7 +119,7 @@ def process_daily_digests(
 
             else:
                 error_msg = result.get("error")
-                print(f"  ✗ Failed to send to {user_email}: {error_msg}")
+                print(f"  ✗ Failed to send to user {user_id}: {error_msg}")
                 stats["failed"] += 1
 
                 # Log error to file
@@ -128,7 +128,6 @@ def process_daily_digests(
                     error_message=error_msg,
                     context={
                         "user_id": user_id,
-                        "user_email": user_email,
                         "batch_id": batch_id,
                         "notification_count": len(notifications),
                         "newsletter_ids": [n["newsletter_id"] for n in notifications],

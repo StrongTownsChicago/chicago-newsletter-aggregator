@@ -30,10 +30,12 @@ uv run python -m ingest.scraper.process_scraped_newsletters
 # Scrape specific source (source_id, archive_url, optional limit)
 uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
 
-# Reprocess newsletters with updated LLM prompts
-uv run python utils/reprocess_newsletters.py --latest 10
-uv run python utils/reprocess_newsletters.py --source-id 5
-uv run python utils/reprocess_newsletters.py --dry-run --latest 10
+# Process newsletters with LLM (add/update metadata)
+uv run python utils/process_llm_metadata.py --latest 10
+uv run python utils/process_llm_metadata.py --source-id 5
+uv run python utils/process_llm_metadata.py --dry-run --latest 10
+uv run python utils/process_llm_metadata.py --missing-metadata --latest 50
+uv run python utils/process_llm_metadata.py --latest 10 --queue-notifications
 
 # Reapply privacy sanitization to existing newsletters
 uv run python utils/reprocess_newsletters_privacy.py <newsletter_id> --update
@@ -147,7 +149,7 @@ backend/
 │   ├── test_matcher.py           # Testing utility for rule matching
 │   └── error_logger.py           # Timestamped error logging
 ├── utils/
-│   ├── reprocess_newsletters.py  # Reprocess existing newsletters with updated LLM prompts
+│   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary, relevance score)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
 │   └── download_samples.py       # Download sample newsletters for testing

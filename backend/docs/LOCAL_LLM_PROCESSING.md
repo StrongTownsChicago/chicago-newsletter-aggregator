@@ -8,19 +8,25 @@ Since LLM processing runs locally with Ollama (not in GitHub Actions), follow th
 2. Model downloaded: `ollama pull gpt-oss:20b`
 3. Backend dependencies installed: `cd backend && uv sync`
 
-## Process Recent Newsletters
+### Manual Processing of Existing Newsletters
+
+You can run the LLM processor on already-ingested newsletters using the `process_llm_metadata.py` utility:
 
 ```bash
-cd backend
+# Process the 10 most recent newsletters
+uv run python -m utils.process_llm_metadata --latest 10
 
-# Process latest 50 newsletters (default behavior)
-uv run python utils/reprocess_newsletters.py --latest 50
+# Process newsletters that are missing LLM metadata
+uv run python -m utils.process_llm_metadata --missing-metadata --latest 50
+
+# Process newsletters and trigger notifications for matched rules
+uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
 
 # Process all newsletters from a specific source
-uv run python utils/reprocess_newsletters.py --source-id 5
+uv run python -m utils.process_llm_metadata --source-id 5
 
-# Dry run to see what would be processed
-uv run python utils/reprocess_newsletters.py --latest 10 --dry-run
+# Process a single newsletter by ID
+uv run python -m utils.process_llm_metadata --newsletter-id <uuid>
 ```
 
 ## Recommended Schedule
