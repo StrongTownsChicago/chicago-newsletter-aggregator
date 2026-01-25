@@ -3,25 +3,25 @@ Reprocess existing newsletters with updated LLM processor.
 
 Usage:
     # Reprocess latest 10 newsletters
-    uv run python -m processing.reprocess_newsletters --latest 10
+    uv run python -m utils.reprocess_newsletters --latest 10
 
     # Skip first 20, process next 10 (newsletters 21-30)
-    uv run python -m processing.reprocess_newsletters --latest 10 --skip 20
+    uv run python -m utils.reprocess_newsletters --latest 10 --skip 20
 
     # Reprocess all newsletters from source_id 5
-    uv run python -m processing.reprocess_newsletters --source-id 5
+    uv run python -m utils.reprocess_newsletters --source-id 5
 
     # Reprocess all newsletters
-    uv run python -m processing.reprocess_newsletters --all
+    uv run python -m utils.reprocess_newsletters --all
 
     # Reprocess specific newsletter by ID
-    uv run python -m processing.reprocess_newsletters --newsletter-id abc-123-def
+    uv run python -m utils.reprocess_newsletters --newsletter-id abc-123-def
 
     # Combine filters: latest 20 from source 3
-    uv run python -m processing.reprocess_newsletters --latest 20 --source-id 3
+    uv run python -m utils.reprocess_newsletters --latest 20 --source-id 3
 
     # Dry run (preview what would be processed)
-    uv run python -m processing.reprocess_newsletters --latest 10 --dry-run
+    uv run python -m utils.reprocess_newsletters --latest 10 --dry-run
 """
 
 import os
