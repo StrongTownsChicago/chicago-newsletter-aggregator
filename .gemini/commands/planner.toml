@@ -159,6 +159,7 @@ Edge cases to handle:
 - Test business logic in isolation
 - Pure functions with various inputs
 - Expected outputs for edge cases
+- Only write tests that cover actual functionality. Do not test basic language features or mock behavior.
 
 **Integration Tests:**
 

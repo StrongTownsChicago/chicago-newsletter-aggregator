@@ -266,6 +266,7 @@ Implementation Checklist:
 
 - Test pure functions in isolation
 - Multiple test cases per function
+- Only write tests that cover actual functionality. Do not test basic language features or mock behavior.
 - Cover edge cases
 - Use descriptive test names: `test_rule_matches_single_topic()`
 
