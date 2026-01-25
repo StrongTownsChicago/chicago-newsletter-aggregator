@@ -158,10 +158,7 @@ backend/
 ├── tests/
 │   ├── unit/                     # Unit tests
 │   ├── integration/              # Integration tests
-│   ├── fixtures/                 # Test data and fixtures
-│   ├── test_sanitization.py      # Privacy sanitization tests
-│   ├── test_sanitization_comprehensive.py  # Comprehensive privacy tests
-│   └── test_user_cases.py        # Real-world newsletter test cases
+│   └── fixtures/                 # Test data and fixtures
 ├── config/
 │   └── privacy_patterns.py     # URL patterns, text patterns, CSS selectors for privacy filtering
 ├── shared/
@@ -278,33 +275,9 @@ PUBLIC_ENABLE_NOTIFICATIONS=
 
 ## Testing
 
-### Privacy Sanitization Tests
+**Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section).
 
-**Test suites** in `backend/tests/`:
-
-- `test_sanitization.py` - Basic tests (unsubscribe links, footers, text filtering)
-- `test_sanitization_comprehensive.py` - Comprehensive coverage (URL patterns, link text, CSS selectors, false positive prevention)
-- `test_user_cases.py` - Real-world integration tests (Mailchimp, Constant Contact, various newsletter formats)
-
-All tests validate privacy patterns defined in `backend/config/privacy_patterns.py`.
-
-**Run tests:**
-
-```bash
-cd backend
-uv run python -m unittest tests.test_sanitization
-uv run python -m unittest tests.test_sanitization_comprehensive
-uv run python -m unittest tests.test_user_cases
-```
-
-### Notification Testing
-
-Test rule matching against recent newsletters:
-
-```bash
-uv run python -m notifications.test_matcher          # Dry run
-uv run python -m notifications.test_matcher --queue  # Actually queue notifications
-```
+**Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section).
 
 ## Deployment
 
