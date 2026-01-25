@@ -7,11 +7,6 @@ for newsletter archive and individual newsletter pages.
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-from pathlib import Path
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from ingest.scraper.newsletter_scraper import NewsletterScraper
 

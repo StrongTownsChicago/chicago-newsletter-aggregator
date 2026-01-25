@@ -83,10 +83,10 @@ uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
 
 ```bash
 # Reprocess newsletters with current LLM prompts
-uv run python utils/reprocess_newsletters.py --latest 10
+uv run python -m utils.process_llm_metadata --latest 10
 
 # Reapply privacy sanitization to existing newsletters
-uv run python utils/reprocess_newsletters_privacy.py --all --update --quiet
+uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 ```
 
 #### Notifications

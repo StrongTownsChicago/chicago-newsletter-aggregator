@@ -7,11 +7,6 @@ topic filtering, and the full processing pipeline.
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-from pathlib import Path
-
-# Add backend directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from processing.llm_processor import (
     call_llm,

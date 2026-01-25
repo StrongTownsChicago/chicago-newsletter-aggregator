@@ -1,10 +1,6 @@
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
-
-# Add parent directory to path to allow imports from backend
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.db import get_supabase_client
 

@@ -1,12 +1,7 @@
 """Unit tests for email parsing and source matching logic."""
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from ingest.email.email_parser import (
     clean_html_content,

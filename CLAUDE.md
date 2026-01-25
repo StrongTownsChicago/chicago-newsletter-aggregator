@@ -31,15 +31,15 @@ uv run python -m ingest.scraper.process_scraped_newsletters
 uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
 
 # Process newsletters with LLM (add/update metadata)
-uv run python utils/process_llm_metadata.py --latest 10
-uv run python utils/process_llm_metadata.py --source-id 5
-uv run python utils/process_llm_metadata.py --dry-run --latest 10
-uv run python utils/process_llm_metadata.py --missing-metadata --latest 50
-uv run python utils/process_llm_metadata.py --latest 10 --queue-notifications
+uv run python -m utils.process_llm_metadata --latest 10
+uv run python -m utils.process_llm_metadata --source-id 5
+uv run python -m utils.process_llm_metadata --dry-run --latest 10
+uv run python -m utils.process_llm_metadata --missing-metadata --latest 50
+uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
 
 # Reapply privacy sanitization to existing newsletters
-uv run python utils/reprocess_newsletters_privacy.py <newsletter_id> --update
-uv run python utils/reprocess_newsletters_privacy.py --all --update --quiet
+uv run python -m utils.reprocess_newsletters_privacy <newsletter_id> --update
+uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 
 # Test notification rule matching (dry run)
 uv run python -m notifications.test_matcher
@@ -115,7 +115,7 @@ Both workflows support manual triggering via Actions tab. See workflow files for
 
 ```bash
 # Process newsletters with Ollama (runs locally, not in GitHub Actions)
-uv run python utils/reprocess_newsletters.py --latest 50
+uv run python -m utils.process_llm_metadata --latest 50
 ```
 
 See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
@@ -398,6 +398,10 @@ Function names should be verbs. Variables should describe their content. Be spec
 
 **Good**: `match_newsletter_to_rules()`, `active_rules`, `newsletter_url`
 **Bad**: `process()`, `data`, `temp`, `x`
+
+### Import Path Discipline
+
+Always use proper Python module execution patterns. Never manipulate sys.path.
 
 ### Declarative Over Imperative
 

@@ -7,11 +7,6 @@ duplicate handling, and grouping.
 
 import unittest
 from unittest.mock import Mock, patch
-import sys
-from pathlib import Path
-
-# Add backend directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from notifications.rule_matcher import (
     _rule_matches_newsletter,

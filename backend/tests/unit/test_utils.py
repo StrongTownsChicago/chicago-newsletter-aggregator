@@ -6,11 +6,6 @@ Tests date parsing utilities and summary printing.
 
 import unittest
 from unittest.mock import patch
-import sys
-from pathlib import Path
-
-# Add backend to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.utils import parse_date_string, print_summary
 

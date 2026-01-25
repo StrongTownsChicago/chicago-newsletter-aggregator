@@ -1,11 +1,4 @@
 import unittest
-import sys
-import os
-
-# Add parent directory to path
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
 
 from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT

@@ -6,26 +6,23 @@ to newsletters already stored in the database.
 
 Usage Examples:
 ---------------
+Run from the backend/ directory:
+
 1.  Dry Run on a single newsletter:
-    uv run python utils/reprocess_newsletters_privacy.py <newsletter_uuid>
+    uv run python -m utils.reprocess_newsletters_privacy <newsletter_uuid>
 
 2.  Commit changes for a single newsletter:
-    uv run python utils/reprocess_newsletters_privacy.py <newsletter_uuid> --update
+    uv run python -m utils.reprocess_newsletters_privacy <newsletter_uuid> --update
 
 3.  Dry Run on ALL newsletters (minimal output):
-    uv run python utils/reprocess_newsletters_privacy.py --all --quiet
+    uv run python -m utils.reprocess_newsletters_privacy --all --quiet
 
 4.  Commit changes for ALL newsletters:
-    uv run python utils/reprocess_newsletters_privacy.py --all --update --quiet
+    uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 """
 
-import os
 import argparse
-import sys
 import difflib
-
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.db import get_supabase_client
 from ingest.email.email_parser import sanitize_content
