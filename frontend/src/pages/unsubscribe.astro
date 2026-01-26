@@ -33,7 +33,7 @@ if (!token) {
       const profileResponse = await fetch(`${Astro.url.origin}/api/notifications/get-user-preferences`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id })
+        body: JSON.stringify({ token })
       });
 
       if (profileResponse.ok) {
@@ -48,7 +48,7 @@ if (!token) {
         const unsubscribeResponse = await fetch(`${Astro.url.origin}/api/notifications/unsubscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id })
+          body: JSON.stringify({ token, user_id })
         });
 
         if (unsubscribeResponse.ok) {

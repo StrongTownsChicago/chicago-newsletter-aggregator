@@ -139,6 +139,25 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    def test_handles_malformed_notifications(self):
+        """Malformed notifications are skipped without error."""
+        notifications = [
+            {"newsletter": None},  # Missing newsletter
+            {"newsletter": {"id": None}},  # Missing ID
+            {"something": "else"},  # Totally wrong structure
+        ]
+        result = _prepare_newsletter_data(notifications)
+        self.assertEqual(result, [])
+
+    def test_handles_invalid_date_format(self):
+        """Invalid date format falls back to substring."""
+        newsletter = create_test_newsletter(received_date="2026-01-24-INVALID")
+        notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
+
+        result = _prepare_newsletter_data(notifications)
+        # Should take first 10 chars as fallback
+        self.assertEqual(result[0]["date_formatted"], "2026-01-24")
+
 
 class TestSendDailyDigest(unittest.TestCase):
     """Tests for send_daily_digest() function."""

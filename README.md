@@ -17,6 +17,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **LLM Processing**: Topic extraction, summarization, relevance scoring
 - **Full-Text Search**: Search with filters (ward, topic, relevance score)
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules (topics, search phrases, wards)
+- **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
 - **Testing Suite**: Backend unit/integration tests, frontend unit tests
 
@@ -175,6 +176,7 @@ Email ingestion automatically queues matching notifications when `ENABLE_NOTIFIC
 - `backend/notifications/rule_matcher.py` - Matching logic
 - `backend/notifications/email_sender.py` - Email delivery via Resend
 - `frontend/src/pages/preferences.astro` - User preference management
+- `frontend/src/pages/unsubscribe.astro` - One-click unsubscribe
 
 ## Privacy & Content Sanitization
 
@@ -214,6 +216,7 @@ ENABLE_NOTIFICATIONS=true
 RESEND_API_KEY=re_xxxxx
 NOTIFICATION_FROM_EMAIL=noreply@yourdomain.com
 FRONTEND_BASE_URL=yourbaseurl  # Optional
+UNSUBSCRIBE_SECRET_KEY=your_secret_key # For signing unsubscribe JWTs
 
 # Privacy (optional)
 PRIVACY_STRIP_PHRASES=  # Comma-separated phrases to redact
@@ -225,4 +228,8 @@ PRIVACY_STRIP_PHRASES=  # Comma-separated phrases to redact
 PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_ANON_KEY=
 PUBLIC_ENABLE_NOTIFICATIONS=
+
+# Server-side Only
+SUPABASE_SERVICE_ROLE_KEY=
+UNSUBSCRIBE_SECRET_KEY=
 ```

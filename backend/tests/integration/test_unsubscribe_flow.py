@@ -4,11 +4,13 @@ Integration tests for complete unsubscribe workflow.
 
 import os
 import unittest
+import jwt
 from unittest.mock import patch
+from datetime import datetime, timedelta, timezone
 from notifications.unsubscribe_tokens import (
     generate_unsubscribe_token,
     validate_unsubscribe_token,
-    UNSUBSCRIBE_SALT,
+    ALGORITHM,
 )
 from notifications.email_sender import send_daily_digest
 
@@ -19,9 +21,8 @@ class TestUnsubscribeFlow(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         self.original_secret = os.environ.get("UNSUBSCRIBE_SECRET_KEY")
-        os.environ["UNSUBSCRIBE_SECRET_KEY"] = (
-            "test-secret-key-for-testing-must-be-at-least-32-chars-long"
-        )
+        self.test_secret = "test-secret-key-for-testing-must-be-at-least-32-chars-long"
+        os.environ["UNSUBSCRIBE_SECRET_KEY"] = self.test_secret
         self.original_base_url = os.environ.get("FRONTEND_BASE_URL")
         os.environ["FRONTEND_BASE_URL"] = "https://test.example.com"
 
@@ -64,7 +65,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -106,19 +107,20 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.assertIn(token, text_body)
 
     def test_expired_token_cannot_be_validated(self):
-        """Test that tokens respect max age parameter."""
+        """Test that tokens respect expiration."""
         user_id = "test-user-expiry-check"
 
-        # Generate token
-        token = generate_unsubscribe_token(user_id)
+        # Manually create an expired token
+        expired_payload = {
+            "sub": user_id,
+            "exp": datetime.now(timezone.utc) - timedelta(days=1),
+            "type": "unsubscribe",
+        }
+        token = jwt.encode(expired_payload, self.test_secret, algorithm=ALGORITHM)
 
-        # Validate with 90 day max age (should work)
-        result_90 = validate_unsubscribe_token(token, max_age_days=90)
-        self.assertEqual(result_90, user_id)
-
-        # Validate with 0 day max age (should fail - token is not old enough to pass this test)
-        # Note: Freshly generated tokens will still be valid with 0 day max age
-        # because they were just created. To test expiry, we'd need to mock time.
+        # Validate should fail
+        result = validate_unsubscribe_token(token)
+        self.assertIsNone(result)
 
     def test_tampered_token_fails_validation(self):
         """Test that modifying token makes it invalid."""
@@ -127,12 +129,13 @@ class TestUnsubscribeFlow(unittest.TestCase):
         # Generate valid token
         token = generate_unsubscribe_token(user_id)
 
-        # Tamper with token
+        # Tamper with token (signature part)
         parts = token.split(".")
         tampered_parts = parts.copy()
-        tampered_parts[2] = tampered_parts[2][:-1] + (
-            "Z" if tampered_parts[2][-1] != "Z" else "A"
-        )
+        # Change the FIRST character of the signature to ensure it changes
+        first_char = tampered_parts[2][0]
+        new_char = "Z" if first_char != "Z" else "A"
+        tampered_parts[2] = new_char + tampered_parts[2][1:]
         tampered_token = ".".join(tampered_parts)
 
         # Validation should fail
@@ -150,35 +153,12 @@ class TestUnsubscribeFlow(unittest.TestCase):
         token = generate_unsubscribe_token(user_id)
 
         # Try to validate with different secret
-        result = validate_unsubscribe_token(
-            token, max_age_days=90
-        )  # Uses same secret, should work
-        self.assertEqual(result, user_id)
-
-        # Now validate with actually different approach - change env var
         os.environ["UNSUBSCRIBE_SECRET_KEY"] = (
             "second-secret-key-must-be-at-least-32-chars-long-diff"
         )
 
-        # Generate new validator with new secret
-        import hashlib
-        from itsdangerous import URLSafeTimedSerializer
-
-        new_serializer = URLSafeTimedSerializer(
-            os.environ["UNSUBSCRIBE_SECRET_KEY"],
-            salt=UNSUBSCRIBE_SALT,
-            signer_kwargs={"digest_method": hashlib.sha256},
-        )
-
-        # Try to load token with wrong secret
-        try:
-            new_serializer.loads(
-                token, max_age=90 * 24 * 60 * 60, salt=UNSUBSCRIBE_SALT
-            )
-            self.fail("Should have raised BadSignature")
-        except Exception:
-            # Expected - signature won't match
-            pass
+        result = validate_unsubscribe_token(token)
+        self.assertIsNone(result)
 
     @patch("notifications.email_sender.resend")
     def test_multiple_users_get_unique_tokens(self, mock_resend):
@@ -195,7 +175,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }

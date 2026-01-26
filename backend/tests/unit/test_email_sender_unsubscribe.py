@@ -9,6 +9,7 @@ from notifications.email_sender import (
     send_daily_digest,
     _build_unsubscribe_url,
 )
+from notifications.unsubscribe_tokens import validate_unsubscribe_token
 
 
 class TestEmailSenderUnsubscribe(unittest.TestCase):
@@ -48,8 +49,12 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         # Extract and validate token
         token = url.split("?token=")[1]
         self.assertGreater(len(token), 0)
-        # Token should have payload.timestamp.signature format
+        # Token should have JWT format (header.payload.signature)
         self.assertEqual(token.count("."), 2)
+
+        # Validate extracted token
+        validated_user_id = validate_unsubscribe_token(token)
+        self.assertEqual(validated_user_id, user_id)
 
     @patch("notifications.email_sender.resend")
     def test_send_daily_digest_requires_user_id_parameter(self, mock_resend):
@@ -62,7 +67,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -88,7 +93,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -130,7 +135,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -168,7 +173,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -205,7 +210,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -244,7 +249,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -277,7 +282,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
@@ -307,7 +312,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
                     "id": "news-1",
                     "subject": "Test Newsletter",
                     "received_date": "2026-01-25T10:00:00Z",
-                    "source": {"name": "Test Source"},
+                    "source": {"name": "Test Source", "ward_number": "1"},
                 },
                 "rule": {"name": "Test Rule"},
             }
