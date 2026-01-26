@@ -45,6 +45,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
           FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
+          UNSUBSCRIBE_SECRET_KEY: ${{ secrets.UNSUBSCRIBE_SECRET_KEY }}
         run: |
           cd backend
           ARGS="--daily-digest"
