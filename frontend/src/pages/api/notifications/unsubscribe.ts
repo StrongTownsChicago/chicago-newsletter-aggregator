@@ -1,9 +1,9 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const { token, user_id } = await request.json();
 
@@ -14,8 +14,8 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Get secret key
-    const secretKeyStr = import.meta.env.UNSUBSCRIBE_SECRET_KEY;
+    // Get secret key from Cloudflare runtime environment
+    const secretKeyStr = locals.runtime?.env?.UNSUBSCRIBE_SECRET_KEY || import.meta.env.UNSUBSCRIBE_SECRET_KEY;
     if (!secretKeyStr) {
       console.error("UNSUBSCRIBE_SECRET_KEY not configured");
       return new Response(JSON.stringify({ error: "Server error" }), {
@@ -64,6 +64,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Update notification preferences to disabled using admin client
+    const supabaseAdmin = getSupabaseAdmin(locals);
     const { error } = await supabaseAdmin
       .from("user_profiles")
       .update({

@@ -23,7 +23,7 @@ const { mockSupabaseAdmin } = vi.hoisted(() => {
 });
 
 vi.mock("../../lib/supabase-admin", () => ({
-  supabaseAdmin: mockSupabaseAdmin,
+  getSupabaseAdmin: vi.fn(() => mockSupabaseAdmin),
 }));
 
 vi.mock("jose", () => ({
@@ -40,6 +40,8 @@ describe("Validate Unsubscribe Token API", () => {
       "UNSUBSCRIBE_SECRET_KEY",
       "test-secret-key-for-testing-must-be-at-least-32-chars-long",
     );
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -134,6 +136,8 @@ describe("Get User Preferences API", () => {
       "UNSUBSCRIBE_SECRET_KEY",
       "test-secret-key-for-testing-must-be-at-least-32-chars-long",
     );
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -265,6 +269,8 @@ describe("Get User Preferences API", () => {
       "UNSUBSCRIBE_SECRET_KEY",
       "test-secret-key-for-testing-must-be-at-least-32-chars-long",
     );
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://test.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 

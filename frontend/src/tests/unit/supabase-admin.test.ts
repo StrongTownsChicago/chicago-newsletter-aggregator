@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-describe("supabaseAdmin", () => {
+describe("getSupabaseAdmin", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -8,7 +8,7 @@ describe("supabaseAdmin", () => {
 
   it("throws error if not in SSR mode", async () => {
     vi.stubEnv("SSR", ""); // Simulate non-SSR
-    
+
     try {
       await import("../../lib/supabase-admin");
       expect.fail("Should have thrown error");
@@ -27,7 +27,8 @@ describe("supabaseAdmin", () => {
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
 
     try {
-      await import("../../lib/supabase-admin");
+      const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
+      getSupabaseAdmin();
       expect.fail("Should have thrown error");
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -43,7 +44,8 @@ describe("supabaseAdmin", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 
-    const { supabaseAdmin } = await import("../../lib/supabase-admin");
-    expect(supabaseAdmin).toBeDefined();
+    const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
+    const client = getSupabaseAdmin();
+    expect(client).toBeDefined();
   });
 });

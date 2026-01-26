@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // Strategy 1: Token provided (Unsubscribe flow)
     if (token) {
-      const secretKeyStr = import.meta.env.UNSUBSCRIBE_SECRET_KEY;
+      const secretKeyStr = locals.runtime?.env?.UNSUBSCRIBE_SECRET_KEY || import.meta.env.UNSUBSCRIBE_SECRET_KEY;
       if (!secretKeyStr) {
         console.error("UNSUBSCRIBE_SECRET_KEY not configured");
         return new Response(JSON.stringify({ error: "Server error" }), {
@@ -59,6 +59,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Query user preferences using admin client (to ensure we can read even if RLS is strict for anon)
+    const supabaseAdmin = getSupabaseAdmin(locals);
     const { data, error } = await supabaseAdmin
       .from("user_profiles")
       .select("notification_preferences")

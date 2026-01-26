@@ -2,7 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const { token } = await request.json();
 
@@ -13,8 +13,8 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Get secret key from environment
-    const secretKeyStr = import.meta.env.UNSUBSCRIBE_SECRET_KEY;
+    // Get secret key from Cloudflare runtime environment
+    const secretKeyStr = locals.runtime?.env?.UNSUBSCRIBE_SECRET_KEY || import.meta.env.UNSUBSCRIBE_SECRET_KEY;
     if (!secretKeyStr) {
       console.error("UNSUBSCRIBE_SECRET_KEY not configured");
       return new Response(
