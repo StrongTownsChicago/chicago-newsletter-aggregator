@@ -243,9 +243,10 @@ frontend/src/
 Both formats are independently sanitized during ingestion for privacy protection. Without `plain_text`, search, LLM features, and notification matching would be non-functional.
 
 **Secure One-Click Unsubscribe**:
+
 - **JWT-based Tokens**: Backend generates `HS256` JWTs containing `user_id` and `exp` using `PyJWT`.
 - **Stateless Verification**: Frontend validates tokens using `jose` without DB lookups for validation.
-- **Privileged Update**: Unsubscribe action uses a server-side-only `supabase-admin` client (bypassing RLS) initialized with `SUPABASE_SERVICE_ROLE_KEY`. This key is never exposed to the client.
+- **Privileged Update**: Unsubscribe action uses a server-side-only `supabase-admin` client (bypassing RLS) initialized with `SUPABASE_SERVICE_KEY`. This key is never exposed to the client.
 
 ## Environment Variables
 
@@ -282,7 +283,7 @@ PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_ANON_KEY=
 PUBLIC_ENABLE_NOTIFICATIONS=
 # Server-side only variables (not exposed to client)
-SUPABASE_SERVICE_ROLE_KEY=      # For privileged actions like unsubscribe
+SUPABASE_SERVICE_KEY=      # For privileged actions like unsubscribe
 UNSUBSCRIBE_SECRET_KEY=         # Must match backend key
 ```
 

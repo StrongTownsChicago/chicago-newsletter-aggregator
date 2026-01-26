@@ -24,7 +24,7 @@ describe("getSupabaseAdmin", () => {
   it("throws error if missing environment variables", async () => {
     vi.stubEnv("SSR", "true");
     vi.stubEnv("PUBLIC_SUPABASE_URL", "");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    vi.stubEnv("SUPABASE_SERVICE_KEY", "");
 
     try {
       const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
@@ -42,7 +42,7 @@ describe("getSupabaseAdmin", () => {
   it("initializes successfully with correct environment", async () => {
     vi.stubEnv("SSR", "true");
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
+    vi.stubEnv("SUPABASE_SERVICE_KEY", "service-role-key");
 
     const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
     const client = getSupabaseAdmin();

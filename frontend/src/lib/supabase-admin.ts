@@ -18,8 +18,8 @@ export function getSupabaseAdmin(locals?: {
 
   // Try to get service role key from Cloudflare runtime env first, then fall back to import.meta.env for local dev
   const serviceRoleKey =
-    locals?.runtime?.env?.SUPABASE_SERVICE_ROLE_KEY ||
-    import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+    locals?.runtime?.env?.SUPABASE_SERVICE_KEY ||
+    import.meta.env.SUPABASE_SERVICE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error("Missing Supabase URL or Service Role Key");
