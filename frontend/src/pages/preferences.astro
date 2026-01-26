@@ -237,7 +237,7 @@ const message = Astro.url.searchParams.get('message');
           </svg>
           <h3 class="text-lg font-semibold text-gray-900 mb-2">No notification rules yet</h3>
           <p class="text-sm text-gray-600 mb-6 max-w-md mx-auto">
-            Create rules to get notified when newsletters match your interests. You can filter by topics, keywords, and more.
+            Create rules to get notified when newsletters match your interests. You can filter by a search phrase, topics, and ward.
           </p>
           {canCreateRule && (
             <button
@@ -391,7 +391,7 @@ const message = Astro.url.searchParams.get('message');
                   value="topic"
                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                 />
-                <span class="ml-2 text-gray-700">Topics</span>
+                <span class="ml-2 text-gray-700">Topics (Beta)</span>
               </label>
             </div>
           </div>
@@ -441,7 +441,7 @@ const message = Astro.url.searchParams.get('message');
                 type="text"
                 id="searchTerm"
                 name="search_term"
-                placeholder="e.g., Lincoln Yards"
+                placeholder="e.g., CTA"
                 maxlength="100"
                 class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
               />
