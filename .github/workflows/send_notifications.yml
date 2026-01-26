@@ -1,10 +1,6 @@
 name: Send Notification Digests
 
 on:
-  schedule:
-    # Run daily at 8:35am Central (13:00 UTC standard, 14:00 UTC daylight)
-    # Using 13:00 UTC as baseline
-    - cron: "35 13 * * *"
   workflow_dispatch:
     inputs:
       batch_id:
@@ -14,6 +10,10 @@ on:
         description: "Dry run mode (true/false)"
         required: false
         default: "false"
+  schedule:
+    # Run daily at 8:35am Central (13:00 UTC standard, 14:00 UTC daylight)
+    # Using 13:00 UTC as baseline
+    - cron: "35 13 * * *"
 
 jobs:
   send-digests:
