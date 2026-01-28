@@ -35,6 +35,7 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PRIVACY_STRIP_PHRASES: ${{ secrets.PRIVACY_STRIP_PHRASES }}
           ENABLE_LLM: false
           ENABLE_NOTIFICATIONS: true
         run: |
