@@ -2,7 +2,7 @@
 CLI script for processing notification queue and sending emails.
 
 Usage:
-    # Send daily digest emails (run once per day)
+    # Send daily digest emails (defaults to yesterday's batch in Chicago timezone)
     uv run python -m notifications.process_notification_queue --daily-digest
 
     # Process specific batch ID
@@ -14,7 +14,8 @@ Usage:
 
 import argparse
 import time
-from datetime import date
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Any
 from shared.db import get_supabase_client
 from notifications.rule_matcher import get_pending_notifications_by_user
@@ -29,18 +30,21 @@ def process_daily_digests(
     Process daily digest notifications.
 
     Groups all pending notifications by user and sends ONE email per user
-    with all matched newsletters from the specified batch (default: today).
+    with all matched newsletters from the specified batch (default: yesterday in Chicago timezone).
 
     Args:
-        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to today.
+        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to yesterday (Chicago time).
         dry_run: If True, don't actually send emails (for testing)
 
     Returns:
         Dictionary with stats: sent, failed, skipped
     """
-    # Default to today if no batch ID specified
+    # Default to yesterday (Chicago timezone) if no batch ID specified
+    # Workflow runs at 13:35 UTC (~7:35-8:35am Central) sending previous day's batch
     if not batch_id:
-        batch_id = date.today().isoformat()
+        chicago_tz = ZoneInfo("America/Chicago")
+        yesterday = datetime.now(chicago_tz).date() - timedelta(days=1)
+        batch_id = yesterday.isoformat()
 
     print(f"Processing daily digest for batch: {batch_id}")
 
@@ -194,7 +198,7 @@ def main():
     parser.add_argument(
         "--batch-id",
         type=str,
-        help="Specific batch ID to process (YYYY-MM-DD format, defaults to today)",
+        help="Specific batch ID to process (YYYY-MM-DD format, defaults to yesterday in Chicago timezone)",
     )
 
     parser.add_argument(

@@ -5,8 +5,9 @@ Matches newsletters against user-defined notification rules and queues
 notifications for delivery.
 """
 
-from datetime import date
+from datetime import datetime
 from typing import Dict, List, Any, Optional
+from zoneinfo import ZoneInfo
 from shared.db import get_supabase_client
 from notifications.error_logger import log_notification_error
 
@@ -162,7 +163,10 @@ def queue_notifications(newsletter_id: str, matched_rules: List[Dict[str, Any]])
         supabase = get_supabase_client()
 
         # Generate digest batch ID for daily grouping (YYYY-MM-DD)
-        today = date.today().isoformat()
+        # Use Chicago timezone to ensure evening emails (7pm-10pm) are batched
+        # with the same day's newsletters, not the next day in UTC
+        chicago_tz = ZoneInfo("America/Chicago")
+        today = datetime.now(chicago_tz).date().isoformat()
 
         # Prepare notifications for batch insert
         notifications = []

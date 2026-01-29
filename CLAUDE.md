@@ -50,7 +50,7 @@ uv run python -m notifications.test_matcher --queue
 # Send daily digest emails (dry run)
 uv run python -m notifications.process_notification_queue --daily-digest --dry-run
 
-# Send today's digest
+# Send yesterday's digest (default behavior)
 uv run python -m notifications.process_notification_queue --daily-digest
 
 # Send specific date's digest

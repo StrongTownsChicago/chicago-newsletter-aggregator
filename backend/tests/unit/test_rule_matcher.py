@@ -355,11 +355,16 @@ class TestQueueNotifications(unittest.TestCase):
     """Tests for queue_notifications() function"""
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("notifications.rule_matcher.date")
+    @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
-    def test_queue_single_notification(self, mock_print, mock_date, mock_get_supabase):
+    def test_queue_single_notification(
+        self, mock_print, mock_datetime, mock_get_supabase
+    ):
         """Basic insertion of one notification"""
-        mock_date.today.return_value.isoformat.return_value = "2026-01-24"
+        # Mock datetime.now() to return a specific date
+        mock_now = Mock()
+        mock_now.date.return_value.isoformat.return_value = "2026-01-24"
+        mock_datetime.now.return_value = mock_now
 
         mock_supabase = create_mock_supabase()
         mock_get_supabase.return_value = mock_supabase
@@ -375,13 +380,16 @@ class TestQueueNotifications(unittest.TestCase):
         self.assertEqual(mock_supabase.insert.call_count, 1)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("notifications.rule_matcher.date")
+    @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
     def test_queue_multiple_notifications(
-        self, mock_print, mock_date, mock_get_supabase
+        self, mock_print, mock_datetime, mock_get_supabase
     ):
         """Batch insert of multiple notifications"""
-        mock_date.today.return_value.isoformat.return_value = "2026-01-24"
+        # Mock datetime.now() to return a specific date
+        mock_now = Mock()
+        mock_now.date.return_value.isoformat.return_value = "2026-01-24"
+        mock_datetime.now.return_value = mock_now
 
         mock_supabase = create_mock_supabase()
         mock_get_supabase.return_value = mock_supabase
@@ -399,11 +407,14 @@ class TestQueueNotifications(unittest.TestCase):
         self.assertEqual(mock_supabase.insert.call_count, 3)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("notifications.rule_matcher.date")
+    @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
-    def test_generates_batch_id(self, mock_print, mock_date, mock_get_supabase):
+    def test_generates_batch_id(self, mock_print, mock_datetime, mock_get_supabase):
         """Uses today's date (YYYY-MM-DD) as batch_id"""
-        mock_date.today.return_value.isoformat.return_value = "2026-01-24"
+        # Mock datetime.now() to return a specific date in Chicago timezone
+        mock_now = Mock()
+        mock_now.date.return_value.isoformat.return_value = "2026-01-24"
+        mock_datetime.now.return_value = mock_now
 
         mock_supabase = create_mock_supabase()
         mock_get_supabase.return_value = mock_supabase
@@ -418,11 +429,14 @@ class TestQueueNotifications(unittest.TestCase):
         self.assertEqual(notification["digest_batch_id"], "2026-01-24")
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("notifications.rule_matcher.date")
+    @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
-    def test_duplicate_handling(self, mock_print, mock_date, mock_get_supabase):
+    def test_duplicate_handling(self, mock_print, mock_datetime, mock_get_supabase):
         """Unique constraint on (user_id, newsletter_id, rule_id) handled gracefully"""
-        mock_date.today.return_value.isoformat.return_value = "2026-01-24"
+        # Mock datetime.now() to return a specific date
+        mock_now = Mock()
+        mock_now.date.return_value.isoformat.return_value = "2026-01-24"
+        mock_datetime.now.return_value = mock_now
 
         # First insert succeeds, second fails with duplicate error
         mock_supabase = Mock()
@@ -452,13 +466,16 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
-    @patch("notifications.rule_matcher.date")
+    @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
     def test_partial_failure_continues(
-        self, mock_print, mock_date, mock_log, mock_get_supabase
+        self, mock_print, mock_datetime, mock_log, mock_get_supabase
     ):
         """Some insertions fail, others succeed"""
-        mock_date.today.return_value.isoformat.return_value = "2026-01-24"
+        # Mock datetime.now() to return a specific date
+        mock_now = Mock()
+        mock_now.date.return_value.isoformat.return_value = "2026-01-24"
+        mock_datetime.now.return_value = mock_now
 
         mock_supabase = Mock()
         mock_supabase.table.return_value = mock_supabase

@@ -2,13 +2,13 @@ name: Send Notification Digests
 
 on:
   schedule:
-    # Run daily at 8:35am Central (13:00 UTC standard, 14:00 UTC daylight)
-    # Using 13:35 UTC as baseline
+    # Run daily at 13:35 UTC (8:35am CDT / 7:35am CST)
+    # Sends digest containing yesterday's newsletters (Chicago timezone date)
     - cron: "35 13 * * *"
   workflow_dispatch:
     inputs:
       batch_id:
-        description: "Batch ID to process (YYYY-MM-DD format, defaults to today)"
+        description: "Batch ID to process (YYYY-MM-DD format, defaults to yesterday in Chicago timezone)"
         required: false
       dry_run:
         description: "Dry run mode (true/false)"
