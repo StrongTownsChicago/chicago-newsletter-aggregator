@@ -41,26 +41,22 @@ def sanitize_content(content: str, content_type: str, privacy_patterns: dict) ->
                 href = a["href"]
                 text = a.get_text(" ", strip=True)
 
-                # Check for matches
-                matched = False
+                url_matched = False
                 for pattern in url_patterns:
                     if re.search(pattern, href, re.IGNORECASE):
-                        matched = True
+                        url_matched = True
                         break
 
-                if not matched:
-                    for pattern in text_patterns:
-                        if re.search(pattern, text, re.IGNORECASE):
-                            matched = True
-                            break
+                text_matched = False
+                for pattern in text_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        text_matched = True
+                        break
 
-                if matched:
-                    # If the link contains media (images, etc.), unwrap to keep the content
-                    if a.find(["img", "picture", "svg"]):
-                        a.unwrap()
-                    else:
-                        # For purely text links, remove entirely (usually privacy links)
-                        a.decompose()
+                if text_matched:
+                    a.decompose()
+                elif url_matched:
+                    a.unwrap()
 
             result = str(soup)
 
