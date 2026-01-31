@@ -295,7 +295,7 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
 
     for report in prepared_reports:
         # Build search URL for this topic
-        topic_url = f"{base_url}/search?topics={report['topic']}"
+        topic_url = f"{base_url}/search?topic={report['topic']}"
 
         content += f"""
         <div class="topic-report">
@@ -665,7 +665,7 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
 
             content += "\n"
 
-        topic_url = f"{base_url}/search?q=&ward=&topics={report['topic']}"
+        topic_url = f"{base_url}/search?topic={report['topic']}"
         content += f"View all {report['topic_display']} newsletters:\n"
         content += f"{topic_url}\n\n"
         content += "=" * 70 + "\n\n"

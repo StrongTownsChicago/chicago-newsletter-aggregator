@@ -244,7 +244,7 @@ class TestRenderWeeklyContentHtml(unittest.TestCase):
         html = _render_weekly_content_html(prepared)
 
         # Assert
-        self.assertIn("/search?topics=transit_funding", html)
+        self.assertIn("/search?topic=transit_funding", html)
 
 
 class TestBuildDigestHtml(unittest.TestCase):
