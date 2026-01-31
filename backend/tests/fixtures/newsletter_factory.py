@@ -2,23 +2,23 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def create_test_newsletter(
     subject: str = "Test Newsletter",
     plain_text: str = "Test newsletter content about zoning and development.",
-    raw_html: Optional[str] = None,
+    raw_html: str | None = None,
     source_id: int = 1,
-    topics: Optional[List[str]] = None,
+    topics: list[str] | None = None,
     relevance_score: int = 5,
-    received_date: Optional[str] = None,
-    email_uid: Optional[str] = None,
-    summary: Optional[str] = None,
-    from_email: Optional[str] = None,
-    to_email: Optional[str] = None,
+    received_date: str | None = None,
+    email_uid: str | None = None,
+    summary: str | None = None,
+    from_email: str | None = None,
+    to_email: str | None = None,
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Factory for creating test newsletter data.
 
@@ -64,11 +64,11 @@ def create_test_newsletter(
 def create_test_source(
     source_id: int = 1,
     name: str = "Test Alderman",
-    ward_number: Optional[int] = 1,
+    ward_number: int | None = 1,
     source_type: str = "alderman",
-    newsletter_archive_url: Optional[str] = None,
+    newsletter_archive_url: str | None = None,
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Factory for creating test source data."""
     source = {
         "id": source_id,
@@ -85,7 +85,7 @@ def create_test_email_mapping(
     email_pattern: str = "%@testward.org",
     source_id: int = 1,
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Factory for creating test email source mapping."""
     mapping = {
         "email_pattern": email_pattern,

@@ -6,15 +6,15 @@ notifications for delivery.
 """
 
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 from shared.db import get_supabase_client
 from notifications.error_logger import log_notification_error
 
 
 def match_newsletter_to_rules(
-    newsletter_id: str, newsletter_data: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    newsletter_id: str, newsletter_data: dict[str, Any]
+) -> list[dict[str, Any]]:
     """
     Find all notification rules that match a given newsletter.
 
@@ -45,10 +45,10 @@ def match_newsletter_to_rules(
         if not response.data:
             return []
 
-        active_rules = response.data
+        active_rules = cast(list[dict[str, Any]], response.data)
 
         # Also fetch user preferences to check if notifications are enabled
-        user_ids = [rule["user_id"] for rule in active_rules]
+        user_ids = [str(rule["user_id"]) for rule in active_rules]
         users_response = (
             supabase.table("user_profiles")
             .select("id, notification_preferences")
@@ -57,27 +57,28 @@ def match_newsletter_to_rules(
         )
 
         # Create lookup for enabled users
-        enabled_users = set()
+        enabled_users: set[str] = set()
         if users_response.data:
-            for user in users_response.data:
-                prefs = user.get("notification_preferences", {})
+            users_data = cast(list[dict[str, Any]], users_response.data)
+            for user in users_data:
+                prefs = cast(dict[str, Any], user.get("notification_preferences", {}))
                 if prefs.get("enabled", True):  # Default to enabled if not set
-                    enabled_users.add(user["id"])
+                    enabled_users.add(str(user["id"]))
 
         # Filter and match rules
-        matched_rules = []
+        matched_rules: list[dict[str, Any]] = []
         for rule in active_rules:
             # Skip if user has notifications disabled
-            if rule["user_id"] not in enabled_users:
+            if str(rule["user_id"]) not in enabled_users:
                 continue
 
             # Check if rule matches newsletter
             if _rule_matches_newsletter(rule, newsletter_data):
                 matched_rules.append(
                     {
-                        "user_id": rule["user_id"],
-                        "rule_id": rule["id"],
-                        "rule_name": rule["name"],
+                        "user_id": str(rule["user_id"]),
+                        "rule_id": str(rule["id"]),
+                        "rule_name": str(rule["name"]),
                     }
                 )
 
@@ -101,7 +102,7 @@ def match_newsletter_to_rules(
 
 
 def _rule_matches_newsletter(
-    rule: Dict[str, Any], newsletter_data: Dict[str, Any]
+    rule: dict[str, Any], newsletter_data: dict[str, Any]
 ) -> bool:
     """
     Check if a single rule matches a newsletter.
@@ -145,7 +146,7 @@ def _rule_matches_newsletter(
     return True
 
 
-def queue_notifications(newsletter_id: str, matched_rules: List[Dict[str, Any]]) -> int:
+def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]]) -> int:
     """
     Queue notifications for matched rules.
 
@@ -188,9 +189,7 @@ def queue_notifications(newsletter_id: str, matched_rules: List[Dict[str, Any]])
 
         for notification in notifications:
             try:
-                supabase.table("notification_queue").insert(
-                    notification, returning="minimal"
-                ).execute()
+                supabase.table("notification_queue").insert(notification).execute()
                 queued_count += 1
             except Exception as e:
                 # Track failures that aren't just duplicates
@@ -233,8 +232,8 @@ def queue_notifications(newsletter_id: str, matched_rules: List[Dict[str, Any]])
 
 
 def get_pending_notifications_by_user(
-    digest_batch_id: Optional[str] = None,
-) -> Dict[str, List[Dict[str, Any]]]:
+    digest_batch_id: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     """
     Get all pending notifications grouped by user.
 
@@ -265,9 +264,10 @@ def get_pending_notifications_by_user(
         return {}
 
     # Group by user_id
-    notifications_by_user = {}
-    for notification in response.data:
-        user_id = notification["user_id"]
+    notifications_by_user: dict[str, list[dict[str, Any]]] = {}
+    notifications_data = cast(list[dict[str, Any]], response.data)
+    for notification in notifications_data:
+        user_id = str(notification["user_id"])
         if user_id not in notifications_by_user:
             notifications_by_user[user_id] = []
         notifications_by_user[user_id].append(notification)

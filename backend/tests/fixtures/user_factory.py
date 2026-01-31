@@ -1,15 +1,15 @@
 """Factory functions for creating test user and notification data."""
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def create_test_user(
-    user_id: Optional[str] = None,
+    user_id: str | None = None,
     email: str = "test@example.com",
     notifications_enabled: bool = True,
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Factory for creating test user profile data."""
     user = {
         "id": user_id or str(uuid.uuid4()),
@@ -23,16 +23,16 @@ def create_test_user(
 
 
 def create_test_rule(
-    rule_id: Optional[str] = None,
-    user_id: Optional[str] = None,
+    rule_id: str | None = None,
+    user_id: str | None = None,
     name: str = "Test Rule",
-    topics: Optional[List[str]] = None,
-    search_term: Optional[str] = None,
-    ward_numbers: Optional[List[int]] = None,
-    min_relevance_score: Optional[int] = None,
+    topics: list[str] | None = None,
+    search_term: str | None = None,
+    ward_numbers: list[int] | None = None,
+    min_relevance_score: int | None = None,
     is_active: bool = True,
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Factory for creating test notification rule data."""
     rule = {
         "id": rule_id or str(uuid.uuid4()),
@@ -49,14 +49,14 @@ def create_test_rule(
 
 
 def create_test_notification(
-    notification_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    newsletter_id: Optional[str] = None,
-    rule_id: Optional[str] = None,
+    notification_id: str | None = None,
+    user_id: str | None = None,
+    newsletter_id: str | None = None,
+    rule_id: str | None = None,
     status: str = "pending",
     digest_batch_id: str = "2026-01-24",
     **overrides,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Factory for creating test notification queue entry."""
     notification = {
         "id": notification_id or str(uuid.uuid4()),

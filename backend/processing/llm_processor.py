@@ -12,7 +12,6 @@ step building on the previous ones for better accuracy.
 
 from ollama import Client
 from pydantic import BaseModel, Field
-from typing import List
 import time
 from datetime import datetime
 
@@ -44,7 +43,7 @@ TOPICS = [
 
 
 class TopicsExtraction(BaseModel):
-    topics: List[str] = Field(
+    topics: list[str] = Field(
         description="List of relevant topics from predefined list"
     )
 
@@ -65,7 +64,7 @@ ollama_client = Client(timeout=240.0)
 def call_llm(
     model: str,
     prompt: str,
-    schema: dict,
+    schema: dict[str, object],
     temperature: float = 0,
     max_retries: int = MAX_LLM_RETRIES,
 ) -> str:
@@ -128,8 +127,11 @@ def call_llm(
             else:
                 raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
 
+    # This should never be reached due to the raise above, but mypy needs it
+    raise Exception("Unreachable code: all retry attempts exhausted")
 
-def extract_topics(content: str, model: str) -> List[str]:
+
+def extract_topics(content: str, model: str) -> list[str]:
     """
     Extract STC-relevant topics from newsletter content.
 
@@ -220,7 +222,10 @@ Newsletter:
 
 
 def score_relevance(
-    content: str, model: str, topics: List[str] = None, summary: str = None
+    content: str,
+    model: str,
+    topics: list[str] | None = None,
+    summary: str | None = None,
 ) -> int | None:
     """
     Score newsletter relevance to Strong Towns Chicago priorities on a 0-10 scale.
@@ -309,8 +314,10 @@ Newsletter:
 
 
 def process_with_ollama(
-    newsletter: dict, model: str = "gpt-oss:20b", max_chars: int = MAX_NEWSLETTER_CHARS
-) -> dict:
+    newsletter: dict[str, str],
+    model: str = "gpt-oss:20b",
+    max_chars: int = MAX_NEWSLETTER_CHARS,
+) -> dict[str, list[str] | str | int | None]:
     """
     Process a newsletter through the complete LLM pipeline.
 
@@ -324,7 +331,7 @@ def process_with_ollama(
         max_chars: Maximum characters to send to LLM (default: MAX_NEWSLETTER_CHARS)
 
     Returns:
-        Dict with keys: 'topics' (List[str]), 'summary' (str), 'relevance_score' (int|None)
+        Dict with keys: 'topics' (list[str]), 'summary' (str), 'relevance_score' (int|None)
     """
     plain_text = newsletter["plain_text"]
 

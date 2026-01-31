@@ -6,6 +6,7 @@ import os
 import time
 import random
 from datetime import datetime
+from typing import Any, cast
 from dotenv import load_dotenv
 from ingest.scraper.newsletter_scraper import NewsletterScraper
 from shared.db import get_supabase_client
@@ -46,17 +47,17 @@ def get_source_archive_url(source_id: int) -> tuple[str, str]:
     if not result.data:
         raise ValueError(f"Source ID {source_id} not found in database")
 
-    source = result.data[0]
+    source = cast(dict[str, Any], result.data[0])
 
     if not source.get("newsletter_archive_url"):
         raise ValueError(
             f"Source '{source['name']}' (ID: {source_id}) has no newsletter_archive_url configured"
         )
 
-    return source["name"], source["newsletter_archive_url"]
+    return cast(str, source["name"]), cast(str, source["newsletter_archive_url"])
 
 
-def process_scraped_newsletters(source_id: int, limit: int | None = None):
+def process_scraped_newsletters(source_id: int, limit: int | None = None) -> None:
     """Scrape and process newsletters for a specific source"""
 
     # Fetch archive URL from database
@@ -108,7 +109,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None):
 
             # Build newsletter record
             received_date = parse_date_string(content.get("archive_date_str", ""))
-            newsletter_data = {
+            newsletter_data: dict[str, Any] = {
                 "source_id": source_id,
                 "received_date": received_date or datetime.now().isoformat(),
                 "subject": content["subject"],
@@ -151,7 +152,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None):
     print_summary(processed_count, skipped_count, failed_count)
 
 
-def scrape_all_sources():
+def scrape_all_sources() -> None:
     """Scrape newsletters from all sources with archive URLs"""
 
     result = (
@@ -170,10 +171,13 @@ def scrape_all_sources():
     print(f"Found {len(sources)} sources with newsletter archives")
 
     for source in sources:
+        source_dict = cast(dict[str, Any], source)
         try:
-            process_scraped_newsletters(source_id=source["id"], limit=None)
+            process_scraped_newsletters(
+                source_id=cast(int, source_dict["id"]), limit=None
+            )
         except Exception as e:
-            print(f"✗ Error processing source {source['name']}: {e}")
+            print(f"✗ Error processing source {source_dict['name']}: {e}")
             continue
 
 

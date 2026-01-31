@@ -1,11 +1,11 @@
 """Helper functions for creating mocked external services."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import Mock
 
 
-def create_mock_supabase(return_data: Optional[List[Dict[str, Any]]] = None):
+def create_mock_supabase(return_data: list[dict[str, Any]] | None = None):
     """
     Create a mocked Supabase client with chainable query builder.
 
@@ -64,7 +64,7 @@ def create_mock_mail_message(
     date=None,
     html: str = "<html><body>Test content</body></html>",
     text: str = "Test content",
-    to: Optional[List[str]] = None,
+    to: list[str] | None = None,
 ):
     """Create a mocked imap_tools MailMessage object."""
     msg = Mock()
@@ -81,7 +81,7 @@ def create_mock_mail_message(
 def create_mock_requests_response(
     status_code: int = 200,
     text: str = "<html>Content</html>",
-    raise_error: Optional[Exception] = None,
+    raise_error: Exception | None = None,
 ):
     """Create a mocked requests Response object."""
     mock_response = Mock()

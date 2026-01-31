@@ -23,29 +23,35 @@ Run from the backend/ directory:
 
 import argparse
 import difflib
+from typing import Any, cast
 
 from shared.db import get_supabase_client
 from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
-def fetch_newsletter(supabase, newsletter_id):
+def fetch_newsletter(supabase: Any, newsletter_id: str) -> dict[str, Any] | None:
     """Fetch a single newsletter by ID."""
     result = supabase.table("newsletters").select("*").eq("id", newsletter_id).execute()
-    return result.data[0] if result.data else None
+    return cast(dict[str, Any], result.data[0]) if result.data else None
 
 
-def fetch_all_newsletters(supabase):
+def fetch_all_newsletters(supabase: Any) -> list[dict[str, Any]]:
     """Fetch all newsletters from the database."""
     result = (
         supabase.table("newsletters")
         .select("id, subject, source_id, raw_html, plain_text")
         .execute()
     )
-    return result.data or []
+    return cast(list[dict[str, Any]], result.data or [])
 
 
-def show_diff(original, sanitized, label="Content", quiet=False):
+def show_diff(
+    original: str | None,
+    sanitized: str | None,
+    label: str = "Content",
+    quiet: bool = False,
+) -> bool:
     """Print a diff of the changes."""
     if (original or "") == (sanitized or ""):
         if not quiet:
@@ -86,7 +92,9 @@ def show_diff(original, sanitized, label="Content", quiet=False):
     return True
 
 
-def process_single_newsletter(newsletter, supabase, update=False, quiet=False):
+def process_single_newsletter(
+    newsletter: dict[str, Any], supabase: Any, update: bool = False, quiet: bool = False
+) -> bool:
     """Process a single newsletter dict and return True if modified."""
     if not quiet:
         print(
@@ -125,7 +133,7 @@ def process_single_newsletter(newsletter, supabase, update=False, quiet=False):
     return modified
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Reprocess newsletters to apply privacy sanitization."
     )
@@ -175,14 +183,14 @@ def main():
 
     else:
         print(f"Fetching newsletter {args.newsletter_id}...")
-        newsletter = fetch_newsletter(supabase, args.newsletter_id)
+        newsletter_result = fetch_newsletter(supabase, args.newsletter_id)
 
-        if not newsletter:
+        if not newsletter_result:
             print("❌ Newsletter not found!")
             return
 
         process_single_newsletter(
-            newsletter, supabase, update=args.update, quiet=args.quiet
+            newsletter_result, supabase, update=args.update, quiet=args.quiet
         )
 
 

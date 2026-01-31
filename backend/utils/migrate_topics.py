@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+from typing import Any, cast
 from collections import defaultdict
 from shared.db import get_supabase_client
 from processing.llm_processor import TOPICS as VALID_TOPICS
@@ -46,7 +47,7 @@ TOPIC_MAPPING = {
 }
 
 
-def remap_topics(old_topics: list) -> list:
+def remap_topics(old_topics: list[str]) -> list[str]:
     """
     Remap old topics to new topics and deduplicate.
 
@@ -72,7 +73,7 @@ def remap_topics(old_topics: list) -> list:
     return sorted(list(new_topics))
 
 
-def migrate_topics(dry_run: bool = False):
+def migrate_topics(dry_run: bool = False) -> None:
     """
     Migrate all newsletter topics from old to new schema.
 
@@ -103,11 +104,11 @@ def migrate_topics(dry_run: bool = False):
         print("No newsletters with topics found.")
         return
 
-    newsletters = response.data
+    newsletters = cast(list[dict[str, Any]], response.data)
     print(f"Found {len(newsletters)} newsletters with topics\n")
 
     # Statistics tracking
-    stats = {
+    stats: dict[str, Any] = {
         "total": len(newsletters),
         "unchanged": 0,
         "modified": 0,
@@ -116,10 +117,10 @@ def migrate_topics(dry_run: bool = False):
     }
 
     # Process each newsletter
-    modified_newsletters = []
+    modified_newsletters: list[dict[str, Any]] = []
 
     for newsletter in newsletters:
-        old_topics = newsletter["topics"] or []
+        old_topics = cast(list[str], newsletter["topics"] or [])
         new_topics = remap_topics(old_topics)
 
         # Track changes
@@ -203,7 +204,7 @@ def migrate_topics(dry_run: bool = False):
         failed_count = 0
 
         for newsletter in newsletters:
-            old_topics = newsletter["topics"] or []
+            old_topics = cast(list[str], newsletter["topics"] or [])
             new_topics = remap_topics(old_topics)
 
             if set(old_topics) != set(new_topics):
@@ -235,7 +236,7 @@ def migrate_topics(dry_run: bool = False):
     print("=" * 60)
 
 
-def main():
+def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Migrate newsletter topics from old to new schema"

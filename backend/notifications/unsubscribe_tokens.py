@@ -8,7 +8,6 @@ Tokens are stateless (no database storage needed).
 import os
 import jwt
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 ALGORITHM = "HS256"
 
@@ -51,7 +50,7 @@ def generate_unsubscribe_token(user_id: str, max_age_days: int = 90) -> str:
     return jwt.encode(payload, secret_key, algorithm=ALGORITHM)
 
 
-def validate_unsubscribe_token(token: str) -> Optional[str]:
+def validate_unsubscribe_token(token: str) -> str | None:
     """
     Validate an unsubscribe JWT and extract the user_id.
 
@@ -71,7 +70,8 @@ def validate_unsubscribe_token(token: str) -> Optional[str]:
         if payload.get("type") != "unsubscribe":
             return None
 
-        return payload.get("sub")
+        user_id = payload.get("sub")
+        return str(user_id) if user_id is not None else None
     except (jwt.InvalidTokenError, ValueError):
         # Invalid signature, expired, malformed, or missing secret key
         return None

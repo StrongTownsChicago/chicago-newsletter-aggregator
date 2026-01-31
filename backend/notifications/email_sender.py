@@ -5,7 +5,7 @@ Handles sending daily digest emails to users with matched newsletters.
 """
 
 import os
-from typing import List, Dict, Any
+from typing import Any
 from datetime import datetime
 import resend
 from notifications.unsubscribe_tokens import generate_unsubscribe_token
@@ -38,8 +38,8 @@ def _build_unsubscribe_url(user_id: str) -> str:
 
 
 def _prepare_newsletter_data(
-    notifications: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    notifications: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """
     Group notifications by newsletter, collect matching rules, and extract all needed data.
 
@@ -135,9 +135,9 @@ def _prepare_newsletter_data(
 def send_daily_digest(
     user_id: str,
     user_email: str,
-    notifications: List[Dict[str, Any]],
-    preferences_url: str = None,
-) -> Dict[str, Any]:
+    notifications: list[dict[str, Any]],
+    preferences_url: str | None = None,
+) -> dict[str, Any]:
     """
     Send a daily digest email with all matched newsletters.
 
@@ -201,7 +201,7 @@ def send_daily_digest(
 
 
 def _build_digest_html(
-    prepared_newsletters: List[Dict[str, Any]],
+    prepared_newsletters: list[dict[str, Any]],
     preferences_url: str,
     unsubscribe_url: str,
 ) -> str:
@@ -401,7 +401,7 @@ def _build_digest_html(
 
 
 def _build_digest_text(
-    prepared_newsletters: List[Dict[str, Any]],
+    prepared_newsletters: list[dict[str, Any]],
     preferences_url: str,
     unsubscribe_url: str,
 ) -> str:

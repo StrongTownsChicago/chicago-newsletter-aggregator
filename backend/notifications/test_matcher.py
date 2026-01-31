@@ -12,11 +12,12 @@ Usage:
 """
 
 import argparse
+from typing import Any, cast
 from shared.db import get_supabase_client
 from notifications.rule_matcher import match_newsletter_to_rules, queue_notifications
 
 
-def test_matching(should_queue: bool = False):
+def test_matching(should_queue: bool = False) -> None:
     """
     Test notification matching with a recent newsletter.
 
@@ -41,25 +42,27 @@ def test_matching(should_queue: bool = False):
         print("No newsletters found in database")
         return
 
-    for newsletter in response.data:
-        newsletter_id = newsletter["id"]
+    newsletters = cast(list[dict[str, Any]], response.data)
+
+    for newsletter in newsletters:
+        newsletter_id = cast(str, newsletter["id"])
 
         print("Testing Notification Matching")
         print("=" * 60)
-        print(f"Newsletter: {newsletter['subject'][:60]}...")
+        newsletter_subject = cast(str, newsletter["subject"])
+        print(f"Newsletter: {newsletter_subject[:60]}...")
         print(f"ID: {newsletter_id}")
         print(f"Topics: {newsletter.get('topics', [])}")
         print(f"Relevance: {newsletter.get('relevance_score')}")
         print()
 
         # Prepare newsletter data
+        sources_data = cast(dict[str, Any] | None, newsletter.get("sources"))
         newsletter_data = {
             "topics": newsletter.get("topics", []),
             "plain_text": newsletter.get("plain_text", ""),
             "source_id": newsletter.get("source_id"),
-            "ward_number": newsletter.get("sources", {}).get("ward_number")
-            if newsletter.get("sources")
-            else None,
+            "ward_number": sources_data.get("ward_number") if sources_data else None,
             "relevance_score": newsletter.get("relevance_score"),
         }
 
@@ -101,7 +104,7 @@ def test_matching(should_queue: bool = False):
     print("Test complete")
 
 
-def main():
+def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Test notification matching logic")
 

@@ -16,7 +16,7 @@ import argparse
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Dict, List, Any
+from typing import Any, cast
 from shared.db import get_supabase_client
 from notifications.rule_matcher import get_pending_notifications_by_user
 from notifications.email_sender import send_daily_digest
@@ -24,8 +24,8 @@ from notifications.error_logger import log_notification_error
 
 
 def process_daily_digests(
-    batch_id: str = None, dry_run: bool = False
-) -> Dict[str, int]:
+    batch_id: str | None = None, dry_run: bool = False
+) -> dict[str, int]:
     """
     Process daily digest notifications.
 
@@ -78,8 +78,11 @@ def process_daily_digests(
             stats["skipped"] += 1
             continue
 
-        user_email = user_response.data["email"]
-        preferences = user_response.data.get("notification_preferences", {})
+        user_data = cast(dict[str, Any], user_response.data)
+        user_email = cast(str, user_data["email"])
+        preferences = cast(
+            dict[str, Any], user_data.get("notification_preferences", {})
+        )
 
         # Double-check notifications are enabled (should be filtered already, but be safe)
         if not preferences.get("enabled", True):
@@ -122,7 +125,7 @@ def process_daily_digests(
                 ).execute()
 
             else:
-                error_msg = result.get("error")
+                error_msg = cast(str, result.get("error", "Unknown error"))
                 print(f"  ✗ Failed to send to user {user_id}: {error_msg}")
                 stats["failed"] += 1
 
@@ -177,7 +180,9 @@ def process_daily_digests(
     return stats
 
 
-def _mark_notifications_skipped(supabase, notifications: List[Dict[str, Any]]) -> None:
+def _mark_notifications_skipped(
+    supabase: Any, notifications: list[dict[str, Any]]
+) -> None:
     """Mark notifications as failed (user has notifications disabled)."""
     notification_ids = [n["id"] for n in notifications]
     supabase.table("notification_queue").update(
@@ -185,7 +190,7 @@ def _mark_notifications_skipped(supabase, notifications: List[Dict[str, Any]]) -
     ).in_("id", notification_ids).execute()
 
 
-def main():
+def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Process notification queue and send emails"

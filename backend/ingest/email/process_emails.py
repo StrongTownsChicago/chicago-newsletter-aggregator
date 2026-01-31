@@ -27,7 +27,8 @@ Output:
 
 import os
 from datetime import datetime
-from imap_tools import MailBox, AND, MailMessageFlags
+from typing import Any, cast
+from imap_tools import MailBox, AND, MailMessageFlags  # type: ignore[attr-defined]
 from ingest.email.email_parser import parse_newsletter
 from shared.db import get_supabase_client
 from shared.utils import print_summary
@@ -53,7 +54,7 @@ def newsletter_exists(email_uid: str) -> bool:
     return len(result.data) > 0
 
 
-def save_unmapped_report(unmapped_emails):
+def save_unmapped_report(unmapped_emails: list[dict[str, str]]) -> None:
     """Save unmapped emails to a log file"""
     if not unmapped_emails:
         return
@@ -73,7 +74,7 @@ def save_unmapped_report(unmapped_emails):
     print(f"\n  Report saved to: {filename}")
 
 
-def process_new_newsletters():
+def process_new_newsletters() -> None:
     """
     Process unread newsletters from Gmail inbox via IMAP.
 
@@ -107,8 +108,12 @@ def process_new_newsletters():
 
     print(f"[{datetime.now()}] Starting newsletter ingestion...")
 
+    # Validate credentials
+    if not GMAIL_ADDRESS or not GMAIL_PASSWORD:
+        raise ValueError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set")
+
     # Connect to Gmail
-    with MailBox("imap.gmail.com").login(GMAIL_ADDRESS, GMAIL_PASSWORD) as mailbox:
+    with MailBox("imap.gmail.com").login(GMAIL_ADDRESS, GMAIL_PASSWORD) as mailbox:  # type: ignore[no-untyped-call]
         # Fetch unread emails
         messages = mailbox.fetch(AND(seen=False))
         # Below line can be uncommented to process all emails for testing
@@ -175,7 +180,8 @@ def process_new_newsletters():
                     and insert_response.data
                     and len(insert_response.data) > 0
                 ):
-                    newsletter_id = insert_response.data[0]["id"]
+                    response_data = cast(list[dict[str, Any]], insert_response.data)
+                    newsletter_id = cast(str, response_data[0]["id"])
 
                     try:
                         from notifications.rule_matcher import (

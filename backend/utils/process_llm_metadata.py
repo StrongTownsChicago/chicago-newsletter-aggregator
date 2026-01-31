@@ -32,6 +32,7 @@ Usage:
 
 import os
 import argparse
+from typing import Any, cast
 from dotenv import load_dotenv
 from shared.db import get_supabase_client
 from processing.llm_processor import process_with_ollama
@@ -39,7 +40,7 @@ from processing.llm_processor import process_with_ollama
 load_dotenv()
 
 
-def fetch_newsletters(supabase, args):
+def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str, Any]]:
     """Fetch newsletters based on filter arguments."""
 
     # Join with sources table to get ward_number
@@ -71,12 +72,16 @@ def fetch_newsletters(supabase, args):
         query = query.range(args.skip, args.skip + 999999)
 
     result = query.execute()
-    return result.data
+    return cast(list[dict[str, Any]], result.data)
 
 
 def reprocess_newsletter(
-    supabase, newsletter, model, dry_run=False, queue_notifications_flag=False
-):
+    supabase: Any,
+    newsletter: dict[str, Any],
+    model: str,
+    dry_run: bool = False,
+    queue_notifications_flag: bool = False,
+) -> bool:
     """Reprocess a single newsletter with LLM."""
 
     newsletter_id = newsletter["id"]
@@ -116,9 +121,11 @@ def reprocess_newsletter(
 
         if update_result.data:
             print("  ✓ Updated successfully")
-            print(
-                f"    Topics: {', '.join(llm_data['topics']) if llm_data['topics'] else 'none'}"
+            topics = llm_data["topics"]
+            topics_str = (
+                ", ".join(topics) if isinstance(topics, list) and topics else "none"
             )
+            print(f"    Topics: {topics_str}")
             print(f"    Score: {llm_data['relevance_score']}/10")
 
             # Queue notifications if enabled
@@ -162,7 +169,7 @@ def reprocess_newsletter(
         return False
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Reprocess existing newsletters with updated LLM processor",
         formatter_class=argparse.RawDescriptionHelpFormatter,

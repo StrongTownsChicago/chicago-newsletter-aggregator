@@ -6,11 +6,11 @@ Logs notification processing errors to timestamped files for debugging.
 
 import os
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 
 
 def log_notification_error(
-    error_type: str, error_message: str, context: Optional[Dict[str, Any]] = None
+    error_type: str, error_message: str, context: dict[str, Any] | None = None
 ) -> str:
     """
     Log a notification error to a timestamped file.

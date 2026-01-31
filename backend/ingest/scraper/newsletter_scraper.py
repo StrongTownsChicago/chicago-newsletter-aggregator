@@ -4,8 +4,8 @@ Main newsletter scraper - fetches newsletter archives and individual newsletters
 
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict, Optional
 import time
+from typing import cast
 from ingest.email.email_parser import clean_html_content
 from ingest.scraper.scraper_strategies import get_strategy_for_url
 
@@ -22,22 +22,22 @@ class NewsletterScraper:
             }
         )
 
-    def fetch_archive_page(self, url: str) -> Optional[str]:
+    def fetch_archive_page(self, url: str) -> str | None:
         """Fetch HTML content of newsletter archive page"""
         for attempt in range(self.max_retries):
             try:
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()
-                return response.text
+                return cast(str, response.text)
             except Exception as e:
                 if attempt < self.max_retries - 1:
                     print(f"  ⚠ Archive fetch failed (attempt {attempt + 1}): {e}")
                     time.sleep(2**attempt)
                 else:
                     print(f"  ✗ Could not fetch archive: {e}")
-                    return None
+        return None
 
-    def extract_newsletter_links(self, archive_url: str) -> list[Dict[str, str]]:
+    def extract_newsletter_links(self, archive_url: str) -> list[dict[str, str]]:
         """Extract all newsletter links from archive page"""
         print(f"→ Fetching archive: {archive_url}")
 
@@ -55,7 +55,7 @@ class NewsletterScraper:
 
     def fetch_newsletter_content(
         self, url: str, title: str, date_str: str
-    ) -> Optional[Dict[str, str]]:
+    ) -> dict[str, str] | None:
         """Fetch and parse individual newsletter content"""
         for attempt in range(self.max_retries):
             try:
@@ -87,4 +87,4 @@ class NewsletterScraper:
                     time.sleep(2**attempt)
                 else:
                     print(f"  ✗ Could not fetch newsletter: {url} - {e}")
-                    return None
+        return None

@@ -2,10 +2,12 @@ import re
 import os
 from bs4 import BeautifulSoup
 from html2text import html2text
-from typing import Dict, Optional
+from typing import Any, cast
 
 
-def sanitize_content(content: str, content_type: str, privacy_patterns: dict) -> str:
+def sanitize_content(
+    content: str, content_type: str, privacy_patterns: dict[str, Any]
+) -> str:
     """
     Remove privacy-sensitive elements from newsletter content.
 
@@ -38,7 +40,7 @@ def sanitize_content(content: str, content_type: str, privacy_patterns: dict) ->
 
             # 2. Remove <a> tags by URL or Link Text
             for a in soup.find_all("a", href=True):
-                href = a["href"]
+                href = cast(str, a["href"])
                 text = a.get_text(" ", strip=True)
 
                 url_matched = False
@@ -104,7 +106,9 @@ def sanitize_content(content: str, content_type: str, privacy_patterns: dict) ->
     return result
 
 
-def lookup_source_by_email(from_email: str, supabase_client) -> dict | None:
+def lookup_source_by_email(
+    from_email: str, supabase_client: Any
+) -> dict[str, Any] | None:
     """
     Match sender email to source using email_source_mappings table.
 
@@ -125,23 +129,24 @@ def lookup_source_by_email(from_email: str, supabase_client) -> dict | None:
 
     # Check each pattern for a match
     for mapping in result.data:
-        pattern = mapping["email_pattern"].lower()
+        mapping_dict = cast(dict[str, Any], mapping)
+        pattern = cast(str, mapping_dict["email_pattern"]).lower()
 
         # Wildcard pattern (e.g., "%@40thward.org")
         if "%" in pattern:
             # Convert SQL wildcard to regex: % becomes .*
             regex_pattern = pattern.replace("%", ".*").replace(".", r"\.")
             if re.search(regex_pattern, from_email_lower):
-                return mapping["sources"]
+                return cast(dict[str, Any], mapping_dict["sources"])
 
         # Exact match or substring match
         elif pattern in from_email_lower or from_email_lower in pattern:
-            return mapping["sources"]
+            return cast(dict[str, Any], mapping_dict["sources"])
 
     return None
 
 
-def extract_name_from_sender(from_address: str) -> Optional[str]:
+def extract_name_from_sender(from_address: str) -> str | None:
     """
     Extract display name from email sender field.
 
@@ -170,7 +175,9 @@ def clean_html_content(html: str) -> str:
     return text.strip()
 
 
-def parse_newsletter(msg, supabase_client, privacy_patterns: dict) -> Dict:
+def parse_newsletter(
+    msg: Any, supabase_client: Any, privacy_patterns: dict[str, Any]
+) -> dict[str, Any]:
     """
     Parse email message into structured newsletter data.
 

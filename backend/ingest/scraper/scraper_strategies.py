@@ -4,9 +4,10 @@ Each strategy knows how to extract newsletter links from a specific site structu
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from urllib.parse import urljoin
+from typing import cast
 import re
 
 
@@ -14,7 +15,7 @@ class NewsletterArchiveStrategy(ABC):
     """Base strategy for scraping newsletter archives"""
 
     @abstractmethod
-    def extract_newsletters(self, html: str, base_url: str) -> List[Dict[str, str]]:
+    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:
         """
         Extract newsletter metadata from archive page HTML.
 
@@ -27,9 +28,9 @@ class NewsletterArchiveStrategy(ABC):
 class MailChimpArchiveStrategy(NewsletterArchiveStrategy):
     """Strategy for MailChimp-based archives (Ward 1, 2, etc.)"""
 
-    def extract_newsletters(self, html: str, base_url: str) -> List[Dict[str, str]]:
+    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:
         soup = BeautifulSoup(html, "html.parser")
-        newsletters = []
+        newsletters: list[dict[str, str]] = []
 
         # Find newsletter list items (excludes the signup button)
         archive_list = soup.find("ul", id="archive-list")
@@ -42,15 +43,16 @@ class MailChimpArchiveStrategy(NewsletterArchiveStrategy):
             if not link:
                 continue
 
-            href = link.get("href", "")
-            title = link.get("title") or link.get_text(strip=True)
+            href = cast(str, link.get("href", ""))
+            title_attr = link.get("title")
+            title = cast(str, title_attr) if title_attr else link.get_text(strip=True)
             date_str = self._extract_date_from_context(link)
 
             newsletters.append({"title": title, "url": href, "date_str": date_str})
 
         return newsletters
 
-    def _extract_date_from_context(self, link_element) -> str:
+    def _extract_date_from_context(self, link_element: Tag) -> str:
         """Extract date from MailChimp archive format: '12/23/2025 - <link>'"""
         parent = link_element.parent
         if parent:
@@ -67,12 +69,12 @@ class MailChimpArchiveStrategy(NewsletterArchiveStrategy):
 class GenericListStrategy(NewsletterArchiveStrategy):
     """Fallback strategy - extract all external links that look like newsletters"""
 
-    def extract_newsletters(self, html: str, base_url: str) -> List[Dict[str, str]]:
+    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:
         soup = BeautifulSoup(html, "html.parser")
-        newsletters = []
+        newsletters: list[dict[str, str]] = []
 
         for link in soup.find_all("a", href=True):
-            href = link.get("href", "")
+            href = cast(str, link.get("href", ""))
 
             # Make absolute URL
             absolute_url = urljoin(base_url, href)
