@@ -173,13 +173,14 @@ def process_weekly_reports(
     week_id: str | None = None,
     dry_run: bool = False,
     force: bool = False,
+    current_week: bool = False,
     model: str = "gpt-oss:20b",
 ) -> dict[str, int]:
     """
     Main orchestration: Generate reports for all active topics.
 
     Workflow:
-    1. Calculate week_id (defaults to previous week)
+    1. Calculate week_id (defaults to previous week, or current week if --current-week)
     2. Query active weekly topics from notification_rules
     3. For each topic:
        a. Check if report already exists (skip if yes, unless force=True)
@@ -188,9 +189,10 @@ def process_weekly_reports(
     4. Return stats (generated, skipped, failed)
 
     Args:
-        week_id: Week identifier (YYYY-WXX), defaults to previous week
+        week_id: Week identifier (YYYY-WXX), defaults based on current_week flag
         dry_run: If True, generate but don't store
         force: If True, regenerate even if report exists
+        current_week: If True, use current week instead of previous week
         model: Ollama model name
 
     Returns:
@@ -198,7 +200,10 @@ def process_weekly_reports(
     """
     # Determine week to process
     if week_id is None:
-        week_id = get_previous_week_id()
+        if current_week:
+            week_id = get_iso_week_id()  # Current week
+        else:
+            week_id = get_previous_week_id()  # Previous week (default)
 
     print(f"\n{'=' * 60}")
     print(f"Weekly Report Generation - Week {week_id}")
@@ -309,6 +314,12 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--current-week",
+        action="store_true",
+        help="Use current week instead of previous week (useful for manual Sunday runs)",
+    )
+
+    parser.add_argument(
         "--model",
         type=str,
         default="gpt-oss:20b",
@@ -318,7 +329,11 @@ def main() -> None:
     args = parser.parse_args()
 
     stats = process_weekly_reports(
-        week_id=args.week_id, dry_run=args.dry_run, force=args.force, model=args.model
+        week_id=args.week_id,
+        dry_run=args.dry_run,
+        force=args.force,
+        current_week=args.current_week,
+        model=args.model,
     )
 
     # Exit with non-zero if any failures

@@ -57,7 +57,8 @@ uv run python -m notifications.process_notification_queue --daily-digest
 uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
 
 # Weekly Reports
-uv run python -m utils.process_weekly_reports            # Generate reports
+uv run python -m utils.process_weekly_reports            # Generate reports (previous week)
+uv run python -m utils.process_weekly_reports --current-week  # Generate for current week (manual Sunday runs)
 uv run python -m notifications.weekly_notification_queue # Queue notifications
 uv run python -m notifications.process_notification_queue --weekly-digest # Send emails
 
