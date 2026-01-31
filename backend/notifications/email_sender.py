@@ -10,6 +10,7 @@ from typing import Any
 from datetime import datetime
 import resend
 from notifications.unsubscribe_tokens import generate_unsubscribe_token
+from shared.db import get_supabase_client
 
 
 class DigestType(Enum):
@@ -310,10 +311,51 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
             <div class="matched-rules">
                 ✓ Matched your rule: {", ".join(report["matched_rules"])}
             </div>
+"""
 
+        # Add referenced newsletters section
+        if report.get("referenced_newsletters"):
+            content += """
+            <div class="referenced-newsletters">
+                <strong>Referenced newsletters:</strong>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+"""
+            for nl in report["referenced_newsletters"]:
+                # Format date
+                try:
+                    date_obj = datetime.fromisoformat(
+                        nl["received_date"].replace("Z", "+00:00")
+                    )
+                    date_str = date_obj.strftime("%B %d, %Y")
+                except (ValueError, TypeError):
+                    date_str = nl["received_date"][:10]
+
+                # Format ward
+                ward_str = (
+                    f"Ward {nl['ward_number']}" if nl["ward_number"] else "Citywide"
+                )
+
+                # Build newsletter URL
+                nl_url = f"{base_url}/newsletter/{nl['id']}"
+
+                content += f"""
+                    <li style="margin: 4px 0;">
+                        <a href="{nl_url}" style="color: #2563eb; text-decoration: none;">
+                            {ward_str}: {nl["subject"]}
+                        </a>
+                        <span style="color: #6b7280; font-size: 13px;"> &bull; {date_str}</span>
+                    </li>
+"""
+
+            content += """
+                </ul>
+            </div>
+"""
+
+        content += f"""
             <p style="margin-top: 15px;">
                 <a href="{topic_url}" class="view-link">
-                    View all {report["topic_display"]} newsletters from this week →
+                    View all newsletters on {report["topic_display"]} →
                 </a>
             </p>
         </div>
@@ -482,6 +524,32 @@ def _build_digest_html(
         .matched-rules strong {{
             color: #047857;
         }}
+        .referenced-newsletters {{
+            margin: 15px 0;
+            padding: 12px;
+            background-color: #f9fafb;
+            border-left: 3px solid #e5e7eb;
+            font-size: 13px;
+        }}
+        .referenced-newsletters strong {{
+            color: #374151;
+        }}
+        .referenced-newsletters ul {{
+            list-style: none;
+            margin: 8px 0;
+            padding: 0;
+        }}
+        .referenced-newsletters li {{
+            margin: 6px 0;
+            padding-left: 0;
+        }}
+        .referenced-newsletters a {{
+            color: #2563eb;
+            text-decoration: none;
+        }}
+        .referenced-newsletters a:hover {{
+            text-decoration: underline;
+        }}
         .footer {{
             margin-top: 30px;
             padding-top: 20px;
@@ -571,6 +639,32 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
         content += report["summary"]
         content += "\n\n"
 
+        # Add referenced newsletters
+        if report.get("referenced_newsletters"):
+            content += "Referenced newsletters:\n"
+            for nl in report["referenced_newsletters"]:
+                # Format date
+                try:
+                    date_obj = datetime.fromisoformat(
+                        nl["received_date"].replace("Z", "+00:00")
+                    )
+                    date_str = date_obj.strftime("%B %d, %Y")
+                except (ValueError, TypeError):
+                    date_str = nl["received_date"][:10]
+
+                # Format ward
+                ward_str = (
+                    f"Ward {nl['ward_number']}" if nl["ward_number"] else "Citywide"
+                )
+
+                # Build newsletter URL
+                nl_url = f"{base_url}/newsletter/{nl['id']}"
+
+                content += f"  • {ward_str}: {nl['subject']} ({date_str})\n"
+                content += f"    {nl_url}\n"
+
+            content += "\n"
+
         topic_url = f"{base_url}/search?q=&ward=&topics={report['topic']}"
         content += f"View all {report['topic_display']} newsletters:\n"
         content += f"{topic_url}\n\n"
@@ -659,6 +753,60 @@ def send_weekly_digest(
 # ============================================================================
 
 
+def _fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]:
+    """
+    Fetch newsletter details for referenced newsletters.
+
+    Args:
+        newsletter_ids: List of newsletter UUIDs
+
+    Returns:
+        List of dicts with id, subject, received_date, ward_number, sorted by ward
+    """
+    if not newsletter_ids:
+        return []
+
+    supabase = get_supabase_client()
+
+    try:
+        response = (
+            supabase.table("newsletters")
+            .select("id, subject, received_date, source:sources(ward_number)")
+            .in_("id", newsletter_ids)
+            .execute()
+        )
+
+        newsletters = []
+        for nl in response.data:
+            nl_dict = dict(nl)  # type: ignore
+            source_data = nl_dict.get("source")
+            ward_number = (
+                source_data.get("ward_number")
+                if source_data and isinstance(source_data, dict)
+                else None
+            )
+
+            newsletters.append(
+                {
+                    "id": str(nl_dict["id"]),
+                    "subject": str(nl_dict["subject"]),
+                    "received_date": str(nl_dict["received_date"]),
+                    "ward_number": ward_number,
+                }
+            )
+
+        # Sort by ward number (put None/citywide last)
+        newsletters.sort(
+            key=lambda x: (x["ward_number"] is None, x["ward_number"] or 999)
+        )
+
+        return newsletters
+
+    except Exception as e:
+        print(f"Warning: Failed to fetch newsletter details: {e}")
+        return []
+
+
 def _prepare_weekly_report_data(
     notifications: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -723,6 +871,9 @@ def _prepare_weekly_report_data(
         newsletter_ids = report.get("newsletter_ids", [])
         newsletter_count = len(newsletter_ids) if newsletter_ids else 0
 
+        # Fetch newsletter details for referenced newsletters
+        referenced_newsletters = _fetch_newsletter_details(newsletter_ids)
+
         prepared_reports.append(
             {
                 "topic": topic,
@@ -732,6 +883,7 @@ def _prepare_weekly_report_data(
                 "week_range": week_range,
                 "week_id": week_id,
                 "matched_rules": item["matched_rules"],
+                "referenced_newsletters": referenced_newsletters,
             }
         )
 
