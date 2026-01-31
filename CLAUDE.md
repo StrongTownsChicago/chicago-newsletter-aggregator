@@ -62,6 +62,7 @@ uv run python -m unittest discover -s tests
 # Lint and format (run after making Python changes)
 uv run ruff check --fix  # Fix auto-fixable issues, manually fix remaining
 uv run ruff format       # Format code
+uv run mypy .            # Type check
 ```
 
 ### Frontend (from `frontend/` directory)
@@ -389,6 +390,16 @@ Function names should be verbs. Variables should describe their content. Be spec
 ### Import Path Discipline
 
 Always use proper Python module execution patterns. Never manipulate sys.path.
+
+### Modern Python Type Hints
+
+Use modern Python 3.10+ type hint syntax. Never use legacy typing module imports when built-in types are available.
+
+**Always use**:
+
+- Pipe union: `str | None` instead of `Optional[str]`
+- Built-in types: `list[str]`, `dict[str, int]` instead of `List[str]`, `Dict[str, int]`
+- Remove unused typing imports: Don't import `Optional`, `List`, `Dict`
 
 ### Declarative Over Imperative
 
