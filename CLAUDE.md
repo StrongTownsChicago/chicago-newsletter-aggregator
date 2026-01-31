@@ -56,6 +56,11 @@ uv run python -m notifications.process_notification_queue --daily-digest
 # Send specific date's digest
 uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
 
+# Weekly Reports
+uv run python -m utils.process_weekly_reports            # Generate reports
+uv run python -m notifications.weekly_notification_queue # Queue notifications
+uv run python -m notifications.process_notification_queue --weekly-digest # Send emails
+
 # Run all tests
 uv run python -m unittest discover -s tests
 
@@ -131,7 +136,8 @@ See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
 2. **Source Matching**: Email patterns matched against `email_source_mappings` table with wildcard support
 3. **Storage**: Raw newsletters stored in `newsletters` table (plain_text, raw_html, metadata)
 4. **LLM Processing**: Three separate Ollama calls per newsletter for topic extraction, summarization, and relevance scoring (see `llm_processor.py` for details)
-5. **Frontend**: Astro SSR queries Supabase for search/display
+5. **Weekly Synthesis**: Aggregated analysis of newsletters by topic using two-phase LLM process (extract facts → synthesize summary)
+6. **Frontend**: Astro SSR queries Supabase for search/display
 
 ### Backend Structure
 
@@ -207,7 +213,7 @@ frontend/src/
 
 **Core Tables:** `sources` (aldermen/officials), `email_source_mappings` (pattern matching), `newsletters` (content with full-text search)
 
-**Notification Tables:** `user_profiles`, `notification_rules`, `notification_queue`, `notification_history`
+**Notification Tables:** `user_profiles`, `notification_rules`, `notification_queue`, `notification_history`, `weekly_topic_reports`
 
 **Full schema and RLS policies:** See [backend/SCHEMA.md](backend/SCHEMA.md)
 

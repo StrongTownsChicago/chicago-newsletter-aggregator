@@ -19,13 +19,19 @@ Usage:
 """
 
 import argparse
+import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
 
 from models.weekly_report import WeeklyTopicReport
 from notifications.error_logger import log_notification_error
 from processing.weekly_report_generator import generate_weekly_topic_report
 from shared.db import get_supabase_client
+
+load_dotenv()
+
+ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 
 
 def get_iso_week_id(date: datetime | None = None) -> str:
@@ -200,7 +206,13 @@ def process_weekly_reports(
     print(f"Mode: {'DRY RUN' if dry_run else 'PRODUCTION'}")
     print(f"Force: {'Yes' if force else 'No'}")
     print(f"Model: {model}")
+    print(f"LLM Enabled: {'Yes' if ENABLE_LLM else 'No'}")
     print()
+
+    if not ENABLE_LLM:
+        print("ℹ ENABLE_LLM is false. Skipping report generation.")
+        print("  Existing reports will still be processed by the notification queue.")
+        return {"generated": 0, "skipped": 0, "failed": 0}
 
     # Get topics with active weekly subscribers
     print("→ Querying active weekly topics...")

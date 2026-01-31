@@ -99,6 +99,56 @@ describe('Notifications API Routes', () => {
       }));
     });
 
+    it('creates a topic rule with weekly frequency', async () => {
+      // Mock the final call in the chain to resolve with data
+      mockSupabase.eq.mockResolvedValueOnce({ count: 2, error: null });
+      mockSupabase.insert.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          name: 'Weekly Topic Rule',
+          rule_type: 'topic',
+          topics: ['Politics'],
+          delivery_frequency: 'weekly',
+          is_active: 'on'
+        }
+      });
+
+      const response = await createRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toContain('message=Rule created successfully');
+      expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
+        topics: ['Politics'],
+        delivery_frequency: 'weekly'
+      }));
+    });
+
+    it('forces daily frequency for search rules', async () => {
+      mockSupabase.eq.mockResolvedValueOnce({ count: 2, error: null });
+      mockSupabase.insert.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          name: 'Search Rule',
+          rule_type: 'search',
+          search_term: 'CTA',
+          delivery_frequency: 'weekly', // Try to set weekly
+          is_active: 'on'
+        }
+      });
+
+      const response = await createRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
+        search_term: 'CTA',
+        delivery_frequency: 'daily' // Should be forced to daily
+      }));
+    });
+
     it('returns error if rule limit reached', async () => {
       mockSupabase.eq.mockResolvedValueOnce({ count: 5, error: null });
 
@@ -193,6 +243,34 @@ describe('Notifications API Routes', () => {
   });
 
   describe('POST /api/notifications/update-rule', () => {
+    it('updates a rule with frequency', async () => {
+      // First eq returns the builder, second eq resolves
+      mockSupabase.eq.mockReturnValueOnce(mockSupabase);
+      mockSupabase.eq.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          rule_id: 'rule-456',
+          name: 'Updated Rule Name',
+          rule_type: 'topic',
+          topics: ['Crime'],
+          delivery_frequency: 'weekly',
+          is_active: 'on'
+        }
+      });
+
+      const response = await updateRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toContain('message=Rule updated successfully');
+      expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Updated Rule Name',
+        topics: ['Crime'],
+        delivery_frequency: 'weekly'
+      }));
+    });
+
     it('updates a rule successfully', async () => {
       // First eq returns the builder, second eq resolves
       mockSupabase.eq.mockReturnValueOnce(mockSupabase);

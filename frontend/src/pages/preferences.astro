@@ -169,7 +169,7 @@ const message = Astro.url.searchParams.get('message');
                 Enable Email Notifications
               </label>
               <p class="text-sm text-gray-600">
-                Receive daily digest emails when newsletters match your rules
+                Receive digest emails when newsletters match your rules
               </p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
@@ -275,6 +275,11 @@ const message = Astro.url.searchParams.get('message');
                         Disabled
                       </span>
                     )}
+                    {rule.delivery_frequency === 'weekly' && (
+                      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                        Weekly Report
+                      </span>
+                    )}
                   </div>
                   {rule.topics && rule.topics.length > 0 && (
                     <div class="flex flex-wrap gap-2">
@@ -314,6 +319,7 @@ const message = Astro.url.searchParams.get('message');
                     data-rule-topics={JSON.stringify(rule.topics)}
                     data-rule-ward-numbers={JSON.stringify(rule.ward_numbers || [])}
                     data-rule-search-term={rule.search_term || ''}
+                    data-rule-delivery-frequency={rule.delivery_frequency || 'daily'}
                     data-rule-active={rule.is_active}
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,6 +407,39 @@ const message = Astro.url.searchParams.get('message');
             <label class="block text-sm font-semibold text-gray-900 mb-3">
               Topics (select at least one)
             </label>
+            
+            <!-- Frequency Selection (Only for Topics) -->
+            <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label class="block text-sm font-semibold text-gray-900 mb-2">Delivery Frequency</label>
+              <div class="flex flex-col space-y-2">
+                <label class="inline-flex items-start">
+                  <input
+                    type="radio"
+                    name="delivery_frequency"
+                    value="daily"
+                    checked
+                    class="mt-1 form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div class="ml-2">
+                    <span class="block text-sm font-medium text-gray-900">Daily Digest</span>
+                    <span class="block text-xs text-gray-600">Get emails whenever a newsletter matches your topics.</span>
+                  </div>
+                </label>
+                <label class="inline-flex items-start">
+                  <input
+                    type="radio"
+                    name="delivery_frequency"
+                    value="weekly"
+                    class="mt-1 form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div class="ml-2">
+                    <span class="block text-sm font-medium text-gray-900">Weekly Summary</span>
+                    <span class="block text-xs text-gray-600">Get a single weekly report summarizing all activity for your topics.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div class="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
               {Object.entries(TOPIC_CATEGORIES).map(([category, topics]) => (
                 <div class="bg-white rounded-lg p-4 border border-gray-200">
@@ -535,6 +574,7 @@ const message = Astro.url.searchParams.get('message');
     const ruleNameInput = document.getElementById('ruleName') as HTMLInputElement;
     const searchTermInput = document.getElementById('searchTerm') as HTMLInputElement;
     const isActiveInput = document.getElementById('isActive') as HTMLInputElement;
+    const frequencyRadios = document.querySelectorAll('input[name="delivery_frequency"]') as NodeListOf<HTMLInputElement>;
     const topicSection = document.getElementById('topicSection');
     const searchSection = document.getElementById('searchSection');
     const ruleTypeRadios = document.querySelectorAll('input[name="rule_type"]') as NodeListOf<HTMLInputElement>;
@@ -582,6 +622,8 @@ const message = Astro.url.searchParams.get('message');
         searchTermInput.value = '';
         // Reset to default (search)
         ruleTypeRadios[0].checked = true;
+        // Reset frequency to daily
+        if (frequencyRadios.length > 0) frequencyRadios[0].checked = true;
         
         // Reset wards UI
         wardSelectionContainer?.classList.add('hidden');
@@ -601,6 +643,7 @@ const message = Astro.url.searchParams.get('message');
         const ruleTopics = JSON.parse(target.dataset.ruleTopics || '[]');
         const ruleWards = JSON.parse(target.dataset.ruleWardNumbers || '[]');
         const ruleSearchTerm = target.dataset.ruleSearchTerm;
+        const ruleFrequency = target.dataset.ruleDeliveryFrequency || 'daily';
         const ruleActive = target.dataset.ruleActive === 'true';
 
         modalTitle!.textContent = 'Edit Notification Rule';
@@ -609,6 +652,11 @@ const message = Astro.url.searchParams.get('message');
         ruleNameInput.value = ruleName || '';
         searchTermInput.value = ruleSearchTerm || '';
         isActiveInput.checked = ruleActive;
+
+        // Set frequency
+        frequencyRadios.forEach(radio => {
+          if (radio.value === ruleFrequency) radio.checked = true;
+        });
 
         // Set correct rule type
         if (ruleSearchTerm) {

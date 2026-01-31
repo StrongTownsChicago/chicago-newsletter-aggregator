@@ -23,6 +23,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     .map((w) => w.toString().trim())
     .filter((w) => w.length > 0);
   const isActive = formData.get("is_active") === "on";
+  let deliveryFrequency = formData.get("delivery_frequency")?.toString() || "daily";
 
   if (!name) {
     return redirect("/preferences?error=Rule name is required");
@@ -30,8 +31,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   // Handle Mutual Exclusivity based on rule type
   if (ruleType === "search") {
-    // Search Mode: Clear topics, require search term
+    // Search Mode: Clear topics, require search term, FORCE daily frequency
     topics = [];
+    deliveryFrequency = "daily";
     if (!searchTerm) {
       return redirect("/preferences?error=Search phrase is required");
     }
@@ -72,6 +74,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     search_term: searchTerm || null,
     ward_numbers: wards.length > 0 ? wards : null,
     is_active: isActive,
+    delivery_frequency: deliveryFrequency,
   });
 
   if (error) {

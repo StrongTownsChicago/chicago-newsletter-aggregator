@@ -116,18 +116,12 @@ GRANT EXECUTE ON FUNCTION get_week_date_range TO service_role;
 -- ============================================================================
 -- 6. ROW-LEVEL SECURITY (RLS)
 -- ============================================================================
--- Weekly reports are publicly readable (no sensitive data)
--- Only service role can insert/update (backend processing)
+-- Weekly reports are backend-only (no frontend access needed)
+-- Only service role can access (backend processing and email composition)
 
 ALTER TABLE weekly_topic_reports ENABLE ROW LEVEL SECURITY;
 
--- Allow all authenticated users to read reports
-CREATE POLICY "Anyone can view weekly topic reports"
-    ON weekly_topic_reports FOR SELECT
-    TO authenticated
-    USING (true);
-
--- Service role has full access (bypasses RLS by default, but explicit policy for clarity)
+-- Service role has full access for backend operations
 CREATE POLICY "Service role can manage weekly topic reports"
     ON weekly_topic_reports FOR ALL
     TO service_role
