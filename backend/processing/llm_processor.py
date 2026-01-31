@@ -13,6 +13,7 @@ step building on the previous ones for better accuracy.
 from ollama import Client
 from pydantic import BaseModel, Field
 import time
+import json
 from datetime import datetime
 
 # LLM processing limits
@@ -62,10 +63,35 @@ class RelevanceScore(BaseModel):
 ollama_client = Client(timeout=240.0)
 
 
+def extract_json(text: str) -> str:
+    """
+    Extract JSON object from LLM response text.
+
+    Handles cases where the LLM wraps JSON in markdown blocks or adds
+    preamble/postamble text. Returns the substring between the first
+    '{' and the last '}'.
+    """
+    text = text.strip()
+
+    # Try to find JSON block in markdown
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0].strip()
+
+    # Find the outermost curly braces to isolate the JSON object
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1:
+        text = text[start : end + 1]
+
+    return text
+
+
 def call_llm(
     model: str,
     prompt: str,
-    schema: dict[str, object],
+    schema: dict[str, object] | None = None,
     temperature: float = 0,
     max_retries: int = MAX_LLM_RETRIES,
 ) -> str:
@@ -73,39 +99,56 @@ def call_llm(
     Call Ollama LLM with structured output validation and exponential backoff retry logic.
 
     Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s)
-    on failure. On the third attempt, truncates prompt to RETRY_TRUNCATE_MODERATE chars. On the
-    fourth attempt, truncates to RETRY_TRUNCATE_AGGRESSIVE chars. Validates that responses are
-    non-empty before returning.
+    on failure. On the third attempt, truncates prompt to RETRY_TRUNCATE_THRESHOLD chars.
+    Validates that responses are non-empty before returning.
+
+    Handles model-specific limitations for structured output (e.g., gpt-oss) by
+    automatically switching to prompt-based JSON extraction when the native 'format'
+    parameter is known to fail.
 
     Args:
         model: Ollama model name (e.g., "gpt-oss:20b")
         prompt: Prompt text to send to the LLM
-        schema: Pydantic model JSON schema for structured output format
+        schema: Optional Pydantic model JSON schema for structured output format
         temperature: Sampling temperature (0 = deterministic, higher = more random)
         max_retries: Maximum retry attempts on failure (default: MAX_LLM_RETRIES)
 
     Returns:
-        JSON string response from LLM
+        JSON string response from LLM (or raw text if no schema provided)
 
     Raises:
         Exception: If all retry attempts fail or LLM returns empty response
     """
     original_prompt = prompt
 
+    # gpt-oss models can fail with "failed to load model vocabulary required for format"
+    # when using Ollama's native 'format' parameter. We handle this by moving the
+    # schema into the prompt and manually extracting the JSON from the raw response.
+    # https://github.com/ollama/ollama/issues/11691
+    use_native_format = schema is not None and not model.startswith("gpt-oss")
+
+    if schema and not use_native_format:
+        prompt += f"\n\nRespond with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
+
     for attempt in range(max_retries):
         try:
             # Truncate prompt on later attempts to avoid token limit issues
             if attempt == 2:  # Third attempt
                 if len(original_prompt) > RETRY_TRUNCATE_THRESHOLD:
-                    prompt = original_prompt[:RETRY_TRUNCATE_THRESHOLD]
+                    prompt_base = original_prompt[:RETRY_TRUNCATE_THRESHOLD]
+                    if schema and not use_native_format:
+                        prompt = f"{prompt_base}\n\nRespond with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
+                    else:
+                        prompt = prompt_base
+
                     print(
-                        f"  ⚠ Truncating prompt: {len(original_prompt)} → {RETRY_TRUNCATE_THRESHOLD} chars"
+                        f"  ⚠ Truncating prompt: {len(original_prompt)} → {len(prompt)} chars"
                     )
 
             response = ollama_client.chat(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
-                format=schema,
+                format=schema if use_native_format else None,
                 options={
                     "temperature": temperature,
                 },
@@ -115,6 +158,10 @@ def call_llm(
             # Validate it's not empty
             if not content or content.strip() == "":
                 raise ValueError("LLM returned empty response")
+
+            # If we manually requested JSON via the prompt, extract it from the response
+            if schema and not use_native_format:
+                content = extract_json(content)
 
             return content
 
