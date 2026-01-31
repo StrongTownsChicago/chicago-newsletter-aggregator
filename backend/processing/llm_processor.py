@@ -31,6 +31,7 @@ TOPICS = [
     # Safe & Productive Streets
     "bike_lanes",
     "street_redesign",
+    "street_safety_or_traffic_calming",
     # Transit
     "transit_funding",
     # Transparent Local Accounting
