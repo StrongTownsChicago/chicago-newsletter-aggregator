@@ -13,6 +13,7 @@ from notifications.email_sender import (
     send_daily_digest,
     _build_digest_html,
     _build_digest_text,
+    DigestType,
 )
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 
@@ -311,7 +312,10 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         html = _build_digest_html(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("Newsletter 1", html)
@@ -333,7 +337,10 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         html = _build_digest_html(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("Zoning Updates", html)
@@ -355,7 +362,10 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         html = _build_digest_html(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("zoning", html)
@@ -378,7 +388,10 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         html = _build_digest_html(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("topic5", html)
@@ -400,7 +413,10 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         html = _build_digest_html(
-            prepared, "http://example.com/preferences", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/preferences",
+            "http://example.com/unsub",
         )
 
         self.assertIn("http://example.com/preferences", html)
@@ -425,7 +441,10 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         text = _build_digest_text(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("DAILY NEWSLETTER DIGEST", text)
@@ -458,7 +477,10 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         text = _build_digest_text(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("1. Newsletter 1", text)
@@ -480,7 +502,10 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         text = _build_digest_text(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("Zoning Updates", text)
@@ -501,7 +526,10 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         text = _build_digest_text(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("zoning", text)
@@ -523,7 +551,10 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         text = _build_digest_text(
-            prepared, "http://example.com/prefs", "http://example.com/unsub"
+            prepared,
+            DigestType.DAILY,
+            "http://example.com/prefs",
+            "http://example.com/unsub",
         )
 
         self.assertIn("http://example.com/prefs", text)

@@ -123,10 +123,12 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
             # LLM processing or delay
             if ENABLE_LLM:
                 try:
-                    from processing.llm_processor import process_with_ollama
+                    from processing.llm_processor import extract_newsletter_metadata
 
                     print("  LLM processing...")
-                    llm_result = process_with_ollama(newsletter_data, OLLAMA_MODEL)
+                    llm_result = extract_newsletter_metadata(
+                        newsletter_data, OLLAMA_MODEL
+                    )
                     newsletter_data.update(llm_result)
                     print("  ✓ LLM complete")
 

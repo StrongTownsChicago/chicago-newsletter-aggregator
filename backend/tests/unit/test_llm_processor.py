@@ -13,7 +13,7 @@ from processing.llm_processor import (
     extract_topics,
     generate_summary,
     score_relevance,
-    process_with_ollama,
+    extract_newsletter_metadata,
     TOPICS,
     RETRY_TRUNCATE_THRESHOLD,
 )
@@ -416,7 +416,7 @@ class TestScoreRelevance(unittest.TestCase):
 
 
 class TestProcessWithOllama(unittest.TestCase):
-    """Tests for process_with_ollama() main pipeline function"""
+    """Tests for extract_newsletter_metadata() main pipeline function"""
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
@@ -432,7 +432,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "New bike lanes and transit funding announced.",
         }
 
-        result = process_with_ollama(newsletter, "test-model")
+        result = extract_newsletter_metadata(newsletter, "test-model")
 
         self.assertEqual(result["topics"], ["bike_lanes", "transit_funding"])
         self.assertEqual(result["summary"], "Newsletter about transit improvements.")
@@ -456,7 +456,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": long_content,
         }
 
-        process_with_ollama(newsletter, "test-model", max_chars=100000)
+        extract_newsletter_metadata(newsletter, "test-model", max_chars=100000)
 
         # Verify truncation message was printed
         truncation_printed = any(
@@ -484,7 +484,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "Test content",
         }
 
-        process_with_ollama(newsletter, "test-model")
+        extract_newsletter_metadata(newsletter, "test-model")
 
         # Check that content passed to extract_topics includes date
         call_args = mock_topics.call_args[0]
@@ -513,7 +513,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "Content",
         }
 
-        result = process_with_ollama(newsletter, "test-model")
+        result = extract_newsletter_metadata(newsletter, "test-model")
 
         # Topics and score succeed, summary returns empty (as it does on error)
         self.assertEqual(result["topics"], ["bike_lanes"])
@@ -538,7 +538,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "Content",
         }
 
-        result = process_with_ollama(newsletter, "test-model")
+        result = extract_newsletter_metadata(newsletter, "test-model")
 
         # All should return their error defaults
         self.assertEqual(result["topics"], [])
@@ -559,7 +559,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "Newsletter body text",
         }
 
-        process_with_ollama(newsletter, "test-model")
+        extract_newsletter_metadata(newsletter, "test-model")
 
         # Check that subject was included in content
         call_args = mock_topics.call_args[0]
@@ -582,7 +582,7 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": "Content",
         }
 
-        process_with_ollama(newsletter, "test-model")
+        extract_newsletter_metadata(newsletter, "test-model")
 
         # Verify score_relevance was called with topics and summary
         self.assertEqual(mock_score.call_count, 1)

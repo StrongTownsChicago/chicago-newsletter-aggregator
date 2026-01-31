@@ -16,40 +16,131 @@ import argparse
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from typing import Any, cast
+from typing import Any, cast, Callable
+from dataclasses import dataclass
 from shared.db import get_supabase_client
 from notifications.rule_matcher import get_pending_notifications_by_user
-from notifications.email_sender import send_daily_digest
+from notifications.email_sender import send_digest, DigestType
 from notifications.error_logger import log_notification_error
 
 
-def process_daily_digests(
-    batch_id: str | None = None, dry_run: bool = False
+@dataclass
+class DigestConfig:
+    """Configuration for digest processing by type."""
+
+    digest_type: DigestType
+    notification_type: str  # DB filter value
+    delivery_type: str  # History record value
+    batch_id_calculator: Callable[[], str]  # Function to calculate default batch_id
+    fetch_notifications: Callable[
+        [str], dict[str, list[dict[str, Any]]]
+    ]  # Fetch function
+
+
+def _calculate_daily_batch_id() -> str:
+    """Calculate default batch ID for daily digests (yesterday in Chicago time)."""
+    chicago_tz = ZoneInfo("America/Chicago")
+    yesterday = datetime.now(chicago_tz).date() - timedelta(days=1)
+    return yesterday.isoformat()
+
+
+def _calculate_weekly_batch_id() -> str:
+    """Calculate default batch ID for weekly digests (previous week)."""
+    chicago_tz = ZoneInfo("America/Chicago")
+    last_week = datetime.now(chicago_tz) - timedelta(days=7)
+    year, week, _ = last_week.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _fetch_daily_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]]:
+    """Fetch pending daily notifications grouped by user."""
+    return get_pending_notifications_by_user(batch_id)
+
+
+def _fetch_weekly_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]]:
+    """Fetch pending weekly notifications grouped by user."""
+    supabase = get_supabase_client()
+
+    try:
+        response = (
+            supabase.table("notification_queue")
+            .select(
+                "id, user_id, newsletter_id, rule_id, "
+                "weekly_topic_reports:newsletter_id(id, topic, week_id, report_summary, newsletter_ids), "
+                "rule:notification_rules(name)"
+            )
+            .eq("status", "pending")
+            .eq("notification_type", "weekly")
+            .eq("digest_batch_id", batch_id)
+            .execute()
+        )
+
+        # Group by user
+        notifications_by_user: dict[str, list[dict[str, Any]]] = {}
+        for notif in response.data:
+            notif_dict = dict(notif)  # type: ignore
+            user_id = str(notif_dict["user_id"])
+            if user_id not in notifications_by_user:
+                notifications_by_user[user_id] = []
+            notifications_by_user[user_id].append(notif_dict)
+
+        return notifications_by_user
+
+    except Exception as e:
+        print(f"Error fetching weekly notifications: {e}")
+        return {}
+
+
+# Digest type configurations
+DIGEST_CONFIGS = {
+    DigestType.DAILY: DigestConfig(
+        digest_type=DigestType.DAILY,
+        notification_type="daily",
+        delivery_type="daily_digest",
+        batch_id_calculator=_calculate_daily_batch_id,
+        fetch_notifications=_fetch_daily_notifications,
+    ),
+    DigestType.WEEKLY: DigestConfig(
+        digest_type=DigestType.WEEKLY,
+        notification_type="weekly",
+        delivery_type="weekly_digest",
+        batch_id_calculator=_calculate_weekly_batch_id,
+        fetch_notifications=_fetch_weekly_notifications,
+    ),
+}
+
+
+def process_digests(
+    digest_type: DigestType, batch_id: str | None = None, dry_run: bool = False
 ) -> dict[str, int]:
     """
-    Process daily digest notifications.
+    Process digest notifications (daily or weekly).
 
-    Groups all pending notifications by user and sends ONE email per user
-    with all matched newsletters from the specified batch (default: yesterday in Chicago timezone).
+    Generic digest processor that handles both daily newsletter digests and
+    weekly topic report digests using type-specific configuration.
 
     Args:
-        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to yesterday (Chicago time).
+        digest_type: Type of digest to process (DigestType.DAILY or DigestType.WEEKLY)
+        batch_id: Digest batch ID. Format depends on type:
+                  - Daily: YYYY-MM-DD (defaults to yesterday in Chicago time)
+                  - Weekly: YYYY-WXX (defaults to previous week)
         dry_run: If True, don't actually send emails (for testing)
 
     Returns:
         Dictionary with stats: sent, failed, skipped
     """
-    # Default to yesterday (Chicago timezone) if no batch ID specified
-    # Workflow runs at 13:35 UTC (~7:35-8:35am Central) sending previous day's batch
+    # Get configuration for this digest type
+    config = DIGEST_CONFIGS[digest_type]
+
+    # Calculate default batch_id if not provided
     if not batch_id:
-        chicago_tz = ZoneInfo("America/Chicago")
-        yesterday = datetime.now(chicago_tz).date() - timedelta(days=1)
-        batch_id = yesterday.isoformat()
+        batch_id = config.batch_id_calculator()
 
-    print(f"Processing daily digest for batch: {batch_id}")
+    digest_name = "daily" if digest_type == DigestType.DAILY else "weekly"
+    print(f"Processing {digest_name} digest for batch: {batch_id}")
 
-    # Get pending notifications grouped by user
-    notifications_by_user = get_pending_notifications_by_user(batch_id)
+    # Fetch pending notifications grouped by user (type-specific)
+    notifications_by_user = config.fetch_notifications(batch_id)
 
     if not notifications_by_user:
         print("No pending notifications to process.")
@@ -91,12 +182,12 @@ def process_daily_digests(
             _mark_notifications_skipped(supabase, notifications)
             continue
 
-        # Send digest email
+        # Send digest email (type-specific sender)
         if dry_run:
-            print(f"  [DRY RUN] Would send digest to user {user_id}")
+            print(f"  [DRY RUN] Would send {digest_name} digest to {user_email}")
             stats["sent"] += 1
         else:
-            result = send_daily_digest(user_id, user_email, notifications)
+            result = send_digest(user_id, user_email, notifications, config.digest_type)
 
             if result["success"]:
                 print(f"  ✓ Sent digest to user {user_id}")
@@ -118,7 +209,7 @@ def process_daily_digests(
                         "newsletter_ids": newsletter_ids,
                         "rule_ids": rule_ids,
                         "digest_batch_id": batch_id,
-                        "delivery_type": "daily_digest",
+                        "delivery_type": config.delivery_type,
                         "success": True,
                         "resend_email_id": result.get("email_id"),
                     }
@@ -158,7 +249,7 @@ def process_daily_digests(
                         "newsletter_ids": newsletter_ids,
                         "rule_ids": rule_ids,
                         "digest_batch_id": batch_id,
-                        "delivery_type": "daily_digest",
+                        "delivery_type": config.delivery_type,
                         "success": False,
                         "error_message": error_msg,
                     }
@@ -169,7 +260,7 @@ def process_daily_digests(
 
     # Print summary
     print(f"\n{'=' * 60}")
-    print("Daily Digest Processing Complete")
+    print(f"{digest_name.title()} Digest Processing Complete")
     print(f"{'=' * 60}")
     print(f"Batch ID: {batch_id}")
     print(f"Sent:     {stats['sent']}")
@@ -180,6 +271,24 @@ def process_daily_digests(
     return stats
 
 
+def process_daily_digests(
+    batch_id: str | None = None, dry_run: bool = False
+) -> dict[str, int]:
+    """
+    Process daily digest notifications.
+
+    Wrapper around process_digests() for backward compatibility and CLI convenience.
+
+    Args:
+        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to yesterday (Chicago time).
+        dry_run: If True, don't actually send emails (for testing)
+
+    Returns:
+        Dictionary with stats: sent, failed, skipped
+    """
+    return process_digests(DigestType.DAILY, batch_id, dry_run)
+
+
 def _mark_notifications_skipped(
     supabase: Any, notifications: list[dict[str, Any]]
 ) -> None:
@@ -188,6 +297,24 @@ def _mark_notifications_skipped(
     supabase.table("notification_queue").update(
         {"status": "failed", "error_message": "User notifications disabled"}
     ).in_("id", notification_ids).execute()
+
+
+def process_weekly_digests(
+    batch_id: str | None = None, dry_run: bool = False
+) -> dict[str, int]:
+    """
+    Process weekly digest notifications.
+
+    Wrapper around process_digests() for backward compatibility and CLI convenience.
+
+    Args:
+        batch_id: Week identifier (YYYY-WXX format). Defaults to previous week.
+        dry_run: If True, don't actually send emails (for testing)
+
+    Returns:
+        Dictionary with stats: sent, failed, skipped
+    """
+    return process_digests(DigestType.WEEKLY, batch_id, dry_run)
 
 
 def main() -> None:
@@ -201,9 +328,13 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--weekly-digest", action="store_true", help="Send weekly digest emails"
+    )
+
+    parser.add_argument(
         "--batch-id",
         type=str,
-        help="Specific batch ID to process (YYYY-MM-DD format, defaults to yesterday in Chicago timezone)",
+        help="Specific batch ID to process (YYYY-MM-DD for daily, YYYY-WXX for weekly)",
     )
 
     parser.add_argument(
@@ -214,11 +345,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if not args.daily_digest:
-        parser.error("Must specify --daily-digest")
+    if not args.daily_digest and not args.weekly_digest:
+        parser.error("Must specify --daily-digest or --weekly-digest")
 
     if args.daily_digest:
         process_daily_digests(batch_id=args.batch_id, dry_run=args.dry_run)
+    elif args.weekly_digest:
+        process_weekly_digests(batch_id=args.batch_id, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

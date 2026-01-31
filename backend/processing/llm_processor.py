@@ -314,7 +314,7 @@ Newsletter:
         return None
 
 
-def process_with_ollama(
+def extract_newsletter_metadata(
     newsletter: dict[str, str],
     model: str = "gpt-oss:20b",
     max_chars: int = MAX_NEWSLETTER_CHARS,

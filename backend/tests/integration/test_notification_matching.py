@@ -178,7 +178,9 @@ class TestNotificationMatching(unittest.TestCase):
         mock_supabase.table.side_effect = table_router
 
         # Mock LLM processor
-        with patch("utils.process_llm_metadata.process_with_ollama") as mock_llm:
+        with patch(
+            "utils.process_llm_metadata.extract_newsletter_metadata"
+        ) as mock_llm:
             mock_llm.return_value = {
                 "topics": ["bike_lanes"],
                 "summary": "Newsletter about bike lanes",

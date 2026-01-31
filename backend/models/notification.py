@@ -28,6 +28,7 @@ class NotificationRule(BaseModel):
     source_ids: list[str] = Field(default_factory=list)
     ward_numbers: list[WardNumber] = Field(default_factory=list)
     is_active: bool = True
+    delivery_frequency: str = Field(default="daily", pattern="^(daily|weekly)$")
 
 
 class RuleMatch(BaseModel):
@@ -43,10 +44,11 @@ class NotificationQueueEntry(BaseModel):
 
     id: int
     user_id: UserID
-    newsletter_id: NewsletterID
+    newsletter_id: NewsletterID | None = None  # Nullable for weekly reports
     rule_id: RuleID
     status: str = Field(..., pattern="^(pending|sent|failed)$")
     digest_batch_id: BatchID
+    notification_type: str = Field(default="daily", pattern="^(daily|weekly)$")
     created_at: datetime
     sent_at: datetime | None = None
     error_message: str | None = None
