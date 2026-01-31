@@ -59,10 +59,10 @@ uv run python -m notifications.process_notification_queue --daily-digest --batch
 # Run all tests
 uv run python -m unittest discover -s tests
 
-# Lint and format (run after making Python changes)
-uv run ruff check --fix  # Fix auto-fixable issues, manually fix remaining
-uv run ruff format       # Format code
-uv run mypy .            # Type check
+# Code quality checks (run before committing Python changes)
+uv run ruff check --fix
+uv run ruff format
+uv run mypy .
 ```
 
 ### Frontend (from `frontend/` directory)
@@ -107,10 +107,12 @@ ollama pull gpt-oss:20b
 
 **GitHub Actions Workflows:**
 
-- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters without LLM metadata, queues notifications
+- Backend CI (`.github/workflows/backend_tests.yml`) - Runs ruff, mypy, and tests on backend changes
+- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and tests on frontend changes
+- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
-Both workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
+All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
 **Local LLM Processing:**
 

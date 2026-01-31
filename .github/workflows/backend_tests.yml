@@ -1,4 +1,4 @@
-name: Backend Tests
+name: Backend CI
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - 'backend/**'
 
 jobs:
-  test:
+  quality-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,6 +30,21 @@ jobs:
         run: |
           cd backend
           uv sync --locked --dev
+
+      - name: Run Ruff Linter
+        run: |
+          cd backend
+          uv run --locked ruff check .
+
+      - name: Run Ruff Formatter Check
+        run: |
+          cd backend
+          uv run --locked ruff format --check .
+
+      - name: Run mypy Type Checker
+        run: |
+          cd backend
+          uv run --locked mypy .
 
       - name: Run Tests
         run: |
