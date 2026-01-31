@@ -61,6 +61,9 @@ uv run python -m utils.process_weekly_reports            # Generate reports
 uv run python -m notifications.weekly_notification_queue # Queue notifications
 uv run python -m notifications.process_notification_queue --weekly-digest # Send emails
 
+# Test/iterate on weekly summary prompt (without full pipeline)
+uv run python -m utils.test_weekly_summary --sample                     # Test with sample data
+
 # Run all tests
 uv run python -m unittest discover -s tests
 

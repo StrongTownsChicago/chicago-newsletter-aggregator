@@ -19,6 +19,7 @@ from models.weekly_report import (
 )
 from models.types import NewsletterID
 from processing.llm_processor import TOPICS, call_llm
+from prompts.weekly_synthesis import FACTUAL_SUMMARY
 from shared.db import get_supabase_client
 
 
@@ -192,35 +193,9 @@ def synthesize_weekly_summary(
     }
     topic_display = topic_names.get(topic, topic.replace("_", " ").title())
 
-    prompt = f"""Synthesize these verified developments about {topic_display} into a 2-4 paragraph weekly summary.
-
-You are writing for Strong Towns Chicago, an advocacy organization that promotes:
-- SAFE STREETS: Protected bike lanes, traffic calming, pedestrian safety, Vision Zero
-- MORE HOUSING: 4-flats, missing middle housing, ADUs, zoning reform, affordable housing
-- PUBLIC TRANSIT: CTA/Metra funding, service improvements, transit-oriented development
-- FISCAL RESPONSIBILITY: Evidence-based policy, transparent budgets, cost-effective infrastructure
-- COMMUNITY ENGAGEMENT: Public meetings, meaningful input, accessible government
-
-**Guidelines:**
-1. Build ONLY from the verified developments below (do not add external information)
-2. Identify patterns, trends, or themes across developments
-3. Apply Strong Towns perspective:
-   - Frame through safety and livability lens
-   - Emphasize evidence and data (safety studies, usage stats, proven outcomes)
-   - Highlight positive progress and growing political will
-   - Acknowledge tensions while grounding analysis in data
-   - Use educational tone (help readers understand why policies matter)
-4. Organize thematically (not chronologically)
-5. Target 2-4 paragraphs (~300-600 words)
-6. Use encouraging, solutions-oriented tone
-7. DO NOT speculate about future outcomes
-8. DO NOT introduce facts not in the list below
-
-**Verified Developments from Week {week_id}:**
-{facts_list}
-
-Write a narrative summary that synthesizes these developments with Strong Towns values.
-"""
+    prompt = FACTUAL_SUMMARY.format(
+        topic_display=topic_display, week_id=week_id, facts_list=facts_list
+    )
 
     try:
         print(f"  → Synthesizing summary for {topic}...")
