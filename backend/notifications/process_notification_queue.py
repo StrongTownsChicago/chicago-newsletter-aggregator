@@ -65,8 +65,8 @@ def _fetch_weekly_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]
         response = (
             supabase.table("notification_queue")
             .select(
-                "id, user_id, newsletter_id, rule_id, "
-                "weekly_topic_reports:newsletter_id(id, topic, week_id, report_summary, newsletter_ids), "
+                "id, user_id, report_id, rule_id, "
+                "report:weekly_topic_reports(id, topic, week_id, report_summary, newsletter_ids), "
                 "rule:notification_rules(name)"
             )
             .eq("status", "pending")
@@ -200,13 +200,14 @@ def process_digests(
                 ).in_("id", notification_ids).execute()
 
                 # Record in history
-                newsletter_ids = list(set([n["newsletter_id"] for n in notifications]))
+                # Extract content IDs (works for both newsletter_id and report_id)
+                content_ids = _extract_content_ids(notifications)
                 rule_ids = list(set([n["rule_id"] for n in notifications]))
 
                 supabase.table("notification_history").insert(
                     {
                         "user_id": user_id,
-                        "newsletter_ids": newsletter_ids,
+                        "newsletter_ids": content_ids,  # Stores both newsletter and report IDs
                         "rule_ids": rule_ids,
                         "digest_batch_id": batch_id,
                         "delivery_type": config.delivery_type,
@@ -221,6 +222,7 @@ def process_digests(
                 stats["failed"] += 1
 
                 # Log error to file
+                content_ids = _extract_content_ids(notifications)
                 error_file = log_notification_error(
                     error_type="sending",
                     error_message=error_msg,
@@ -228,7 +230,7 @@ def process_digests(
                         "user_id": user_id,
                         "batch_id": batch_id,
                         "notification_count": len(notifications),
-                        "newsletter_ids": [n["newsletter_id"] for n in notifications],
+                        "content_ids": content_ids,  # Works for both newsletter and report IDs
                     },
                 )
                 print(f"    Error details logged to: {error_file}")
@@ -240,13 +242,12 @@ def process_digests(
                 ).in_("id", notification_ids).execute()
 
                 # Record failure in history
-                newsletter_ids = list(set([n["newsletter_id"] for n in notifications]))
                 rule_ids = list(set([n["rule_id"] for n in notifications]))
 
                 supabase.table("notification_history").insert(
                     {
                         "user_id": user_id,
-                        "newsletter_ids": newsletter_ids,
+                        "newsletter_ids": content_ids,  # Stores both newsletter and report IDs
                         "rule_ids": rule_ids,
                         "digest_batch_id": batch_id,
                         "delivery_type": config.delivery_type,
@@ -287,6 +288,29 @@ def process_daily_digests(
         Dictionary with stats: sent, failed, skipped
     """
     return process_digests(DigestType.DAILY, batch_id, dry_run)
+
+
+def _extract_content_ids(notifications: list[dict[str, Any]]) -> list[str]:
+    """
+    Extract content IDs from notifications (either newsletter_id or report_id).
+
+    For daily notifications, extracts newsletter_id.
+    For weekly notifications, extracts report_id.
+
+    Args:
+        notifications: List of notification dictionaries
+
+    Returns:
+        List of unique content IDs (UUIDs as strings)
+    """
+    content_ids = []
+    for n in notifications:
+        # Weekly notifications have report_id, daily have newsletter_id
+        if "report_id" in n and n["report_id"] is not None:
+            content_ids.append(n["report_id"])
+        elif "newsletter_id" in n and n["newsletter_id"] is not None:
+            content_ids.append(n["newsletter_id"])
+    return list(set(content_ids))
 
 
 def _mark_notifications_skipped(

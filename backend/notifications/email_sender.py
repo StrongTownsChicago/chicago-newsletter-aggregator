@@ -571,8 +571,8 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
         content += report["summary"]
         content += "\n\n"
 
-        topic_url = f"{base_url}/search?topics={report['topic']}"
-        content += f"View all {report['topic_display']} newsletters from this week:\n"
+        topic_url = f"{base_url}/search?q=&ward=&topics={report['topic']}"
+        content += f"View all {report['topic_display']} newsletters:\n"
         content += f"{topic_url}\n\n"
         content += "=" * 70 + "\n\n"
 
@@ -669,7 +669,7 @@ def _prepare_weekly_report_data(
 
     Args:
         notifications: List of notification records from database
-                      (report data should be joined as 'weekly_topic_reports')
+                      (report data should be joined as 'report')
 
     Returns:
         List of dicts with topic, summary, newsletter_count, week_id, matched_rules
@@ -678,8 +678,8 @@ def _prepare_weekly_report_data(
     reports_with_rules = {}
 
     for notif in notifications:
-        # For weekly notifications, newsletter_id is actually report_id
-        report_data = notif.get("weekly_topic_reports")
+        # For weekly notifications, report data is joined as "report"
+        report_data = notif.get("report")
         if not report_data:
             continue
 

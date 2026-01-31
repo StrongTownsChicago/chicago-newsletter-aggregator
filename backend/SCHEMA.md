@@ -179,13 +179,14 @@ User-defined notification rules.
 
 ### `notification_queue`
 
-Pending notifications waiting to be sent.
+Pending notifications waiting to be sent. Supports both newsletter and report notifications via polymorphic design.
 
 | Column            | Type        | Constraints                            | Description                                    |
 | ----------------- | ----------- | -------------------------------------- | ---------------------------------------------- |
 | id                | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Queue entry ID                                 |
 | user_id           | uuid        | NOT NULL, FK → auth.users(id)          | Recipient user                                 |
-| newsletter_id     | uuid        | FK → newsletters(id)                   | Matched newsletter (or report_id for weekly)   |
+| newsletter_id     | uuid        | FK → newsletters(id)                   | Matched newsletter (NULL for weekly reports)   |
+| report_id         | uuid        | FK → weekly_topic_reports(id)          | Matched report (NULL for daily newsletters)    |
 | rule_id           | uuid        | NOT NULL, FK → notification_rules(id)  | Rule that matched                              |
 | status            | text        | NOT NULL, DEFAULT 'pending'            | Status: pending/sent/failed                    |
 | digest_batch_id   | text        |                                        | Batch ID for grouping (YYYY-MM-DD or YYYY-WXX) |
@@ -197,12 +198,16 @@ Pending notifications waiting to be sent.
 **Foreign Keys**:
 
 - `user_id` → `auth.users(id)` ON DELETE CASCADE
-- `newsletter_id` → `newsletters(id)` ON DELETE CASCADE (nullable for weekly reports)
+- `newsletter_id` → `newsletters(id)` ON DELETE CASCADE (nullable)
+- `report_id` → `weekly_topic_reports(id)` ON DELETE CASCADE (nullable)
 - `rule_id` → `notification_rules(id)` ON DELETE CASCADE
 
-**Note**: For weekly notifications, `newsletter_id` stores the UUID from `weekly_topic_reports.id` instead of a newsletter ID.
+**Polymorphic Design**: Exactly one of `newsletter_id` or `report_id` must be set (enforced by CHECK constraint). Daily notifications use `newsletter_id`, weekly notifications use `report_id`.
 
-**Unique Constraint**: `(user_id, newsletter_id, rule_id)` - prevents duplicate notifications
+**Unique Constraints**: Partial unique indexes prevent duplicate notifications:
+
+- `idx_unique_newsletter_notif` on `(user_id, newsletter_id, rule_id)` WHERE `newsletter_id` IS NOT NULL
+- `idx_unique_report_notif` on `(user_id, report_id, rule_id)` WHERE `report_id` IS NOT NULL
 
 **Status Values**:
 
@@ -221,6 +226,7 @@ Pending notifications waiting to be sent.
 - `idx_notification_queue_user` on `(user_id, status)`
 - `idx_notification_queue_digest` on `(digest_batch_id, status)`
 - `idx_notification_queue_type_status` on `(notification_type, status, created_at)`
+- `idx_notification_queue_report` on `report_id` (partial index WHERE `report_id` IS NOT NULL)
 
 ---
 
@@ -388,11 +394,12 @@ SELECT * FROM get_week_date_range('2026-W05');
 
 ## Migration History
 
-| Version | File                            | Description                                                  | Date       |
-| ------- | ------------------------------- | ------------------------------------------------------------ | ---------- |
-| 001     | `001_notification_system.sql`   | Added notification system (4 tables, triggers, RLS)          | 2026-01-21 |
-| 002     | `002_add_search_term.sql`       | Replaced keywords array with single search_term column       | 2026-01-23 |
-| 003     | `003_weekly_topic_reports.sql`  | Added weekly topic reports (table, delivery_frequency, helpers) | 2026-01-31 |
+| Version | File                               | Description                                                     | Date       |
+| ------- | ---------------------------------- | --------------------------------------------------------------- | ---------- |
+| 001     | `001_notification_system.sql`      | Added notification system (4 tables, triggers, RLS)             | 2026-01-21 |
+| 002     | `002_add_search_term.sql`          | Replaced keywords array with single search_term column          | 2026-01-23 |
+| 003     | `003_weekly_topic_reports.sql`     | Added weekly topic reports (table, delivery_frequency, helpers) | 2026-01-31 |
+| 004     | `004_polymorphic_notifications.sql`| Polymorphic notification_queue (dedicated report_id column)     | 2026-01-31 |
 
 ---
 

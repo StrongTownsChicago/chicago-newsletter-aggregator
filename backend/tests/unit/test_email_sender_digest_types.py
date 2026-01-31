@@ -89,7 +89,7 @@ class TestSendDigest(unittest.TestCase):
         ]
         mock_resend.return_value = {"id": "email-456"}
 
-        notifications = [{"weekly_topic_reports": {}, "rule": {}}]
+        notifications = [{"report": {}, "rule": {}}]
 
         # Act
         result = send_digest(

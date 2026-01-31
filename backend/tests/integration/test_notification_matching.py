@@ -39,7 +39,6 @@ class TestNotificationMatching(unittest.TestCase):
         # Mock active rules query
         mock_rules_table = MagicMock()
         mock_rules_select = MagicMock()
-        mock_rules_eq = MagicMock()
         mock_rules_response = MagicMock()
         mock_rules_response.data = [
             {
@@ -54,14 +53,14 @@ class TestNotificationMatching(unittest.TestCase):
                 "delivery_frequency": "daily",
             }
         ]
-        
+
         # Handle chained .eq() calls: .eq(active).eq(daily)
         mock_rules_eq_daily = MagicMock()
         mock_rules_eq_daily.execute.return_value = mock_rules_response
-        
+
         mock_rules_eq_active = MagicMock()
         mock_rules_eq_active.eq.return_value = mock_rules_eq_daily
-        
+
         mock_rules_select.eq.return_value = mock_rules_eq_active
         mock_rules_table.select.return_value = mock_rules_select
 

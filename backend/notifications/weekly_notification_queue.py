@@ -164,7 +164,7 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
                     supabase.table("notification_queue").insert(
                         {
                             "user_id": user_id,
-                            "newsletter_id": report_id,  # Store report_id here
+                            "report_id": report_id,  # Store in dedicated report_id column
                             "rule_id": rule_id,
                             "status": "pending",
                             "digest_batch_id": week_id,
