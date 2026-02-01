@@ -42,7 +42,7 @@ import re
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 # Import patterns and utilities from the bash tool script (avoid duplication)
@@ -54,6 +54,9 @@ spec = importlib.util.spec_from_file_location(
     "bash_tool",
     Path(__file__).parent / "bash-tool-damage-control.py"
 )
+if spec is None or spec.loader is None:
+    raise ImportError("Could not load bash-tool-damage-control.py")
+
 bash_tool = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bash_tool)
 
@@ -311,7 +314,7 @@ def run_interactive_mode():
             for reason in reasons:
                 print(f"   - {reason}")
         else:
-            print(f"\033[92mALLOWED\033[0m - No dangerous patterns matched")
+            print("\033[92mALLOWED\033[0m - No dangerous patterns matched")
         print()
 
 
@@ -365,7 +368,6 @@ def run_test(hook_type: str, tool_name: str, value: str, expectation: str) -> bo
             timeout=10
         )
         exit_code = result.returncode
-        stdout = result.stdout.strip()
         stderr = result.stderr.strip()
     except subprocess.TimeoutExpired:
         print("TIMEOUT")

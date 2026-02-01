@@ -21,7 +21,7 @@ import fnmatch
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 def is_glob_pattern(pattern: str) -> bool:

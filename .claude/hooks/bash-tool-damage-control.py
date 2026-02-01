@@ -18,11 +18,10 @@ import json
 import sys
 import re
 import os
-import fnmatch
 from pathlib import Path
 from typing import Tuple, List, Dict, Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 def is_glob_pattern(pattern: str) -> bool:
