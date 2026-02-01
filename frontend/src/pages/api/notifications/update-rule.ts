@@ -30,28 +30,23 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     return redirect("/preferences?error=Rule ID and name are required");
   }
 
-  // Validation: Weekly rules cannot have ward filters
-  if (deliveryFrequency === "weekly" && wards.length > 0) {
-    return redirect(
-      "/preferences?error=Ward filters cannot be applied to weekly summaries. Weekly summaries cover citywide activity.",
-    );
-  }
-
-  // Validation: Weekly rules must have topics
+  // Validation: Weekly rules
   if (deliveryFrequency === "weekly") {
     if (topics.length === 0) {
       return redirect(
         "/preferences?error=At least one topic is required for weekly summaries",
       );
     }
-    // Weekly rules cannot have search terms
+    if (wards.length > 0) {
+      return redirect(
+        "/preferences?error=Ward filters cannot be applied to weekly summaries. Weekly summaries cover citywide activity.",
+      );
+    }
+    // Weekly rules cannot have search terms or ward filters
     searchTerm = undefined;
-    // Clear any ward filters (belt-and-suspenders)
     wards = [];
-  }
-
-  // Validation: Daily rules must have at least search term or topics
-  if (deliveryFrequency === "daily") {
+  } else {
+    // Validation: Daily rules (default)
     if (!searchTerm && topics.length === 0) {
       return redirect(
         "/preferences?error=Please specify at least one topic or search phrase",
