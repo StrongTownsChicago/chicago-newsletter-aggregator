@@ -36,9 +36,10 @@ def match_newsletter_to_rules(
         response = (
             supabase.table("notification_rules")
             .select(
-                "id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers"
+                "id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers, delivery_frequency"
             )
             .eq("is_active", True)
+            .eq("delivery_frequency", "daily")
             .execute()
         )
 

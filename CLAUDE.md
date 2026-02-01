@@ -56,8 +56,20 @@ uv run python -m notifications.process_notification_queue --daily-digest
 # Send specific date's digest
 uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
 
+# Weekly Reports
+uv run python -m utils.process_weekly_reports            # Generate reports (previous week)
+uv run python -m utils.process_weekly_reports --current-week  # Generate for current week (manual Sunday runs)
+uv run python -m notifications.weekly_notification_queue # Queue notifications
+uv run python -m notifications.process_notification_queue --weekly-digest # Send emails
+
+# Test/iterate on weekly summary prompt (without full pipeline)
+uv run python -m utils.test_weekly_summary --sample                     # Test with sample data
+
 # Run all tests
 uv run python -m unittest discover -s tests
+
+# Run tests with performance timing
+uv run python utils/time_tests.py
 
 # Code quality checks (run before committing Python changes)
 uv run ruff check --fix
@@ -131,7 +143,8 @@ See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
 2. **Source Matching**: Email patterns matched against `email_source_mappings` table with wildcard support
 3. **Storage**: Raw newsletters stored in `newsletters` table (plain_text, raw_html, metadata)
 4. **LLM Processing**: Three separate Ollama calls per newsletter for topic extraction, summarization, and relevance scoring (see `llm_processor.py` for details)
-5. **Frontend**: Astro SSR queries Supabase for search/display
+5. **Weekly Synthesis**: Aggregated analysis of newsletters by topic using two-phase LLM process (extract facts → synthesize summary)
+6. **Frontend**: Astro SSR queries Supabase for search/display
 
 ### Backend Structure
 
@@ -207,7 +220,7 @@ frontend/src/
 
 **Core Tables:** `sources` (aldermen/officials), `email_source_mappings` (pattern matching), `newsletters` (content with full-text search)
 
-**Notification Tables:** `user_profiles`, `notification_rules`, `notification_queue`, `notification_history`
+**Notification Tables:** `user_profiles`, `notification_rules`, `notification_queue`, `notification_history`, `weekly_topic_reports`
 
 **Full schema and RLS policies:** See [backend/SCHEMA.md](backend/SCHEMA.md)
 
@@ -223,10 +236,15 @@ frontend/src/
 
 **Notification System** (`notifications/`):
 
-- `rule_matcher.py` - Matches newsletters against user rules (topics, search terms, wards). All filters AND-ed, within categories OR-ed.
-- `email_sender.py` - Sends daily digests via Resend API with HTML/plain text templates
+- `rule_matcher.py` - Matches newsletters against user rules (topics, search terms, wards). All filters AND-ed, within categories OR-ed. **Ward filters only apply to daily digest notifications.**
+- `email_sender.py` - Sends daily and weekly digests via Resend API with HTML/plain text templates
 - `process_notification_queue.py` - Orchestrates digest sending, groups by user, updates queue status, records in history
+- `weekly_notification_queue.py` - Queues weekly topic report notifications (topic-based only, no ward filtering)
 - Integration: Email ingestion queues notifications when `ENABLE_NOTIFICATIONS=true`. Web scraping does NOT trigger notifications (intentional). Failures don't break ingestion.
+
+**Notification Types:**
+- **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
+- **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 

@@ -54,7 +54,7 @@ describe('Notifications API Routes', () => {
         locals: { user: { id: 'user-123' }, supabase: mockSupabase },
         formData: {
           name: 'My Search Rule',
-          rule_type: 'search',
+          delivery_frequency: 'daily',
           search_term: 'Chicago Police',
           is_active: 'on'
         }
@@ -83,7 +83,7 @@ describe('Notifications API Routes', () => {
         locals: { user: { id: 'user-123' }, supabase: mockSupabase },
         formData: {
           name: 'My Topic Rule',
-          rule_type: 'topic',
+          delivery_frequency: 'daily',
           topics: ['Politics', 'Education'],
           is_active: 'on'
         }
@@ -99,6 +99,55 @@ describe('Notifications API Routes', () => {
       }));
     });
 
+    it('creates a topic rule with weekly frequency', async () => {
+      // Mock the final call in the chain to resolve with data
+      mockSupabase.eq.mockResolvedValueOnce({ count: 2, error: null });
+      mockSupabase.insert.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          name: 'Weekly Topic Rule',
+          topics: ['Politics'],
+          delivery_frequency: 'weekly',
+          is_active: 'on'
+        }
+      });
+
+      const response = await createRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toContain('message=Rule created successfully');
+      expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
+        topics: ['Politics'],
+        delivery_frequency: 'weekly'
+      }));
+    });
+
+    it('clears search term for weekly rules', async () => {
+      mockSupabase.eq.mockResolvedValueOnce({ count: 2, error: null });
+      mockSupabase.insert.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          name: 'Weekly Rule',
+          topics: ['Politics'],
+          search_term: 'CTA',
+          delivery_frequency: 'weekly',
+          is_active: 'on'
+        }
+      });
+
+      const response = await createRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
+        search_term: null,
+        delivery_frequency: 'weekly'
+      }));
+    });
+
     it('returns error if rule limit reached', async () => {
       mockSupabase.eq.mockResolvedValueOnce({ count: 5, error: null });
 
@@ -106,7 +155,6 @@ describe('Notifications API Routes', () => {
         locals: { user: { id: 'user-123' }, supabase: mockSupabase },
         formData: {
           name: 'Too Many Rules',
-          rule_type: 'topic',
           topics: ['Politics']
         }
       });
@@ -126,25 +174,25 @@ describe('Notifications API Routes', () => {
     it('redirects with error if name is missing', async () => {
       const context = createMockContext({
         locals: { user: { id: 'user-123' } },
-        formData: { rule_type: 'search', search_term: 'test' }
+        formData: { delivery_frequency: 'daily', search_term: 'test' }
       });
       const response = await createRulePOST(context);
       expect(response.headers.get('Location')).toContain('error=Rule name is required');
     });
 
-    it('redirects with error if search term is missing in search mode', async () => {
+    it('redirects with error if daily rule has no search term and no topics', async () => {
       const context = createMockContext({
         locals: { user: { id: 'user-123' } },
-        formData: { name: 'My Rule', rule_type: 'search' }
+        formData: { name: 'My Rule', delivery_frequency: 'daily' }
       });
       const response = await createRulePOST(context);
-      expect(response.headers.get('Location')).toContain('error=Search phrase is required');
+      expect(response.headers.get('Location')).toContain('error=Please specify at least one topic or search phrase');
     });
 
-    it('redirects with error if topics are missing in topic mode', async () => {
+    it('redirects with error if weekly rule has no topics', async () => {
       const context = createMockContext({
         locals: { user: { id: 'user-123' } },
-        formData: { name: 'My Rule', rule_type: 'topic', topics: [] }
+        formData: { name: 'My Rule', delivery_frequency: 'weekly', topics: [] }
       });
       const response = await createRulePOST(context);
       expect(response.headers.get('Location')).toContain('error=At least one topic is required');
@@ -193,6 +241,33 @@ describe('Notifications API Routes', () => {
   });
 
   describe('POST /api/notifications/update-rule', () => {
+    it('updates a rule with frequency', async () => {
+      // First eq returns the builder, second eq resolves
+      mockSupabase.eq.mockReturnValueOnce(mockSupabase);
+      mockSupabase.eq.mockResolvedValueOnce({ error: null });
+
+      const context = createMockContext({
+        locals: { user: { id: 'user-123' }, supabase: mockSupabase },
+        formData: {
+          rule_id: 'rule-456',
+          name: 'Updated Rule Name',
+          topics: ['Crime'],
+          delivery_frequency: 'weekly',
+          is_active: 'on'
+        }
+      });
+
+      const response = await updateRulePOST(context);
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('Location')).toContain('message=Rule updated successfully');
+      expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Updated Rule Name',
+        topics: ['Crime'],
+        delivery_frequency: 'weekly'
+      }));
+    });
+
     it('updates a rule successfully', async () => {
       // First eq returns the builder, second eq resolves
       mockSupabase.eq.mockReturnValueOnce(mockSupabase);
@@ -203,7 +278,6 @@ describe('Notifications API Routes', () => {
         formData: {
           rule_id: 'rule-456',
           name: 'Updated Rule Name',
-          rule_type: 'topic',
           topics: ['Crime'],
           is_active: 'on'
         }

@@ -66,4 +66,5 @@ export interface NotificationRule {
   min_relevance_score?: number;
   source_ids?: number[];
   ward_numbers?: string[]; // TEXT[] to match sources.ward_number TEXT type
+  delivery_frequency: "daily" | "weekly";
 }

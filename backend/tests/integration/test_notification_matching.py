@@ -39,7 +39,6 @@ class TestNotificationMatching(unittest.TestCase):
         # Mock active rules query
         mock_rules_table = MagicMock()
         mock_rules_select = MagicMock()
-        mock_rules_eq = MagicMock()
         mock_rules_response = MagicMock()
         mock_rules_response.data = [
             {
@@ -51,10 +50,18 @@ class TestNotificationMatching(unittest.TestCase):
                 "min_relevance_score": None,
                 "source_ids": None,
                 "ward_numbers": None,
+                "delivery_frequency": "daily",
             }
         ]
-        mock_rules_eq.execute.return_value = mock_rules_response
-        mock_rules_select.eq.return_value = mock_rules_eq
+
+        # Handle chained .eq() calls: .eq(active).eq(daily)
+        mock_rules_eq_daily = MagicMock()
+        mock_rules_eq_daily.execute.return_value = mock_rules_response
+
+        mock_rules_eq_active = MagicMock()
+        mock_rules_eq_active.eq.return_value = mock_rules_eq_daily
+
+        mock_rules_select.eq.return_value = mock_rules_eq_active
         mock_rules_table.select.return_value = mock_rules_select
 
         # Mock user preferences query
@@ -142,6 +149,7 @@ class TestNotificationMatching(unittest.TestCase):
                 "min_relevance_score": None,
                 "source_ids": None,
                 "ward_numbers": ["10"],
+                "delivery_frequency": "daily",
             }
         ]
 
@@ -161,7 +169,8 @@ class TestNotificationMatching(unittest.TestCase):
                 return mock_update_table
             if table_name == "notification_rules":
                 mock_rules_table = MagicMock()
-                mock_rules_table.select.return_value.eq.return_value.execute.return_value = mock_rules_response
+                # Handle .select().eq().eq().execute()
+                mock_rules_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_rules_response
                 return mock_rules_table
             elif table_name == "user_profiles":
                 mock_users_table = MagicMock()
@@ -178,7 +187,9 @@ class TestNotificationMatching(unittest.TestCase):
         mock_supabase.table.side_effect = table_router
 
         # Mock LLM processor
-        with patch("utils.process_llm_metadata.process_with_ollama") as mock_llm:
+        with patch(
+            "utils.process_llm_metadata.extract_newsletter_metadata"
+        ) as mock_llm:
             mock_llm.return_value = {
                 "topics": ["bike_lanes"],
                 "summary": "Newsletter about bike lanes",

@@ -134,31 +134,44 @@ User account data (extends Supabase Auth).
 
 User-defined notification rules.
 
-| Column              | Type        | Constraints                            | Description                    |
-| ------------------- | ----------- | -------------------------------------- | ------------------------------ |
-| id                  | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Rule ID                        |
-| user_id             | uuid        | NOT NULL, FK → auth.users(id)          | Rule owner                     |
-| name                | text        | NOT NULL                               | User-friendly rule name        |
-| is_active           | boolean     | NOT NULL, DEFAULT true                 | Whether rule is enabled        |
-| created_at          | timestamptz | NOT NULL, DEFAULT now()                | Rule creation time             |
-| updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time               |
-| topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match (MVP)          |
-| search_term         | text        |                                        | Search word or phrase to match |
-| min_relevance_score | integer     |                                        | Minimum relevance score        |
-| source_ids          | integer[]   |                                        | Specific sources to match      |
-| ward_numbers        | text[]      |                                        | Specific wards to match        |
+| Column              | Type        | Constraints                            | Description                     |
+| ------------------- | ----------- | -------------------------------------- | ------------------------------- |
+| id                  | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Rule ID                         |
+| user_id             | uuid        | NOT NULL, FK → auth.users(id)          | Rule owner                      |
+| name                | text        | NOT NULL                               | User-friendly rule name         |
+| is_active           | boolean     | NOT NULL, DEFAULT true                 | Whether rule is enabled         |
+| created_at          | timestamptz | NOT NULL, DEFAULT now()                | Rule creation time              |
+| updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time                |
+| topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match (MVP)           |
+| search_term         | text        |                                        | Search word or phrase to match  |
+| min_relevance_score | integer     |                                        | Minimum relevance score         |
+| source_ids          | integer[]   |                                        | Specific sources to match       |
+| ward_numbers        | text[]      |                                        | Specific wards to match         |
+| delivery_frequency  | text        | NOT NULL, DEFAULT 'daily'              | Delivery frequency: daily/weekly |
 
 **Foreign Keys**:
 
 - `user_id` → `auth.users(id)` ON DELETE CASCADE
 
-**Application Constraint**: Maximum 5 rules per user (enforced in API)
+**Application Constraints**:
+- Maximum 5 rules per user (enforced in API)
+- Ward filters (`ward_numbers`) only allowed for `delivery_frequency = 'daily'`
+- Weekly rules must have at least one topic; search terms not supported
 
-**Matching Logic**: All filters are AND-ed together.
+**Database Constraint**:
+- `weekly_rules_no_ward_filter`: Prevents ward_numbers on weekly rules (added in migration 003)
+
+**Matching Logic** (applies to daily digest notifications only):
 
 - `topics`: Matches if newsletter has ANY of the selected topics.
 - `search_term`: Matches if newsletter contains the exact search phrase (case-insensitive substring).
-- If both are present, newsletter must match BOTH criteria.
+- `ward_numbers`: Matches if newsletter is from ANY of the specified wards.
+- All filters are AND-ed together (newsletter must match all specified criteria).
+
+**Weekly Summary Behavior**:
+- Weekly summaries are topic-based only (no search term or ward filtering)
+- Reports cover citywide activity for selected topics
+- Delivered every Monday morning
 
 **Row-Level Security**:
 
@@ -172,32 +185,41 @@ User-defined notification rules.
 
 - `idx_notification_rules_user_id` on `user_id`
 - `idx_notification_rules_active` on `(user_id, is_active)`
+- `idx_notification_rules_frequency` on `(delivery_frequency, is_active)`
 
 ---
 
 ### `notification_queue`
 
-Pending notifications waiting to be sent.
+Pending notifications waiting to be sent. Supports both newsletter and report notifications via polymorphic design.
 
-| Column          | Type        | Constraints                            | Description                        |
-| --------------- | ----------- | -------------------------------------- | ---------------------------------- |
-| id              | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Queue entry ID                     |
-| user_id         | uuid        | NOT NULL, FK → auth.users(id)          | Recipient user                     |
-| newsletter_id   | uuid        | NOT NULL, FK → newsletters(id)         | Matched newsletter                 |
-| rule_id         | uuid        | NOT NULL, FK → notification_rules(id)  | Rule that matched                  |
-| status          | text        | NOT NULL, DEFAULT 'pending'            | Status: pending/sent/failed        |
-| digest_batch_id | text        |                                        | Batch ID for grouping (YYYY-MM-DD) |
-| created_at      | timestamptz | NOT NULL, DEFAULT now()                | When queued                        |
-| sent_at         | timestamptz |                                        | When sent/failed                   |
-| error_message   | text        |                                        | Error details if failed            |
+| Column            | Type        | Constraints                            | Description                                    |
+| ----------------- | ----------- | -------------------------------------- | ---------------------------------------------- |
+| id                | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Queue entry ID                                 |
+| user_id           | uuid        | NOT NULL, FK → auth.users(id)          | Recipient user                                 |
+| newsletter_id     | uuid        | FK → newsletters(id)                   | Matched newsletter (NULL for weekly reports)   |
+| report_id         | uuid        | FK → weekly_topic_reports(id)          | Matched report (NULL for daily newsletters)    |
+| rule_id           | uuid        | NOT NULL, FK → notification_rules(id)  | Rule that matched                              |
+| status            | text        | NOT NULL, DEFAULT 'pending'            | Status: pending/sent/failed                    |
+| digest_batch_id   | text        |                                        | Batch ID for grouping (YYYY-MM-DD or YYYY-WXX) |
+| notification_type | text        | NOT NULL, DEFAULT 'daily'              | Type: daily/weekly                             |
+| created_at        | timestamptz | NOT NULL, DEFAULT now()                | When queued                                    |
+| sent_at           | timestamptz |                                        | When sent/failed                               |
+| error_message     | text        |                                        | Error details if failed                        |
 
 **Foreign Keys**:
 
 - `user_id` → `auth.users(id)` ON DELETE CASCADE
-- `newsletter_id` → `newsletters(id)` ON DELETE CASCADE
+- `newsletter_id` → `newsletters(id)` ON DELETE CASCADE (nullable)
+- `report_id` → `weekly_topic_reports(id)` ON DELETE CASCADE (nullable)
 - `rule_id` → `notification_rules(id)` ON DELETE CASCADE
 
-**Unique Constraint**: `(user_id, newsletter_id, rule_id)` - prevents duplicate notifications
+**Polymorphic Design**: Exactly one of `newsletter_id` or `report_id` must be set (enforced by CHECK constraint). Daily notifications use `newsletter_id`, weekly notifications use `report_id`.
+
+**Unique Constraints**: Partial unique indexes prevent duplicate notifications:
+
+- `idx_unique_newsletter_notif` on `(user_id, newsletter_id, rule_id)` WHERE `newsletter_id` IS NOT NULL
+- `idx_unique_report_notif` on `(user_id, report_id, rule_id)` WHERE `report_id` IS NOT NULL
 
 **Status Values**:
 
@@ -215,6 +237,8 @@ Pending notifications waiting to be sent.
 - `idx_notification_queue_status` on `(status, created_at)`
 - `idx_notification_queue_user` on `(user_id, status)`
 - `idx_notification_queue_digest` on `(digest_batch_id, status)`
+- `idx_notification_queue_type_status` on `(notification_type, status, created_at)`
+- `idx_notification_queue_report` on `report_id` (partial index WHERE `report_id` IS NOT NULL)
 
 ---
 
@@ -241,7 +265,8 @@ Audit log of sent notifications.
 
 **Delivery Types**:
 
-- `daily_digest` - Daily aggregated email
+- `daily_digest` - Daily aggregated email with matched newsletters
+- `weekly_digest` - Weekly aggregated email with AI-generated topic reports
 
 **Row-Level Security**:
 
@@ -253,6 +278,37 @@ Audit log of sent notifications.
 - `idx_notification_history_user` on `(user_id, sent_at DESC)`
 - `idx_notification_history_batch` on `digest_batch_id`
 - `idx_notification_history_success` on `(success, sent_at DESC)`
+
+---
+
+### `weekly_topic_reports`
+
+AI-generated weekly summaries for specific topics.
+
+| Column           | Type        | Constraints                            | Description                                  |
+| ---------------- | ----------- | -------------------------------------- | -------------------------------------------- |
+| id               | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Report ID                                    |
+| topic            | text        | NOT NULL                               | Topic name (from TOPICS constant)            |
+| week_id          | text        | NOT NULL                               | ISO week identifier (YYYY-WXX)               |
+| report_summary   | text        | NOT NULL                               | AI-generated 2-4 paragraph synthesis         |
+| newsletter_ids   | uuid[]      | NOT NULL                               | Array of newsletter IDs analyzed             |
+| key_developments | jsonb       |                                        | Optional structured facts from Phase 1 LLM   |
+| created_at       | timestamptz | NOT NULL, DEFAULT now()                | When report was generated                    |
+
+**Unique Constraint**: `(topic, week_id)` - Prevents duplicate reports for same topic/week (idempotency)
+
+**Row-Level Security**:
+
+- ✅ All authenticated users can view weekly reports
+- ❌ Only service role can create/update (backend processing only)
+
+**Indexes**:
+
+- `idx_weekly_topic_reports_week` on `week_id`
+- `idx_weekly_topic_reports_topic` on `topic`
+- `idx_weekly_topic_reports_topic_week` on `(topic, week_id)`
+
+**Report Generation**: Reports are generated by `utils.process_weekly_reports` for topics with active weekly subscribers.
 
 ---
 
@@ -286,6 +342,34 @@ Audit log of sent notifications.
 
 ---
 
+### `get_active_weekly_topics() → TABLE(topic text)`
+
+**Helper Function** - Returns list of topics that have active weekly subscribers.
+
+**Usage**: Used by `process_weekly_reports.py` to optimize report generation (only process topics with subscribers).
+
+**Returns**: Distinct list of topics from active weekly notification rules.
+
+**Permissions**: Granted to `authenticated` and `service_role`.
+
+---
+
+### `get_week_date_range(week_id_param text) → TABLE(week_start date, week_end date)`
+
+**Helper Function** - Converts ISO week ID (YYYY-WXX) to date range.
+
+**Usage**: Used to query newsletters by week for report generation.
+
+**Example**:
+```sql
+SELECT * FROM get_week_date_range('2026-W05');
+-- Returns: week_start = 2026-01-26, week_end = 2026-02-01
+```
+
+**Permissions**: Granted to `authenticated` and `service_role`.
+
+---
+
 ## Data Flow
 
 ### Newsletter Ingestion
@@ -296,22 +380,38 @@ Audit log of sent notifications.
 4. Insert into `newsletters` table
 5. **NEW**: Match against `notification_rules` → queue in `notification_queue`
 
-### Notification Delivery
+### Daily Notification Delivery
 
-1. Daily cron/GitHub Action runs `process_notification_queue.py`
+1. Daily cron/GitHub Action runs `process_notification_queue.py --daily-digest`
 2. Group pending notifications by `user_id` and `digest_batch_id`
 3. Send ONE email per user via Resend API
 4. Update `notification_queue` status to 'sent'
-5. Record delivery in `notification_history`
+5. Record delivery in `notification_history` with `delivery_type='daily_digest'`
+
+### Weekly Report Generation and Delivery
+
+1. Weekly cron runs `utils.process_weekly_reports` (e.g., Monday morning)
+2. Query `get_active_weekly_topics()` to find topics with subscribers
+3. For each active topic:
+   - Fetch newsletters tagged with topic from previous week
+   - Extract structured facts via LLM (Phase 1)
+   - Synthesize weekly summary via LLM (Phase 2)
+   - Store in `weekly_topic_reports` table
+4. Run `notifications.weekly_notification_queue` to queue notifications
+5. Weekly cron runs `process_notification_queue.py --weekly-digest`
+6. Group by user, send ONE email per user with all subscribed topics
+7. Record delivery with `delivery_type='weekly_digest'`
 
 ---
 
 ## Migration History
 
-| Version | File                          | Description                                            | Date       |
-| ------- | ----------------------------- | ------------------------------------------------------ | ---------- |
-| 001     | `001_notification_system.sql` | Added notification system (4 tables, triggers, RLS)    | 2026-01-21 |
-| 002     | `002_add_search_term.sql`     | Replaced keywords array with single search_term column | 2026-01-23 |
+| Version | File                               | Description                                                     | Date       |
+| ------- | ---------------------------------- | --------------------------------------------------------------- | ---------- |
+| 001     | `001_notification_system.sql`      | Added notification system (4 tables, triggers, RLS)             | 2026-01-21 |
+| 002     | `002_add_search_term.sql`          | Replaced keywords array with single search_term column          | 2026-01-23 |
+| 003     | `003_weekly_topic_reports.sql`     | Added weekly topic reports (table, delivery_frequency, helpers) | 2026-01-31 |
+| 004     | `004_polymorphic_notifications.sql`| Polymorphic notification_queue (dedicated report_id column)     | 2026-01-31 |
 
 ---
 
@@ -359,6 +459,58 @@ FROM newsletters
 WHERE received_date >= CURRENT_DATE - INTERVAL '30 days'
 GROUP BY DATE(received_date)
 ORDER BY date DESC;
+```
+
+### Weekly report generation status
+
+```sql
+SELECT
+  week_id,
+  topic,
+  array_length(newsletter_ids, 1) AS newsletters_analyzed,
+  LENGTH(report_summary) AS summary_length,
+  created_at
+FROM weekly_topic_reports
+ORDER BY week_id DESC, topic;
+```
+
+### Topics with active weekly subscribers
+
+```sql
+SELECT * FROM get_active_weekly_topics()
+ORDER BY topic;
+```
+
+### Weekly digest delivery statistics
+
+```sql
+SELECT
+  digest_batch_id AS week_id,
+  COUNT(DISTINCT user_id) AS users,
+  COUNT(*) AS total_reports_sent
+FROM notification_history
+WHERE delivery_type = 'weekly_digest'
+GROUP BY digest_batch_id
+ORDER BY digest_batch_id DESC
+LIMIT 10;
+```
+
+### Fetch newsletters for weekly report generation
+
+```sql
+SELECT
+  n.id,
+  n.subject,
+  n.plain_text,
+  n.received_date,
+  s.name AS source_name,
+  s.ward_number
+FROM newsletters n
+JOIN sources s ON n.source_id = s.id
+CROSS JOIN get_week_date_range('2026-W05') AS week_range
+WHERE 'bike_lanes' = ANY(n.topics)
+  AND n.received_date::DATE BETWEEN week_range.week_start AND week_range.week_end
+ORDER BY n.received_date DESC;
 ```
 
 ---

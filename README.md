@@ -16,7 +16,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **Web Scraping**: MailChimp archive scraping for historical newsletters
 - **LLM Processing**: Topic extraction, summarization, relevance scoring
 - **Full-Text Search**: Search with filters (ward, topic, relevance score)
-- **User Notifications**: Daily digest emails for newsletters matching user-defined rules (topics, search phrases, wards)
+- **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
 - **Testing Suite**: Backend unit/integration tests, frontend unit tests
@@ -102,11 +102,24 @@ uv run python -m notifications.test_matcher --queue
 # Send daily digest (dry run)
 uv run python -m notifications.process_notification_queue --daily-digest --dry-run
 
-# Send today's digest
+# Send today's daily digest
 uv run python -m notifications.process_notification_queue --daily-digest
 
 # Send specific date's digest
 uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
+```
+
+#### Weekly Reports
+
+```bash
+# Generate weekly reports for active topics
+uv run python -m utils.process_weekly_reports
+
+# Queue notifications for generated reports
+uv run python -m notifications.weekly_notification_queue
+
+# Send weekly digest emails
+uv run python -m notifications.process_notification_queue --weekly-digest
 ```
 
 #### Testing
@@ -167,13 +180,17 @@ Three separate Ollama queries per newsletter for topic extraction, summarization
 
 ## Notification System
 
-Users create alert rules to receive daily digest emails for matching newsletters. Rules support topic-based matching, search phrase matching, and ward filtering.
+The system supports two types of notifications:
 
-Email ingestion automatically queues matching notifications when `ENABLE_NOTIFICATIONS=true`. Daily digest sending is handled by `backend/notifications/process_notification_queue.py`.
+1.  **Daily Digest**: Immediate updates when newsletters match user rules (topics, search phrases, wards).
+2.  **Weekly Topic Report**: AI-synthesized summary of all activity for a subscribed topic over the past week.
+
+Users configure these preferences via the frontend. Email ingestion automatically queues daily notifications. Weekly reports are generated via a scheduled process.
 
 **Key files:**
 
 - `backend/notifications/rule_matcher.py` - Matching logic
+- `backend/processing/weekly_report_generator.py` - Weekly report LLM synthesis
 - `backend/notifications/email_sender.py` - Email delivery via Resend
 - `frontend/src/pages/preferences.astro` - User preference management
 - `frontend/src/pages/unsubscribe.astro` - One-click unsubscribe
@@ -188,7 +205,8 @@ Newsletter content is automatically sanitized to remove tracking links, unsubscr
 ## Deployment
 
 - **Email Ingestion**: Automated via GitHub Actions (see `.github/workflows/email_ingestion.yml`)
-- **Notification Sending**: Automated via GitHub Actions (see `.github/workflows/send_notifications.yml`)
+- **Daily Notifications**: Automated via GitHub Actions (see `.github/workflows/send_notifications.yml`)
+- **Weekly Reports**: Automated via GitHub Actions (see `.github/workflows/send_weekly_digests.yml`)
 - **LLM Processing**: Manual local execution with Ollama (see `backend/docs/LOCAL_LLM_PROCESSING.md`)
 - **Frontend**: Auto-deploy via Cloudflare Pages on push to main
 

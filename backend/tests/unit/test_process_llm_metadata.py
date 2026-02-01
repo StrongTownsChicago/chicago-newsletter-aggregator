@@ -99,7 +99,7 @@ class TestFetchNewsletters(unittest.TestCase):
 class TestNotificationQueuing(unittest.TestCase):
     """Test notification queuing during LLM processing."""
 
-    @patch("utils.process_llm_metadata.process_with_ollama")
+    @patch("utils.process_llm_metadata.extract_newsletter_metadata")
     @patch("notifications.rule_matcher.match_newsletter_to_rules")
     @patch("notifications.rule_matcher.queue_notifications")
     def test_queues_notifications_when_flag_enabled(
@@ -153,7 +153,7 @@ class TestNotificationQueuing(unittest.TestCase):
         mock_match.assert_called_once()
         mock_queue.assert_called_once()
 
-    @patch("utils.process_llm_metadata.process_with_ollama")
+    @patch("utils.process_llm_metadata.extract_newsletter_metadata")
     def test_skips_notifications_when_flag_disabled(self, mock_llm):
         """Test notifications not queued when --queue-notifications not set."""
         # Arrange

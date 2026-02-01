@@ -35,7 +35,7 @@ import argparse
 from typing import Any, cast
 from dotenv import load_dotenv
 from shared.db import get_supabase_client
-from processing.llm_processor import process_with_ollama
+from processing.llm_processor import extract_newsletter_metadata
 
 load_dotenv()
 
@@ -103,7 +103,7 @@ def reprocess_newsletter(
 
     try:
         # Run LLM processing
-        llm_data = process_with_ollama(newsletter, model)
+        llm_data = extract_newsletter_metadata(newsletter, model)
 
         # Update database
         update_result = (

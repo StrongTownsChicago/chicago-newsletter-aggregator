@@ -155,10 +155,12 @@ def process_new_newsletters() -> None:
                 # Optional: Process with LLM if enabled
                 if ENABLE_LLM:
                     try:
-                        from processing.llm_processor import process_with_ollama
+                        from processing.llm_processor import extract_newsletter_metadata
 
                         OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
-                        llm_result = process_with_ollama(newsletter, OLLAMA_MODEL)
+                        llm_result = extract_newsletter_metadata(
+                            newsletter, OLLAMA_MODEL
+                        )
                         newsletter.update(llm_result)
                         print("  LLM processing complete")
                     except ImportError:
