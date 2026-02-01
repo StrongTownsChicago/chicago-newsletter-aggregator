@@ -6,9 +6,8 @@
 ALTER TABLE notification_queue
 ADD COLUMN report_id UUID REFERENCES weekly_topic_reports(id) ON DELETE CASCADE;
 
--- Step 2: Make newsletter_id nullable (since we now support two content types)
-ALTER TABLE notification_queue
-ALTER COLUMN newsletter_id DROP NOT NULL;
+-- Step 2: newsletter_id is already nullable from migration 003
+-- (Migration 003 made it nullable to support weekly reports)
 
 -- Step 3: Add constraint to ensure exactly one ID is present
 ALTER TABLE notification_queue
