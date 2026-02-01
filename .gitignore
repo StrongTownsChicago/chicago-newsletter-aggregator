@@ -7,3 +7,8 @@ backend/samples/
 settings.local.json
 /feature_planning
 frontend/coverage/
+
+# Claude Code - Ignore local settings, keep shared configuration
+.claude/settings.local.json
+!.claude/settings.json
+!.claude/hooks/
