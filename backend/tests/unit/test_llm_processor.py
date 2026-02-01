@@ -15,7 +15,6 @@ from processing.llm_processor import (
     score_relevance,
     extract_newsletter_metadata,
     TOPICS,
-    RETRY_TRUNCATE_THRESHOLD,
 )
 
 
@@ -61,38 +60,6 @@ class TestCallLLM(unittest.TestCase):
     @patch("processing.llm_processor.ollama_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_truncation_on_third_attempt(self, mock_print, mock_sleep, mock_client):
-        """Long prompt truncated on 3rd retry"""
-        long_prompt = "x" * 60000  # >50k chars
-        mock_response = Mock()
-        mock_response.message.content = '{"topics": []}'
-
-        # Fail twice, succeed on third attempt
-        mock_client.chat.side_effect = [
-            Exception("First failure"),
-            Exception("Second failure"),
-            mock_response,
-        ]
-
-        result = call_llm("test-model", long_prompt, {"type": "object"})
-
-        self.assertEqual(result, '{"topics": []}')
-        # Verify truncation message was printed
-        truncation_printed = any(
-            "Truncating prompt" in str(call) for call in mock_print.call_args_list
-        )
-        self.assertTrue(
-            truncation_printed, "Should print truncation message on 3rd attempt"
-        )
-
-        # On third attempt, prompt should be truncated
-        third_call = mock_client.chat.call_args_list[2]
-        prompt_used = third_call[1]["messages"][0]["content"]
-        self.assertEqual(len(prompt_used), RETRY_TRUNCATE_THRESHOLD)
-
-    @patch("processing.llm_processor.ollama_client")
-    @patch("time.sleep")
-    @patch("builtins.print")
     def test_max_retries_exceeded_raises(self, mock_print, mock_sleep, mock_client):
         """All retries fail, raises exception"""
         mock_client.chat.side_effect = Exception("Always fails")
@@ -103,8 +70,9 @@ class TestCallLLM(unittest.TestCase):
         self.assertIn("failed after 3 attempts", str(context.exception))
 
     @patch("processing.llm_processor.ollama_client")
+    @patch("time.sleep")
     @patch("builtins.print")
-    def test_empty_response_raises(self, mock_print, mock_client):
+    def test_empty_response_raises(self, mock_print, mock_sleep, mock_client):
         """Empty LLM response raises exception"""
         mock_response = Mock()
         mock_response.message.content = ""
@@ -116,8 +84,9 @@ class TestCallLLM(unittest.TestCase):
         self.assertIn("empty response", str(context.exception).lower())
 
     @patch("processing.llm_processor.ollama_client")
+    @patch("time.sleep")
     @patch("builtins.print")
-    def test_whitespace_only_response_raises(self, mock_print, mock_client):
+    def test_whitespace_only_response_raises(self, mock_print, mock_sleep, mock_client):
         """Whitespace-only response raises exception"""
         mock_response = Mock()
         mock_response.message.content = "   \n\t  "
@@ -421,7 +390,8 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
-    def test_full_pipeline(self, mock_score, mock_summary, mock_topics):
+    @patch("time.sleep")
+    def test_full_pipeline(self, mock_sleep, mock_score, mock_summary, mock_topics):
         """All three LLM steps execute successfully"""
         mock_topics.return_value = ["bike_lanes", "transit_funding"]
         mock_summary.return_value = "Newsletter about transit improvements."
@@ -445,7 +415,8 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.extract_topics")
     @patch("builtins.print")
-    def test_truncation_applied(self, mock_print, mock_topics):
+    @patch("time.sleep")
+    def test_truncation_applied(self, mock_sleep, mock_print, mock_topics):
         """Content >100k chars truncated"""
         mock_topics.return_value = []
 
@@ -473,7 +444,10 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
-    def test_includes_todays_date(self, mock_score, mock_summary, mock_topics):
+    @patch("time.sleep")
+    def test_includes_todays_date(
+        self, mock_sleep, mock_score, mock_summary, mock_topics
+    ):
         """Prompt includes today's date"""
         mock_topics.return_value = []
         mock_summary.return_value = ""
@@ -498,8 +472,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
     @patch("builtins.print")
+    @patch("time.sleep")
     def test_partial_failure_handling(
-        self, mock_print, mock_score, mock_summary, mock_topics
+        self, mock_sleep, mock_print, mock_score, mock_summary, mock_topics
     ):
         """One step fails, others continue"""
         # extract_topics, generate_summary, and score_relevance all catch their own
@@ -524,8 +499,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
     @patch("builtins.print")
+    @patch("time.sleep")
     def test_returns_empty_on_complete_failure(
-        self, mock_print, mock_score, mock_summary, mock_topics
+        self, mock_sleep, mock_print, mock_score, mock_summary, mock_topics
     ):
         """All steps fail gracefully"""
         # The individual functions catch their own exceptions, so they return defaults
@@ -548,7 +524,10 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
-    def test_content_includes_subject(self, mock_score, mock_summary, mock_topics):
+    @patch("time.sleep")
+    def test_content_includes_subject(
+        self, mock_sleep, mock_score, mock_summary, mock_topics
+    ):
         """Content passed to LLM includes subject"""
         mock_topics.return_value = []
         mock_summary.return_value = ""
@@ -569,8 +548,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("processing.llm_processor.score_relevance")
+    @patch("time.sleep")
     def test_score_receives_topics_and_summary_context(
-        self, mock_score, mock_summary, mock_topics
+        self, mock_sleep, mock_score, mock_summary, mock_topics
     ):
         """Relevance scoring receives topics and summary as context"""
         mock_topics.return_value = ["bike_lanes"]

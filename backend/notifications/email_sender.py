@@ -189,6 +189,10 @@ def send_digest(
             prepared_data = _prepare_weekly_report_data(notifications)
             subject = f"Your Weekly Chicago Alderman Topic Digest ({len(prepared_data)} topics)"
 
+        # Check for empty content - don't send empty digests
+        if not prepared_data:
+            return {"success": False, "error": "Empty digest content"}
+
         # Build email content using templates
         html_body = _build_digest_html(
             prepared_data, digest_type, preferences_url, unsubscribe_url

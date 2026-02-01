@@ -68,6 +68,9 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 # Run all tests
 uv run python -m unittest discover -s tests
 
+# Run tests with performance timing
+uv run python utils/time_tests.py
+
 # Code quality checks (run before committing Python changes)
 uv run ruff check --fix
 uv run ruff format

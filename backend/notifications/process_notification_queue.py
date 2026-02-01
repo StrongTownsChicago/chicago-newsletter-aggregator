@@ -179,7 +179,9 @@ def process_digests(
         if not preferences.get("enabled", True):
             print("  ⚠️  Notifications disabled for user, skipping")
             stats["skipped"] += 1
-            _mark_notifications_skipped(supabase, notifications)
+            _mark_notifications_failed(
+                supabase, notifications, "User notifications disabled"
+            )
             continue
 
         # Send digest email (type-specific sender)
@@ -216,6 +218,28 @@ def process_digests(
                     }
                 ).execute()
 
+            elif result.get("error") == "Empty digest content":
+                print(f"  ⚠ Skipped user {user_id}: Empty digest content")
+                stats["skipped"] += 1
+
+                # Update notification queue with skip reason
+                _mark_notifications_failed(supabase, notifications, result["error"])
+
+                # Record skip in history (as failure, but with specific reason)
+                content_ids = _extract_content_ids(notifications)
+                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                supabase.table("notification_history").insert(
+                    {
+                        "user_id": user_id,
+                        "newsletter_ids": content_ids,
+                        "rule_ids": rule_ids,
+                        "digest_batch_id": batch_id,
+                        "delivery_type": config.delivery_type,
+                        "success": False,
+                        "error_message": result["error"],
+                    }
+                ).execute()
+
             else:
                 error_msg = cast(str, result.get("error", "Unknown error"))
                 print(f"  ✗ Failed to send to user {user_id}: {error_msg}")
@@ -236,10 +260,7 @@ def process_digests(
                 print(f"    Error details logged to: {error_file}")
 
                 # Update notification queue with error
-                notification_ids = [n["id"] for n in notifications]
-                supabase.table("notification_queue").update(
-                    {"status": "failed", "error_message": error_msg}
-                ).in_("id", notification_ids).execute()
+                _mark_notifications_failed(supabase, notifications, error_msg)
 
                 # Record failure in history
                 rule_ids = list(set([n["rule_id"] for n in notifications]))
@@ -313,13 +334,13 @@ def _extract_content_ids(notifications: list[dict[str, Any]]) -> list[str]:
     return list(set(content_ids))
 
 
-def _mark_notifications_skipped(
-    supabase: Any, notifications: list[dict[str, Any]]
+def _mark_notifications_failed(
+    supabase: Any, notifications: list[dict[str, Any]], error_message: str
 ) -> None:
-    """Mark notifications as failed (user has notifications disabled)."""
+    """Mark notifications as failed with a specific reason."""
     notification_ids = [n["id"] for n in notifications]
     supabase.table("notification_queue").update(
-        {"status": "failed", "error_message": "User notifications disabled"}
+        {"status": "failed", "error_message": error_message}
     ).in_("id", notification_ids).execute()
 
 

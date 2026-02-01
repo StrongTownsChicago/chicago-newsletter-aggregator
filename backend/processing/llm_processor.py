@@ -116,8 +116,6 @@ def call_llm(
     Raises:
         Exception: If all retry attempts fail or LLM returns empty response
     """
-    original_prompt = prompt
-
     # gpt-oss models can fail with "failed to load model vocabulary required for format"
     # when using Ollama's native 'format' parameter. We handle this by moving the
     # schema into the prompt and manually extracting the JSON from the raw response.
