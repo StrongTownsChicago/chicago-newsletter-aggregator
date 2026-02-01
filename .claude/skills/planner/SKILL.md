@@ -236,7 +236,7 @@ Integration tests:
 
 ## Output Format
 
-Generate a structured plan in `feature_planning/<descriptive_name_of_feature>/` with these files:
+Generate a structured plan in `<project_root>/feature_planning/<descriptive_name_of_feature>/` with these files:
 
 ### 1. `plan.md` - Main Implementation Plan
 

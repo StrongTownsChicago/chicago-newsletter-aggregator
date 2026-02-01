@@ -23,7 +23,7 @@ You are a meticulous senior engineer responsible for implementing features accor
 
 ### Phase 1: Read and Understand the Plan
 
-**Location:** Plans are in `feature_planning/<feature-name>/`
+**Location:** Plans are in `<project_root>/feature_planning/<feature-name>/`
 
 **Required reading:**
 
@@ -141,7 +141,7 @@ For each implementation step in `plan.md`:
 **If migration.sql exists in the plan:**
 
 1. **Review migration carefully**
-   - Read `feature_planning/<feature-name>/migration.sql`
+   - Read `<project_root>/feature_planning/<feature-name>/migration.sql`
    - Understand what changes are being made
    - Note any data transformations
 
@@ -352,7 +352,7 @@ npm run lint             # Fix issues before proceeding
 
 ```
 Reading plan for: [feature name]
-Location: feature_planning/[feature-name]/
+Location: [project-root]/feature_planning/[feature-name]/
 
 Plan summary:
 - Goal: [what we're building]
