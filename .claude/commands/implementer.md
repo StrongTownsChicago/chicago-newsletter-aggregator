@@ -169,6 +169,7 @@ For each implementation step in `plan.md`:
    uv run python -m unittest discover tests
    uv run ruff check --fix
    uv run ruff format
+   uv run mypy .
    ```
 
 2. **Frontend** (if changed)
@@ -301,6 +302,7 @@ class TestFeatureName(unittest.TestCase):
 cd backend
 uv run ruff check --fix  # Fix auto-fixable issues
 uv run ruff format       # Format code
+uv run mypy .
 ```
 
 **Frontend (TypeScript/Astro)**:
