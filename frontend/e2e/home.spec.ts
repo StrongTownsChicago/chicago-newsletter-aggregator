@@ -32,3 +32,21 @@ test('shows pagination when many newsletters exist', async ({ page }) => {
     await expect(page.getByTestId('pagination-next')).toBeVisible();
   }
 });
+
+test('can toggle newsletter summary expansion', async ({ page }) => {
+  await page.goto('/');
+  const toggle = page.getByTestId('summary-toggle').first();
+  const summary = page.getByTestId('newsletter-summary').first();
+  
+  if (await toggle.count() > 0) {
+    // Initially has line-clamp-2 (collapsed)
+    await expect(summary).toHaveClass(/line-clamp-2/);
+    await expect(toggle).toHaveText('Show more');
+    
+    await toggle.click();
+    
+    // Should now be expanded
+    await expect(summary).not.toHaveClass(/line-clamp-2/);
+    await expect(toggle).toHaveText('Show less');
+  }
+});
