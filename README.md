@@ -19,7 +19,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
-- **Testing Suite**: Backend unit/integration tests, frontend unit tests
+- **Testing Suite**: Backend unit/integration tests, frontend unit/E2E tests (Playwright)
 
 ## Database Schema
 
@@ -130,7 +130,8 @@ uv run python -m unittest discover -s tests
 
 # Frontend tests
 cd ../frontend
-npm run test
+npm run test      # Unit tests
+npm run test:e2e -- --project=chromium  # E2E tests (Playwright)
 npm run lint
 ```
 

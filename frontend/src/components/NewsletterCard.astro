@@ -7,8 +7,8 @@ interface Props {
 const { newsletter } = Astro.props;
 const summaryId = `summary-${newsletter.id}`;
 ---
-<article class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200">
-  <h2 class="text-2xl font-semibold mb-2">
+<article class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200" data-testid="newsletter-card">
+  <h2 class="text-2xl font-semibold mb-2" data-testid="newsletter-title">
     <a href={`/newsletter/${newsletter.id}`} class="hover:text-blue-600 transition-colors">
       {newsletter.subject}
     </a>
@@ -16,7 +16,7 @@ const summaryId = `summary-${newsletter.id}`;
   
   <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-3">
     {newsletter.sources?.name && (
-      <span class="font-medium text-gray-800">{newsletter.sources.name}</span>
+      <span class="font-medium text-gray-800" data-testid="newsletter-source">{newsletter.sources.name}</span>
     )}
     {newsletter.sources?.ward_number && (
       <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">

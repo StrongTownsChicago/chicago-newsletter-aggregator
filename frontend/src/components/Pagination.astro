@@ -52,17 +52,18 @@ const pageNumbers = generatePageNumbersToDisplay();
 ---
 
 {totalPages > 1 && (
-  <nav class="flex items-center justify-center gap-2 mt-8" aria-label="Pagination">
+  <nav class="flex items-center justify-center gap-2 mt-8" aria-label="Pagination" data-testid="pagination">
     <!-- Previous Button -->
     {currentPage > 1 ? (
       <a
         href={buildPaginationUrl(currentPage - 1)}
         class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+        data-testid="pagination-prev"
       >
         Previous
       </a>
     ) : (
-      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed">
+      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed" data-testid="pagination-prev-disabled">
         Previous
       </span>
     )}
@@ -72,13 +73,14 @@ const pageNumbers = generatePageNumbersToDisplay();
       {pageNumbers.map((page) => (
         typeof page === 'number' ? (
           page === currentPage ? (
-            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold">
+            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold" data-testid="pagination-current">
               {page}
             </span>
           ) : (
             <a
               href={buildPaginationUrl(page)}
               class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              data-testid={`pagination-page-${page}`}
             >
               {page}
             </a>
@@ -94,11 +96,12 @@ const pageNumbers = generatePageNumbersToDisplay();
       <a
         href={buildPaginationUrl(currentPage + 1)}
         class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+        data-testid="pagination-next"
       >
         Next
       </a>
     ) : (
-      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed">
+      <span class="px-4 py-2 border border-gray-200 rounded-lg text-gray-400 font-medium cursor-not-allowed" data-testid="pagination-next-disabled">
         Next
       </span>
     )}

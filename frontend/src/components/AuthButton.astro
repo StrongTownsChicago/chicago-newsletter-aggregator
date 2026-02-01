@@ -6,12 +6,13 @@ const user = Astro.locals.user;
 {notificationsEnabled() && (
   user ? (
     <div class="flex items-center gap-4">
-      <span class="text-sm text-gray-700">
+      <span class="text-sm text-gray-700" data-testid="user-email">
         {user.email}
       </span>
       <a
         href="/preferences"
         class="text-sm font-medium text-blue-600 hover:text-blue-500"
+        data-testid="preferences-link"
       >
         Preferences
       </a>
@@ -19,6 +20,7 @@ const user = Astro.locals.user;
         <button
           type="submit"
           class="text-sm font-medium text-gray-700 hover:text-gray-900"
+          data-testid="signout-button"
         >
           Sign out
         </button>
@@ -30,6 +32,7 @@ const user = Astro.locals.user;
         href="/login"
         target="_top"
         class="text-sm font-medium text-gray-700 hover:text-gray-900"
+        data-testid="signin-link"
       >
         Sign in
       </a>
@@ -37,6 +40,7 @@ const user = Astro.locals.user;
         href="/signup"
         target="_top"
         class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
+        data-testid="signup-link"
       >
         Sign up for alerts
       </a>

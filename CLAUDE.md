@@ -99,6 +99,9 @@ npm run preview
 # Run unit tests
 npm run test
 
+# Run E2E tests (Playwright)
+npm run test:e2e -- --project=chromium
+
 # Run tests with coverage
 npm run test:coverage
 
@@ -124,7 +127,7 @@ ollama pull gpt-oss:20b
 **GitHub Actions Workflows:**
 
 - Backend CI (`.github/workflows/backend_tests.yml`) - Runs ruff, mypy, and tests on backend changes
-- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and tests on frontend changes
+- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and unit tests on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
@@ -210,6 +213,7 @@ frontend/src/
 │       ├── update-preferences.ts # Toggle notifications on/off
 │       ├── unsubscribe.ts        # Handle token-based unsubscribe
 │       └── validate-unsubscribe-token.ts # Validate JWT token
+├── e2e/                          # Playwright E2E tests
 ├── tests/                        # Vitest unit tests
 │   ├── unit/                     # Utility tests (supabase.test.ts)
 │   ├── api/                      # API route tests (auth.test.ts, notifications.test.ts)
