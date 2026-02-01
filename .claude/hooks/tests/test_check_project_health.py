@@ -115,5 +115,37 @@ class TestCheckProjectHealth(unittest.TestCase):
         self.assertEqual(output['decision'], 'block')
         self.assertIn("Frontend Tests failed", output['reason'])
 
+    @patch('subprocess.run')
+    @patch('sys.stdout', new_callable=StringIO)
+    @patch('os.path.exists')
+    def test_playwright_fail(self, mock_exists, mock_stdout, mock_run):
+        # Arrange
+        mock_exists.return_value = True
+        
+        def side_effect(*args, **kwargs):
+            mock_process = MagicMock()
+            cmd_str = str(args[0])
+            
+            if "test:e2e" in cmd_str:
+                mock_process.returncode = 1
+                mock_process.stdout = "Playwright failure"
+                mock_process.stderr = ""
+            else:
+                mock_process.returncode = 0
+                mock_process.stdout = ""
+                mock_process.stderr = ""
+            return mock_process
+
+        mock_run.side_effect = side_effect
+        
+        # Act
+        self.hook.main()
+        
+        # Assert
+        output = json.loads(mock_stdout.getvalue())
+        self.assertEqual(output['decision'], 'block')
+        self.assertIn("Frontend E2E Tests (Playwright) failed", output['reason'])
+        self.assertIn("Playwright failure", output['reason'])
+
 if __name__ == '__main__':
     unittest.main()

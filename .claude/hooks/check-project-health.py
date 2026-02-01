@@ -56,7 +56,8 @@ def main():
     if os.path.exists(frontend_path):
         checks = [
             ("npm run lint", "Frontend Lint"),
-            ("npm run test", "Frontend Tests")
+            ("npm run test", "Frontend Tests"),
+            ("npm run test:e2e -- --project=chromium", "Frontend E2E Tests (Playwright)")
         ]
         
         for cmd, desc in checks:
