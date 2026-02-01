@@ -10,7 +10,7 @@ from models.types import NewsletterID
 class KeyDevelopment(BaseModel):
     """Individual development/event extracted from newsletters."""
 
-    description: str = Field(..., max_length=500)
+    description: str = Field(..., max_length=2000)
     newsletter_ids: list[NewsletterID] = Field(default_factory=list)
     wards: list[str] = Field(default_factory=list)
 

@@ -18,10 +18,7 @@ from datetime import datetime
 
 # LLM processing limits
 MAX_NEWSLETTER_CHARS = 100000  # Maximum newsletter content length before truncation
-MAX_LLM_RETRIES = 3  # Maximum retry attempts for failed LLM calls
-
-# Retry truncation limits for prompts that fail due to length/token issues
-RETRY_TRUNCATE_THRESHOLD = 50000  # Third attempt truncation length
+MAX_LLM_RETRIES = 6  # Maximum retry attempts for failed LLM calls
 
 TOPICS = [
     # Incremental Housing
@@ -60,7 +57,7 @@ class RelevanceScore(BaseModel):
 
 
 # Sometimes Ollama calls hang indefinitely. We create a global client with a set timeout to avoid this breaking things.
-ollama_client = Client(timeout=240.0)
+ollama_client = Client(timeout=360.0)
 
 
 def extract_json(text: str) -> str:
@@ -98,8 +95,8 @@ def call_llm(
     """
     Call Ollama LLM with structured output validation and exponential backoff retry logic.
 
-    Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s)
-    on failure. On the third attempt, truncates prompt to RETRY_TRUNCATE_THRESHOLD chars.
+    Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s, etc)
+    on failure.
     Validates that responses are non-empty before returning.
 
     Handles model-specific limitations for structured output (e.g., gpt-oss) by
@@ -132,19 +129,6 @@ def call_llm(
 
     for attempt in range(max_retries):
         try:
-            # Truncate prompt on later attempts to avoid token limit issues
-            if attempt == 2:  # Third attempt
-                if len(original_prompt) > RETRY_TRUNCATE_THRESHOLD:
-                    prompt_base = original_prompt[:RETRY_TRUNCATE_THRESHOLD]
-                    if schema and not use_native_format:
-                        prompt = f"{prompt_base}\n\nRespond with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
-                    else:
-                        prompt = prompt_base
-
-                    print(
-                        f"  ⚠ Truncating prompt: {len(original_prompt)} → {len(prompt)} chars"
-                    )
-
             response = ollama_client.chat(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
