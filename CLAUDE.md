@@ -65,6 +65,10 @@ uv run python -m notifications.process_notification_queue --weekly-digest # Send
 # Test/iterate on weekly summary prompt (without full pipeline)
 uv run python -m utils.test_weekly_summary --sample                     # Test with sample data
 
+# LLM Token Cost Analysis
+uv run python -m utils.calculate_token_costs --list-models              # List available models
+uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
+
 # Run all tests
 uv run python -m unittest discover -s tests
 
@@ -243,6 +247,7 @@ frontend/src/
 - Integration: Email ingestion queues notifications when `ENABLE_NOTIFICATIONS=true`. Web scraping does NOT trigger notifications (intentional). Failures don't break ingestion.
 
 **Notification Types:**
+
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
 
