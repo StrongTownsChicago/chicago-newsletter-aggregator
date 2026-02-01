@@ -41,6 +41,14 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python .claude/hooks/check-project-health.py",
+        "statusMessage": "Running project health checks (linting, tests)...",
+        "timeout": 300
+      }
     ]
   },
   "permissions": {

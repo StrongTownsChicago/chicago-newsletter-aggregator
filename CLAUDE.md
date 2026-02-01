@@ -139,6 +139,10 @@ uv run python -m utils.process_llm_metadata --latest 50
 
 See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
 
+**Claude Code Hooks:**
+
+Custom Claude Code hooks are located in `.claude/hooks/` and registered in `.claude/settings.json`.
+
 ## Architecture
 
 ### Data Flow
