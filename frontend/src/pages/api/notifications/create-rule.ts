@@ -15,38 +15,49 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   const formData = await request.formData();
   const name = formData.get("name")?.toString();
-  const ruleType = formData.get("rule_type")?.toString() || "search";
-  let topics = formData.getAll("topics").map((t) => t.toString());
+  const topics = formData.getAll("topics").map((t) => t.toString());
   let searchTerm = formData.get("search_term")?.toString().trim();
-  const wards = formData
+  let wards = formData
     .getAll("wards")
     .map((w) => w.toString().trim())
     .filter((w) => w.length > 0);
   const isActive = formData.get("is_active") === "on";
-  let deliveryFrequency = formData.get("delivery_frequency")?.toString() || "daily";
 
   if (!name) {
     return redirect("/preferences?error=Rule name is required");
   }
 
-  // Handle Mutual Exclusivity based on rule type
-  if (ruleType === "search") {
-    // Search Mode: Clear topics, require search term, FORCE daily frequency
-    topics = [];
-    deliveryFrequency = "daily";
-    if (!searchTerm) {
-      return redirect("/preferences?error=Search phrase is required");
+  // Validation: Weekly rules cannot have ward filters
+  if (deliveryFrequency === "weekly" && wards.length > 0) {
+    return redirect(
+      "/preferences?error=Ward filters cannot be applied to weekly summaries. Weekly summaries cover citywide activity.",
+    );
+  }
+
+  // Validation: Weekly rules must have topics
+  if (deliveryFrequency === "weekly") {
+    if (topics.length === 0) {
+      return redirect(
+        "/preferences?error=At least one topic is required for weekly summaries",
+      );
     }
-    if (searchTerm.length > 100) {
+    // Weekly rules cannot have search terms
+    searchTerm = undefined;
+    // Clear any ward filters (belt-and-suspenders)
+    wards = [];
+  }
+
+  // Validation: Daily rules must have at least search term or topics
+  if (deliveryFrequency === "daily") {
+    if (!searchTerm && topics.length === 0) {
+      return redirect(
+        "/preferences?error=Please specify at least one topic or search phrase",
+      );
+    }
+    if (searchTerm && searchTerm.length > 100) {
       return redirect(
         "/preferences?error=Search phrase must be under 100 characters",
       );
-    }
-  } else {
-    // Topic Mode: Clear search term, require topics
-    searchTerm = undefined;
-    if (topics.length === 0) {
-      return redirect("/preferences?error=At least one topic is required");
     }
   }
 

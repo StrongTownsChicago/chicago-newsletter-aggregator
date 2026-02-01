@@ -153,13 +153,25 @@ User-defined notification rules.
 
 - `user_id` → `auth.users(id)` ON DELETE CASCADE
 
-**Application Constraint**: Maximum 5 rules per user (enforced in API)
+**Application Constraints**:
+- Maximum 5 rules per user (enforced in API)
+- Ward filters (`ward_numbers`) only allowed for `delivery_frequency = 'daily'`
+- Weekly rules must have at least one topic; search terms not supported
 
-**Matching Logic**: All filters are AND-ed together.
+**Database Constraint**:
+- `weekly_rules_no_ward_filter`: Prevents ward_numbers on weekly rules (added in migration 003)
+
+**Matching Logic** (applies to daily digest notifications only):
 
 - `topics`: Matches if newsletter has ANY of the selected topics.
 - `search_term`: Matches if newsletter contains the exact search phrase (case-insensitive substring).
-- If both are present, newsletter must match BOTH criteria.
+- `ward_numbers`: Matches if newsletter is from ANY of the specified wards.
+- All filters are AND-ed together (newsletter must match all specified criteria).
+
+**Weekly Summary Behavior**:
+- Weekly summaries are topic-based only (no search term or ward filtering)
+- Reports cover citywide activity for selected topics
+- Delivered every Monday morning
 
 **Row-Level Security**:
 
