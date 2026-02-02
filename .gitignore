@@ -7,6 +7,7 @@ backend/samples/
 settings.local.json
 /feature_planning
 frontend/coverage/
+.wrangler
 
 # Claude Code - Ignore local settings, keep shared configuration
 .claude/settings.local.json

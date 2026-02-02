@@ -3,6 +3,22 @@ import subprocess
 import sys
 import os
 
+def get_changed_files():
+    """Get list of changed files using git diff."""
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--name-only', 'HEAD'],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd()
+        )
+        if result.returncode == 0:
+            return result.stdout.splitlines()
+        return []
+    except Exception:
+        # If git for some reason fails, assume all files changed (run all checks)
+        return []
+
 def run_check(command, cwd, description):
     try:
         # On Windows, shell=True helps with resolving PATH for npm/uv
@@ -37,9 +53,14 @@ def main():
 
     errors = []
 
+    # Get changed files to determine which checks to run
+    changed_files = get_changed_files()
+    backend_changed = any(f.startswith('backend/') for f in changed_files)
+    frontend_changed = any(f.startswith('frontend/') for f in changed_files)
+
     # Backend Checks
     backend_path = "backend"
-    if os.path.exists(backend_path):
+    if os.path.exists(backend_path) and backend_changed:
         checks = [
             ("uv run ruff check .", "Backend Lint (Ruff)"),
             ("uv run mypy .", "Backend Type Check (MyPy)"),
@@ -53,7 +74,7 @@ def main():
 
     # Frontend Checks
     frontend_path = "frontend"
-    if os.path.exists(frontend_path):
+    if os.path.exists(frontend_path) and frontend_changed:
         checks = [
             ("npm run lint", "Frontend Lint"),
             ("npm run test", "Frontend Tests"),
