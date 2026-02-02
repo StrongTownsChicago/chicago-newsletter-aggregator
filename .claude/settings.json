@@ -63,6 +63,22 @@
       "Bash(mkfs:*)",
       "Bash(dd if=* of=/dev/*:*)"
     ],
-    "ask": ["Bash(git push --force:*)", "Bash(git reset --hard:*)"]
+    "ask": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(uv add *)",
+      "Bash(uv remove *)",
+      "Bash(pip install *)",
+      "Bash(pip uninstall *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(npm i *)",
+      "Bash(npm un *)",
+      "Bash(npx *)",
+      "Bash(yarn add *)",
+      "Bash(yarn remove *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)"
+    ]
   }
 }
