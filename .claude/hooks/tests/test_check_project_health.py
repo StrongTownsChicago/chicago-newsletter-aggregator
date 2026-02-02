@@ -38,7 +38,8 @@ class TestCheckProjectHealth(unittest.TestCase):
         
         # Assert
         output = json.loads(mock_stdout.getvalue())
-        self.assertEqual(output['decision'], 'allow')
+        # When checks pass, hook returns empty object (no decision field)
+        self.assertNotIn('decision', output)
 
     @patch('subprocess.run')
     @patch('sys.stdout', new_callable=StringIO)
