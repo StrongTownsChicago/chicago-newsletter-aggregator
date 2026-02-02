@@ -51,8 +51,7 @@ import importlib.util
 import fnmatch
 
 spec = importlib.util.spec_from_file_location(
-    "bash_tool",
-    Path(__file__).parent / "bash-tool-damage-control.py"
+    "bash_tool", Path(__file__).parent / "bash-tool-damage-control.py"
 )
 if spec is None or spec.loader is None:
     raise ImportError("Could not load bash-tool-damage-control.py")
@@ -66,7 +65,7 @@ NO_DELETE_BLOCKED = bash_tool.NO_DELETE_BLOCKED
 
 def is_glob_pattern(pattern: str) -> bool:
     """Check if pattern contains glob wildcards."""
-    return '*' in pattern or '?' in pattern or '[' in pattern
+    return "*" in pattern or "?" in pattern or "[" in pattern
 
 
 def match_path(file_path: str, pattern: str) -> bool:
@@ -93,7 +92,9 @@ def match_path(file_path: str, pattern: str) -> bool:
         return False
     else:
         # Prefix matching (original behavior for directories)
-        if expanded_normalized.startswith(expanded_pattern) or expanded_normalized == expanded_pattern.rstrip('/'):
+        if expanded_normalized.startswith(
+            expanded_pattern
+        ) or expanded_normalized == expanded_pattern.rstrip("/"):
             return True
         return False
 
@@ -102,12 +103,12 @@ def glob_to_regex(glob_pattern: str) -> str:
     """Convert a glob pattern to a regex pattern for matching in commands."""
     result = ""
     for char in glob_pattern:
-        if char == '*':
-            result += r'[^\s/]*'  # Match any chars except whitespace and path sep
-        elif char == '?':
-            result += r'[^\s/]'   # Match single char except whitespace and path sep
-        elif char in r'\.^$+{}[]|()':
-            result += '\\' + char
+        if char == "*":
+            result += r"[^\s/]*"  # Match any chars except whitespace and path sep
+        elif char == "?":
+            result += r"[^\s/]"  # Match single char except whitespace and path sep
+        elif char in r"\.^$+{}[]|()":
+            result += "\\" + char
         else:
             result += char
     return result
@@ -116,6 +117,7 @@ def glob_to_regex(glob_pattern: str) -> str:
 # ============================================================================
 # CONFIG LOADING
 # ============================================================================
+
 
 def get_script_dir() -> Path:
     return Path(__file__).parent
@@ -143,7 +145,12 @@ def load_config() -> Dict[str, Any]:
     config_path = get_config_path()
 
     if not config_path.exists():
-        return {"bashToolPatterns": [], "zeroAccessPaths": [], "readOnlyPaths": [], "noDeletePaths": []}
+        return {
+            "bashToolPatterns": [],
+            "zeroAccessPaths": [],
+            "readOnlyPaths": [],
+            "noDeletePaths": [],
+        }
 
     with open(config_path, "r") as f:
         return yaml.safe_load(f) or {}
@@ -152,6 +159,7 @@ def load_config() -> Dict[str, Any]:
 # ============================================================================
 # DIRECT CHECKING (for interactive mode - no subprocess needed)
 # ============================================================================
+
 
 def check_bash_command(command: str, config: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """Check bash command against patterns. Returns (blocked, list of reasons)."""
@@ -232,7 +240,8 @@ def check_file_path(file_path: str, config: Dict[str, Any]) -> Tuple[bool, List[
 # INTERACTIVE MODE
 # ============================================================================
 
-def print_banner():
+
+def print_banner() -> None:
     """Print interactive mode banner."""
     print("\n" + "=" * 60)
     print("  Damage Control Interactive Tester")
@@ -254,19 +263,19 @@ def prompt_tool_selection() -> Optional[str]:
     while True:
         choice = input("Tool [1/2/3/q]> ").strip().lower()
 
-        if choice in ('q', 'quit'):
+        if choice in ("q", "quit"):
             return None
-        elif choice == '1' or choice == 'bash':
-            return 'Bash'
-        elif choice == '2' or choice == 'edit':
-            return 'Edit'
-        elif choice == '3' or choice == 'write':
-            return 'Write'
+        elif choice == "1" or choice == "bash":
+            return "Bash"
+        elif choice == "2" or choice == "edit":
+            return "Edit"
+        elif choice == "3" or choice == "write":
+            return "Write"
         else:
             print("Invalid choice. Enter 1, 2, 3, or q.")
 
 
-def run_interactive_mode():
+def run_interactive_mode() -> None:
     """Run interactive testing mode."""
     config = load_config()
     print_banner()
@@ -276,7 +285,9 @@ def run_interactive_mode():
     zero_paths = len(config.get("zeroAccessPaths", []))
     readonly_paths = len(config.get("readOnlyPaths", []))
     nodelete_paths = len(config.get("noDeletePaths", []))
-    print(f"Loaded: {bash_patterns} bash patterns, {zero_paths} zero-access, {readonly_paths} read-only, {nodelete_paths} no-delete paths\n")
+    print(
+        f"Loaded: {bash_patterns} bash patterns, {zero_paths} zero-access, {readonly_paths} read-only, {nodelete_paths} no-delete paths\n"
+    )
 
     while True:
         tool = prompt_tool_selection()
@@ -285,7 +296,7 @@ def run_interactive_mode():
             break
 
         print()
-        if tool == 'Bash':
+        if tool == "Bash":
             prompt_text = "Command> "
         else:
             prompt_text = "Path> "
@@ -297,12 +308,12 @@ def run_interactive_mode():
             print("\nGoodbye!")
             break
 
-        if not user_input or user_input.lower() in ('q', 'quit'):
+        if not user_input or user_input.lower() in ("q", "quit"):
             print("\nGoodbye!")
             break
 
         # Test the input
-        if tool == 'Bash':
+        if tool == "Bash":
             blocked, reasons = check_bash_command(user_input, config)
         else:
             blocked, reasons = check_file_path(user_input, config)
@@ -322,6 +333,7 @@ def run_interactive_mode():
 # CLI MODE HELPERS
 # ============================================================================
 
+
 def get_hook_path(hook_type: str) -> Path:
     """Get path to hook script."""
     hooks = {
@@ -335,7 +347,7 @@ def get_hook_path(hook_type: str) -> Path:
     return get_script_dir() / hooks[hook_type]
 
 
-def build_tool_input(tool_name: str, value: str) -> dict:
+def build_tool_input(tool_name: str, value: str) -> Dict[str, Any]:
     """Build tool_input based on tool type."""
     if tool_name == "Bash":
         return {"command": value}
@@ -354,10 +366,7 @@ def run_test(hook_type: str, tool_name: str, value: str, expectation: str) -> bo
     hook_path = get_hook_path(hook_type)
     tool_input = build_tool_input(tool_name, value)
 
-    input_json = json.dumps({
-        "tool_name": tool_name,
-        "tool_input": tool_input
-    })
+    input_json = json.dumps({"tool_name": tool_name, "tool_input": tool_input})
 
     try:
         result = subprocess.run(
@@ -365,7 +374,7 @@ def run_test(hook_type: str, tool_name: str, value: str, expectation: str) -> bo
             input=input_json,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
         exit_code = result.returncode
         stderr = result.stderr.strip()
@@ -394,9 +403,9 @@ def run_test(hook_type: str, tool_name: str, value: str, expectation: str) -> bo
     return passed
 
 
-def main():
+def main() -> None:
     # Check for interactive mode
-    if len(sys.argv) >= 2 and sys.argv[1].lower() in ('-i', '--interactive'):
+    if len(sys.argv) >= 2 and sys.argv[1].lower() in ("-i", "--interactive"):
         run_interactive_mode()
         sys.exit(0)
 

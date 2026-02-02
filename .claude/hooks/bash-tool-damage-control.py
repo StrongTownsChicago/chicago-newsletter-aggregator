@@ -26,7 +26,7 @@ import yaml  # type: ignore[import-untyped]
 
 def is_glob_pattern(pattern: str) -> bool:
     """Check if pattern contains glob wildcards."""
-    return '*' in pattern or '?' in pattern or '[' in pattern
+    return "*" in pattern or "?" in pattern or "[" in pattern
 
 
 def glob_to_regex(glob_pattern: str) -> str:
@@ -34,15 +34,16 @@ def glob_to_regex(glob_pattern: str) -> str:
     # Escape special regex chars except * and ?
     result = ""
     for char in glob_pattern:
-        if char == '*':
-            result += r'[^\s/]*'  # Match any chars except whitespace and path sep
-        elif char == '?':
-            result += r'[^\s/]'   # Match single char except whitespace and path sep
-        elif char in r'\.^$+{}[]|()':
-            result += '\\' + char
+        if char == "*":
+            result += r"[^\s/]*"  # Match any chars except whitespace and path sep
+        elif char == "?":
+            result += r"[^\s/]"  # Match single char except whitespace and path sep
+        elif char in r"\.^$+{}[]|()":
+            result += "\\" + char
         else:
             result += char
     return result
+
 
 # ============================================================================
 # OPERATION PATTERNS - Edit these to customize what operations are blocked
@@ -51,54 +52,54 @@ def glob_to_regex(glob_pattern: str) -> str:
 
 # Operations blocked for READ-ONLY paths (all modifications)
 WRITE_PATTERNS = [
-    (r'>\s*{path}', "write"),
-    (r'\btee\s+(?!.*-a).*{path}', "write"),
+    (r">\s*{path}", "write"),
+    (r"\btee\s+(?!.*-a).*{path}", "write"),
 ]
 
 APPEND_PATTERNS = [
-    (r'>>\s*{path}', "append"),
-    (r'\btee\s+-a\s+.*{path}', "append"),
-    (r'\btee\s+.*-a.*{path}', "append"),
+    (r">>\s*{path}", "append"),
+    (r"\btee\s+-a\s+.*{path}", "append"),
+    (r"\btee\s+.*-a.*{path}", "append"),
 ]
 
 EDIT_PATTERNS = [
-    (r'\bsed\s+-i.*{path}', "edit"),
-    (r'\bperl\s+-[^\s]*i.*{path}', "edit"),
-    (r'\bawk\s+-i\s+inplace.*{path}', "edit"),
+    (r"\bsed\s+-i.*{path}", "edit"),
+    (r"\bperl\s+-[^\s]*i.*{path}", "edit"),
+    (r"\bawk\s+-i\s+inplace.*{path}", "edit"),
 ]
 
 MOVE_COPY_PATTERNS = [
-    (r'\bmv\s+.*\s+{path}', "move"),
-    (r'\bcp\s+.*\s+{path}', "copy"),
+    (r"\bmv\s+.*\s+{path}", "move"),
+    (r"\bcp\s+.*\s+{path}", "copy"),
 ]
 
 DELETE_PATTERNS = [
-    (r'\brm\s+.*{path}', "delete"),
-    (r'\bunlink\s+.*{path}', "delete"),
-    (r'\brmdir\s+.*{path}', "delete"),
-    (r'\bshred\s+.*{path}', "delete"),
+    (r"\brm\s+.*{path}", "delete"),
+    (r"\bunlink\s+.*{path}", "delete"),
+    (r"\brmdir\s+.*{path}", "delete"),
+    (r"\bshred\s+.*{path}", "delete"),
 ]
 
 PERMISSION_PATTERNS = [
-    (r'\bchmod\s+.*{path}', "chmod"),
-    (r'\bchown\s+.*{path}', "chown"),
-    (r'\bchgrp\s+.*{path}', "chgrp"),
+    (r"\bchmod\s+.*{path}", "chmod"),
+    (r"\bchown\s+.*{path}", "chown"),
+    (r"\bchgrp\s+.*{path}", "chgrp"),
 ]
 
 TRUNCATE_PATTERNS = [
-    (r'\btruncate\s+.*{path}', "truncate"),
-    (r':\s*>\s*{path}', "truncate"),
+    (r"\btruncate\s+.*{path}", "truncate"),
+    (r":\s*>\s*{path}", "truncate"),
 ]
 
 # Combined patterns for read-only paths (block ALL modifications)
 READ_ONLY_BLOCKED = (
-    WRITE_PATTERNS +
-    APPEND_PATTERNS +
-    EDIT_PATTERNS +
-    MOVE_COPY_PATTERNS +
-    DELETE_PATTERNS +
-    PERMISSION_PATTERNS +
-    TRUNCATE_PATTERNS
+    WRITE_PATTERNS
+    + APPEND_PATTERNS
+    + EDIT_PATTERNS
+    + MOVE_COPY_PATTERNS
+    + DELETE_PATTERNS
+    + PERMISSION_PATTERNS
+    + TRUNCATE_PATTERNS
 )
 
 # Patterns for no-delete paths (block ONLY delete operations)
@@ -107,6 +108,7 @@ NO_DELETE_BLOCKED = DELETE_PATTERNS
 # ============================================================================
 # CONFIGURATION LOADING
 # ============================================================================
+
 
 def get_config_path() -> Path:
     """Get path to patterns.yaml."""
@@ -120,7 +122,12 @@ def load_config() -> Dict[str, Any]:
 
     if not config_path.exists():
         print(f"Warning: Config not found at {config_path}", file=sys.stderr)
-        return {"bashToolPatterns": [], "zeroAccessPaths": [], "readOnlyPaths": [], "noDeletePaths": []}
+        return {
+            "bashToolPatterns": [],
+            "zeroAccessPaths": [],
+            "readOnlyPaths": [],
+            "noDeletePaths": [],
+        }
 
     with open(config_path, "r") as f:
         return yaml.safe_load(f) or {}
@@ -130,7 +137,10 @@ def load_config() -> Dict[str, Any]:
 # PATH CHECKING
 # ============================================================================
 
-def check_path_patterns(command: str, path: str, patterns: List[Tuple[str, str]], path_type: str) -> Tuple[bool, str]:
+
+def check_path_patterns(
+    command: str, path: str, patterns: List[Tuple[str, str]], path_type: str
+) -> Tuple[bool, str]:
     """Check command against a list of patterns for a specific path.
 
     Supports both:
@@ -147,7 +157,9 @@ def check_path_patterns(command: str, path: str, patterns: List[Tuple[str, str]]
                 # Build a regex that matches: operation ... glob_pattern
                 # Extract the command prefix from pattern_template (e.g., '\brm\s+.*' from '\brm\s+.*{path}')
                 cmd_prefix = pattern_template.replace("{path}", "")
-                if cmd_prefix and re.search(cmd_prefix + glob_regex, command, re.IGNORECASE):
+                if cmd_prefix and re.search(
+                    cmd_prefix + glob_regex, command, re.IGNORECASE
+                ):
                     return True, f"Blocked: {operation} operation on {path_type} {path}"
             except re.error:
                 continue
@@ -162,7 +174,9 @@ def check_path_patterns(command: str, path: str, patterns: List[Tuple[str, str]]
             pattern_expanded = pattern_template.replace("{path}", escaped_expanded)
             pattern_original = pattern_template.replace("{path}", escaped_original)
             try:
-                if re.search(pattern_expanded, command) or re.search(pattern_original, command):
+                if re.search(pattern_expanded, command) or re.search(
+                    pattern_original, command
+                ):
                     return True, f"Blocked: {operation} operation on {path_type} {path}"
             except re.error:
                 continue
@@ -205,7 +219,11 @@ def check_command(command: str, config: Dict[str, Any]) -> Tuple[bool, bool, str
             glob_regex = glob_to_regex(zero_path)
             try:
                 if re.search(glob_regex, command, re.IGNORECASE):
-                    return True, False, f"Blocked: zero-access pattern {zero_path} (no operations allowed)"
+                    return (
+                        True,
+                        False,
+                        f"Blocked: zero-access pattern {zero_path} (no operations allowed)",
+                    )
             except re.error:
                 continue
         else:
@@ -215,18 +233,28 @@ def check_command(command: str, config: Dict[str, Any]) -> Tuple[bool, bool, str
             escaped_original = re.escape(zero_path)
 
             # Check both expanded path (/Users/x/.ssh/) and original tilde form (~/.ssh/)
-            if re.search(escaped_expanded, command) or re.search(escaped_original, command):
-                return True, False, f"Blocked: zero-access path {zero_path} (no operations allowed)"
+            if re.search(escaped_expanded, command) or re.search(
+                escaped_original, command
+            ):
+                return (
+                    True,
+                    False,
+                    f"Blocked: zero-access path {zero_path} (no operations allowed)",
+                )
 
     # 3. Check for modifications to read-only paths (reads allowed)
     for readonly in read_only_paths:
-        blocked, reason = check_path_patterns(command, readonly, READ_ONLY_BLOCKED, "read-only path")
+        blocked, reason = check_path_patterns(
+            command, readonly, READ_ONLY_BLOCKED, "read-only path"
+        )
         if blocked:
             return True, False, reason
 
     # 4. Check for deletions on no-delete paths (read/write/edit allowed)
     for no_delete in no_delete_paths:
-        blocked, reason = check_path_patterns(command, no_delete, NO_DELETE_BLOCKED, "no-delete path")
+        blocked, reason = check_path_patterns(
+            command, no_delete, NO_DELETE_BLOCKED, "no-delete path"
+        )
         if blocked:
             return True, False, reason
 
@@ -236,6 +264,7 @@ def check_command(command: str, config: Dict[str, Any]) -> Tuple[bool, bool, str
 # ============================================================================
 # MAIN
 # ============================================================================
+
 
 def main() -> None:
     config = load_config()
@@ -266,7 +295,10 @@ def main() -> None:
 
     if is_blocked:
         print(f"SECURITY: {reason}", file=sys.stderr)
-        print(f"Command: {command[:100]}{'...' if len(command) > 100 else ''}", file=sys.stderr)
+        print(
+            f"Command: {command[:100]}{'...' if len(command) > 100 else ''}",
+            file=sys.stderr,
+        )
         sys.exit(2)
     elif should_ask:
         # Output JSON to trigger confirmation dialog
@@ -274,7 +306,7 @@ def main() -> None:
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "ask",
-                "permissionDecisionReason": reason
+                "permissionDecisionReason": reason,
             }
         }
         print(json.dumps(output))

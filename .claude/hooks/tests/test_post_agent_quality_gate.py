@@ -5,14 +5,18 @@ import os
 import importlib.util
 from io import StringIO
 from types import ModuleType
+from pathlib import Path
 
 
 # Helper to import the hook script
 def import_hook() -> ModuleType:
-    hook_path = os.path.join(
-        os.getcwd(), ".claude", "hooks", "post-agent-quality-gate.py"
+    # Navigate to repo root (handle both running from repo root and backend/)
+    cwd = Path.cwd()
+    repo_root = cwd.parent if cwd.name == "backend" else cwd
+    hook_path = repo_root / ".claude" / "hooks" / "post-agent-quality-gate.py"
+    spec = importlib.util.spec_from_file_location(
+        "post_agent_quality_gate", str(hook_path)
     )
-    spec = importlib.util.spec_from_file_location("post_agent_quality_gate", hook_path)
     if spec is None or spec.loader is None:
         raise ImportError("Failed to load hook module")
     module = importlib.util.module_from_spec(spec)
@@ -32,7 +36,7 @@ class TestPostAgentQualityGate(unittest.TestCase):
     ) -> None:
         """Helper to mock git diff and subprocess checks."""
 
-        def side_effect(*args, **kwargs):
+        def side_effect(*args: object, **kwargs: object) -> MagicMock:
             mock_process = MagicMock()
             cmd = args[0]
 
@@ -44,7 +48,12 @@ class TestPostAgentQualityGate(unittest.TestCase):
                 return mock_process
 
             # Handle check commands
-            cmd_str = str(cmd) if isinstance(cmd, str) else " ".join(cmd)
+            if isinstance(cmd, str):
+                cmd_str = cmd
+            elif isinstance(cmd, list):
+                cmd_str = " ".join(cmd)
+            else:
+                cmd_str = str(cmd)
 
             if failing_check and failing_check in cmd_str:
                 mock_process.returncode = 1
@@ -204,7 +213,7 @@ class TestPostAgentQualityGate(unittest.TestCase):
     ) -> None:
         # Arrange
         mock_exists.return_value = True
-        changed_files = []  # No changes
+        changed_files: list[str] = []  # No changes
         self._mock_git_and_checks(mock_run, changed_files)
 
         # Act
