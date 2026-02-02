@@ -76,9 +76,8 @@ def main():
             "reason": f"Project health checks failed:\n{full_error}"
         }))
     else:
-        print(json.dumps({
-            "decision": "allow"
-        }))
+        # For Stop hooks, omit the decision field to allow stopping
+        print(json.dumps({}))
 
 if __name__ == "__main__":
     main()
