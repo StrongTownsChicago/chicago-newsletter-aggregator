@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import json
-import os
 import importlib.util
 from io import StringIO
 from types import ModuleType
