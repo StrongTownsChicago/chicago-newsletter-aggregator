@@ -1,6 +1,7 @@
 """Pydantic models for notification system."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,9 +43,10 @@ class RuleMatch(BaseModel):
 class NotificationQueueEntry(BaseModel):
     """Queued notification waiting to be sent."""
 
-    id: int
+    id: str  # UUID in database
     user_id: UserID
     newsletter_id: NewsletterID | None = None  # Nullable for weekly reports
+    report_id: str | None = None  # UUID of weekly report
     rule_id: RuleID
     status: str = Field(..., pattern="^(pending|sent|failed)$")
     digest_batch_id: BatchID
@@ -59,6 +61,6 @@ class UserProfile(BaseModel):
 
     id: UserID
     email: str = Field(..., pattern=r"^[^@]+@[^@]+\.[^@]+$")
-    notification_preferences: dict[str, bool] = Field(
-        default_factory=lambda: {"enabled": True}
+    notification_preferences: dict[str, Any] = Field(
+        default_factory=lambda: {"enabled": True, "delivery_frequency": "daily"}
     )

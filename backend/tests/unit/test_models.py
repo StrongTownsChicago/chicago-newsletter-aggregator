@@ -377,7 +377,7 @@ class TestNotificationModels(unittest.TestCase):
     def test_notification_queue_entry_valid(self):
         """Queue entry with all fields."""
         entry = NotificationQueueEntry(
-            id=1,
+            id="notif-123",
             user_id="user-123",
             newsletter_id="newsletter-456",
             rule_id="rule-789",
@@ -386,7 +386,7 @@ class TestNotificationModels(unittest.TestCase):
             created_at=datetime(2026, 1, 30, 10, 0, 0),
         )
 
-        self.assertEqual(entry.id, 1)
+        self.assertEqual(entry.id, "notif-123")
         self.assertEqual(entry.user_id, "user-123")
         self.assertEqual(entry.newsletter_id, "newsletter-456")
         self.assertEqual(entry.status, "pending")
@@ -396,7 +396,7 @@ class TestNotificationModels(unittest.TestCase):
         """Status must be pending/sent/failed."""
         for status in ["pending", "sent", "failed"]:
             entry = NotificationQueueEntry(
-                id=1,
+                id="notif-123",
                 user_id="user-123",
                 newsletter_id="newsletter-456",
                 rule_id="rule-789",
@@ -410,7 +410,7 @@ class TestNotificationModels(unittest.TestCase):
         """Invalid status rejected."""
         with self.assertRaises(ValidationError) as ctx:
             NotificationQueueEntry(
-                id=1,
+                id="notif-123",
                 user_id="user-123",
                 newsletter_id="newsletter-456",
                 rule_id="rule-789",
@@ -438,10 +438,13 @@ class TestNotificationModels(unittest.TestCase):
                 UserProfile(id="user-123", email=invalid_email)
 
     def test_user_profile_preferences_default(self):
-        """Notification preferences default to enabled."""
+        """Notification preferences default to enabled and daily."""
         profile = UserProfile(id="user-123", email="test@example.com")
 
-        self.assertEqual(profile.notification_preferences, {"enabled": True})
+        self.assertEqual(
+            profile.notification_preferences,
+            {"enabled": True, "delivery_frequency": "daily"},
+        )
 
 
 class TestEdgeCases(unittest.TestCase):
