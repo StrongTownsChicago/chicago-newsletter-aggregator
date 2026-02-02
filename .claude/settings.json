@@ -47,8 +47,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/check-project-health.py",
-            "statusMessage": "Running project health checks (linting, tests)...",
+            "command": "python .claude/hooks/post-agent-quality-gate.py",
+            "statusMessage": "Running quality checks on changed code (linting, tests)...",
             "timeout": 400
           }
         ]
