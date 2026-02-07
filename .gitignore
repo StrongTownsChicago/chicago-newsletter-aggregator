@@ -13,3 +13,5 @@ frontend/coverage/
 .claude/settings.local.json
 !.claude/settings.json
 !.claude/hooks/
+
+/docs
