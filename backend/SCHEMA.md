@@ -134,19 +134,19 @@ User account data (extends Supabase Auth).
 
 User-defined notification rules.
 
-| Column              | Type        | Constraints                            | Description                     |
-| ------------------- | ----------- | -------------------------------------- | ------------------------------- |
-| id                  | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Rule ID                         |
-| user_id             | uuid        | NOT NULL, FK → auth.users(id)          | Rule owner                      |
-| name                | text        | NOT NULL                               | User-friendly rule name         |
-| is_active           | boolean     | NOT NULL, DEFAULT true                 | Whether rule is enabled         |
-| created_at          | timestamptz | NOT NULL, DEFAULT now()                | Rule creation time              |
-| updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time                |
-| topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match                 |
-| search_term         | text        | CHECK (length <= 100)                  | Search word or phrase to match  |
-| min_relevance_score | integer     |                                        | Minimum relevance score         |
-| source_ids          | integer[]   |                                        | Specific sources to match       |
-| ward_numbers        | text[]      |                                        | Specific wards to match         |
+| Column              | Type        | Constraints                            | Description                      |
+| ------------------- | ----------- | -------------------------------------- | -------------------------------- |
+| id                  | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Rule ID                          |
+| user_id             | uuid        | NOT NULL, FK → auth.users(id)          | Rule owner                       |
+| name                | text        | NOT NULL                               | User-friendly rule name          |
+| is_active           | boolean     | NOT NULL, DEFAULT true                 | Whether rule is enabled          |
+| created_at          | timestamptz | NOT NULL, DEFAULT now()                | Rule creation time               |
+| updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time                 |
+| topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match                  |
+| search_term         | text        | CHECK (length <= 100)                  | Search word or phrase to match   |
+| min_relevance_score | integer     |                                        | Minimum relevance score          |
+| source_ids          | integer[]   |                                        | Specific sources to match        |
+| ward_numbers        | text[]      |                                        | Specific wards to match          |
 | delivery_frequency  | text        | DEFAULT 'daily'                        | Delivery frequency: daily/weekly |
 
 **Foreign Keys**:
@@ -259,15 +259,15 @@ Audit log of sent notifications.
 
 AI-generated weekly summaries for specific topics.
 
-| Column           | Type        | Constraints                            | Description                                  |
-| ---------------- | ----------- | -------------------------------------- | -------------------------------------------- |
-| id               | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Report ID                                    |
-| topic            | text        | NOT NULL                               | Topic name                                   |
-| week_id          | text        | NOT NULL                               | ISO week identifier (YYYY-WXX)               |
-| report_summary   | text        | NOT NULL                               | AI-generated synthesis                       |
-| newsletter_ids   | uuid[]      | NOT NULL                               | Array of newsletter IDs analyzed             |
-| key_developments | jsonb       |                                        | Optional structured facts                    |
-| created_at       | timestamptz | NOT NULL, DEFAULT now()                | When report was generated                    |
+| Column           | Type        | Constraints                            | Description                      |
+| ---------------- | ----------- | -------------------------------------- | -------------------------------- |
+| id               | uuid        | PRIMARY KEY, DEFAULT gen_random_uuid() | Report ID                        |
+| topic            | text        | NOT NULL                               | Topic name                       |
+| week_id          | text        | NOT NULL                               | ISO week identifier (YYYY-WXX)   |
+| report_summary   | text        | NOT NULL                               | AI-generated synthesis           |
+| newsletter_ids   | uuid[]      | NOT NULL                               | Array of newsletter IDs analyzed |
+| key_developments | jsonb       |                                        | Optional structured facts        |
+| created_at       | timestamptz | NOT NULL, DEFAULT now()                | When report was generated        |
 
 **Unique Constraint**: `(topic, week_id)` - Prevents duplicate reports for same topic/week.
 
@@ -290,16 +290,30 @@ AI-generated weekly summaries for specific topics.
 - `update_updated_at_column()`: Trigger function to update timestamps.
 - `count_user_rules(user_uuid)`: Returns count of rules for a user.
 - `get_active_weekly_topics()`: Returns list of topics with active weekly subscribers.
-- `get_week_date_range(week_id)`: Converts ISO week ID (YYYY-WXX) to date range.
+
+### `get_week_date_range(week_id TEXT)`
+
+Converts ISO week identifier to date range.
+
+**Purpose:** Enables efficient filtering of newsletters by ISO week in PostgreSQL queries.
+
+**Parameters:**
+
+- `week_id`: ISO week identifier in format YYYY-WXX (e.g., "2026-W05")
+
+**Returns:** Table with columns:
+
+- `week_start`: Monday of the ISO week (DATE)
+- `week_end`: Sunday of the ISO week (DATE)
 
 ---
 
 ## Migration History
 
-| Version | File                               | Description                                                     |
-| ------- | ---------------------------------- | --------------------------------------------------------------- |
-| 001     | `001_notification_system.sql`      | Added notification system (4 tables, triggers, RLS)             |
-| 002     | `002_add_search_term.sql`          | Replaced keywords array with single search_term column          |
-| 003     | `003_weekly_topic_reports.sql`     | Added weekly topic reports (table, delivery_frequency, helpers) |
-| 004     | `004_polymorphic_notifications.sql`| Polymorphic notification_queue (dedicated report_id column)     |
-| 005     | `005_weekly_rules_no_ward_filter.sql`| Constraint to prevent ward filters on weekly rules           |
+| Version | File                                  | Description                                                     |
+| ------- | ------------------------------------- | --------------------------------------------------------------- |
+| 001     | `001_notification_system.sql`         | Added notification system (4 tables, triggers, RLS)             |
+| 002     | `002_add_search_term.sql`             | Replaced keywords array with single search_term column          |
+| 003     | `003_weekly_topic_reports.sql`        | Added weekly topic reports (table, delivery_frequency, helpers) |
+| 004     | `004_polymorphic_notifications.sql`   | Polymorphic notification_queue (dedicated report_id column)     |
+| 005     | `005_weekly_rules_no_ward_filter.sql` | Constraint to prevent ward filters on weekly rules              |

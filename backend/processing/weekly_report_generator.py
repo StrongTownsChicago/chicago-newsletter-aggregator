@@ -237,11 +237,11 @@ def generate_weekly_topic_report(
         print(f"  ✗ Invalid topic: {topic}")
         return None
 
-    # Parse week_id to get date range
+    # Validate week_id format (basic check before RPC call)
     try:
         year_str, week_str = week_id.split("-W")
-        year = int(year_str)
-        week = int(week_str)
+        int(year_str)
+        int(week_str)
     except ValueError:
         print(f"  ✗ Invalid week_id format: {week_id} (expected YYYY-WXX)")
         return None
@@ -251,45 +251,60 @@ def generate_weekly_topic_report(
 
     supabase = get_supabase_client()
 
+    # Get week date range from PostgreSQL function
     try:
-        # Use PostgreSQL's ISO week functions to filter by week
+        week_range_result = supabase.rpc(
+            "get_week_date_range", {"week_id_param": week_id}
+        ).execute()
+
+        if not week_range_result.data:
+            print(f"  ✗ Invalid week_id: {week_id}")
+            return None
+
+        week_range = dict(week_range_result.data[0])  # type: ignore
+        week_start = str(week_range["week_start"])
+        week_end = str(week_range["week_end"])
+        print(f"  → Querying newsletters from {week_start} to {week_end}...")
+
+    except Exception as e:
+        print(f"  ✗ Failed to calculate week range: {e}")
+        return None
+
+    try:
+        # Query newsletters (filtered in PostgreSQL)
         response = (
             supabase.table("newsletters")
             .select(
                 "id, subject, plain_text, received_date, source:sources(name, ward_number)"
             )
             .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
+            .gte("received_date", week_start)  # PostgreSQL date filter
+            .lte("received_date", week_end)  # PostgreSQL date filter
             .execute()
         )
 
-        # Filter results to only include newsletters from the target week
-        # (Supabase PostgREST doesn't support EXTRACT directly, so we filter in Python)
+        # Process results
         newsletters = []
         for nl_data in response.data:
             # Type assertions for Supabase response
             nl_dict = dict(nl_data)  # type: ignore
-            received_date = datetime.fromisoformat(
-                str(nl_dict["received_date"]).replace("Z", "+00:00")
-            )
-            nl_year, nl_week, _ = received_date.isocalendar()
-            if nl_year == year and nl_week == week:
-                # Flatten source data
-                source_data = nl_dict.get("source")
-                newsletter = {
-                    "id": str(nl_dict["id"]),
-                    "subject": str(nl_dict["subject"]),
-                    "plain_text": str(nl_dict["plain_text"] or ""),
-                    "received_date": str(nl_dict["received_date"]),
-                    "source_name": str(source_data["name"])
-                    if source_data and isinstance(source_data, dict)
-                    else "Unknown",
-                    "ward_number": str(source_data["ward_number"])
-                    if source_data
-                    and isinstance(source_data, dict)
-                    and source_data.get("ward_number")
-                    else None,
-                }
-                newsletters.append(newsletter)
+            source_data = nl_dict.get("source")
+
+            newsletter = {
+                "id": str(nl_dict["id"]),
+                "subject": str(nl_dict["subject"]),
+                "plain_text": str(nl_dict["plain_text"] or ""),
+                "received_date": str(nl_dict["received_date"]),
+                "source_name": str(source_data["name"])
+                if source_data and isinstance(source_data, dict)
+                else "Unknown",
+                "ward_number": str(source_data["ward_number"])
+                if source_data
+                and isinstance(source_data, dict)
+                and source_data.get("ward_number")
+                else None,
+            }
+            newsletters.append(newsletter)
 
         if not newsletters:
             print(f"  ℹ No newsletters found for {topic} in week {week_id}")

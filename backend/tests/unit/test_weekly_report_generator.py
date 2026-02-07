@@ -1,8 +1,7 @@
 """
 Unit tests for processing/weekly_report_generator.py
 
-Tests actual business logic: aggregation, error handling, and resilience.
-Only includes tests that verify real functionality, not trivial language features.
+Tests aggregation, error handling, and resilience.
 """
 
 import unittest
