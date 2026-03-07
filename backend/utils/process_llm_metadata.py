@@ -271,7 +271,7 @@ def main() -> None:
         print("The following newsletters would be processed:\n")
 
     # Confirm if processing many newsletters
-    if len(newsletters) > 10 and not args.dry_run:
+    if len(newsletters) > 100 and not args.dry_run:
         confirm = input(
             f"\nAbout to process {len(newsletters)} newsletters. Continue? (y/N): "
         )
