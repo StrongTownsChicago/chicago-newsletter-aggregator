@@ -16,7 +16,7 @@ load_dotenv()
 
 # Configuration
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+OLLAMA_MODEL = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
 
 # Initialize clients
 supabase = get_supabase_client()

@@ -1,20 +1,25 @@
 """
 LLM-based newsletter processing for Strong Towns Chicago.
 
-This module uses Ollama with local LLM inference to analyze alderman newsletters and extract:
+This module analyzes alderman newsletters and extracts:
 - Relevant topics from a predefined list aligned with STC's 5 priority campaigns
 - Concise summaries that prioritize STC-relevant content
 - Relevance scores (0-10) indicating how important the newsletter is to STC members
 
 The processing pipeline runs three sequential LLM calls per newsletter, with the relevance scoring
 step building on the previous ones for better accuracy.
+
+LLM calls are dispatched via `processing.llm_client`, which supports multiple providers.
+Pass a provider-prefixed model string (e.g., "openai:gpt-5") to use a cloud provider.
+Bare model names default to Ollama for backward compatibility.
 """
 
-from ollama import Client
 from pydantic import BaseModel, Field
-import time
-import json
 from datetime import datetime
+
+from processing.llm_client import call_llm
+
+__all__ = ["call_llm"]
 
 # LLM processing limits
 MAX_NEWSLETTER_CHARS = 100000  # Maximum newsletter content length before truncation
@@ -54,111 +59,6 @@ class Summary(BaseModel):
 class RelevanceScore(BaseModel):
     score: int = Field(ge=0, le=10, description="Relevance score 0-10")
     reasoning: str = Field(max_length=1000, description="Brief explanation")
-
-
-# Sometimes Ollama calls hang indefinitely. We create a global client with a set timeout to avoid this breaking things.
-ollama_client = Client(timeout=360.0)
-
-
-def extract_json(text: str) -> str:
-    """
-    Extract JSON object from LLM response text.
-
-    Handles cases where the LLM wraps JSON in markdown blocks or adds
-    preamble/postamble text. Returns the substring between the first
-    '{' and the last '}'.
-    """
-    text = text.strip()
-
-    # Try to find JSON block in markdown
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].split("```")[0].strip()
-
-    # Find the outermost curly braces to isolate the JSON object
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1:
-        text = text[start : end + 1]
-
-    return text
-
-
-def call_llm(
-    model: str,
-    prompt: str,
-    schema: dict[str, object] | None = None,
-    temperature: float = 0,
-    max_retries: int = MAX_LLM_RETRIES,
-) -> str:
-    """
-    Call Ollama LLM with structured output validation and exponential backoff retry logic.
-
-    Uses the global ollama_client with 240s timeout. Retries with exponential backoff (1s, 2s, 4s, etc)
-    on failure.
-    Validates that responses are non-empty before returning.
-
-    Handles model-specific limitations for structured output (e.g., gpt-oss) by
-    automatically switching to prompt-based JSON extraction when the native 'format'
-    parameter is known to fail.
-
-    Args:
-        model: Ollama model name (e.g., "gpt-oss:20b")
-        prompt: Prompt text to send to the LLM
-        schema: Optional Pydantic model JSON schema for structured output format
-        temperature: Sampling temperature (0 = deterministic, higher = more random)
-        max_retries: Maximum retry attempts on failure (default: MAX_LLM_RETRIES)
-
-    Returns:
-        JSON string response from LLM (or raw text if no schema provided)
-
-    Raises:
-        Exception: If all retry attempts fail or LLM returns empty response
-    """
-    # gpt-oss models can fail with "failed to load model vocabulary required for format"
-    # when using Ollama's native 'format' parameter. We handle this by moving the
-    # schema into the prompt and manually extracting the JSON from the raw response.
-    # https://github.com/ollama/ollama/issues/11691
-    use_native_format = schema is not None and not model.startswith("gpt-oss")
-
-    if schema and not use_native_format:
-        prompt += f"\n\nRespond with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
-
-    for attempt in range(max_retries):
-        try:
-            response = ollama_client.chat(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                format=schema if use_native_format else None,
-                options={
-                    "temperature": temperature,
-                },
-            )
-            content = response.message.content
-
-            # Validate it's not empty
-            if not content or content.strip() == "":
-                raise ValueError("LLM returned empty response")
-
-            # If we manually requested JSON via the prompt, extract it from the response
-            if schema and not use_native_format:
-                content = extract_json(content)
-
-            return content
-
-        except Exception as e:
-            if attempt < max_retries - 1:
-                wait_time = 2**attempt  # Simple exponential backoff: 1s, 2s
-                print(
-                    f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
-                )
-                time.sleep(wait_time)
-            else:
-                raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
-
-    # This should never be reached due to the raise above, but mypy needs it
-    raise Exception("Unreachable code: all retry attempts exhausted")
 
 
 def extract_topics(content: str, model: str) -> list[str]:

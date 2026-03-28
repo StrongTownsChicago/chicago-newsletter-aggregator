@@ -10,6 +10,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Any
 
+from processing.llm_client import parse_model_string
 from processing.llm_processor import (
     TOPICS,
     TopicsExtraction,
@@ -103,8 +104,9 @@ def analyze_newsletter_tokens(
         f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
     )
 
-    # Determine if schema goes in prompt (gpt-oss models)
-    include_schema = model_name.startswith("gpt-oss")
+    # Determine if schema goes in prompt (gpt-oss Ollama models embed schema in prompt)
+    _, bare_model = parse_model_string(model_name)
+    include_schema = bare_model.startswith("gpt-oss")
 
     # Operation 1: Topic Extraction (llm_processor.py:180-192)
     topics_prompt = f"""Identify topics from this Chicago alderman newsletter relevant to Strong Towns Chicago.
@@ -289,7 +291,8 @@ def analyze_weekly_report_tokens(
     Returns:
         WeeklyReportTokenAnalysis with Phase 1 and Phase 2 token counts
     """
-    include_schema = model_name.startswith("gpt-oss")
+    _, bare_model = parse_model_string(model_name)
+    include_schema = bare_model.startswith("gpt-oss")
 
     # Phase 1: Extract facts from each newsletter
     phase1_operations = []

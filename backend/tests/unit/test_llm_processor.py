@@ -6,109 +6,15 @@ topic filtering, and the full processing pipeline.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from processing.llm_processor import (
-    call_llm,
     extract_topics,
     generate_summary,
     score_relevance,
     extract_newsletter_metadata,
     TOPICS,
 )
-
-
-class TestCallLLM(unittest.TestCase):
-    """Tests for call_llm() function with retry logic"""
-
-    @patch("processing.llm_processor.ollama_client")
-    def test_successful_call(self, mock_client):
-        """Successful LLM call returns response"""
-        mock_response = Mock()
-        mock_response.message.content = '{"topics": ["bike_lanes"]}'
-        mock_client.chat.return_value = mock_response
-
-        result = call_llm("test-model", "test prompt", {"type": "object"})
-
-        self.assertEqual(result, '{"topics": ["bike_lanes"]}')
-        mock_client.chat.assert_called_once()
-
-    @patch("processing.llm_processor.ollama_client")
-    @patch("time.sleep")
-    @patch("builtins.print")
-    def test_retry_on_failure(self, mock_print, mock_sleep, mock_client):
-        """Failed call retries with exponential backoff"""
-        mock_response = Mock()
-        mock_response.message.content = '{"topics": []}'
-
-        # Fail twice, succeed on third attempt
-        mock_client.chat.side_effect = [
-            Exception("First failure"),
-            Exception("Second failure"),
-            mock_response,
-        ]
-
-        result = call_llm("test-model", "test prompt", {"type": "object"})
-
-        self.assertEqual(result, '{"topics": []}')
-        # Should have called sleep twice (after 1st and 2nd failures)
-        self.assertEqual(mock_sleep.call_count, 2)
-        # Check exponential backoff: 1s, then 2s
-        mock_sleep.assert_any_call(1)  # 2^0
-        mock_sleep.assert_any_call(2)  # 2^1
-
-    @patch("processing.llm_processor.ollama_client")
-    @patch("time.sleep")
-    @patch("builtins.print")
-    def test_max_retries_exceeded_raises(self, mock_print, mock_sleep, mock_client):
-        """All retries fail, raises exception"""
-        mock_client.chat.side_effect = Exception("Always fails")
-
-        with self.assertRaises(Exception) as context:
-            call_llm("test-model", "test prompt", {"type": "object"}, max_retries=3)
-
-        self.assertIn("failed after 3 attempts", str(context.exception))
-
-    @patch("processing.llm_processor.ollama_client")
-    @patch("time.sleep")
-    @patch("builtins.print")
-    def test_empty_response_raises(self, mock_print, mock_sleep, mock_client):
-        """Empty LLM response raises exception"""
-        mock_response = Mock()
-        mock_response.message.content = ""
-        mock_client.chat.return_value = mock_response
-
-        with self.assertRaises(Exception) as context:
-            call_llm("test-model", "test prompt", {"type": "object"})
-
-        self.assertIn("empty response", str(context.exception).lower())
-
-    @patch("processing.llm_processor.ollama_client")
-    @patch("time.sleep")
-    @patch("builtins.print")
-    def test_whitespace_only_response_raises(self, mock_print, mock_sleep, mock_client):
-        """Whitespace-only response raises exception"""
-        mock_response = Mock()
-        mock_response.message.content = "   \n\t  "
-        mock_client.chat.return_value = mock_response
-
-        with self.assertRaises(Exception) as context:
-            call_llm("test-model", "test prompt", {"type": "object"})
-
-        self.assertIn("empty response", str(context.exception).lower())
-
-    @patch("processing.llm_processor.ollama_client")
-    def test_uses_provided_temperature(self, mock_client):
-        """Temperature parameter passed to Ollama client"""
-        mock_response = Mock()
-        mock_response.message.content = '{"result": "test"}'
-        mock_client.chat.return_value = mock_response
-
-        call_llm("test-model", "test prompt", {"type": "object"}, temperature=0.7)
-
-        # Check that temperature was passed
-        call_kwargs = mock_client.chat.call_args[1]
-        self.assertEqual(call_kwargs["options"]["temperature"], 0.7)
 
 
 class TestExtractTopics(unittest.TestCase):

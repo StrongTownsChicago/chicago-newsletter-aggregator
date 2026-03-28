@@ -57,6 +57,26 @@ def create_mock_ollama_client(response_content: str = '{"topics": []}'):
     return mock_client
 
 
+def create_mock_openai_client(response_content: str = '{"topics": []}'):
+    """
+    Create a mocked OpenAI client.
+
+    Args:
+        response_content: JSON string to return from chat.completions.create()
+
+    Returns:
+        Mock OpenAI client
+    """
+    mock_client = Mock()
+    mock_choice = Mock()
+    mock_choice.message.content = response_content
+    mock_choice.message.refusal = None
+    mock_response = Mock()
+    mock_response.choices = [mock_choice]
+    mock_client.chat.completions.create.return_value = mock_response
+    return mock_client
+
+
 def create_mock_mail_message(
     uid: str = "test_123",
     from_: str = "alderman@ward1.org",

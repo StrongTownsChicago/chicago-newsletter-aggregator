@@ -115,11 +115,12 @@ npm run lint
 ### LLM Setup (one-time)
 
 ```bash
-# Install Ollama
+# Option A: Ollama (local inference)
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull the model
 ollama pull gpt-oss:20b
+
+# Option B: OpenAI (cloud)
+# Set OPENAI_API_KEY in backend/.env, then use --model openai:gpt-5
 ```
 
 ## Automation
@@ -153,7 +154,7 @@ Custom Claude Code hooks are located in `.claude/hooks/` and registered in `.cla
 1. **Ingestion**: Emails arrive via Gmail IMAP polling OR web scraping from MailChimp archives
 2. **Source Matching**: Email patterns matched against `email_source_mappings` table with wildcard support
 3. **Storage**: Raw newsletters stored in `newsletters` table (plain_text, raw_html, metadata)
-4. **LLM Processing**: Three separate Ollama calls per newsletter for topic extraction, summarization, and relevance scoring (see `llm_processor.py` for details)
+4. **LLM Processing**: Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Provider dispatched via `llm_client.py` (supports Ollama and OpenAI)
 5. **Weekly Synthesis**: Aggregated analysis of newsletters by topic using two-phase LLM process (extract facts → synthesize summary)
 6. **Frontend**: Astro SSR queries Supabase for search/display
 
@@ -170,6 +171,7 @@ backend/
 │       ├── newsletter_scraper.py # Fetches and parses individual newsletter pages
 │       └── process_scraped_newsletters.py  # Orchestrates scraping workflow
 ├── processing/
+│   ├── llm_client.py             # Multi-provider LLM dispatch (Ollama + OpenAI adapters)
 │   └── llm_processor.py          # LLM topic/summary/scoring with Pydantic schemas
 ├── notifications/
 │   ├── rule_matcher.py           # Match newsletters to user notification rules
@@ -242,7 +244,7 @@ frontend/src/
 
 **Web Scraping Strategy Pattern** (`scraper_strategies.py`): Strategy pattern for different archive formats. `get_strategy_for_url()` selects between `MailChimpArchiveStrategy` (most common) and `GenericListStrategy` fallback.
 
-**LLM Processing** (`llm_processor.py:process_with_ollama()`): Three separate Ollama calls using Pydantic models for structured output validation. Filters extracted topics against predefined list to prevent hallucinations.
+**LLM Processing** (`llm_processor.py` + `llm_client.py`): Three sequential LLM calls per newsletter for topic extraction, summarization, and relevance scoring using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
 **Newsletter Deduplication**: Both ingest paths check for existing `email_uid` (email) or URL+subject combination (scraping) before inserting.
 
@@ -297,7 +299,9 @@ SUPABASE_SERVICE_KEY=
 
 # LLM Processing (optional, default: false)
 ENABLE_LLM=true
-OLLAMA_MODEL=gpt-oss:20b
+LLM_MODEL=gpt-oss:20b              # Supports provider prefix: openai:gpt-5, ollama:gpt-oss:20b
+OLLAMA_MODEL=gpt-oss:20b           # Legacy fallback (LLM_MODEL takes precedence)
+OPENAI_API_KEY=sk-...              # Required when using openai: provider prefix
 
 # Notifications (optional, default: false)
 ENABLE_NOTIFICATIONS=true        # Enables notification queuing during email ingestion

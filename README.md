@@ -8,7 +8,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **Backend**: Python 3.x + uv package manager
 - **Database**: Supabase PostgreSQL
 - **Email**: Gmail IMAP polling
-- **LLM**: Ollama for summarization/categorization
+- **LLM**: Ollama (local) or OpenAI (cloud) for summarization/categorization
 
 ## Features
 
@@ -147,9 +147,20 @@ npm run dev
 
 ### LLM Setup
 
+**Option A: Ollama (local inference)**
+
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gpt-oss:20b
+# Use with: --model gpt-oss:20b (default) or --model ollama:gpt-oss:20b
+```
+
+**Option B: OpenAI (cloud)**
+
+```bash
+# Add to backend/.env:
+# OPENAI_API_KEY=sk-...
+# LLM_MODEL=openai:gpt-5
 ```
 
 ## Project Structure
@@ -177,7 +188,7 @@ frontend/
 
 ## LLM Processing
 
-Three separate Ollama queries per newsletter for topic extraction, summarization, and relevance scoring. See `backend/processing/llm_processor.py` for implementation details and topic definitions.
+Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings. See `backend/processing/llm_client.py` for provider dispatch and `backend/processing/llm_processor.py` for topic definitions.
 
 ## Notification System
 
@@ -228,7 +239,9 @@ SUPABASE_SERVICE_KEY=
 
 # LLM Processing (optional)
 ENABLE_LLM=true
-OLLAMA_MODEL=gpt-oss:20b
+LLM_MODEL=gpt-oss:20b              # Supports provider prefix: openai:gpt-5, ollama:gpt-oss:20b
+OLLAMA_MODEL=gpt-oss:20b           # Legacy fallback (LLM_MODEL takes precedence)
+OPENAI_API_KEY=sk-...              # Required when using openai: provider prefix
 
 # Notifications (optional)
 ENABLE_NOTIFICATIONS=true

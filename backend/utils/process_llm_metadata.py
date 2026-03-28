@@ -210,8 +210,8 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default=os.getenv("OLLAMA_MODEL", "gpt-oss:20b"),
-        help="Ollama model to use (default: from OLLAMA_MODEL env var)",
+        default=os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b")),
+        help="LLM model to use, with optional provider prefix (e.g., openai:gpt-5, ollama:gpt-oss:20b). Default: from LLM_MODEL or OLLAMA_MODEL env var",
     )
 
     parser.add_argument(

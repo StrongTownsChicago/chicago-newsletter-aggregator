@@ -1,6 +1,6 @@
 {
-  "version": "2026-01",
-  "updated": "2026-01-31",
+  "version": "2026-03",
+  "updated": "2026-03-28",
   "models": [
     {
       "provider": "amazon",
@@ -37,6 +37,33 @@
       "context_window": 300000,
       "encoding": "cl100k_base",
       "notes": "Pricing extracted from HTML data (2026-01-31)"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-4-6",
+      "input_cost_per_1m": 5.0,
+      "output_cost_per_1m": 25.0,
+      "context_window": 1000000,
+      "encoding": "cl100k_base",
+      "notes": "Latest flagship model (2026-03)"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "input_cost_per_1m": 3.0,
+      "output_cost_per_1m": 15.0,
+      "context_window": 1000000,
+      "encoding": "cl100k_base",
+      "notes": "Latest balanced model (2026-03)"
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5",
+      "input_cost_per_1m": 1.0,
+      "output_cost_per_1m": 5.0,
+      "context_window": 200000,
+      "encoding": "cl100k_base",
+      "notes": "Latest fast model (2026-03)"
     },
     {
       "provider": "anthropic",
@@ -154,6 +181,24 @@
       "context_window": 128000,
       "encoding": "cl100k_base",
       "notes": "Pricing extracted from HTML data (2026-01-31)"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.1-flash-lite-preview",
+      "input_cost_per_1m": 0.25,
+      "output_cost_per_1m": 1.5,
+      "context_window": 1000000,
+      "encoding": "cl100k_base",
+      "notes": "Preview pricing (2026-03); tiered: $0.50/1M input >200k"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "input_cost_per_1m": 2.0,
+      "output_cost_per_1m": 12.0,
+      "context_window": 1000000,
+      "encoding": "cl100k_base",
+      "notes": "Preview pricing (2026-03); tiered: $4.00/1M input >200k"
     },
     {
       "provider": "google",
@@ -599,20 +644,92 @@
     {
       "provider": "openai",
       "model": "gpt-5.1",
-      "input_cost_per_1m": 1.25,
-      "output_cost_per_1m": 10.0,
+      "input_cost_per_1m": 0.625,
+      "output_cost_per_1m": 5.0,
       "context_window": 1000000,
       "encoding": "o200k_base",
-      "notes": "Pricing extracted from HTML data (2026-01-31)"
+      "notes": "Price reduced since 2026-01 (was $1.25/$10.00)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.1-chat",
+      "input_cost_per_1m": 0.625,
+      "output_cost_per_1m": 5.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
     },
     {
       "provider": "openai",
       "model": "gpt-5.2",
+      "input_cost_per_1m": 0.875,
+      "output_cost_per_1m": 7.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Price reduced since 2026-01 (was $1.75/$14.00)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.2-chat",
       "input_cost_per_1m": 1.75,
       "output_cost_per_1m": 14.0,
       "context_window": 1000000,
       "encoding": "o200k_base",
-      "notes": "Pricing extracted from HTML data (2026-01-31)"
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.2-codex",
+      "input_cost_per_1m": 1.75,
+      "output_cost_per_1m": 14.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.3-chat",
+      "input_cost_per_1m": 1.75,
+      "output_cost_per_1m": 14.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.3-codex",
+      "input_cost_per_1m": 1.75,
+      "output_cost_per_1m": 14.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-nano",
+      "input_cost_per_1m": 0.2,
+      "output_cost_per_1m": 1.25,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "input_cost_per_1m": 0.75,
+      "output_cost_per_1m": 4.5,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "input_cost_per_1m": 2.5,
+      "output_cost_per_1m": 15.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
     },
     {
       "provider": "openai",
@@ -662,11 +779,11 @@
     {
       "provider": "openai",
       "model": "o3",
-      "input_cost_per_1m": 10.0,
-      "output_cost_per_1m": 40.0,
+      "input_cost_per_1m": 2.0,
+      "output_cost_per_1m": 8.0,
       "context_window": 1000000,
       "encoding": "o200k_base",
-      "notes": "Pricing extracted from HTML data (2026-01-31)"
+      "notes": "80% price drop announced 2026-03 (was $10/$40)"
     },
     {
       "provider": "openai",
@@ -725,11 +842,20 @@
     {
       "provider": "openai",
       "model": "gpt-5.2-pro",
-      "input_cost_per_1m": 21.0,
-      "output_cost_per_1m": 168.0,
+      "input_cost_per_1m": 10.5,
+      "output_cost_per_1m": 84.0,
       "context_window": 1000000,
       "encoding": "o200k_base",
-      "notes": "Pricing extracted from HTML data (2026-01-31)"
+      "notes": "Price reduced since 2026-01 (was $21/$168)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-pro",
+      "input_cost_per_1m": 30.0,
+      "output_cost_per_1m": 180.0,
+      "context_window": 1000000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-03"
     },
     {
       "provider": "openai",

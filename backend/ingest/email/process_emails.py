@@ -157,7 +157,9 @@ def process_new_newsletters() -> None:
                     try:
                         from processing.llm_processor import extract_newsletter_metadata
 
-                        OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+                        OLLAMA_MODEL = os.getenv(
+                            "LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
+                        )
                         llm_result = extract_newsletter_metadata(
                             newsletter, OLLAMA_MODEL
                         )
