@@ -278,7 +278,9 @@ def _call_openai(
     # Reasoning models (o-series, gpt-5) do not accept temperature or other
     # sampling parameters — omit them entirely to avoid 400 errors.
     is_reasoning_model = bool(_OPENAI_REASONING_MODEL_RE.match(model))
-    extra_params: dict[str, Any] = {} if is_reasoning_model else {"temperature": temperature}
+    extra_params: dict[str, Any] = (
+        {} if is_reasoning_model else {"temperature": temperature}
+    )
 
     for attempt in range(max_retries):
         try:
@@ -300,7 +302,7 @@ def _call_openai(
             if message.refusal:
                 raise ValueError(f"OpenAI refused to answer: {message.refusal}")
 
-            content = message.content
+            content: str | None = message.content
 
             if not content or content.strip() == "":
                 raise ValueError("LLM returned empty response")
