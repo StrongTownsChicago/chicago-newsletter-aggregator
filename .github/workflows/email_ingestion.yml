@@ -36,7 +36,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PRIVACY_STRIP_PHRASES: ${{ secrets.PRIVACY_STRIP_PHRASES }}
-          ENABLE_LLM: false
+          ENABLE_LLM: ${{ secrets.ENABLE_LLM || 'false' }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ENABLE_NOTIFICATIONS: true
         run: |
           cd backend
