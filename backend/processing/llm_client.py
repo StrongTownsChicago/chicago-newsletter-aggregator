@@ -90,6 +90,7 @@ def call_llm(
     model: str,
     prompt: str,
     schema: dict[str, Any] | None = None,
+    required_keys: list[str] = [],
     temperature: float = 0,
     max_retries: int = MAX_LLM_RETRIES,
 ) -> str:
@@ -117,7 +118,7 @@ def call_llm(
     provider, model_name = parse_model_string(model)
 
     if provider == "openai":
-        return _call_openai(model_name, prompt, schema, temperature, max_retries)
+        return _call_openai(model_name, prompt, schema, required_keys, temperature, max_retries)
     return _call_ollama(model_name, prompt, schema, temperature, max_retries)
 
 
@@ -239,6 +240,7 @@ def _call_openai(
     model: str,
     prompt: str,
     schema: dict[str, Any] | None,
+    required: list[str],
     temperature: float,
     max_retries: int,
 ) -> str:
@@ -252,6 +254,7 @@ def _call_openai(
         model: OpenAI model name (e.g., "gpt-5")
         prompt: Prompt text
         schema: Optional JSON schema for structured output
+        required: List of keys required in the json response
         temperature: Sampling temperature
         max_retries: Maximum retry attempts
 
@@ -273,6 +276,7 @@ def _call_openai(
                 "strict": True,
                 "schema": processed_schema,
             },
+            "required": [],
         }
 
     # Reasoning models (o-series, gpt-5) do not accept temperature or other
