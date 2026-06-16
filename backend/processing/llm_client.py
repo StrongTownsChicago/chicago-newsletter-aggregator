@@ -240,7 +240,7 @@ def _call_openai(
     model: str,
     prompt: str,
     schema: dict[str, Any] | None,
-    required: list[str],
+    required: list[str] = [],
     temperature: float,
     max_retries: int,
 ) -> str:
@@ -276,7 +276,7 @@ def _call_openai(
                 "strict": True,
                 "schema": processed_schema,
             },
-            "required": [],
+            "required": required,
         }
 
     # Reasoning models (o-series, gpt-5) do not accept temperature or other
