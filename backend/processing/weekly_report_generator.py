@@ -50,6 +50,7 @@ def extract_facts_from_single_newsletter(
     )
     source_info = newsletter.get("source_name", "Unknown Source")
     newsletter_id = newsletter.get("id", "")
+    ward_number = newsletter.get("ward_number")
 
     # Build content for single newsletter
     content = f"""Source: {source_info} ({ward_info})
@@ -68,7 +69,6 @@ You are analyzing newsletters for Strong Towns Chicago, an advocacy organization
 
 For each development, provide:
 - Concrete, specific description (what happened, where, when)
-- Ward number involved (if mentioned)
 
 ONLY extract developments that are:
 ✓ Specific and factual (include locations, dates, numbers)
@@ -92,11 +92,17 @@ Newsletter:
         response = call_llm(model, prompt, FactExtraction.model_json_schema())
         data = FactExtraction.model_validate_json(response)
 
-        # Add newsletter_id to each development
-        for dev in data.developments:
-            dev.newsletter_ids = [NewsletterID(newsletter_id)]
-
-        return data.developments
+        # The LLM returns only descriptions; the newsletter's id and ward are
+        # known deterministically from the source, so attach them here.
+        wards = [str(ward_number)] if ward_number else []
+        return [
+            KeyDevelopment(
+                description=description,
+                newsletter_ids=[NewsletterID(newsletter_id)],
+                wards=wards,
+            )
+            for description in data.developments
+        ]
 
     except Exception as e:
         print(f"    ⚠ Extraction failed for newsletter {newsletter_id[:8]}: {e}")
