@@ -21,7 +21,7 @@ class WeeklyTopicReport(BaseModel):
     id: str
     topic: str
     week_id: str  # Format: YYYY-WXX
-    report_summary: str = Field(..., max_length=3000)
+    report_summary: str = Field(..., max_length=5000)
     newsletter_ids: list[NewsletterID]
     key_developments: list[KeyDevelopment] | None = None
     created_at: datetime
@@ -45,6 +45,6 @@ class WeeklySynthesis(BaseModel):
     """Phase 2: Synthesize facts into narrative summary."""
 
     summary: str = Field(
-        max_length=3000,
+        max_length=5000,
         description="2-4 paragraph weekly summary of topic activity",
     )
