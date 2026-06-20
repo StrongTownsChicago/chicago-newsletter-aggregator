@@ -344,7 +344,7 @@ Newsletter:
 """
 
         # Typical response with 1-2 developments
-        phase1_response = '{"developments": [{"description": "Plan Commission approved 120-unit development at 1234 Main St", "newsletter_ids": [], "wards": ["42"]}]}'
+        phase1_response = '{"developments": ["Plan Commission approved 120-unit development at 1234 Main St"]}'
 
         phase1_tokens = estimate_llm_call_tokens(
             phase1_prompt,

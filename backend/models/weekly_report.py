@@ -8,7 +8,7 @@ from models.types import NewsletterID
 
 
 class KeyDevelopment(BaseModel):
-    """Individual development/event extracted from newsletters."""
+    """Individual development/event extracted from newsletters (domain/storage model)."""
 
     description: str = Field(..., max_length=2000)
     newsletter_ids: list[NewsletterID] = Field(default_factory=list)
@@ -29,9 +29,14 @@ class WeeklyTopicReport(BaseModel):
 
 # LLM Response Schemas
 class FactExtraction(BaseModel):
-    """Phase 1: Extract structured facts from newsletters."""
+    """Phase 1: Extract structured facts from newsletters.
 
-    developments: list[KeyDevelopment] = Field(
+    The LLM returns only development descriptions. The owning newsletter's id
+    and ward are not LLM concerns — they are known deterministically from the
+    source and attached when building the KeyDevelopment domain objects.
+    """
+
+    developments: list[str] = Field(
         description="Key developments, decisions, or announcements"
     )
 

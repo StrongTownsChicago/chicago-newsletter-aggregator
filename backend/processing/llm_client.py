@@ -219,6 +219,10 @@ def _add_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:
 
     OpenAI's structured output mode requires this on all object schemas. Pydantic v2's
     model_json_schema() does not include it by default.
+
+    Note: OpenAI strict mode also requires every property to appear in 'required'.
+    We satisfy that by keeping LLM-facing models free of optional fields (Pydantic
+    then emits a complete 'required' array) rather than rewriting it here.
     """
     schema = dict(schema)
     if schema.get("type") == "object":

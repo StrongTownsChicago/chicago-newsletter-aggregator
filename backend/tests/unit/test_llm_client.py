@@ -17,7 +17,9 @@ from processing.llm_client import (
     _extract_json,
     _get_ollama_client,
     _get_openai_client,
+    _add_additional_properties_false,
 )
+from models.weekly_report import FactExtraction
 from tests.fixtures.mock_helpers import (
     create_mock_ollama_client,
     create_mock_openai_client,
@@ -395,6 +397,75 @@ class TestCallOpenAI(unittest.TestCase):
 
         with self.assertRaises(Exception):
             _call_openai("gpt-5", "test prompt", None, 0, 2)
+
+
+class TestAddAdditionalPropertiesFalse(unittest.TestCase):
+    """Tests for _add_additional_properties_false() and OpenAI strict-mode validity."""
+
+    def _collect_objects(self, node):
+        """Yield every object-type schema dict reachable from node."""
+        if isinstance(node, dict):
+            if node.get("type") == "object" and "properties" in node:
+                yield node
+            for value in node.values():
+                yield from self._collect_objects(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from self._collect_objects(value)
+
+    def test_sets_additional_properties_false_on_all_objects(self):
+        """Every nested object gets additionalProperties: false."""
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "$defs": {
+                "Inner": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                }
+            },
+        }
+
+        result = _add_additional_properties_false(schema)
+
+        objects = list(self._collect_objects(result))
+        self.assertTrue(objects)
+        for obj in objects:
+            self.assertIs(obj["additionalProperties"], False)
+
+    def test_does_not_mutate_input_schema(self):
+        """The input schema dict is not mutated in place."""
+        schema = {
+            "type": "object",
+            "properties": {"a": {"type": "string"}},
+            "required": ["a"],
+        }
+
+        _add_additional_properties_false(schema)
+
+        self.assertNotIn("additionalProperties", schema)
+
+    def test_real_fact_extraction_schema_is_strict_valid(self):
+        """Regression: the schema sent to OpenAI must satisfy strict mode.
+
+        OpenAI strict mode requires every object to set additionalProperties:false
+        (added here) and to list every property in 'required' (which Pydantic emits
+        only when the model has no optional fields). FactExtraction previously nested
+        a development with optional fields, causing a 400 during weekly report
+        generation; keeping LLM-facing models free of optional fields prevents it.
+        This test guards both invariants together.
+        """
+        result = _add_additional_properties_false(FactExtraction.model_json_schema())
+
+        objects = list(self._collect_objects(result))
+        self.assertTrue(objects)
+        for obj in objects:
+            self.assertIs(obj["additionalProperties"], False)
+            self.assertEqual(
+                set(obj["required"]),
+                set(obj["properties"].keys()),
+                msg="every property must appear in required for strict mode",
+            )
 
 
 class TestClientLifecycle(unittest.TestCase):
