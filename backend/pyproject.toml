@@ -5,20 +5,20 @@ description = "An app that tracks Chicago alderman newsletters"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
-    "cryptography>=46.0.6",
+    "cryptography>=50.0.0",
     "html2text>=2025.4.15",
     "imap-tools>=1.11.0",
     "ollama>=0.6.1",
     "openai>=1.82.0",
     "pydantic>=2.12.5",
-    "pyjwt>=2.12.0",
+    "pyjwt>=2.15.0",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.2.1",
     "requests>=2.33.0",
     "resend>=2.19.0",
     "supabase>=2.27.0",
     "tzdata>=2025.3",
-    "urllib3>=2.6.3",
+    "urllib3>=2.8.0",
 ]
 
 [dependency-groups]
