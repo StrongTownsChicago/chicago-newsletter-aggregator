@@ -104,6 +104,20 @@ describe('buildCanonicalUrl', () => {
       `${SITE}/newsletter/abc-123`,
     );
   });
+
+  it('keeps the page number for page 2 and beyond of a paginated listing', () => {
+    expect(buildCanonicalUrl('/', SITE, 3)).toBe(`${SITE}/?page=3`);
+  });
+
+  it('omits the page number for the first page', () => {
+    expect(buildCanonicalUrl('/', SITE, 1)).toBe(`${SITE}/`);
+  });
+
+  it('omits invalid page numbers', () => {
+    expect(buildCanonicalUrl('/', SITE, Number.NaN)).toBe(`${SITE}/`);
+    expect(buildCanonicalUrl('/', SITE, -2)).toBe(`${SITE}/`);
+    expect(buildCanonicalUrl('/', SITE, 2.5)).toBe(`${SITE}/`);
+  });
 });
 
 describe('isNonProductionHost', () => {

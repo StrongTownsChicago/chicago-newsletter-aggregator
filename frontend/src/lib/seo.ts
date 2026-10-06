@@ -73,11 +73,23 @@ export function buildNewsletterDescription(
 /**
  * Builds the canonical URL for a page. Query strings are dropped and trailing
  * slashes removed (except for the root) so each page has exactly one canonical form.
+ *
+ * Paginated listings pass `page` so that page 2+ canonicalizes to itself
+ * (`?page=N`) rather than to page 1, which would discourage crawlers from
+ * following deeper pages and the newsletters linked from them.
  */
-export function buildCanonicalUrl(pathname: string, site: URL | string): string {
+export function buildCanonicalUrl(
+  pathname: string,
+  site: URL | string,
+  page?: number,
+): string {
   const normalizedPath =
     pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return new URL(normalizedPath || "/", site).href;
+  const canonicalUrl = new URL(normalizedPath || "/", site);
+  if (page !== undefined && Number.isInteger(page) && page > 1) {
+    canonicalUrl.searchParams.set("page", String(page));
+  }
+  return canonicalUrl.href;
 }
 
 /**

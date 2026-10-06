@@ -7,12 +7,14 @@ interface Props {
   description: string;
   image?: string;
   type?: 'website' | 'article';
+  /** Current page of a paginated listing; page 2+ is kept in the canonical URL. */
+  canonicalPage?: number;
 }
 
-const { title, description, image, type = 'website' } = Astro.props;
+const { title, description, image, type = 'website', canonicalPage } = Astro.props;
 
 const site = Astro.site ?? Astro.url.origin;
-const canonicalUrl = buildCanonicalUrl(Astro.url.pathname, site);
+const canonicalUrl = buildCanonicalUrl(Astro.url.pathname, site, canonicalPage);
 const metaDescription = truncateDescription(description);
 const imageUrl = image ? new URL(image, site).href : undefined;
 const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
