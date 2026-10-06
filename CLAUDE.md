@@ -240,7 +240,7 @@ frontend/src/
 
 ### Key Design Patterns
 
-**Email Source Matching** (`email_parser.py:lookup_source_by_email()`): Flexible pattern matching with SQL wildcard support (e.g., `%@40thward.org`), regex conversion, and fallback to substring matching.
+**Email Source Matching** (`email_parser.py:lookup_source_by_email()`): Each pattern must match the whole sender address, case-insensitively; `%` is a wildcard anywhere in the pattern (e.g., `%@40thward.org`), and `_` is a literal character. See `email_parser.py:email_matches_pattern()`.
 
 **Web Scraping Strategy Pattern** (`scraper_strategies.py`): Strategy pattern for different archive formats. `get_strategy_for_url()` selects between `MailChimpArchiveStrategy` (most common) and `GenericListStrategy` fallback.
 

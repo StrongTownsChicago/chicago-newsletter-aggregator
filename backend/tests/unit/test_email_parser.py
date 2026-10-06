@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from ingest.email.email_parser import (
     clean_html_content,
+    email_matches_pattern,
     extract_name_from_sender,
     lookup_source_by_email,
     parse_newsletter,
@@ -15,6 +16,106 @@ from tests.fixtures.newsletter_factory import (
     create_test_source,
 )
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+
+
+class TestEmailMatchesPattern(unittest.TestCase):
+    """Tests for email_matches_pattern() pure matching function."""
+
+    def test_exact_match(self):
+        self.assertTrue(
+            email_matches_pattern("info@the1stward.com", "info@the1stward.com")
+        )
+
+    def test_exact_pattern_rejects_substring_of_sender(self):
+        """Exact patterns must not match senders that merely contain them."""
+        self.assertFalse(
+            email_matches_pattern("info@the1stward.com.evil.io", "info@the1stward.com")
+        )
+        self.assertFalse(
+            email_matches_pattern("xinfo@the1stward.com", "info@the1stward.com")
+        )
+
+    def test_exact_pattern_rejects_sender_that_is_substring_of_pattern(self):
+        self.assertFalse(email_matches_pattern("ward09", "ward09@cityofchicago.org"))
+
+    def test_leading_wildcard(self):
+        self.assertTrue(
+            email_matches_pattern("ward27@redburnett.com", "%@redburnett.com")
+        )
+
+    def test_leading_wildcard_rejects_domain_suffix_overmatch(self):
+        self.assertFalse(
+            email_matches_pattern("x@redburnett.com.evil.io", "%@redburnett.com")
+        )
+
+    def test_leading_wildcard_rejects_lookalike_domain(self):
+        """'.' in the pattern is literal, not a regex any-character."""
+        self.assertFalse(email_matches_pattern("x@redburnettxcom", "%@redburnett.com"))
+
+    def test_trailing_wildcard(self):
+        self.assertTrue(email_matches_pattern("ward23@cityofchicago.org", "ward23@%"))
+        self.assertFalse(email_matches_pattern("xward23@cityofchicago.org", "ward23@%"))
+
+    def test_mid_pattern_wildcard(self):
+        pattern = "nicolelee11thwardchi%@shared1.ccsend.com"
+        self.assertTrue(
+            email_matches_pattern(
+                "nicolelee11thwardchi-gmail.com@shared1.ccsend.com", pattern
+            )
+        )
+        self.assertFalse(
+            email_matches_pattern(
+                "nicolelee11thwardchi-gmail.com@shared1.ccsend.com.evil.io", pattern
+            )
+        )
+
+    def test_multiple_wildcards(self):
+        self.assertTrue(
+            email_matches_pattern(
+                "nicolelee11thwardchi-gmail.com@ward11.ccsend.com",
+                "nicolelee11thwardchi%@%.ccsend.com",
+            )
+        )
+
+    def test_wildcard_matches_empty_run(self):
+        self.assertTrue(
+            email_matches_pattern("ward@chicago14.com", "ward%@chicago14.com")
+        )
+
+    def test_case_insensitive(self):
+        self.assertTrue(
+            email_matches_pattern(
+                "Ward23@CityOfChicago.org", "ward23@cityofchicago.org"
+            )
+        )
+        self.assertTrue(email_matches_pattern("info@40thward.org", "%@40THWARD.ORG"))
+
+    def test_surrounding_whitespace_ignored(self):
+        self.assertTrue(
+            email_matches_pattern(" x@aldermanervin.com ", " %@aldermanervin.com")
+        )
+
+    def test_regex_metacharacters_are_literal(self):
+        pattern = "yourvoice+newsletter@ward43.org"
+        self.assertTrue(
+            email_matches_pattern("yourvoice+newsletter@ward43.org", pattern)
+        )
+        self.assertFalse(
+            email_matches_pattern("yourvoiceeenewsletter@ward43.org", pattern)
+        )
+        self.assertFalse(email_matches_pattern("ward1@x.org", "ward[0-9]@x.org"))
+        self.assertTrue(email_matches_pattern("ward[0-9]@x.org", "ward[0-9]@x.org"))
+
+    def test_underscore_is_literal_not_wildcard(self):
+        self.assertTrue(email_matches_pattern("ward_1@x.org", "ward_1@x.org"))
+        self.assertFalse(email_matches_pattern("wardA1@x.org", "ward_1@x.org"))
+
+    def test_empty_email_never_matches(self):
+        self.assertFalse(email_matches_pattern("", "info@the1stward.com"))
+        self.assertFalse(email_matches_pattern("", "%"))
+
+    def test_empty_pattern_never_matches(self):
+        self.assertFalse(email_matches_pattern("info@the1stward.com", ""))
 
 
 class TestLookupSourceByEmail(unittest.TestCase):
@@ -51,8 +152,6 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
     def test_wildcard_suffix_match(self):
         """Email matches wildcard suffix pattern (%alderman@chicago.gov)."""
-        # Note: Patterns with % in middle may not work due to regex escaping order
-        # Using prefix wildcard instead
         source = create_test_source(source_id=2, name="Chicago Alderman")
         mapping = create_test_email_mapping(
             email_pattern="%alderman@chicago.gov", source_id=2
@@ -118,6 +217,46 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result["name"], "First Match")
+
+    def test_mid_pattern_wildcard_match(self):
+        """Wildcard in the middle of a pattern resolves the source."""
+        source = create_test_source(source_id=11, name="Ward 11")
+        mapping = create_test_email_mapping(
+            email_pattern="nicolelee11thwardchi%@shared1.ccsend.com", source_id=11
+        )
+        mapping["sources"] = source
+        mock_supabase = create_mock_supabase(return_data=[mapping])
+
+        result = lookup_source_by_email(
+            "nicolelee11thwardchi-gmail.com@shared1.ccsend.com", mock_supabase
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["id"], 11)
+
+    def test_exact_pattern_does_not_substring_match(self):
+        """Exact patterns no longer match senders that merely contain them."""
+        mapping = create_test_email_mapping(
+            email_pattern="info@the1stward.com", source_id=1
+        )
+        mapping["sources"] = create_test_source(source_id=1)
+        mock_supabase = create_mock_supabase(return_data=[mapping])
+
+        result = lookup_source_by_email("info@the1stward.com.evil.io", mock_supabase)
+
+        self.assertIsNone(result)
+
+    def test_empty_email_does_not_match_exact_pattern(self):
+        """Empty sender must not match exact patterns (was a substring bug)."""
+        mapping = create_test_email_mapping(
+            email_pattern="info@the1stward.com", source_id=1
+        )
+        mapping["sources"] = create_test_source(source_id=1)
+        mock_supabase = create_mock_supabase(return_data=[mapping])
+
+        result = lookup_source_by_email("", mock_supabase)
+
+        self.assertIsNone(result)
 
     def test_empty_email_returns_none(self):
         """Empty string email returns None."""
