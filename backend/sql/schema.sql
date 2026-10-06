@@ -29,23 +29,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Helper function: count user rules
-CREATE OR REPLACE FUNCTION public.count_user_rules(user_uuid UUID)
-RETURNS INTEGER AS $$
-    SELECT COUNT(*)::INTEGER
-    FROM public.notification_rules
-    WHERE user_id = user_uuid;
-$$ LANGUAGE SQL STABLE;
-
--- Helper function: get active weekly topics
-CREATE OR REPLACE FUNCTION public.get_active_weekly_topics()
-RETURNS TABLE(topic TEXT) AS $$
-    SELECT DISTINCT unnest(topics) AS topic
-    FROM notification_rules
-    WHERE is_active = true
-      AND delivery_frequency = 'weekly';
-$$ LANGUAGE SQL STABLE;
-
 -- Helper function: get week date range (ISO-8601)
 CREATE OR REPLACE FUNCTION public.get_week_date_range(week_id_param TEXT)
 RETURNS TABLE(week_start DATE, week_end DATE) AS $$
@@ -190,6 +173,27 @@ CREATE INDEX IF NOT EXISTS idx_notification_rules_frequency ON public.notificati
 
 COMMENT ON CONSTRAINT weekly_rules_no_ward_filter ON public.notification_rules IS
 'Weekly summaries cover citywide activity and cannot be filtered by ward. Only daily digest notifications support ward filtering.';
+
+-- Helpers that query notification_rules. SQL-language function bodies are
+-- validated at creation time (check_function_bodies), so these must be
+-- defined after the table exists.
+
+-- Helper function: count user rules
+CREATE OR REPLACE FUNCTION public.count_user_rules(user_uuid UUID)
+RETURNS INTEGER AS $$
+    SELECT COUNT(*)::INTEGER
+    FROM public.notification_rules
+    WHERE user_id = user_uuid;
+$$ LANGUAGE SQL STABLE;
+
+-- Helper function: get active weekly topics
+CREATE OR REPLACE FUNCTION public.get_active_weekly_topics()
+RETURNS TABLE(topic TEXT) AS $$
+    SELECT DISTINCT unnest(topics) AS topic
+    FROM notification_rules
+    WHERE is_active = true
+      AND delivery_frequency = 'weekly';
+$$ LANGUAGE SQL STABLE;
 
 -- NOTIFICATION_QUEUE: Pending notifications
 CREATE TABLE public.notification_queue (
