@@ -13,18 +13,13 @@ export interface StarterRule {
   topics: string[];
 }
 
-// Pre-filled suggestion shown in the rule modal during onboarding. A weekly
-// citywide summary is low-volume and always matches something, so it is a safe
-// default that new users can adjust before saving.
+// Starting state of the rule modal during onboarding. A weekly citywide summary
+// is low-volume, but no topics are pre-selected: unwanted subscriptions add
+// sending cost, so users should opt in only to topics they care about.
 export const STARTER_RULE: StarterRule = {
   name: "Weekly Summary",
   deliveryFrequency: "weekly",
-  topics: [
-    "missing_middle_housing",
-    "zoning_or_development_meeting_or_approval",
-    "street_safety_or_traffic_calming",
-    "transit_funding",
-  ],
+  topics: [],
 };
 
 /**

@@ -7,7 +7,6 @@ import {
   shouldShowWelcome,
 } from '../../lib/onboarding';
 import { getSafeRedirectPath } from '../../lib/redirects';
-import { ALL_TOPICS } from '../../lib/topics';
 
 describe('shouldShowWelcome', () => {
   it('shows welcome when the flag is set and the user has no rules', () => {
@@ -40,15 +39,12 @@ describe('buildEmailConfirmationRedirect', () => {
 });
 
 describe('STARTER_RULE', () => {
-  it('is a valid weekly rule (weekly rules require at least one topic)', () => {
+  it('starts as a named weekly rule', () => {
     expect(STARTER_RULE.deliveryFrequency).toBe('weekly');
-    expect(STARTER_RULE.topics.length).toBeGreaterThan(0);
     expect(STARTER_RULE.name.trim()).not.toBe('');
   });
 
-  it('only uses topics offered in the rule form', () => {
-    for (const topic of STARTER_RULE.topics) {
-      expect(ALL_TOPICS).toContain(topic);
-    }
+  it('pre-selects no topics so users opt in only to what they care about', () => {
+    expect(STARTER_RULE.topics).toEqual([]);
   });
 });

@@ -117,8 +117,8 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
       <div data-testid="welcome-banner" class="mb-6 bg-blue-50 border border-blue-200 text-blue-900 px-5 py-4 rounded-lg">
         <h2 class="text-lg font-semibold mb-1">Welcome! One more step to start getting emails</h2>
         <p class="text-sm text-blue-800">
-          You'll only receive emails once you create an alert. We've suggested a weekly summary to get you
-          started. Adjust the topics, switch to a daily digest, or save it as is. You can change it anytime.
+          You'll only receive emails once you create an alert. Pick the topics you care about for a weekly
+          summary, or switch to a daily digest. You can change it anytime.
         </p>
       </div>
     )}
@@ -762,13 +762,13 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
       btn?.addEventListener('click', openNewRuleModal);
     });
 
-    // Onboarding: open the new-rule modal pre-filled with the suggested starter rule
+    // Onboarding: open the new-rule modal in its starter state
     function openStarterRuleModal(starterRule: StarterRule) {
       openNewRuleModal();
       modalTitle!.textContent = 'Create Your First Alert';
       if (modalSubtitle) {
         modalSubtitle.textContent =
-          "You'll only receive emails once you save an alert. We've suggested a weekly summary; adjust it or save it as is.";
+          "You'll only receive emails once you save an alert. Pick the topics you care about.";
       }
       ruleNameInput.value = starterRule.name;
 
