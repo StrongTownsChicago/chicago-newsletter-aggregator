@@ -4,12 +4,13 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import AuthButton from '../../components/AuthButton.astro';
 import { supabase } from '../../lib/supabase';
+import { NEWSLETTER_DETAIL_SELECT } from '../../lib/newsletter-queries';
 
 const { id } = Astro.params;
 
 const { data: newsletter, error } = await supabase
   .from('newsletters')
-  .select('*, sources(*)')
+  .select(NEWSLETTER_DETAIL_SELECT)
   .eq('id', id)
   .single();
 
