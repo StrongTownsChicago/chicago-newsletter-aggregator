@@ -8,7 +8,6 @@ prefix default to Ollama for backward compatibility.
 """
 
 import json
-import re
 import time
 from typing import Any
 
@@ -20,10 +19,6 @@ MAX_LLM_RETRIES = 6
 
 SUPPORTED_PROVIDERS = ("ollama", "openai")
 DEFAULT_PROVIDER = "ollama"
-
-# OpenAI reasoning models do not support temperature, top_p, or other sampling params.
-# These models use reasoning_effort instead. Pattern matches o1, o3, o4, gpt-5 families.
-_OPENAI_REASONING_MODEL_RE = re.compile(r"^(o\d|gpt-5)")
 
 # Lazy-initialized clients (None until first use)
 _ollama_client: Client | None = None
@@ -104,7 +99,8 @@ def call_llm(
         model: Model identifier with optional provider prefix
         prompt: Prompt text to send to the LLM
         schema: Optional Pydantic model JSON schema for structured output
-        temperature: Sampling temperature (0 = deterministic)
+        temperature: Sampling temperature (0 = deterministic). Ollama only; OpenAI
+            reasoning models reject sampling params, so it is not sent to OpenAI.
         max_retries: Maximum retry attempts on failure
 
     Returns:
@@ -117,7 +113,7 @@ def call_llm(
     provider, model_name = parse_model_string(model)
 
     if provider == "openai":
-        return _call_openai(model_name, prompt, schema, temperature, max_retries)
+        return _call_openai(model_name, prompt, schema, max_retries)
     return _call_ollama(model_name, prompt, schema, temperature, max_retries)
 
 
@@ -243,20 +239,20 @@ def _call_openai(
     model: str,
     prompt: str,
     schema: dict[str, Any] | None,
-    temperature: float,
     max_retries: int,
 ) -> str:
     """
     Call an OpenAI model with structured output and exponential backoff retry.
 
     Uses response_format with json_schema for structured output, maintaining the
-    same JSON string return type as the Ollama adapter.
+    same JSON string return type as the Ollama adapter. Sampling params such as
+    temperature are never sent: current OpenAI models are reasoning models and
+    reject them with a 400.
 
     Args:
         model: OpenAI model name (e.g., "gpt-5")
         prompt: Prompt text
         schema: Optional JSON schema for structured output
-        temperature: Sampling temperature
         max_retries: Maximum retry attempts
 
     Returns:
@@ -279,13 +275,6 @@ def _call_openai(
             },
         }
 
-    # Reasoning models (o-series, gpt-5) do not accept temperature or other
-    # sampling parameters — omit them entirely to avoid 400 errors.
-    is_reasoning_model = bool(_OPENAI_REASONING_MODEL_RE.match(model))
-    extra_params: dict[str, Any] = (
-        {} if is_reasoning_model else {"temperature": temperature}
-    )
-
     for attempt in range(max_retries):
         try:
             if openai_response_format is not None:
@@ -293,13 +282,11 @@ def _call_openai(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
                     response_format=openai_response_format,
-                    **extra_params,
                 )
             else:
                 completion = client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": prompt}],
-                    **extra_params,
                 )
             message = completion.choices[0].message
 

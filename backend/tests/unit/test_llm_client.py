@@ -80,7 +80,7 @@ class TestCallLLMDispatch(unittest.TestCase):
         """'openai:gpt-5' routes to _call_openai with 'gpt-5'"""
         mock_openai.return_value = '{"topics": []}'
         call_llm("openai:gpt-5", "test prompt")
-        mock_openai.assert_called_once_with("gpt-5", "test prompt", None, 0, 6)
+        mock_openai.assert_called_once_with("gpt-5", "test prompt", None, 6)
 
     @patch("processing.llm_client._call_ollama")
     def test_dispatches_bare_name_to_ollama(self, mock_ollama):
@@ -252,36 +252,20 @@ class TestCallOpenAI(unittest.TestCase):
         mock_client = create_mock_openai_client('{"topics": ["bike_lanes"]}')
         mock_get_client.return_value = mock_client
 
-        result = _call_openai("gpt-5", "test prompt", None, 0, 3)
+        result = _call_openai("gpt-5", "test prompt", None, 3)
         self.assertEqual(result, '{"topics": ["bike_lanes"]}')
 
     @patch("processing.llm_client._get_openai_client")
-    def test_passes_temperature_for_standard_models(self, mock_get_client):
-        """Temperature is passed as a top-level kwarg for standard (non-reasoning) models."""
+    def test_never_sends_sampling_params(self, mock_get_client):
+        """OpenAI reasoning models reject temperature with a 400, so it is never sent."""
         mock_client = create_mock_openai_client('{"result": "ok"}')
         mock_get_client.return_value = mock_client
 
-        _call_openai("gpt-4o", "test prompt", None, 0.5, 3)
+        call_llm("openai:gpt-6-luna", "test prompt", {"type": "object"}, 0.7)
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
-        self.assertEqual(call_kwargs["temperature"], 0.5)
-        self.assertNotIn("options", call_kwargs)
-
-    @patch("processing.llm_client._get_openai_client")
-    def test_omits_temperature_for_reasoning_models(self, mock_get_client):
-        """Reasoning models (o-series, gpt-5) must not receive temperature param."""
-        mock_client = create_mock_openai_client('{"result": "ok"}')
-        mock_get_client.return_value = mock_client
-
-        for model in ("gpt-5", "gpt-5-mini", "o1", "o3-mini", "o4-mini"):
-            mock_client.chat.completions.create.reset_mock()
-            _call_openai(model, "test prompt", None, 0, 3)
-            call_kwargs = mock_client.chat.completions.create.call_args[1]
-            self.assertNotIn(
-                "temperature",
-                call_kwargs,
-                msg=f"temperature should be omitted for reasoning model '{model}'",
-            )
+        self.assertNotIn("temperature", call_kwargs)
+        self.assertNotIn("top_p", call_kwargs)
 
     @patch("processing.llm_client._get_openai_client")
     def test_schema_passed_as_response_format(self, mock_get_client):
@@ -290,7 +274,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_get_client.return_value = mock_client
         schema = {"type": "object", "properties": {"topics": {"type": "array"}}}
 
-        _call_openai("gpt-5", "test prompt", schema, 0, 3)
+        _call_openai("gpt-5", "test prompt", schema, 3)
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
         self.assertIn("response_format", call_kwargs)
@@ -306,7 +290,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_client = create_mock_openai_client("plain text response")
         mock_get_client.return_value = mock_client
 
-        _call_openai("gpt-5", "test prompt", None, 0, 3)
+        _call_openai("gpt-5", "test prompt", None, 3)
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
         self.assertNotIn("response_format", call_kwargs)
@@ -327,7 +311,7 @@ class TestCallOpenAI(unittest.TestCase):
         ]
         mock_get_client.return_value = mock_client
 
-        result = _call_openai("gpt-5", "test prompt", None, 0, 6)
+        result = _call_openai("gpt-5", "test prompt", None, 6)
         self.assertEqual(result, '{"topics": []}')
         self.assertEqual(mock_sleep.call_count, 2)
 
@@ -341,7 +325,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_get_client.return_value = mock_client
 
         with self.assertRaises(Exception) as ctx:
-            _call_openai("gpt-5", "test prompt", None, 0, 3)
+            _call_openai("gpt-5", "test prompt", None, 3)
         self.assertIn("failed after 3 attempts", str(ctx.exception))
 
     @patch("processing.llm_client._get_openai_client")
@@ -355,7 +339,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_get_client.return_value = mock_client
 
         with self.assertRaises(Exception) as ctx:
-            _call_openai("gpt-5", "test prompt", None, 0, 2)
+            _call_openai("gpt-5", "test prompt", None, 2)
         self.assertIn("empty response", str(ctx.exception).lower())
 
     @patch("processing.llm_client._get_openai_client")
@@ -373,7 +357,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_get_client.return_value = mock_client
 
         with self.assertRaises(Exception) as ctx:
-            _call_openai("gpt-5", "test prompt", None, 0, 2)
+            _call_openai("gpt-5", "test prompt", None, 2)
         self.assertIn("refused", str(ctx.exception).lower())
 
     @patch("processing.llm_client._get_openai_client")
@@ -396,7 +380,7 @@ class TestCallOpenAI(unittest.TestCase):
         mock_get_client.return_value = mock_client
 
         with self.assertRaises(Exception):
-            _call_openai("gpt-5", "test prompt", None, 0, 2)
+            _call_openai("gpt-5", "test prompt", None, 2)
 
 
 class TestAddAdditionalPropertiesFalse(unittest.TestCase):

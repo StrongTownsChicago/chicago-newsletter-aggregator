@@ -715,6 +715,15 @@
     },
     {
       "provider": "openai",
+      "model": "gpt-6-luna",
+      "input_cost_per_1m": 0.1,
+      "output_cost_per_1m": 0.5,
+      "context_window": 1050000,
+      "encoding": "o200k_base",
+      "notes": "Pricing as of 2026-10"
+    },
+    {
+      "provider": "openai",
       "model": "gpt-5.4-mini",
       "input_cost_per_1m": 0.75,
       "output_cost_per_1m": 4.5,
