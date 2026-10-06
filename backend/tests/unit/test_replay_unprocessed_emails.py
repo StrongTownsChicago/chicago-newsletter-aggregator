@@ -186,10 +186,18 @@ class TestGroupingAndFormatting(unittest.TestCase):
         self.assertEqual(find_unmatched_requested_uids(None, []), [])
 
     def test_follow_up_includes_ingestion_and_llm_backfill(self):
-        commands = format_follow_up_commands(42)
+        commands = format_follow_up_commands()
 
         self.assertIn("uv run python -m ingest.email.process_emails", commands)
-        self.assertIn("--missing-metadata --latest 42", commands)
+        self.assertIn("process_llm_metadata --missing-metadata\n", commands)
+
+    def test_follow_up_backfill_has_no_latest_limit(self):
+        # Replayed emails are older than newer metadata-less newsletters, so a
+        # --latest N limit would select the newer ones and skip the replayed ones
+        self.assertNotIn("--latest", format_follow_up_commands())
+
+    def test_follow_up_warns_about_notifications(self):
+        self.assertIn("ENABLE_NOTIFICATIONS=true", format_follow_up_commands())
 
 
 class TestMarkCandidatesUnread(unittest.TestCase):
@@ -303,7 +311,7 @@ class TestMain(unittest.TestCase):
         self.mailbox.delete.assert_not_called()
         self.mailbox.move.assert_not_called()
         self.assertIn("Marked 2 email(s) unread.", output)
-        self.assertIn("--missing-metadata --latest 2", output)
+        self.assertIn("process_llm_metadata --missing-metadata", output)
 
     def test_apply_respects_source_filter(self):
         self.run_main("--apply", "--source-id", "21")

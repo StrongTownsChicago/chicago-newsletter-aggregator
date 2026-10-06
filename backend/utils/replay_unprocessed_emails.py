@@ -25,13 +25,19 @@ Usage:
 
 Follow-up after --apply:
     $ uv run python -m ingest.email.process_emails
-    $ uv run python -m utils.process_llm_metadata --missing-metadata --latest N
+    $ uv run python -m utils.process_llm_metadata --missing-metadata
+
+    No --latest limit: replayed emails keep their original received_date, so
+    newer newsletters missing metadata would sort ahead of them and crowd them out.
 
 Notes:
     - The only mailbox change ever made is clearing \\Seen on selected UIDs, and
       only with --apply. Nothing is marked read, moved, or deleted.
     - Messages whose sender is still unmapped are never selected; ingestion
       would just skip them again.
+    - Whichever ingestion run stores replayed emails queues notifications if
+      ENABLE_NOTIFICATIONS=true (as in the scheduled GitHub Actions workflow),
+      so matching rules will alert users about these older newsletters.
 
 Required environment variables (.env file):
     - GMAIL_ADDRESS, GMAIL_APP_PASSWORD
@@ -195,13 +201,15 @@ def mark_candidates_unread(mailbox: Any, candidates: list[ReplayCandidate]) -> N
     )
 
 
-def format_follow_up_commands(replayed_count: int) -> str:
+def format_follow_up_commands() -> str:
     """Commands to ingest the replayed emails and backfill their LLM metadata."""
     return (
         "Next steps (from backend/):\n"
         "    uv run python -m ingest.email.process_emails\n"
-        "    uv run python -m utils.process_llm_metadata "
-        f"--missing-metadata --latest {replayed_count}"
+        "    uv run python -m utils.process_llm_metadata --missing-metadata\n"
+        "Note: an ingestion run with ENABLE_NOTIFICATIONS=true (including the "
+        "scheduled GitHub Actions workflow) queues digest notifications for "
+        "replayed emails that match user rules."
     )
 
 
@@ -275,7 +283,7 @@ def main() -> None:
         else:
             print("DRY RUN: nothing was changed. Re-run with --apply to replay.")
 
-    print(format_follow_up_commands(len(candidates)))
+    print(format_follow_up_commands())
 
 
 if __name__ == "__main__":
