@@ -1,6 +1,6 @@
 -- CHICAGO ALDERMAN NEWSLETTER TRACKER - DATABASE SCHEMA
 -- Schema definition for Supabase (PostgreSQL)
--- Updated: 2026-02-01
+-- Updated: 2026-10-05
 
 -- ============================================================================
 -- 1. EXTENSIONS & FUNCTIONS
@@ -261,30 +261,51 @@ CREATE TRIGGER update_notification_rules_updated_at
 -- ============================================================================
 -- 5. ROW-LEVEL SECURITY (RLS)
 -- ============================================================================
+-- Mirrors migrations/006_enable_rls_public_tables.sql (production policies).
+-- * Default deny: with RLS enabled, any command without a permissive policy is
+--   denied for anon/authenticated. Do not add write policies to the public
+--   content tables; ingestion writes with the service key.
+-- * service_role bypasses RLS entirely, so backend jobs are unaffected.
+-- * "Block non-service inserts/updates" use literal FALSE: deny-all gates,
+--   not grants. Redundant with default deny; kept as belt-and-braces.
+-- * TO public means "every role". auth.uid() is NULL for anon, so owner
+--   checks (auth.uid() = user_id) deny anonymous requests.
+
+-- SOURCES: public read-only
+ALTER TABLE public.sources ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read sources" ON public.sources FOR SELECT TO public USING (true);
+
+-- NEWSLETTERS: public read-only
+ALTER TABLE public.newsletters ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read newsletters" ON public.newsletters FOR SELECT TO public USING (true);
+CREATE POLICY "Block non-service inserts" ON public.newsletters FOR INSERT TO public WITH CHECK (false);
+CREATE POLICY "Block non-service updates" ON public.newsletters FOR UPDATE TO public USING (false);
+
+-- EMAIL_SOURCE_MAPPINGS: service role only (RLS on, intentionally no policies)
+ALTER TABLE public.email_source_mappings ENABLE ROW LEVEL SECURITY;
 
 -- USER_PROFILES
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT TO public USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE TO public USING (auth.uid() = id);
 
 -- NOTIFICATION_RULES
 ALTER TABLE public.notification_rules ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own rules" ON public.notification_rules FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own rules" ON public.notification_rules FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own rules" ON public.notification_rules FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own rules" ON public.notification_rules FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own rules" ON public.notification_rules FOR SELECT TO public USING (auth.uid() = user_id);
+CREATE POLICY "Users can create own rules" ON public.notification_rules FOR INSERT TO public WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own rules" ON public.notification_rules FOR UPDATE TO public USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own rules" ON public.notification_rules FOR DELETE TO public USING (auth.uid() = user_id);
 
--- NOTIFICATION_QUEUE
+-- NOTIFICATION_QUEUE (writes via service role)
 ALTER TABLE public.notification_queue ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own queued notifications" ON public.notification_queue FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own queued notifications" ON public.notification_queue FOR SELECT TO public USING (auth.uid() = user_id);
 
--- NOTIFICATION_HISTORY
+-- NOTIFICATION_HISTORY (writes via service role)
 ALTER TABLE public.notification_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own notification history" ON public.notification_history FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own notification history" ON public.notification_history FOR SELECT TO public USING (auth.uid() = user_id);
 
--- WEEKLY_TOPIC_REPORTS
+-- WEEKLY_TOPIC_REPORTS: service role only (no frontend reads this table)
 ALTER TABLE public.weekly_topic_reports ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "All authenticated users can view weekly reports" ON public.weekly_topic_reports FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Service role can manage weekly topic reports" ON public.weekly_topic_reports FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ============================================================================
