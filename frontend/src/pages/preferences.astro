@@ -6,6 +6,7 @@ import AuthButton from '../components/AuthButton.astro';
 import { notificationsEnabled } from '../lib/supabase';
 import type { UserProfile, NotificationRule } from '../lib/supabase';
 import { STARTER_RULE, shouldShowWelcome } from '../lib/onboarding';
+import { TOPIC_CATEGORIES } from '../lib/topics';
 
 // Redirect if notifications are disabled
 if (!notificationsEnabled()) {
@@ -65,32 +66,6 @@ const availableWards = Array.from(new Set(
 
 const userProfile = profile as UserProfile | null;
 const notificationRules = (rules as NotificationRule[]) || [];
-
-// Topics grouped by category (from backend/processing/llm_processor.py)
-const TOPIC_CATEGORIES = {
-  "Incremental Housing": [
-    "4_flats_legalization",
-    "missing_middle_housing",
-    "accessory_dwelling_units",
-    "single_stair_reform"
-  ],
-  "Streets": [
-    "bike_lanes",
-    "street_redesign",
-    "street_safety_or_traffic_calming"
-  ],
-  "Transit": [
-    "transit_funding"
-  ],
-  "Transparency": [
-    "city_budget",
-    "tax_policy"
-  ],
-  "Governance": [
-    "zoning_or_development_meeting_or_approval",
-    "city_charter"
-  ]
-};
 
 // Format topic for display
 function formatTopic(topic: string): string {
@@ -373,7 +348,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
       <!-- Modal Header -->
       <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
         <h3 id="modalTitle" class="text-2xl font-bold text-gray-900">Add Notification Rule</h3>
-        <p class="text-sm text-gray-600 mt-1">Configure when you want to receive email notifications</p>
+        <p id="modalSubtitle" class="text-sm text-gray-600 mt-1">Configure when you want to receive email notifications</p>
       </div>
 
       <!-- Modal Body -->
@@ -652,6 +627,8 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
 
     const modal = document.getElementById('ruleModal');
     const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const defaultModalSubtitle = modalSubtitle?.textContent ?? '';
     const ruleForm = document.getElementById('ruleForm') as HTMLFormElement;
     const ruleIdInput = document.getElementById('ruleId') as HTMLInputElement;
     const ruleNameInput = document.getElementById('ruleName') as HTMLInputElement;
@@ -764,6 +741,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
     // Open modal for a new rule, reset to the default (daily) state
     function openNewRuleModal() {
       modalTitle!.textContent = 'Add Notification Rule';
+      if (modalSubtitle) modalSubtitle.textContent = defaultModalSubtitle;
       ruleForm.action = '/api/notifications/create-rule';
       ruleForm.reset();
       ruleIdInput.value = '';
@@ -788,6 +766,10 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
     function openStarterRuleModal(starterRule: StarterRule) {
       openNewRuleModal();
       modalTitle!.textContent = 'Create Your First Alert';
+      if (modalSubtitle) {
+        modalSubtitle.textContent =
+          "You'll only receive emails once you save an alert. We've suggested a weekly summary; adjust it or save it as is.";
+      }
       ruleNameInput.value = starterRule.name;
 
       notificationTypeRadios.forEach(radio => {
@@ -820,6 +802,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
         const ruleActive = target.dataset.ruleActive === 'true';
 
         modalTitle!.textContent = 'Edit Notification Rule';
+        if (modalSubtitle) modalSubtitle.textContent = defaultModalSubtitle;
         ruleForm.action = '/api/notifications/update-rule';
         ruleIdInput.value = ruleId || '';
         ruleNameInput.value = ruleName || '';

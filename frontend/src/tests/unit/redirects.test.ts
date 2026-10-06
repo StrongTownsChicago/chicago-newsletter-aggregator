@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { buildLoginUrl, getSafeRedirectPath } from '../../lib/redirects';
 
 describe('getSafeRedirectPath', () => {
+  it('keeps encoded slashes as same-origin paths', () => {
+    expect(getSafeRedirectPath('/%2F/evil.com', '/')).toBe('/%2F/evil.com');
+  });
+
   it('returns relative paths unchanged, including query and hash', () => {
     expect(getSafeRedirectPath('/preferences?welcome=1', '/')).toBe('/preferences?welcome=1');
     expect(getSafeRedirectPath('/search?q=cta#results', '/')).toBe('/search?q=cta#results');
@@ -16,6 +20,16 @@ describe('getSafeRedirectPath', () => {
     ['backslash host trick', '/\\evil.com'],
     ['javascript URL', 'javascript:alert(1)'],
     ['path without leading slash', 'preferences'],
+    ['dot segment before double slash', '/.//evil.com'],
+    ['parent segment before double slash', '/a/..//evil.com'],
+    ['encoded dot segment', '/%2e//evil.com'],
+    ['mixed encoded dot segments', '/.%2e//evil.com'],
+    ['encoded parent segment', '/%2e%2e//evil.com'],
+    ['dot segment before backslash', '/./\\evil.com'],
+    ['tab inside dot segment', '/.\t//evil.com'],
+    ['dot segment before slash-backslash', '/.//\\evil.com'],
+    ['tab after leading slash', '/\t/evil.com'],
+    ['newline after leading slash', '/\n/evil.com'],
   ])('falls back for %s', (_label, candidate) => {
     expect(getSafeRedirectPath(candidate, '/')).toBe('/');
   });

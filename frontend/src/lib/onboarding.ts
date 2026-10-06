@@ -3,8 +3,9 @@
 
 export const WELCOME_PATH = "/preferences?welcome=1";
 
-export const CONFIRMED_EMAIL_MESSAGE =
-  "Thanks for confirming your email. Sign in to set up your first alert.";
+// Neutral wording: Supabase also uses this redirect when confirmation fails
+// (e.g. an expired link), so the message must not claim success.
+export const CONFIRMED_EMAIL_MESSAGE = "Sign in to set up your first alert.";
 
 export interface StarterRule {
   name: string;

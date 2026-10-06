@@ -68,17 +68,20 @@ describe('Auth API Routes', () => {
       expect(response.headers.get('Location')).toBe(WELCOME_PATH);
     });
 
-    it('ignores an off-site next path and redirects to /', async () => {
-      successfulSignIn();
+    it.each(['//evil.com', '/.//evil.com', 'https://evil.com'])(
+      'ignores off-site next path %s and redirects to /',
+      async (next) => {
+        successfulSignIn();
 
-      const context = createMockContext({
-        formData: { email: 'test@example.com', password: 'password123', next: '//evil.com' },
-      });
+        const context = createMockContext({
+          formData: { email: 'test@example.com', password: 'password123', next },
+        });
 
-      const response = await signinPOST(context);
+        const response = await signinPOST(context);
 
-      expect(response.headers.get('Location')).toBe('/');
-    });
+        expect(response.headers.get('Location')).toBe('/');
+      },
+    );
 
     it('preserves next when signin fails so the user can retry', async () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
