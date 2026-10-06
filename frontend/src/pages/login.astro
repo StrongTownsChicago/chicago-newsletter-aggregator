@@ -3,16 +3,20 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import { notificationsEnabled } from '../lib/supabase';
+import { getSafeRedirectPath } from '../lib/redirects';
 
 // Redirect if notifications are disabled
 if (!notificationsEnabled()) {
   return Astro.redirect('/');
 }
 
-// Redirect to home if already logged in
+// Where to send the user after signing in (e.g. onboarding after email confirmation)
+const next = getSafeRedirectPath(Astro.url.searchParams.get('next'), '/');
+
+// Skip the form if already logged in
 const user = Astro.locals.user;
 if (user) {
-  return Astro.redirect('/');
+  return Astro.redirect(next);
 }
 
 const error = Astro.url.searchParams.get('error');
@@ -59,6 +63,8 @@ const message = Astro.url.searchParams.get('message');
         )}
 
         <form class="space-y-5" action="/api/auth/signin" method="POST" enctype="application/x-www-form-urlencoded">
+          <input type="hidden" name="next" value={next} />
+
           <div>
             <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
               Email address

@@ -5,6 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import AuthButton from '../components/AuthButton.astro';
 import { notificationsEnabled } from '../lib/supabase';
 import type { UserProfile, NotificationRule } from '../lib/supabase';
+import { STARTER_RULE, shouldShowWelcome } from '../lib/onboarding';
 
 // Redirect if notifications are disabled
 if (!notificationsEnabled()) {
@@ -15,7 +16,8 @@ const user = Astro.locals.user;
 
 // Protect this route - require authentication
 if (!user) {
-  return Astro.redirect('/login');
+  const returnPath = `${Astro.url.pathname}${Astro.url.search}`;
+  return Astro.redirect(`/login?next=${encodeURIComponent(returnPath)}`);
 }
 
 const supabase = Astro.locals.supabase;
@@ -103,6 +105,9 @@ const canCreateRule = notificationRules.length < maxRules;
 
 const error = Astro.url.searchParams.get('error');
 const message = Astro.url.searchParams.get('message');
+
+// First visit after signup: explain that alerts require a rule and pre-open the rule modal
+const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.length);
 ---
 
 <Layout title="Notification Preferences - Chicago Alderman Newsletter Tracker">
@@ -132,6 +137,16 @@ const message = Astro.url.searchParams.get('message');
       <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
       <a href="/preferences" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Preferences</a>
     </nav>
+
+    {isWelcome && (
+      <div data-testid="welcome-banner" class="mb-6 bg-blue-50 border border-blue-200 text-blue-900 px-5 py-4 rounded-lg">
+        <h2 class="text-lg font-semibold mb-1">Welcome! One more step to start getting emails</h2>
+        <p class="text-sm text-blue-800">
+          You'll only receive emails once you create an alert. We've suggested a weekly summary to get you
+          started. Adjust the topics, switch to a daily digest, or save it as is. You can change it anytime.
+        </p>
+      </div>
+    )}
 
     {error && (
       <div class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
@@ -350,7 +365,10 @@ const message = Astro.url.searchParams.get('message');
   </div>
 
   <!-- Add/Edit Rule Modal -->
-  <div id="ruleModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div
+    id="ruleModal"
+    data-starter-rule={isWelcome ? JSON.stringify(STARTER_RULE) : undefined}
+    class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
       <!-- Modal Header -->
       <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
@@ -630,6 +648,8 @@ const message = Astro.url.searchParams.get('message');
   </div>
 
   <script>
+    import type { StarterRule } from '../lib/onboarding';
+
     const modal = document.getElementById('ruleModal');
     const modalTitle = document.getElementById('modalTitle');
     const ruleForm = document.getElementById('ruleForm') as HTMLFormElement;
@@ -741,26 +761,51 @@ const message = Astro.url.searchParams.get('message');
     // Initialize on page load
     toggleNotificationTypeSections();
 
-    // Open modal for new rule
+    // Open modal for a new rule, reset to the default (daily) state
+    function openNewRuleModal() {
+      modalTitle!.textContent = 'Add Notification Rule';
+      ruleForm.action = '/api/notifications/create-rule';
+      ruleForm.reset();
+      ruleIdInput.value = '';
+      searchTermInput.value = '';
+
+      // Reset to default (daily)
+      notificationTypeRadios[0].checked = true;
+
+      // Reset wards UI
+      wardSelectionContainer?.classList.add('hidden');
+      if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
+
+      toggleNotificationTypeSections();
+      modal?.classList.remove('hidden');
+    }
+
     addRuleBtns.forEach(btn => {
-      btn?.addEventListener('click', () => {
-        modalTitle!.textContent = 'Add Notification Rule';
-        ruleForm.action = '/api/notifications/create-rule';
-        ruleForm.reset();
-        ruleIdInput.value = '';
-        searchTermInput.value = '';
-
-        // Reset to default (daily)
-        notificationTypeRadios[0].checked = true;
-
-        // Reset wards UI
-        wardSelectionContainer?.classList.add('hidden');
-        if (toggleWardsBtn) toggleWardsBtn.textContent = 'Show Wards';
-
-        toggleNotificationTypeSections();
-        modal?.classList.remove('hidden');
-      });
+      btn?.addEventListener('click', openNewRuleModal);
     });
+
+    // Onboarding: open the new-rule modal pre-filled with the suggested starter rule
+    function openStarterRuleModal(starterRule: StarterRule) {
+      openNewRuleModal();
+      modalTitle!.textContent = 'Create Your First Alert';
+      ruleNameInput.value = starterRule.name;
+
+      notificationTypeRadios.forEach(radio => {
+        radio.checked = radio.value === starterRule.deliveryFrequency;
+      });
+      toggleNotificationTypeSections();
+
+      const visibleSection = starterRule.deliveryFrequency === 'weekly' ? weeklyOptionsSection : dailyOptionsSection;
+      const topicCheckboxes = visibleSection?.querySelectorAll('input[name="topics"]') as NodeListOf<HTMLInputElement>;
+      topicCheckboxes?.forEach(checkbox => {
+        checkbox.checked = starterRule.topics.includes(checkbox.value);
+      });
+    }
+
+    const starterRuleData = modal?.dataset.starterRule;
+    if (starterRuleData) {
+      openStarterRuleModal(JSON.parse(starterRuleData) as StarterRule);
+    }
 
     // Open modal for editing rule
     editRuleBtns.forEach(btn => {
