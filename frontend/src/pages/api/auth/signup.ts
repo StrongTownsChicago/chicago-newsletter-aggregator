@@ -1,8 +1,9 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase, notificationsEnabled } from "../../../lib/supabase";
+import { WELCOME_PATH, buildEmailConfirmationRedirect } from "../../../lib/onboarding";
 
-export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (!notificationsEnabled()) {
     return new Response("Notifications are disabled", { status: 404 });
   }
@@ -22,6 +23,9 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: buildEmailConfirmationRedirect(url.origin),
+    },
   });
 
   if (error) {
@@ -30,7 +34,9 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
 
   // Check if email confirmation is required
   if (data.user && !data.session) {
-    return redirect("/signup?message=Check your email to confirm your account");
+    return redirect(
+      "/signup?message=Check your email to confirm your account, then sign in to set up your first alert",
+    );
   }
 
   // If session is created immediately (email confirmation disabled)
@@ -51,7 +57,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
 
-    return redirect("/preferences");
+    return redirect(WELCOME_PATH);
   }
 
   return redirect("/login?message=Account created successfully");
