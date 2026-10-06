@@ -106,17 +106,51 @@ def sanitize_content(
     return result
 
 
+SQL_ANY_CHARACTERS_WILDCARD = "%"
+
+
+def email_matches_pattern(email: str, pattern: str) -> bool:
+    """
+    Check whether a sender address matches an email_source_mappings pattern.
+
+    The whole address must match the whole pattern (no substring matching),
+    case-insensitively, with surrounding whitespace ignored on both sides.
+    `%` matches any run of characters (including none), as in SQL LIKE, and
+    may appear anywhere in the pattern. Every other character, including
+    regex metacharacters such as `.` and `+`, matches only itself.
+
+    The SQL single-character wildcard `_` is deliberately NOT supported:
+    underscores legitimately appear in email addresses, so it is treated as
+    a literal character.
+
+    Examples:
+        email_matches_pattern("info@40thward.org", "%@40thward.org") -> True
+        email_matches_pattern("x@40thward.org.evil.io", "%@40thward.org") -> False
+        email_matches_pattern("Ward23@CityOfChicago.org", "ward23@cityofchicago.org") -> True
+    """
+    normalized_email = email.strip()
+    normalized_pattern = pattern.strip()
+    if not normalized_email or not normalized_pattern:
+        return False
+
+    escaped_wildcard = re.escape(SQL_ANY_CHARACTERS_WILDCARD)
+    regex_pattern = re.escape(normalized_pattern).replace(escaped_wildcard, ".*")
+    return (
+        re.fullmatch(regex_pattern, normalized_email, flags=re.IGNORECASE) is not None
+    )
+
+
 def lookup_source_by_email(
     from_email: str, supabase_client: Any
 ) -> dict[str, Any] | None:
     """
     Match sender email to source using email_source_mappings table.
 
-    Supports SQL wildcard patterns (e.g., '%@40thward.org') and exact matches.
-    Returns full source record with joined data, or None if no match found.
+    Patterns are matched against the full sender address via
+    email_matches_pattern() (exact match, or SQL `%` wildcards such as
+    '%@40thward.org'). Returns the first matching mapping's source record,
+    or None if no match is found.
     """
-    from_email_lower = from_email.lower()
-
     # Get all mappings with joined source data
     result = (
         supabase_client.table("email_source_mappings")
@@ -127,20 +161,10 @@ def lookup_source_by_email(
     if not result.data:
         return None
 
-    # Check each pattern for a match
     for mapping in result.data:
         mapping_dict = cast(dict[str, Any], mapping)
-        pattern = cast(str, mapping_dict["email_pattern"]).lower()
-
-        # Wildcard pattern (e.g., "%@40thward.org")
-        if "%" in pattern:
-            # Convert SQL wildcard to regex: % becomes .*
-            regex_pattern = pattern.replace("%", ".*").replace(".", r"\.")
-            if re.search(regex_pattern, from_email_lower):
-                return cast(dict[str, Any], mapping_dict["sources"])
-
-        # Exact match or substring match
-        elif pattern in from_email_lower or from_email_lower in pattern:
+        pattern = cast(str, mapping_dict["email_pattern"])
+        if email_matches_pattern(from_email, pattern):
             return cast(dict[str, Any], mapping_dict["sources"])
 
     return None
