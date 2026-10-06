@@ -41,6 +41,9 @@ uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
 uv run python -m utils.reprocess_newsletters_privacy <newsletter_id> --update
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 
+# Replay emails from senders mapped after arrival (dry run; --apply marks them unread for next ingestion)
+uv run python -m utils.replay_unprocessed_emails [--source-id 28] [--since 2026-09-01] [--apply]
+
 # Test notification rule matching (dry run)
 uv run python -m notifications.test_matcher
 
