@@ -10,16 +10,14 @@ export const CONFIRMED_EMAIL_MESSAGE = "Sign in to set up your first alert.";
 export interface StarterRule {
   name: string;
   deliveryFrequency: "daily" | "weekly";
-  topics: string[];
 }
 
 // Starting state of the rule modal during onboarding. A weekly citywide summary
-// is low-volume, but no topics are pre-selected: unwanted subscriptions add
-// sending cost, so users should opt in only to topics they care about.
+// is low-volume. Topics are intentionally never pre-selected: unwanted
+// subscriptions add sending cost, so users opt in only to topics they care about.
 export const STARTER_RULE: StarterRule = {
   name: "Weekly Summary",
   deliveryFrequency: "weekly",
-  topics: [],
 };
 
 /**

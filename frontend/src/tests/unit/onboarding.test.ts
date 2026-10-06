@@ -43,8 +43,4 @@ describe('STARTER_RULE', () => {
     expect(STARTER_RULE.deliveryFrequency).toBe('weekly');
     expect(STARTER_RULE.name.trim()).not.toBe('');
   });
-
-  it('pre-selects no topics so users opt in only to what they care about', () => {
-    expect(STARTER_RULE.topics).toEqual([]);
-  });
 });

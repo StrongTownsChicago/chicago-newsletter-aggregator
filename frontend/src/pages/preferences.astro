@@ -776,12 +776,6 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
         radio.checked = radio.value === starterRule.deliveryFrequency;
       });
       toggleNotificationTypeSections();
-
-      const visibleSection = starterRule.deliveryFrequency === 'weekly' ? weeklyOptionsSection : dailyOptionsSection;
-      const topicCheckboxes = visibleSection?.querySelectorAll('input[name="topics"]') as NodeListOf<HTMLInputElement>;
-      topicCheckboxes?.forEach(checkbox => {
-        checkbox.checked = starterRule.topics.includes(checkbox.value);
-      });
     }
 
     const starterRuleData = modal?.dataset.starterRule;
