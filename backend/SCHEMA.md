@@ -4,6 +4,15 @@ Complete reference for the Chicago Alderman Newsletter Tracker database schema.
 
 > **Authoritative Schema**: See `sql/schema.sql` for the exact SQL definitions.
 
+## Row-Level Security
+
+RLS is enabled on every public table. Policies are defined in `sql/schema.sql` (section 5) and `migrations/006_enable_rls_public_tables.sql`, which match production; see those files for the exact policy set.
+
+- **Default deny**: any command without a permissive policy is denied to `anon`/`authenticated`. `sources` and `newsletters` are public read-only; `email_source_mappings` and `weekly_topic_reports` have no public policies (backend only).
+- **`service_role` bypasses RLS**, so backend jobs using `SUPABASE_SERVICE_KEY` are unaffected.
+- **`Block non-service inserts/updates`** on `newsletters` use literal `false`: deny-all gates, not grants. Do not turn them into grants.
+- Owner-scoped tables (`user_profiles`, `notification_*`) check `auth.uid()`, which is null for anonymous requests.
+
 ## Core Tables
 
 ### `sources`
@@ -273,8 +282,8 @@ AI-generated weekly summaries for specific topics.
 
 **Row-Level Security**:
 
-- ✅ All authenticated users can view weekly reports
 - ✅ Service role has full access for backend operations
+- ❌ No `anon`/`authenticated` access (no frontend reads this table)
 
 **Indexes**:
 
@@ -317,3 +326,4 @@ Converts ISO week identifier to date range.
 | 003     | `003_weekly_topic_reports.sql`        | Added weekly topic reports (table, delivery_frequency, helpers) |
 | 004     | `004_polymorphic_notifications.sql`   | Polymorphic notification_queue (dedicated report_id column)     |
 | 005     | `005_weekly_rules_no_ward_filter.sql` | Constraint to prevent ward filters on weekly rules              |
+| 006     | `006_enable_rls_public_tables.sql`    | RLS on all public tables; codifies production policies          |
