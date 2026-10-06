@@ -85,7 +85,10 @@ const message = Astro.url.searchParams.get('message');
 const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.length);
 ---
 
-<Layout title="Notification Preferences - Chicago Alderman Newsletter Tracker">
+<Layout
+  title="Notification Preferences - Chicago Alderman Newsletter Tracker"
+  description="Manage your email alerts for Chicago alderman newsletters."
+>
   <div class="container mx-auto px-4 py-8 max-w-5xl">
     <!-- Top Bar with Auth -->
     <div class="mb-6 flex justify-end">

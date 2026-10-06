@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /preferences
+Disallow: /unsubscribe
+Disallow: /login
+Disallow: /signup
+Disallow: /api/
+
+Sitemap: https://chicago-newsletter-aggregator.open-advocacy.com/sitemap-index.xml

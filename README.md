@@ -222,6 +222,8 @@ Newsletter content is automatically sanitized to remove tracking links, unsubscr
 - **LLM Processing**: Manual local execution with Ollama (see `backend/docs/LOCAL_LLM_PROCESSING.md`)
 - **Frontend**: Auto-deploy via Cloudflare Pages on push to main
 
+**Search indexing**: The production URL is set as `site` in `frontend/astro.config.mjs`. The build emits `/sitemap-index.xml`, which references the static-route sitemap and the dynamic `/sitemap-newsletters.xml` (one entry per newsletter). Submit `https://chicago-newsletter-aggregator.open-advocacy.com/sitemap-index.xml` in Google Search Console; a Domain property on `open-advocacy.com` covers the subdomain. Requests on any other host (`*.pages.dev`, preview deployments) get `X-Robots-Tag: noindex` from `frontend/src/middleware.ts`.
+
 **GitHub Actions**: Both workflows support manual triggering and require secrets configured in repository Settings → Secrets (see workflow files for details).
 
 ## Environment Variables
