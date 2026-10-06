@@ -7,6 +7,8 @@ import Pagination from '../components/Pagination.astro';
 import AuthButton from '../components/AuthButton.astro';
 import { supabase, notificationsEnabled } from '../lib/supabase';
 import type { Newsletter, Source } from '../lib/supabase';
+import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
+import type { NewsletterCardRow } from '../lib/newsletter-queries';
 
 const searchQuery = Astro.url.searchParams.get('q') || '';
 const sourceTypeFilter = Astro.url.searchParams.get('source_type');
@@ -20,17 +22,17 @@ const start = (page - 1) * PAGE_SIZE;
 const end = start + PAGE_SIZE - 1;
 
 // Use !inner when we need to filter on sources table
-const sourcesJoin = (wardFilter || sourceTypeFilter) ? 'sources!inner(*)' : 'sources(*)';
+const filtersOnSource = Boolean(wardFilter || sourceTypeFilter);
 
 // Build count query with same filters
 let countQuery = supabase
   .from('newsletters')
-  .select(`*, ${sourcesJoin}`, { count: 'exact', head: true });
+  .select(buildNewsletterCountSelect({ filtersOnSource }), { count: 'exact', head: true });
 
 // Build data query
 let query = supabase
   .from('newsletters')
-  .select(`*, ${sourcesJoin}`)
+  .select(buildNewsletterCardSelect({ filtersOnSource }))
   .order('received_date', { ascending: false });
 
 // Apply filters to both queries
@@ -65,7 +67,8 @@ const { count } = await countQuery;
 const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
 
 // Get paginated data
-const { data: newsletters } = await query.range(start, end);
+const { data } = await query.range(start, end);
+const newsletters = data as NewsletterCardRow[] | null;
 
 // Get unique topics
 const { data: allTopics } = await supabase

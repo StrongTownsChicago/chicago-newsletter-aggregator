@@ -6,6 +6,8 @@ import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import AuthButton from '../components/AuthButton.astro';
 import { supabase, notificationsEnabled } from '../lib/supabase';
+import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
+import type { NewsletterCardRow } from '../lib/newsletter-queries';
 
 // Pagination setup
 const page = parseInt(Astro.url.searchParams.get('page') || '1');
@@ -16,16 +18,17 @@ const end = start + PAGE_SIZE - 1;
 // Get total count
 const { count } = await supabase
   .from('newsletters')
-  .select('*', { count: 'exact', head: true });
+  .select(buildNewsletterCountSelect({ filtersOnSource: false }), { count: 'exact', head: true });
 
 const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
 
 // Get paginated newsletters
-const { data: newsletters, error } = await supabase
+const { data, error } = await supabase
   .from('newsletters')
-  .select('*, sources(*)')
+  .select(buildNewsletterCardSelect({ filtersOnSource: false }))
   .order('received_date', { ascending: false })
   .range(start, end);
+const newsletters = data as NewsletterCardRow[] | null;
 
 if (error) {
   console.error('Error fetching newsletters:', error);
