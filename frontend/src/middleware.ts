@@ -1,5 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
 import { createClient } from "@supabase/supabase-js";
+import { isNonProductionHost } from "./lib/seo";
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
@@ -35,5 +36,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.session = session;
   context.locals.user = session?.user ?? null;
 
-  return next();
+  const response = await next();
+
+  // Cloudflare Pages also serves *.pages.dev and preview hosts; keep them out of search indexes.
+  if (isNonProductionHost(context.url.host, context.site)) {
+    response.headers.set("X-Robots-Tag", "noindex");
+  }
+
+  return response;
 });

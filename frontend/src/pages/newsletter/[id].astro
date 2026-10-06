@@ -5,6 +5,7 @@ import Layout from '../../layouts/Layout.astro';
 import AuthButton from '../../components/AuthButton.astro';
 import { supabase } from '../../lib/supabase';
 import { NEWSLETTER_DETAIL_SELECT } from '../../lib/newsletter-queries';
+import { buildNewsletterDescription } from '../../lib/seo';
 
 const { id } = Astro.params;
 
@@ -17,9 +18,15 @@ const { data: newsletter, error } = await supabase
 if (error || !newsletter) {
   return Astro.redirect('/404');
 }
+
+const description = buildNewsletterDescription(newsletter);
 ---
 
-<Layout title={`${newsletter.subject} - Chicago Alderman Newsletter Tracker`}>
+<Layout
+  title={`${newsletter.subject} - Chicago Alderman Newsletter Tracker`}
+  description={description}
+  type="article"
+>
   <div class="container mx-auto px-4 py-8 max-w-4xl">
     <!-- Top Bar with Auth -->
     <div class="mb-6 flex justify-between items-center">

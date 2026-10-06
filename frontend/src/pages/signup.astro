@@ -19,7 +19,10 @@ const error = Astro.url.searchParams.get('error');
 const message = Astro.url.searchParams.get('message');
 ---
 
-<Layout title="Sign Up - Chicago Alderman Newsletter Tracker">
+<Layout
+  title="Sign Up - Chicago Alderman Newsletter Tracker"
+  description="Create an account to get email alerts when Chicago aldermen send newsletters on the topics and wards you follow."
+>
   <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
     <div class="max-w-md w-full">
       <!-- Logo/Header -->

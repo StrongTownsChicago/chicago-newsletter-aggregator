@@ -26,6 +26,7 @@ vi.mock('astro:middleware', () => ({
 
 import { onRequest } from '../middleware';
 import { createMockContext } from './helpers';
+import type { APIContext } from 'astro';
 
 describe('Middleware', () => {
   beforeEach(() => {
@@ -75,5 +76,31 @@ describe('Middleware', () => {
 
     expect(context.locals.session).toBe(mockSession);
     expect(context.locals.user).toBe(mockSession.user);
+  });
+
+  describe('X-Robots-Tag', () => {
+    const productionSite = new URL('https://chicago-newsletter-aggregator.open-advocacy.com');
+
+    const runOnHost = async (requestUrl: string) => {
+      const context = {
+        ...createMockContext(),
+        url: new URL(requestUrl),
+        site: productionSite,
+      } as unknown as APIContext;
+      const next = vi.fn(() => Promise.resolve(new Response()));
+      return onRequest(context, next) as Promise<Response>;
+    };
+
+    it('does not add noindex on the production host', async () => {
+      const response = await runOnHost('https://chicago-newsletter-aggregator.open-advocacy.com/search');
+
+      expect(response.headers.get('X-Robots-Tag')).toBeNull();
+    });
+
+    it('adds noindex on Cloudflare Pages preview hosts', async () => {
+      const response = await runOnHost('https://abc123.chicago-newsletter-aggregator.pages.dev/');
+
+      expect(response.headers.get('X-Robots-Tag')).toBe('noindex');
+    });
   });
 });
