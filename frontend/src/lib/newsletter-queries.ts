@@ -33,6 +33,45 @@ export const SOURCE_DETAIL_COLUMNS = [
   "email_address",
 ] as const satisfies readonly (keyof Source)[];
 
+/**
+ * Source columns rendered in the ward page header (public contact info and
+ * links). Fetched in a separate sources query; the ward page's newsletter list
+ * still uses the card columns above.
+ */
+export const SOURCE_WARD_PROFILE_COLUMNS = [
+  "id",
+  "name",
+  "ward_number",
+  "website",
+  "signup_url",
+  "phone",
+  "email_address",
+] as const satisfies readonly (keyof Source)[];
+
+/** Source columns rendered by the ward directory (`/wards`). */
+export const SOURCE_WARD_DIRECTORY_COLUMNS = [
+  "id",
+  "name",
+  "ward_number",
+] as const satisfies readonly (keyof Source)[];
+
+export type WardProfileSource = Pick<
+  Source,
+  (typeof SOURCE_WARD_PROFILE_COLUMNS)[number]
+>;
+
+export type WardDirectorySource = Pick<
+  Source,
+  (typeof SOURCE_WARD_DIRECTORY_COLUMNS)[number]
+>;
+
+/** Select string for the ward page header's sources query. */
+export const SOURCE_WARD_PROFILE_SELECT = SOURCE_WARD_PROFILE_COLUMNS.join(", ");
+
+/** Select string for the ward directory's sources query. */
+export const SOURCE_WARD_DIRECTORY_SELECT =
+  SOURCE_WARD_DIRECTORY_COLUMNS.join(", ");
+
 export type NewsletterCardSource = Pick<
   Source,
   (typeof SOURCE_CARD_COLUMNS)[number]

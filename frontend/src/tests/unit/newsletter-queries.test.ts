@@ -3,6 +3,8 @@ import {
   buildNewsletterCardSelect,
   buildNewsletterCountSelect,
   NEWSLETTER_DETAIL_SELECT,
+  SOURCE_WARD_DIRECTORY_SELECT,
+  SOURCE_WARD_PROFILE_SELECT,
 } from '../../lib/newsletter-queries';
 
 /** Split a PostgREST select string into top-level columns and the sources embed. */
@@ -90,5 +92,25 @@ describe('NEWSLETTER_DETAIL_SELECT', () => {
   it('embeds only the source fields the detail page renders', () => {
     expect(relation).toBe('sources');
     expect(embedColumns.sort()).toEqual(['email_address', 'name', 'phone', 'ward_number']);
+  });
+});
+
+const splitColumns = (select: string) => select.split(',').map((column) => column.trim());
+
+describe('SOURCE_WARD_PROFILE_SELECT', () => {
+  it('selects exactly the public fields the ward page header renders', () => {
+    expect(splitColumns(SOURCE_WARD_PROFILE_SELECT).sort()).toEqual(
+      ['email_address', 'id', 'name', 'phone', 'signup_url', 'ward_number', 'website'],
+    );
+  });
+});
+
+describe('SOURCE_WARD_DIRECTORY_SELECT', () => {
+  it('selects only identity fields, never contact details', () => {
+    const columns = splitColumns(SOURCE_WARD_DIRECTORY_SELECT);
+    expect(columns.sort()).toEqual(['id', 'name', 'ward_number']);
+    for (const field of SOURCE_CONTACT_FIELDS) {
+      expect(columns).not.toContain(field);
+    }
   });
 });

@@ -1,7 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ALL_WARD_NUMBERS, buildWardPath } from "./wards";
 
 /** PostgREST caps each response at this many rows by default. */
 export const SUPABASE_PAGE_SIZE = 1000;
+
+const SITEMAP_CACHE_MAX_AGE_SECONDS = 60 * 60;
+
+/** Response headers shared by the server-rendered sitemap endpoints. */
+export const SITEMAP_RESPONSE_HEADERS = {
+  "Content-Type": "application/xml; charset=utf-8",
+  "Cache-Control": `public, max-age=${SITEMAP_CACHE_MAX_AGE_SECONDS}`,
+} as const;
 
 export interface NewsletterSitemapEntry {
   id: string;
@@ -28,19 +37,27 @@ function toLastmod(receivedDate: string | null): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function buildUrlElement(entry: NewsletterSitemapEntry, site: URL | string): string {
-  const location = new URL(`/newsletter/${encodeURIComponent(entry.id)}`, site).href;
-  const lastmod = toLastmod(entry.received_date);
+/** A page to list in a sitemap. */
+export interface SitemapPage {
+  /** Site-relative path, e.g. `/ward/1`. */
+  path: string;
+  /** Last modification timestamp in any `Date`-parsable form. */
+  lastmod?: string | null;
+}
+
+function buildUrlElement(page: SitemapPage, site: URL | string): string {
+  const location = new URL(page.path, site).href;
+  const lastmod = toLastmod(page.lastmod ?? null);
   const lastmodElement = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
   return `<url><loc>${escapeXml(location)}</loc>${lastmodElement}</url>`;
 }
 
-/** Renders a sitemap `<urlset>` document listing every newsletter detail page. */
-export function buildNewsletterSitemapXml(
-  entries: NewsletterSitemapEntry[],
+/** Renders a sitemap `<urlset>` document listing the given pages. */
+export function buildSitemapXml(
+  pages: readonly SitemapPage[],
   site: URL | string,
 ): string {
-  const urlElements = entries.map((entry) => buildUrlElement(entry, site)).join("\n");
+  const urlElements = pages.map((page) => buildUrlElement(page, site)).join("\n");
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -49,6 +66,30 @@ export function buildNewsletterSitemapXml(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/** Renders a sitemap `<urlset>` document listing every newsletter detail page. */
+export function buildNewsletterSitemapXml(
+  entries: NewsletterSitemapEntry[],
+  site: URL | string,
+): string {
+  return buildSitemapXml(
+    entries.map((entry) => ({
+      path: `/newsletter/${encodeURIComponent(entry.id)}`,
+      lastmod: entry.received_date,
+    })),
+    site,
+  );
+}
+
+/**
+ * Pages for the ward sitemap: one page per ward. Every ward is listed because
+ * ward numbers are fixed, so the set needs no database query. The ward
+ * directory (`/wards`) is a non-dynamic route, so @astrojs/sitemap already
+ * lists it in the static-route sitemap.
+ */
+export function buildWardSitemapPages(): SitemapPage[] {
+  return ALL_WARD_NUMBERS.map((wardNumber) => ({ path: buildWardPath(wardNumber) }));
 }
 
 /**

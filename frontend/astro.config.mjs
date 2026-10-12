@@ -34,8 +34,11 @@ export default defineConfig({
     sitemap({
       filter: isIndexablePage,
       serialize: (item) => ({ ...item, url: stripTrailingSlash(item.url) }),
-      // Newsletter detail pages are server-rendered, so they are listed by a dynamic endpoint.
-      customSitemaps: [`${SITE_URL}/sitemap-newsletters.xml`],
+      // Newsletter and ward pages are server-rendered, so they are listed by their own endpoints.
+      customSitemaps: [
+        `${SITE_URL}/sitemap-newsletters.xml`,
+        `${SITE_URL}/sitemap-wards.xml`,
+      ],
     }),
   ],
   vite: {

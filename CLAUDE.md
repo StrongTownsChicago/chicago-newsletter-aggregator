@@ -208,6 +208,8 @@ frontend/src/
 ├── pages/
 │   ├── index.astro               # Homepage with recent newsletters
 │   ├── search.astro              # Search interface with filters
+│   ├── wards.astro               # Ward directory (all wards and their alders)
+│   ├── ward/[ward].astro         # Per-ward page: alder contact info + paginated newsletters
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
@@ -230,6 +232,8 @@ frontend/src/
 │   └── AuthButton.astro          # Auth UI
 └── lib/
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
+    ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
+    ├── ward-queries.ts           # Supabase queries for ward pages
     └── supabase-admin.ts         # Server-side ONLY privileged Supabase client
 ```
 
@@ -250,6 +254,8 @@ frontend/src/
 **LLM Processing** (`llm_processor.py` + `llm_client.py`): Three sequential LLM calls per newsletter for topic extraction, summarization, and relevance scoring using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
 **Newsletter Deduplication**: Both ingest paths check for existing `email_uid` (email) or URL+subject combination (scraping) before inserting.
+
+**Ward Pages** (`frontend/src/pages/ward/[ward].astro`, `lib/wards.ts`): URLs are keyed by ward number (stable) rather than alder (changes). Invalid wards respond 404; a ward with several `alderman` sources shows all of them and merges their newsletters. Ward pages are server-rendered, so they are listed in the sitemap by `pages/sitemap-wards.xml.ts`.
 
 **Notification System** (`notifications/`):
 
