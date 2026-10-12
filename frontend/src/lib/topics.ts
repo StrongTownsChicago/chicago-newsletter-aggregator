@@ -14,3 +14,11 @@ export const TOPIC_CATEGORIES: Record<string, string[]> = {
 };
 
 export const ALL_TOPICS: string[] = Object.values(TOPIC_CATEGORIES).flat();
+
+/** Turn a topic slug like "bike_lanes" into a display label like "Bike Lanes". */
+export function formatTopicLabel(topic: string): string {
+  return topic
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
