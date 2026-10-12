@@ -83,8 +83,8 @@ export function buildWardDescription(
   alderNames: string | null,
 ): string {
   const sender = alderNames
-    ? `${alderNames}, alder for Chicago's Ward ${wardNumber}`
-    : `the alder for Chicago's Ward ${wardNumber}`;
+    ? `${alderNames}, alderman for Chicago's Ward ${wardNumber}`
+    : `the alderman for Chicago's Ward ${wardNumber}`;
   return truncateDescription(
     `Read newsletters from ${sender}, along with ward office contact information.`,
   );

@@ -42,7 +42,7 @@ const createSupabase = (results: QueryResult[]) => {
 };
 
 describe('fetchWardSources', () => {
-  it('queries alder sources for the ward with the profile columns', async () => {
+  it('queries alderman sources for the ward with the profile columns', async () => {
     const rows = [{ id: 1, name: 'Daniel La Spata', ward_number: '1' }];
     const { supabase, from, queries } = createSupabase([{ data: rows, error: null }]);
 
@@ -68,7 +68,7 @@ describe('fetchWardSources', () => {
 });
 
 describe('fetchWardDirectorySources', () => {
-  it('fetches all alder sources in a single query', async () => {
+  it('fetches all alderman sources in a single query', async () => {
     const { supabase, from, queries } = createSupabase([{ data: [], error: null }]);
 
     await fetchWardDirectorySources(supabase);

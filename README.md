@@ -16,7 +16,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **Web Scraping**: MailChimp archive scraping for historical newsletters
 - **LLM Processing**: Topic extraction, summarization, relevance scoring
 - **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range, minimum relevance score) and sorting (newest, oldest, highest relevance)
-- **Ward Pages**: A page per ward (`/ward/N`) with the alder's contact info and newsletters, plus a ward directory (`/wards`)
+- **Ward Pages**: A page per ward (`/ward/N`) with the alderman's contact info and newsletters, plus a ward directory (`/wards`)
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content

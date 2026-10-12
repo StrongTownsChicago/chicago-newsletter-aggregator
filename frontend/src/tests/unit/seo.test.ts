@@ -146,25 +146,25 @@ describe('isNonProductionHost', () => {
 });
 
 describe('buildWardTitle', () => {
-  it('includes the ward number and alder name', () => {
+  it('includes the ward number and alderman name', () => {
     expect(buildWardTitle(1, 'Daniel La Spata')).toBe(
       'Ward 1 - Daniel La Spata Newsletters - Chicago Alderman Newsletter Tracker',
     );
   });
 
-  it('omits the alder when none is on file', () => {
+  it('omits the alderman when none is on file', () => {
     expect(buildWardTitle(12, null)).toBe('Ward 12 Newsletters - Chicago Alderman Newsletter Tracker');
   });
 });
 
 describe('buildWardDescription', () => {
-  it('names the alder and ward', () => {
+  it('names the alderman and ward', () => {
     const description = buildWardDescription(49, 'Maria Hadden');
-    expect(description).toContain("Maria Hadden, alder for Chicago's Ward 49");
+    expect(description).toContain("Maria Hadden, alderman for Chicago's Ward 49");
     expect(description.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX_LENGTH);
   });
 
-  it('falls back to a generic sender when no alder is on file', () => {
-    expect(buildWardDescription(12, null)).toContain("the alder for Chicago's Ward 12");
+  it('falls back to a generic sender when no alderman is on file', () => {
+    expect(buildWardDescription(12, null)).toContain("the alderman for Chicago's Ward 12");
   });
 });

@@ -208,8 +208,8 @@ frontend/src/
 ├── pages/
 │   ├── index.astro               # Homepage with recent newsletters
 │   ├── search.astro              # Search interface with filters
-│   ├── wards.astro               # Ward directory (all wards and their alders)
-│   ├── ward/[ward].astro         # Per-ward page: alder contact info + paginated newsletters
+│   ├── wards.astro               # Ward directory (all wards and their aldermen)
+│   ├── ward/[ward].astro         # Per-ward page: alderman contact info + paginated newsletters
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
@@ -264,7 +264,7 @@ frontend/src/
 
 **Newsletter Deduplication**: Both ingest paths check for existing `email_uid` (email) or URL+subject combination (scraping) before inserting.
 
-**Ward Pages** (`frontend/src/pages/ward/[ward].astro`, `lib/wards.ts`): URLs are keyed by ward number (stable) rather than alder (changes). Invalid wards respond 404; a ward with several `alderman` sources shows all of them and merges their newsletters. Ward pages are server-rendered, so they are listed in the sitemap by `pages/sitemap-wards.xml.ts`.
+**Ward Pages** (`frontend/src/pages/ward/[ward].astro`, `lib/wards.ts`): URLs are keyed by ward number (stable) rather than alderman (changes). Invalid wards respond 404; a ward with several `alderman` sources shows all of them and merges their newsletters. Ward pages are server-rendered, so they are listed in the sitemap by `pages/sitemap-wards.xml.ts`.
 
 **Notification System** (`notifications/`):
 
