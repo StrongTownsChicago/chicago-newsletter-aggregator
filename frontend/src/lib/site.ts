@@ -3,7 +3,7 @@ import { WARD_DIRECTORY_PATH } from "./wards";
 
 /** One-line explanation of the site shown under the site name in the header. */
 export const SITE_TAGLINE =
-  "A searchable archive of what Chicago alders tell their wards";
+  "A searchable database tracking what aldermen communicate to their wards.";
 
 export const STRONG_TOWNS_CHICAGO_NAME = "Strong Towns Chicago";
 export const STRONG_TOWNS_CHICAGO_URL = "https://www.strongtownschicago.org/";
