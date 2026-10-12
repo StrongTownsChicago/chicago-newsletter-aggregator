@@ -72,6 +72,10 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 uv run python -m utils.calculate_token_costs --list-models              # List available models
 uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
 
+# Local analytics dashboard data (read-only DB access; writes gitignored JSON for /analytics)
+uv run python -m utils.compute_analytics
+uv run python -m utils.compute_analytics --min-term-newsletters 30 --output-dir <dir>
+
 # Run all tests
 uv run python -m unittest discover -s tests
 
@@ -182,7 +186,9 @@ backend/
 │   ├── process_notification_queue.py  # Daily digest orchestration
 │   ├── test_matcher.py           # Testing utility for rule matching
 │   └── error_logger.py           # Timestamped error logging
+├── analytics/                    # Pure metric logic for the local analytics dashboard (no I/O)
 ├── utils/
+│   ├── compute_analytics.py      # Fetch → compute → write analytics JSON for /analytics
 │   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary, relevance score)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
@@ -213,6 +219,7 @@ frontend/src/
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
+│   ├── analytics.astro           # Local-only analytics dashboard (not linked, noindex)
 │   └── api/notifications/        # Notification management API routes
 │       ├── create-rule.ts        # Create notification rule
 │       ├── update-rule.ts        # Update existing rule
@@ -234,7 +241,12 @@ frontend/src/
 │   ├── SiteFooter.astro          # Strong Towns Chicago credit + source link
 │   ├── NewsletterCard.astro      # Reusable card component
 │   └── AuthButton.astro          # Auth UI
+├── scripts/
+│   └── analytics-dashboard.ts    # Client wiring for /analytics (filters → panels)
 └── lib/
+    ├── analytics.ts              # Pure dashboard aggregations (unit tested)
+    ├── analytics-charts.ts       # Observable Plot chart builders
+    ├── analytics-data.ts         # Loads generated analytics JSON (tolerates missing files)
     ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
     ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
@@ -278,6 +290,8 @@ frontend/src/
 
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
+
+**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` fetches newsletters and sources once (paginated, read-only), computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to the gitignored `frontend/src/data/analytics/`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`.
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 

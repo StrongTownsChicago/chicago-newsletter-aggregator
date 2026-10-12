@@ -89,6 +89,9 @@ uv run python -m utils.process_llm_metadata --latest 10
 
 # Reapply privacy sanitization to existing newsletters
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
+
+# Generate data for the local analytics dashboard, then open http://localhost:4321/analytics
+uv run python -m utils.compute_analytics
 ```
 
 #### Notifications
