@@ -2,12 +2,11 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import AuthButton from '../components/AuthButton.astro';
-import { supabase, notificationsEnabled } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { WardDirectorySource } from '../lib/newsletter-queries';
 import { SITE_NAME } from '../lib/seo';
 import { fetchWardDirectorySources } from '../lib/ward-queries';
-import { WARD_DIRECTORY_PATH, buildWardDirectory, buildWardPath, formatAlderNames } from '../lib/wards';
+import { buildWardDirectory, buildWardPath, formatAlderNames } from '../lib/wards';
 
 let sources: WardDirectorySource[] = [];
 let loadFailed = false;
@@ -27,20 +26,6 @@ const wardDirectory = buildWardDirectory(sources);
   description="Browse all 50 Chicago wards. Find your alder, their contact information, and the newsletters they send to the ward."
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
-      <a href={WARD_DIRECTORY_PATH} class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Wards</a>
-      {notificationsEnabled() && Astro.locals.user && (
-        <a href="/preferences" class="text-gray-600 hover:text-blue-600 pb-3">Preferences</a>
-      )}
-    </nav>
 
     <header class="mb-8">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Chicago Wards</h1>
@@ -49,7 +34,7 @@ const wardDirectory = buildWardDirectory(sources);
       </p>
     </header>
 
-    <main>
+    <section>
       {loadFailed && (
         <p class="mb-6 text-sm text-gray-600" data-testid="ward-directory-load-error">
           Alder names couldn't be loaded right now, but every ward page is still available.
@@ -76,6 +61,6 @@ const wardDirectory = buildWardDirectory(sources);
           </li>
         ))}
       </ul>
-    </main>
+    </section>
   </div>
 </Layout>

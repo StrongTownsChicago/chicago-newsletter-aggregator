@@ -5,21 +5,14 @@ const user = Astro.locals.user;
 
 {notificationsEnabled() && (
   user ? (
-    <div class="flex items-center gap-4">
-      <span class="text-sm text-gray-700" data-testid="user-email">
+    <div class="flex items-center gap-4 min-w-0">
+      <span class="text-sm text-gray-700 truncate" data-testid="user-email">
         {user.email}
       </span>
-      <a
-        href="/preferences"
-        class="text-sm font-medium text-blue-600 hover:text-blue-500"
-        data-testid="preferences-link"
-      >
-        Preferences
-      </a>
       <form action="/api/auth/signout" method="POST" enctype="application/x-www-form-urlencoded" class="inline">
         <button
           type="submit"
-          class="text-sm font-medium text-gray-700 hover:text-gray-900"
+          class="text-sm font-medium text-gray-700 hover:text-gray-900 whitespace-nowrap"
           data-testid="signout-button"
         >
           Sign out

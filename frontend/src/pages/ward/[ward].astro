@@ -4,8 +4,7 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import NewsletterCard from '../../components/NewsletterCard.astro';
 import Pagination from '../../components/Pagination.astro';
-import AuthButton from '../../components/AuthButton.astro';
-import { supabase, notificationsEnabled } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import type { WardProfileSource } from '../../lib/newsletter-queries';
 import { countPages, parsePageParam } from '../../lib/pagination';
 import { SITE_NAME, buildWardDescription, buildWardTitle, formatReceivedDate } from '../../lib/seo';
@@ -62,29 +61,15 @@ const description = wardNumber === null
 
 <Layout title={title} description={description} canonicalPage={page}>
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
-      <a href={WARD_DIRECTORY_PATH} class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Wards</a>
-      {notificationsEnabled() && Astro.locals.user && (
-        <a href="/preferences" class="text-gray-600 hover:text-blue-600 pb-3">Preferences</a>
-      )}
-    </nav>
 
     {wardNumber === null ? (
-      <main class="text-center py-16" data-testid="ward-not-found">
+      <section class="text-center py-16" data-testid="ward-not-found">
         <h1 class="text-3xl font-bold text-gray-900 mb-3">Ward not found</h1>
         <p class="text-gray-600 mb-6">Chicago has 50 wards, numbered 1 through 50.</p>
         <a href={WARD_DIRECTORY_PATH} class="text-blue-600 hover:text-blue-800 font-medium">
           Browse all wards →
         </a>
-      </main>
+      </section>
     ) : (
       <>
         <!-- Ward Header -->
@@ -151,7 +136,7 @@ const description = wardNumber === null
         </header>
 
         <!-- Newsletter List -->
-        <main>
+        <section>
           {loadFailed ? (
             <p class="text-gray-600 text-center py-12" data-testid="ward-load-error">
               Newsletters for this ward couldn't be loaded right now. Please try again later.
@@ -173,7 +158,7 @@ const description = wardNumber === null
               <Pagination currentPage={page} totalPages={totalPages} baseUrl={buildWardPath(wardNumber)} />
             </>
           )}
-        </main>
+        </section>
       </>
     )}
   </div>

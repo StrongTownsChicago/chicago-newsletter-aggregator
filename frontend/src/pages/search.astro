@@ -4,8 +4,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
-import AuthButton from '../components/AuthButton.astro';
-import { supabase, notificationsEnabled } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/newsletter-queries';
 import { TOPIC_CATEGORIES } from '../lib/topics';
@@ -79,30 +78,16 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
   description="Search Chicago alderman newsletters by keyword, ward, alderman, and topic."
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
     <!-- Header -->
     <header class="mb-8">
-      <h1 class="text-3xl sm:text-5xl font-bold text-gray-900 mb-2 sm:mb-3">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
         Search Newsletters
       </h1>
-      <p class="text-base sm:text-xl text-gray-600">
+      <p class="text-base sm:text-lg text-gray-600">
         Filter and search through Chicago alderman newsletters
       </p>
     </header>
 
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Search</a>
-      <a href="/wards" class="text-gray-600 hover:text-blue-600 pb-3">Wards</a>
-      {notificationsEnabled() && Astro.locals.user && (
-        <a href="/preferences" class="text-gray-600 hover:text-blue-600 pb-3">Preferences</a>
-      )}
-    </nav>
 
     <form method="get" class="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
