@@ -1,0 +1,66 @@
+---
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import { supabase } from '../lib/supabase';
+import type { WardDirectorySource } from '../lib/newsletter-queries';
+import { SITE_NAME } from '../lib/seo';
+import { fetchWardDirectorySources } from '../lib/ward-queries';
+import { buildWardDirectory, buildWardPath, formatAlderNames } from '../lib/wards';
+
+let sources: WardDirectorySource[] = [];
+let loadFailed = false;
+
+try {
+  sources = await fetchWardDirectorySources(supabase);
+} catch (error) {
+  console.error('Error loading ward directory:', error);
+  loadFailed = true;
+}
+
+const wardDirectory = buildWardDirectory(sources);
+---
+
+<Layout
+  title={`Chicago Wards and Alders - ${SITE_NAME}`}
+  description="Browse all 50 Chicago wards. Find your alder, their contact information, and the newsletters they send to the ward."
+>
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+
+    <header class="mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Chicago Wards</h1>
+      <p class="text-base sm:text-lg text-gray-600">
+        Pick a ward to see its alder, their contact information, and their newsletters.
+      </p>
+    </header>
+
+    <section>
+      {loadFailed && (
+        <p class="mb-6 text-sm text-gray-600" data-testid="ward-directory-load-error">
+          Alder names couldn't be loaded right now, but every ward page is still available.
+        </p>
+      )}
+      <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="ward-directory">
+        {wardDirectory.map(({ wardNumber, sources: wardSources }) => (
+          <li>
+            <a
+              href={buildWardPath(wardNumber)}
+              class="flex items-center gap-3 h-full bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md hover:border-blue-300 transition"
+              data-testid="ward-directory-link"
+            >
+              <span class="flex-shrink-0 w-12 h-12 rounded-full bg-blue-50 text-blue-700 font-bold text-lg flex items-center justify-center">
+                {wardNumber}
+              </span>
+              <span class="min-w-0">
+                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Ward {wardNumber}</span>
+                <span class="block font-medium text-gray-900">
+                  {formatAlderNames(wardSources.map((source) => source.name)) ?? 'No alder on file'}
+                </span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</Layout>

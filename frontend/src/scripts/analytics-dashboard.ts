@@ -42,7 +42,8 @@ import {
   type TableColumn,
 } from "../lib/analytics-charts";
 import { loadAnalyticsDataset } from "../lib/analytics-data";
-import { ALL_TOPICS, formatTopicLabel } from "../lib/topics";
+import { humanizeIdentifier } from "../lib/format";
+import { ALL_TOPICS } from "../lib/topics";
 
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
@@ -265,7 +266,7 @@ function renderWardTopicPanel(
     table,
     [
       { label: "Ward", value: (cell) => cell.ward },
-      { label: "Topic", value: (cell) => formatTopicLabel(cell.topic) },
+      { label: "Topic", value: (cell) => humanizeIdentifier(cell.topic) },
       { label: "Ward newsletters", value: (cell) => `${cell.wardTopicNewsletters} / ${cell.wardNewsletters}`, numeric: true },
       { label: "Ward share", value: (cell) => formatPercent(cell.wardShare), numeric: true },
       { label: "City share", value: (cell) => formatPercent(cell.cityShare), numeric: true },
@@ -295,7 +296,7 @@ function renderTopicTrendsPanel(facts: NewsletterFact[], filters: AnalyticsFilte
       const figure = document.createElement("figure");
       const title = document.createElement("figcaption");
       title.className = "text-sm font-semibold text-gray-700";
-      title.textContent = formatTopicLabel(topic);
+      title.textContent = humanizeIdentifier(topic);
       const topicPoints = trimSparseEdges(points.filter((point) => point.topic === topic));
       figure.append(title, renderTopicTrend(topicPoints, maxShare, cardWidth));
       return figure;
@@ -305,7 +306,7 @@ function renderTopicTrendsPanel(facts: NewsletterFact[], filters: AnalyticsFilte
     table,
     [
       { label: "Month", value: (point) => point.month },
-      { label: "Topic", value: (point) => formatTopicLabel(point.topic) },
+      { label: "Topic", value: (point) => humanizeIdentifier(point.topic) },
       { label: "Newsletters", value: (point) => `${point.newsletters} / ${point.monthNewsletters}`, numeric: true },
       { label: "Share", value: (point) => formatOptionalShare(point.share), numeric: true },
     ],

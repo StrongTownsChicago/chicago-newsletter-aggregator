@@ -4,106 +4,73 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
-import AuthButton from '../components/AuthButton.astro';
-import { supabase, notificationsEnabled } from '../lib/supabase';
-import type { Newsletter, Source } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/newsletter-queries';
+import { TOPIC_CATEGORIES } from '../lib/topics';
+import { humanizeIdentifier } from '../lib/format';
+import {
+  RELEVANCE_THRESHOLD_OPTIONS,
+  SEARCH_PAGE_SIZE,
+  SEARCH_PARAM_NAMES,
+  SEARCH_PATH,
+  SEARCH_SORTS,
+  SEARCH_SORT_LABELS,
+  applySearchFilters,
+  applySearchSort,
+  buildSearchBaseUrl,
+  getPageRange,
+  parseSearchParams,
+  requiresSourceJoin,
+} from '../lib/search-filters';
+import {
+  SEARCH_SOURCE_COLUMNS,
+  buildSourceOptions,
+  extractSourceTypes,
+  extractWardNumbers,
+} from '../lib/search-form-options';
+import type { SearchSourceRow } from '../lib/search-form-options';
 
-const searchQuery = Astro.url.searchParams.get('q') || '';
-const sourceTypeFilter = Astro.url.searchParams.get('source_type');
-const topicFilter = Astro.url.searchParams.get('topic');
-const wardFilter = Astro.url.searchParams.get('ward');
+const { filters, sort, page } = parseSearchParams(Astro.url.searchParams);
+const filtersOnSource = requiresSourceJoin(filters);
+const { start, end } = getPageRange(page);
 
-// Pagination setup
-const page = parseInt(Astro.url.searchParams.get('page') || '1');
-const PAGE_SIZE = 20;
-const start = (page - 1) * PAGE_SIZE;
-const end = start + PAGE_SIZE - 1;
-
-// Use !inner when we need to filter on sources table
-const filtersOnSource = Boolean(wardFilter || sourceTypeFilter);
-
-// Build count query with same filters
-let countQuery = supabase
+const unfilteredCountQuery = supabase
   .from('newsletters')
   .select(buildNewsletterCountSelect({ filtersOnSource }), { count: 'exact', head: true });
+const countQuery = applySearchFilters(unfilteredCountQuery, filters);
 
-// Build data query
-let query = supabase
+const unfilteredDataQuery = supabase
   .from('newsletters')
-  .select(buildNewsletterCardSelect({ filtersOnSource }))
-  .order('received_date', { ascending: false });
+  .select(buildNewsletterCardSelect({ filtersOnSource }));
+const filteredDataQuery = applySearchFilters(unfilteredDataQuery, filters);
+const dataQuery = applySearchSort(filteredDataQuery, sort);
 
-// Apply filters to both queries
-if (searchQuery) {
-  countQuery = countQuery.textSearch('search_vector', searchQuery, {
-    type: 'websearch',
-    config: 'english'
-  });
-  query = query.textSearch('search_vector', searchQuery, {
-    type: 'websearch',
-    config: 'english'
-  });
-}
+const sourcesQuery = supabase
+  .from('sources')
+  .select(SEARCH_SOURCE_COLUMNS.join(', '))
+  .overrideTypes<SearchSourceRow[], { merge: false }>();
 
-if (sourceTypeFilter) {
-  countQuery = countQuery.eq('sources.source_type', sourceTypeFilter);
-  query = query.eq('sources.source_type', sourceTypeFilter);
-}
+const [{ count }, { data }, { data: sourceData }] = await Promise.all([
+  countQuery,
+  dataQuery.range(start, end),
+  sourcesQuery,
+]);
 
-if (wardFilter) {
-  countQuery = countQuery.eq('sources.ward_number', wardFilter);
-  query = query.eq('sources.ward_number', wardFilter);
-}
-
-if (topicFilter) {
-  countQuery = countQuery.contains('topics', [topicFilter]);
-  query = query.contains('topics', [topicFilter]);
-}
-
-// Get total count
-const { count } = await countQuery;
-const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
-
-// Get paginated data
-const { data } = await query.range(start, end);
+const totalPages = Math.ceil((count || 0) / SEARCH_PAGE_SIZE);
 const newsletters = data as NewsletterCardRow[] | null;
 
-// Get unique topics
-const { data: allTopics } = await supabase
-  .from('newsletters')
-  .select('topics')
-  .not('topics', 'is', null);
+const sources = sourceData ?? [];
+const sourceOptions = buildSourceOptions(sources);
+const wardNumbers = extractWardNumbers(sources);
+const sourceTypes = extractSourceTypes(sources);
+const showSourceTypeFilter = sourceTypes.length > 1;
 
-const uniqueTopics = [...new Set(
-  allTopics?.flatMap((n: Pick<Newsletter, 'topics'>) => n.topics || []) || []
-)].sort();
+const baseUrl = buildSearchBaseUrl(filters, sort);
 
-// Get unique ward numbers
-const { data: wardData } = await supabase
-  .from('sources')
-  .select('ward_number')
-  .eq('source_type', 'alderman')
-  .not('ward_number', 'is', null);
-
-const uniqueWards = [...new Set(
-  wardData?.map((s: Pick<Source, 'ward_number'>) => s.ward_number).filter(Boolean) || []
-)].sort((a, b) => parseInt(a as string) - parseInt(b as string));
-
-// Build base URL with all query params except 'page' for pagination
-const buildBaseUrl = () => {
-  const params = new URLSearchParams();
-  if (searchQuery) params.set('q', searchQuery);
-  if (wardFilter) params.set('ward', wardFilter);
-  if (topicFilter) params.set('topic', topicFilter);
-  if (sourceTypeFilter) params.set('source_type', sourceTypeFilter);
-
-  const queryString = params.toString();
-  return queryString ? `/search?${queryString}` : '/search';
-};
-
-const baseUrl = buildBaseUrl();
+const inputClass =
+  'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
+const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
 ---
 
 <Layout
@@ -111,69 +78,130 @@ const baseUrl = buildBaseUrl();
   description="Search Chicago alderman newsletters by keyword, ward, alderman, and topic."
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
     <!-- Header -->
     <header class="mb-8">
-      <h1 class="text-3xl sm:text-5xl font-bold text-gray-900 mb-2 sm:mb-3">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
         Search Newsletters
       </h1>
-      <p class="text-base sm:text-xl text-gray-600">
+      <p class="text-base sm:text-lg text-gray-600">
         Filter and search through Chicago alderman newsletters
       </p>
     </header>
 
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Search</a>
-      {notificationsEnabled() && Astro.locals.user && (
-        <a href="/preferences" class="text-gray-600 hover:text-blue-600 pb-3">Preferences</a>
-      )}
-    </nav>
 
     <form method="get" class="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">
-            Search Keywords
-          </label>
+        <div class="md:col-span-2">
+          <label for="search-query" class={labelClass}>Search Keywords</label>
           <input
+            id="search-query"
             type="text"
-            name="q"
-            value={searchQuery}
+            name={SEARCH_PARAM_NAMES.query}
+            value={filters.query}
             placeholder="Enter keywords..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            class={inputClass}
             data-testid="search-input"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">
-            Ward Number
-          </label>
-          <select name="ward" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" data-testid="ward-filter">
-            <option value="">All Wards</option>
-            {uniqueWards.map(ward => (
-              <option value={ward} selected={wardFilter === ward}>
-                Ward {ward}
+          <label for="search-topic" class={labelClass}>Topic</label>
+          <select id="search-topic" name={SEARCH_PARAM_NAMES.topic} class={inputClass} data-testid="topic-filter">
+            <option value="">All Topics</option>
+            {Object.entries(TOPIC_CATEGORIES).map(([category, topics]) => (
+              <optgroup label={category}>
+                {topics.map((topic) => (
+                  <option value={topic} selected={filters.topic === topic}>
+                    {humanizeIdentifier(topic)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label for="search-sort" class={labelClass}>Sort By</label>
+          <select id="search-sort" name={SEARCH_PARAM_NAMES.sort} class={inputClass} data-testid="sort-select">
+            {SEARCH_SORTS.map((sortOption) => (
+              <option value={sortOption} selected={sort === sortOption}>
+                {SEARCH_SORT_LABELS[sortOption]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 pt-4 border-t border-gray-100">
+        <div class="sm:col-span-2">
+          <label for="search-source" class={labelClass}>Alderman / Source</label>
+          <select id="search-source" name={SEARCH_PARAM_NAMES.sourceId} class={inputClass} data-testid="source-filter">
+            <option value="">All Sources</option>
+            {sourceOptions.map((sourceOption) => (
+              <option value={sourceOption.id} selected={filters.sourceId === sourceOption.id}>
+                {sourceOption.label}
               </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">
-            Topic
-          </label>
-          <select name="topic" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" data-testid="topic-filter">
-            <option value="">All Topics</option>
-            {uniqueTopics.map(topic => (
-              <option value={topic} selected={topicFilter === topic}>
-                {topic}
+          <label for="search-ward" class={labelClass}>Ward Number</label>
+          <select id="search-ward" name={SEARCH_PARAM_NAMES.ward} class={inputClass} data-testid="ward-filter">
+            <option value="">All Wards</option>
+            {wardNumbers.map((ward) => (
+              <option value={ward} selected={filters.ward === ward}>
+                Ward {ward}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {showSourceTypeFilter && (
+          <div>
+            <label for="search-source-type" class={labelClass}>Source Type</label>
+            <select id="search-source-type" name={SEARCH_PARAM_NAMES.sourceType} class={inputClass} data-testid="source-type-filter">
+              <option value="">All Types</option>
+              {sourceTypes.map((sourceType) => (
+                <option value={sourceType} selected={filters.sourceType === sourceType}>
+                  {humanizeIdentifier(sourceType)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label for="search-from-date" class={labelClass}>Received From</label>
+          <input
+            id="search-from-date"
+            type="date"
+            name={SEARCH_PARAM_NAMES.fromDate}
+            value={filters.fromDate ?? ''}
+            class={inputClass}
+            data-testid="from-date-filter"
+          />
+        </div>
+
+        <div>
+          <label for="search-to-date" class={labelClass}>Received To</label>
+          <input
+            id="search-to-date"
+            type="date"
+            name={SEARCH_PARAM_NAMES.toDate}
+            value={filters.toDate ?? ''}
+            class={inputClass}
+            data-testid="to-date-filter"
+          />
+        </div>
+
+        <div>
+          <label for="search-min-relevance" class={labelClass}>Min. Relevance</label>
+          <select id="search-min-relevance" name={SEARCH_PARAM_NAMES.minRelevance} class={inputClass} data-testid="min-relevance-filter">
+            <option value="">Any Score</option>
+            {RELEVANCE_THRESHOLD_OPTIONS.map((threshold) => (
+              <option value={threshold} selected={filters.minRelevance === threshold}>
+                {threshold}+
               </option>
             ))}
           </select>
@@ -190,11 +218,11 @@ const baseUrl = buildBaseUrl();
         </button>
 
         <a
-        href="/search"
-        class="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-        data-testid="clear-filters-link"
+          href={SEARCH_PATH}
+          class="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+          data-testid="clear-filters-link"
         >
-        Clear Filters
+          Clear Filters
         </a>
       </div>
     </form>

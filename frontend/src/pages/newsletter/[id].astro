@@ -2,10 +2,10 @@
 export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
-import AuthButton from '../../components/AuthButton.astro';
 import { supabase } from '../../lib/supabase';
 import { NEWSLETTER_DETAIL_SELECT } from '../../lib/newsletter-queries';
 import { buildNewsletterDescription } from '../../lib/seo';
+import { buildWardPath, parseWardParam } from '../../lib/wards';
 
 const { id } = Astro.params;
 
@@ -20,6 +20,8 @@ if (error || !newsletter) {
 }
 
 const description = buildNewsletterDescription(newsletter);
+const wardNumber = parseWardParam(newsletter.sources?.ward_number ?? undefined);
+const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
 ---
 
 <Layout
@@ -28,17 +30,9 @@ const description = buildNewsletterDescription(newsletter);
   type="article"
 >
   <div class="container mx-auto px-4 py-8 max-w-4xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-between items-center">
-      <a href="/" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
-        ← Back to newsletters
-      </a>
-      <AuthButton />
-    </div>
-
-        <article class="bg-white rounded-lg shadow-lg p-8 border border-gray-200" data-testid="newsletter-detail">
+        <article class="bg-white rounded-lg shadow-lg p-5 sm:p-8 border border-gray-200" data-testid="newsletter-detail">
           <header class="mb-8 border-b border-gray-200 pb-6">
-            <h1 class="text-4xl font-bold text-gray-900 mb-4" data-testid="newsletter-detail-title">
+            <h1 class="text-2xl sm:text-4xl font-bold text-gray-900 mb-4 break-words" data-testid="newsletter-detail-title">
               {newsletter.subject}
             </h1>
             
@@ -46,9 +40,17 @@ const description = buildNewsletterDescription(newsletter);
               <!-- Source info row -->
               <div class="flex flex-wrap items-center gap-3 text-gray-600">
                 {newsletter.sources?.name && (
-                  <span class="text-lg font-medium text-gray-800" data-testid="newsletter-detail-source">{newsletter.sources.name}</span>
+                  wardPath ? (
+                    <a href={wardPath} class="text-lg font-medium text-gray-800 hover:text-blue-600 transition-colors" data-testid="newsletter-detail-source">{newsletter.sources.name}</a>
+                  ) : (
+                    <span class="text-lg font-medium text-gray-800" data-testid="newsletter-detail-source">{newsletter.sources.name}</span>
+                  )
                 )}
-                {newsletter.sources?.ward_number && (
+                {wardPath ? (
+                  <a href={wardPath} class="px-3 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 rounded-full text-sm font-semibold transition-colors" data-testid="newsletter-detail-ward-link">
+                    Ward {wardNumber}
+                  </a>
+                ) : newsletter.sources?.ward_number && (
                   <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
                     Ward {newsletter.sources.ward_number}
                   </span>

@@ -14,7 +14,7 @@ import {
   type WardRelevance,
   type WardTopicCell,
 } from "./analytics";
-import { formatTopicLabel } from "./topics";
+import { humanizeIdentifier } from "./format";
 
 export const CHART_COLORS = {
   series: "#2a78d6",
@@ -204,7 +204,7 @@ export function renderWardTopicHeatmap(
     marginBottom: 40,
     padding: 0.08,
     x: { label: "Ward", domain: wards },
-    y: { label: null, domain: topics, tickFormat: formatTopicLabel },
+    y: { label: null, domain: topics, tickFormat: humanizeIdentifier },
     color: {
       type: "linear",
       domain: [-MAX_LOG_RATIO, 0, MAX_LOG_RATIO],
@@ -222,7 +222,7 @@ export function renderWardTopicHeatmap(
         rx: 2,
         href: (cell: WardTopicCell) => buildSearchUrl({ ward: cell.ward, topic: cell.topic }),
         title: (cell: WardTopicCell) =>
-          `${formatWard(cell.ward)} · ${formatTopicLabel(cell.topic)}\n` +
+          `${formatWard(cell.ward)} · ${humanizeIdentifier(cell.topic)}\n` +
           `${cell.wardTopicNewsletters} of ${cell.wardNewsletters} newsletters (${formatPercent(cell.wardShare)})\n` +
           `City: ${formatPercent(cell.cityShare)}\nClick to search`,
         tip: true,

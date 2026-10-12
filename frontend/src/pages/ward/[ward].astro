@@ -1,0 +1,165 @@
+---
+export const prerender = false;
+
+import Layout from '../../layouts/Layout.astro';
+import NewsletterCard from '../../components/NewsletterCard.astro';
+import Pagination from '../../components/Pagination.astro';
+import { supabase } from '../../lib/supabase';
+import type { WardProfileSource } from '../../lib/newsletter-queries';
+import { countPages, parsePageParam } from '../../lib/pagination';
+import { SITE_NAME, buildWardDescription, buildWardTitle, formatReceivedDate } from '../../lib/seo';
+import {
+  EMPTY_WARD_NEWSLETTER_PAGE,
+  fetchWardNewsletterPage,
+  fetchWardSources,
+  type WardNewsletterPage,
+} from '../../lib/ward-queries';
+import {
+  WARD_DIRECTORY_PATH,
+  buildWardContactLinks,
+  buildWardPath,
+  buildWardSearchPath,
+  formatAlderNames,
+  parseWardParam,
+} from '../../lib/wards';
+
+const wardNumber = parseWardParam(Astro.params.ward);
+const page = parsePageParam(Astro.url.searchParams.get('page'));
+
+let sources: WardProfileSource[] = [];
+let newsletterPage: WardNewsletterPage = EMPTY_WARD_NEWSLETTER_PAGE;
+let loadFailed = false;
+
+if (wardNumber === null) {
+  Astro.response.status = 404;
+} else {
+  try {
+    sources = await fetchWardSources(supabase, wardNumber);
+    newsletterPage = await fetchWardNewsletterPage(
+      supabase,
+      sources.map((source) => source.id),
+      page,
+    );
+  } catch (error) {
+    console.error(`Error loading ward ${wardNumber}:`, error);
+    loadFailed = true;
+  }
+}
+
+const alderNames = formatAlderNames(sources.map((source) => source.name));
+const { newsletters, totalCount, latestReceivedDate } = newsletterPage;
+const totalPages = countPages(totalCount);
+const latestDateLabel = latestReceivedDate ? formatReceivedDate(latestReceivedDate) : null;
+
+const title = wardNumber === null
+  ? `Ward not found - ${SITE_NAME}`
+  : buildWardTitle(wardNumber, alderNames);
+const description = wardNumber === null
+  ? 'Chicago has 50 wards. Browse the ward directory to find newsletters from your alder.'
+  : buildWardDescription(wardNumber, alderNames);
+---
+
+<Layout title={title} description={description} canonicalPage={page}>
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+
+    {wardNumber === null ? (
+      <section class="text-center py-16" data-testid="ward-not-found">
+        <h1 class="text-3xl font-bold text-gray-900 mb-3">Ward not found</h1>
+        <p class="text-gray-600 mb-6">Chicago has 50 wards, numbered 1 through 50.</p>
+        <a href={WARD_DIRECTORY_PATH} class="text-blue-600 hover:text-blue-800 font-medium">
+          Browse all wards →
+        </a>
+      </section>
+    ) : (
+      <>
+        <!-- Ward Header -->
+        <header class="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6" data-testid="ward-header">
+          <p class="text-sm font-semibold uppercase tracking-wide text-blue-700 mb-1">
+            Ward {wardNumber}
+          </p>
+          <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" data-testid="ward-title">
+            {alderNames ? alderNames : `Ward ${wardNumber}`}
+          </h1>
+
+          {sources.length > 0 && (
+            <div class="space-y-3">
+              {sources.map((source) => {
+                const contactLinks = buildWardContactLinks(source);
+                return (
+                  <div data-testid="ward-alder">
+                    {sources.length > 1 && (
+                      <p class="font-medium text-gray-800 mb-1">{source.name}</p>
+                    )}
+                    {contactLinks.length > 0 && (
+                      <ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm" data-testid="ward-contact-links">
+                        {contactLinks.map((link) => (
+                          <li>
+                            <a
+                              href={link.href}
+                              class="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                              {...(link.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                              data-testid={`ward-contact-${link.kind}`}
+                            >
+                              {link.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!loadFailed && sources.length === 0 && (
+            <p class="text-gray-600" data-testid="ward-no-alder">
+              We don't have an alder on file for this ward yet.
+            </p>
+          )}
+
+          {totalCount > 0 && (
+            <>
+              <p class="mt-4 text-sm text-gray-600" data-testid="ward-stats">
+                {totalCount} newsletter{totalCount !== 1 ? 's' : ''}
+                {latestDateLabel && <> · Latest {latestDateLabel}</>}
+              </p>
+              <a
+                href={buildWardSearchPath(wardNumber)}
+                class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800"
+                data-testid="ward-search-link"
+              >
+                Search and filter Ward {wardNumber} newsletters →
+              </a>
+            </>
+          )}
+        </header>
+
+        <!-- Newsletter List -->
+        <section>
+          {loadFailed ? (
+            <p class="text-gray-600 text-center py-12" data-testid="ward-load-error">
+              Newsletters for this ward couldn't be loaded right now. Please try again later.
+            </p>
+          ) : totalCount === 0 ? (
+            <p class="text-gray-600 text-center py-12" data-testid="ward-empty">
+              No newsletters from Ward {wardNumber} yet.
+            </p>
+          ) : (
+            <>
+              <div class="space-y-4">
+                {newsletters.length === 0 && (
+                  <p class="text-gray-600 text-center py-12">No newsletters on this page.</p>
+                )}
+                {newsletters.map((newsletter) => (
+                  <NewsletterCard newsletter={newsletter} />
+                ))}
+              </div>
+              <Pagination currentPage={page} totalPages={totalPages} baseUrl={buildWardPath(wardNumber)} />
+            </>
+          )}
+        </section>
+      </>
+    )}
+  </div>
+</Layout>

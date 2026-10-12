@@ -7,7 +7,8 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { findMissingAnalyticsFiles, loadAnalyticsMetadata } from '../lib/analytics-data';
-import { ALL_TOPICS, formatTopicLabel } from '../lib/topics';
+import { humanizeIdentifier } from '../lib/format';
+import { ALL_TOPICS } from '../lib/topics';
 import { MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
 
 // Local exploration only: keep it out of search indexes (Layout has no noindex option).
@@ -25,10 +26,9 @@ const controlClass =
   description="Local analytics dashboard exploring topics, vocabulary, and sending patterns across alderman newsletters."
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
-    <header class="mb-8">
-      <a href="/" class="text-sm text-blue-600 hover:text-blue-700">&larr; Back to newsletters</a>
-      <h1 class="text-3xl sm:text-5xl font-bold text-gray-900 mt-3 mb-2 sm:mb-3">Newsletter Analytics</h1>
-      <p class="text-base sm:text-xl text-gray-600">
+    <header class="mb-6">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Newsletter Analytics</h1>
+      <p class="text-base sm:text-lg text-gray-600">
         What aldermen talk about, how often, and how it differs across the city.
       </p>
       {metadata && (
@@ -67,7 +67,7 @@ const controlClass =
               <span class="block text-sm font-semibold text-gray-700 mb-2">Topic</span>
               <select name="topic" class={controlClass}>
                 <option value="">All topics</option>
-                {ALL_TOPICS.map((topic) => <option value={topic}>{formatTopicLabel(topic)}</option>)}
+                {ALL_TOPICS.map((topic) => <option value={topic}>{humanizeIdentifier(topic)}</option>)}
               </select>
             </label>
             <label class="block">

@@ -2,11 +2,11 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import AuthButton from '../components/AuthButton.astro';
 import { notificationsEnabled } from '../lib/supabase';
 import type { UserProfile, NotificationRule } from '../lib/supabase';
 import { STARTER_RULE, shouldShowWelcome } from '../lib/onboarding';
-import { TOPIC_CATEGORIES, formatTopicLabel } from '../lib/topics';
+import { TOPIC_CATEGORIES } from '../lib/topics';
+import { humanizeIdentifier } from '../lib/format';
 
 // Redirect if notifications are disabled
 if (!notificationsEnabled()) {
@@ -82,11 +82,6 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
   description="Manage your email alerts for Chicago alderman newsletters."
 >
   <div class="container mx-auto px-4 py-8 max-w-5xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
     <!-- Header -->
     <header class="mb-8">
       <div class="flex items-center justify-between">
@@ -101,12 +96,6 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
       </div>
     </header>
 
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
-      <a href="/preferences" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Preferences</a>
-    </nav>
 
     {isWelcome && (
       <div data-testid="welcome-banner" class="mb-6 bg-blue-50 border border-blue-200 text-blue-900 px-5 py-4 rounded-lg">
@@ -270,7 +259,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
                     <div class="flex flex-wrap gap-2">
                       {rule.topics.map((topic) => (
                         <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          {formatTopicLabel(topic)}
+                          {humanizeIdentifier(topic)}
                         </span>
                       ))}
                     </div>
@@ -475,7 +464,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
                               value={topic}
                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
-                            <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopicLabel(topic)}</span>
+                            <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
                           </label>
                         ))}
                       </div>
@@ -510,7 +499,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
                             value={topic}
                             class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                           />
-                          <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopicLabel(topic)}</span>
+                          <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
                         </label>
                       ))}
                     </div>

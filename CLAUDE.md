@@ -214,6 +214,8 @@ frontend/src/
 ├── pages/
 │   ├── index.astro               # Homepage with recent newsletters
 │   ├── search.astro              # Search interface with filters
+│   ├── wards.astro               # Ward directory (all wards and their alders)
+│   ├── ward/[ward].astro         # Per-ward page: alder contact info + paginated newsletters
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
@@ -232,7 +234,11 @@ frontend/src/
 │   ├── middleware.test.ts        # Middleware logic tests
 │   ├── helpers.ts                # Test factories for mocking Astro context
 │   └── mocks/                    # Global mocks (astro:middleware)
+├── layouts/
+│   └── Layout.astro              # <head>/SEO tags + site header, single <main>, and footer for every page
 ├── components/
+│   ├── SiteHeader.astro          # Site name, tagline, primary nav, AuthButton
+│   ├── SiteFooter.astro          # Strong Towns Chicago credit + source link
 │   ├── NewsletterCard.astro      # Reusable card component
 │   └── AuthButton.astro          # Auth UI
 ├── scripts/
@@ -241,7 +247,10 @@ frontend/src/
     ├── analytics.ts              # Pure dashboard aggregations (unit tested)
     ├── analytics-charts.ts       # Observable Plot chart builders
     ├── analytics-data.ts         # Loads generated analytics JSON (tolerates missing files)
+    ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
+    ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
+    ├── ward-queries.ts           # Supabase queries for ward pages
     └── supabase-admin.ts         # Server-side ONLY privileged Supabase client
 ```
 
@@ -261,7 +270,13 @@ frontend/src/
 
 **LLM Processing** (`llm_processor.py` + `llm_client.py`): Three sequential LLM calls per newsletter for topic extraction, summarization, and relevance scoring using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
+**Search Filters** (`frontend/src/lib/search-filters.ts`): The search page parses URL params into a validated `SearchFilters` object (invalid values are dropped, never thrown), then `applySearchFilters()` is applied to both the count and data queries so they always filter identically. `buildSearchBaseUrl()` serializes filters back for pagination. Date filters are inclusive Chicago calendar days (`chicago-dates.ts`). Topic options come from `lib/topics.ts`, not from the database.
+
+**Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup.
+
 **Newsletter Deduplication**: Both ingest paths check for existing `email_uid` (email) or URL+subject combination (scraping) before inserting.
+
+**Ward Pages** (`frontend/src/pages/ward/[ward].astro`, `lib/wards.ts`): URLs are keyed by ward number (stable) rather than alder (changes). Invalid wards respond 404; a ward with several `alderman` sources shows all of them and merges their newsletters. Ward pages are server-rendered, so they are listed in the sitemap by `pages/sitemap-wards.xml.ts`.
 
 **Notification System** (`notifications/`):
 
