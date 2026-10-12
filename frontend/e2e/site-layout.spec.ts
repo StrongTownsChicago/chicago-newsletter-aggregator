@@ -17,7 +17,7 @@ async function expectSiteHeaderAndFooter(page: Page) {
   );
   await expect(footer.getByTestId('site-footer-source-link')).toHaveAttribute(
     'href',
-    'https://github.com/matt-hendrick/chicago-newsletter-aggregator',
+    'https://github.com/StrongTownsChicago/chicago-newsletter-aggregator',
   );
 }
 

@@ -10,7 +10,7 @@ export const STRONG_TOWNS_CHICAGO_URL = "https://www.strongtownschicago.org/";
 /** Footer credit text that precedes the linked organization name. */
 export const FOOTER_CREDIT_PREFIX = "Built for";
 export const SOURCE_CODE_URL =
-  "https://github.com/matt-hendrick/chicago-newsletter-aggregator";
+  "https://github.com/StrongTownsChicago/chicago-newsletter-aggregator";
 export const SOURCE_CODE_LINK_LABEL = "Source code on GitHub";
 
 export const HOME_PATH = "/";
