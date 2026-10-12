@@ -150,7 +150,7 @@ class RisingTerm:
 
 
 def build_name_tokens_by_ward(sources: Iterable[SourceRecord]) -> dict[str, set[str]]:
-    """Collect the lowercase name words of each ward's sources (e.g. alder names)."""
+    """Collect the lowercase name words of each ward's sources (e.g. alderman names)."""
     tokens_by_ward: dict[str, set[str]] = defaultdict(set)
     for source in sources:
         if source.ward is not None:
@@ -204,7 +204,7 @@ def compute_distinctive_terms(
 
     Skipped as uninformative: terms below min_term_newsletters_in_ward, terms in
     more than max_ward_share of a ward's newsletters (signatures and footers),
-    and terms containing the ward's own source names (alder self-references).
+    and terms containing the ward's own source names (alderman self-references).
     Wards with fewer than min_ward_newsletters newsletters are omitted.
     """
     documents_by_ward: dict[str, list[NewsletterTerms]] = defaultdict(list)
