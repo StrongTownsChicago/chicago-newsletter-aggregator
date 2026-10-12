@@ -31,7 +31,8 @@ export interface NewsletterDescriptionInput {
   sources?: { name: string; ward_number: string | null } | null;
 }
 
-function formatReceivedDate(receivedDate: string): string | null {
+/** Formats a newsletter date as e.g. "March 15, 2026" in Chicago time, or null if invalid. */
+export function formatReceivedDate(receivedDate: string): string | null {
   const date = new Date(receivedDate);
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -67,6 +68,25 @@ export function buildNewsletterDescription(
 
   return truncateDescription(
     `Newsletter from ${sender}${sentOn}: ${newsletter.subject.trim()}`,
+  );
+}
+
+/** Page title for a ward page, e.g. "Ward 1 - Daniel La Spata Newsletters - <site>". */
+export function buildWardTitle(wardNumber: number, alderNames: string | null): string {
+  const alderSegment = alderNames ? ` - ${alderNames}` : "";
+  return `Ward ${wardNumber}${alderSegment} Newsletters - ${SITE_NAME}`;
+}
+
+/** Meta description for a ward page. */
+export function buildWardDescription(
+  wardNumber: number,
+  alderNames: string | null,
+): string {
+  const sender = alderNames
+    ? `${alderNames}, alder for Chicago's Ward ${wardNumber}`
+    : `the alder for Chicago's Ward ${wardNumber}`;
+  return truncateDescription(
+    `Read newsletters from ${sender}, along with ward office contact information.`,
   );
 }
 

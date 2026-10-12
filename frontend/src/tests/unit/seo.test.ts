@@ -3,6 +3,8 @@ import {
   META_DESCRIPTION_MAX_LENGTH,
   buildCanonicalUrl,
   buildNewsletterDescription,
+  buildWardDescription,
+  buildWardTitle,
   isNonProductionHost,
   truncateDescription,
 } from '../../lib/seo';
@@ -140,5 +142,29 @@ describe('isNonProductionHost', () => {
 
   it('returns true when no production site is configured', () => {
     expect(isNonProductionHost('chicago-newsletter-aggregator.open-advocacy.com', undefined)).toBe(true);
+  });
+});
+
+describe('buildWardTitle', () => {
+  it('includes the ward number and alder name', () => {
+    expect(buildWardTitle(1, 'Daniel La Spata')).toBe(
+      'Ward 1 - Daniel La Spata Newsletters - Chicago Alderman Newsletter Tracker',
+    );
+  });
+
+  it('omits the alder when none is on file', () => {
+    expect(buildWardTitle(12, null)).toBe('Ward 12 Newsletters - Chicago Alderman Newsletter Tracker');
+  });
+});
+
+describe('buildWardDescription', () => {
+  it('names the alder and ward', () => {
+    const description = buildWardDescription(49, 'Maria Hadden');
+    expect(description).toContain("Maria Hadden, alder for Chicago's Ward 49");
+    expect(description.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX_LENGTH);
+  });
+
+  it('falls back to a generic sender when no alder is on file', () => {
+    expect(buildWardDescription(12, null)).toContain("the alder for Chicago's Ward 12");
   });
 });
