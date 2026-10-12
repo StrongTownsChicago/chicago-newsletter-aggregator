@@ -1,0 +1,37 @@
+---
+import {
+  FOOTER_CREDIT_PREFIX,
+  SOURCE_CODE_LINK_LABEL,
+  SOURCE_CODE_URL,
+  STRONG_TOWNS_CHICAGO_NAME,
+  STRONG_TOWNS_CHICAGO_URL,
+} from '../lib/site';
+
+const linkClass = 'text-blue-600 hover:text-blue-800 hover:underline';
+---
+
+<footer class="mt-12 bg-white border-t border-gray-200" data-testid="site-footer">
+  <div class="container mx-auto max-w-6xl px-4 py-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600">
+    <p data-testid="site-footer-credit">
+      {FOOTER_CREDIT_PREFIX}{' '}
+      <a
+        href={STRONG_TOWNS_CHICAGO_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        class={linkClass}
+        data-testid="site-footer-stc-link"
+      >
+        {STRONG_TOWNS_CHICAGO_NAME}
+      </a>
+    </p>
+    <a
+      href={SOURCE_CODE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      class={linkClass}
+      data-testid="site-footer-source-link"
+    >
+      {SOURCE_CODE_LINK_LABEL}
+    </a>
+  </div>
+</footer>

@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
 import { SITE_NAME, buildCanonicalUrl, truncateDescription } from '../lib/seo';
 
 interface Props {
@@ -41,7 +43,17 @@ const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
     <meta name="twitter:description" content={metaDescription} />
     {imageUrl && <meta name="twitter:image" content={imageUrl} />}
   </head>
-  <body class="bg-gray-50 min-h-screen">
-    <slot />
+  <body class="bg-gray-50 min-h-screen flex flex-col">
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-md focus:shadow focus:text-blue-600"
+    >
+      Skip to content
+    </a>
+    <SiteHeader />
+    <main id="main-content" class="flex-1">
+      <slot />
+    </main>
+    <SiteFooter />
   </body>
 </html>

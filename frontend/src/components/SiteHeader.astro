@@ -1,0 +1,53 @@
+---
+import AuthButton from './AuthButton.astro';
+import { notificationsEnabled } from '../lib/supabase';
+import { SITE_NAME } from '../lib/seo';
+import { HOME_PATH, SITE_TAGLINE, buildPrimaryNavItems, isNavItemActive } from '../lib/site';
+
+const navItems = buildPrimaryNavItems({
+  showPreferences: notificationsEnabled() && Boolean(Astro.locals.user),
+});
+const currentPath = Astro.url.pathname;
+---
+
+<header class="bg-white border-b border-gray-200" data-testid="site-header">
+  <div class="container mx-auto max-w-6xl px-4 pt-4">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
+        <a
+          href={HOME_PATH}
+          class="text-lg sm:text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
+          data-testid="site-name"
+        >
+          {SITE_NAME}
+        </a>
+        <p class="text-sm text-gray-600" data-testid="site-tagline">{SITE_TAGLINE}</p>
+      </div>
+      <AuthButton />
+    </div>
+
+    <nav aria-label="Primary" class="mt-3" data-testid="site-nav">
+      <ul class="flex flex-wrap gap-x-6">
+        {navItems.map((item) => {
+          const isActive = isNavItemActive(item, currentPath);
+          return (
+            <li>
+              <a
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                class:list={[
+                  'inline-block py-2 border-b-2 transition-colors',
+                  isActive
+                    ? 'border-blue-600 text-blue-600 font-semibold'
+                    : 'border-transparent text-gray-600 hover:text-blue-600',
+                ]}
+              >
+                {item.label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  </div>
+</header>
