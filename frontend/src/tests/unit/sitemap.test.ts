@@ -127,9 +127,13 @@ describe('buildSitemapXml', () => {
 });
 
 describe('buildWardSitemapPages', () => {
-  it('lists the ward directory followed by every ward page', () => {
+  it('lists every ward page', () => {
     const paths = buildWardSitemapPages().map((page) => page.path);
-    expect(paths[0]).toBe('/wards');
-    expect(paths.slice(1)).toEqual(Array.from({ length: 50 }, (_, index) => `/ward/${index + 1}`));
+    expect(paths).toEqual(Array.from({ length: 50 }, (_, index) => `/ward/${index + 1}`));
+  });
+
+  it('omits the ward directory, which the static-route sitemap already lists', () => {
+    const paths = buildWardSitemapPages().map((page) => page.path);
+    expect(paths).not.toContain('/wards');
   });
 });

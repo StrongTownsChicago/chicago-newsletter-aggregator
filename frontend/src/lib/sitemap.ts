@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ALL_WARD_NUMBERS, WARD_DIRECTORY_PATH, buildWardPath } from "./wards";
+import { ALL_WARD_NUMBERS, buildWardPath } from "./wards";
 
 /** PostgREST caps each response at this many rows by default. */
 export const SUPABASE_PAGE_SIZE = 1000;
@@ -83,15 +83,13 @@ export function buildNewsletterSitemapXml(
 }
 
 /**
- * Pages for the ward sitemap: the ward directory plus one page per ward.
- * Every ward is listed because ward numbers are fixed, so the set needs no
- * database query.
+ * Pages for the ward sitemap: one page per ward. Every ward is listed because
+ * ward numbers are fixed, so the set needs no database query. The ward
+ * directory (`/wards`) is a non-dynamic route, so @astrojs/sitemap already
+ * lists it in the static-route sitemap.
  */
 export function buildWardSitemapPages(): SitemapPage[] {
-  return [
-    { path: WARD_DIRECTORY_PATH },
-    ...ALL_WARD_NUMBERS.map((wardNumber) => ({ path: buildWardPath(wardNumber) })),
-  ];
+  return ALL_WARD_NUMBERS.map((wardNumber) => ({ path: buildWardPath(wardNumber) }));
 }
 
 /**
