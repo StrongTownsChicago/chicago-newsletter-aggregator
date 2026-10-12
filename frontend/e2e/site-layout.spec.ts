@@ -6,6 +6,10 @@ async function expectSiteHeaderAndFooter(page: Page) {
   await expect(header.getByTestId('site-name')).toHaveAttribute('href', '/');
   await expect(header.getByTestId('site-tagline')).toBeVisible();
   await expect(header.locator('h1')).toHaveCount(0);
+  await expect(header.getByTestId('header-github-link')).toHaveAttribute(
+    'href',
+    'https://github.com/StrongTownsChicago/chicago-newsletter-aggregator',
+  );
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 
   const footer = page.getByRole('contentinfo');
