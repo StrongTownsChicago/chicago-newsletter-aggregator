@@ -5,7 +5,10 @@ async function expectSiteHeaderAndFooter(page: Page) {
   await expect(header).toBeVisible();
   await expect(header.getByTestId('site-name')).toHaveAttribute('href', '/');
   await expect(header.getByTestId('site-tagline')).toBeVisible();
-  await expect(header.locator('h1')).toHaveCount(0);
+  // Only the homepage uses the site name as its h1; covered by the per-path h1 test.
+  if (new URL(page.url()).pathname !== '/') {
+    await expect(header.locator('h1')).toHaveCount(0);
+  }
   await expect(header.getByTestId('header-github-link')).toHaveAttribute(
     'href',
     'https://github.com/StrongTownsChicago/chicago-newsletter-aggregator',
@@ -47,7 +50,8 @@ for (const path of ['/', '/search', '/wards', '/ward/1']) {
     await page.goto(path);
     await expect(page.getByRole('main')).toHaveCount(1);
     await expect(page.locator('h1')).toHaveCount(1);
-    await expect(page.getByRole('main').locator('h1')).toHaveCount(1);
+    const h1Container = path === '/' ? page.getByRole('banner') : page.getByRole('main');
+    await expect(h1Container.locator('h1')).toHaveCount(1);
   });
 }
 

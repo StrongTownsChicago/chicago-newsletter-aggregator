@@ -14,19 +14,23 @@ const navItems = buildPrimaryNavItems({
   showPreferences: notificationsEnabled() && Boolean(Astro.locals.user),
 });
 const currentPath = Astro.url.pathname;
+// The homepage's h1 is the site name itself; every other page supplies its own h1.
+const SiteNameHeading = currentPath === HOME_PATH ? 'h1' : 'p';
 ---
 
 <header class="bg-white border-b border-gray-200" data-testid="site-header">
   <div class="container mx-auto max-w-6xl px-4 pt-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="min-w-0">
-        <a
-          href={HOME_PATH}
-          class="text-lg sm:text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
-          data-testid="site-name"
-        >
-          {SITE_NAME}
-        </a>
+        <SiteNameHeading class="text-lg sm:text-xl font-bold text-gray-900">
+          <a
+            href={HOME_PATH}
+            class="hover:text-blue-600 transition-colors"
+            data-testid="site-name"
+          >
+            {SITE_NAME}
+          </a>
+        </SiteNameHeading>
         <p class="text-sm text-gray-600" data-testid="site-tagline">{SITE_TAGLINE}</p>
       </div>
       <div class="flex items-center gap-4">
