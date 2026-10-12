@@ -11,7 +11,7 @@ test('ward directory lists all 50 wards and links to ward pages', async ({ page 
   await expect(page.getByTestId('ward-header')).toBeVisible();
 });
 
-test('ward page shows the alder header and links to filtered search', async ({ page }) => {
+test('ward page shows the alderman header and links to filtered search', async ({ page }) => {
   await page.goto('/ward/1');
 
   await expect(page.getByTestId('ward-title')).toBeVisible();
