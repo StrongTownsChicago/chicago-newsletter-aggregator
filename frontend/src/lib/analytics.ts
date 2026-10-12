@@ -229,7 +229,9 @@ export function normalizeTermQuery(query: string): string {
 }
 
 export function lookupTermPostings(index: TermIndex, query: string): number[] | null {
-  return index.terms[normalizeTermQuery(query)] ?? null;
+  const term = normalizeTermQuery(query);
+  // Own keys only: "constructor" or "__proto__" must not resolve to Object.prototype members.
+  return Object.hasOwn(index.terms, term) ? index.terms[term] : null;
 }
 
 /** Up to `limit` indexed terms that start with the query, most specific first. */
@@ -535,12 +537,50 @@ export function selectCoverage(
 // ---------------------------------------------------------------------------
 // Links
 
+/** Search page parameters a dashboard click-through can set. Dates are inclusive YYYY-MM-DD. */
+export interface SearchLinkParams {
+  q?: string;
+  ward?: string;
+  topic?: string;
+  fromDate?: string;
+  toDate?: string;
+  minRelevance?: number;
+}
+
+/** First and last calendar day (YYYY-MM-DD) of a YYYY-MM month. */
+export function monthDateRange(month: string): { fromDate: string; toDate: string } {
+  const [year, monthNumber] = month.split("-").map(Number);
+  // Day 0 of the following month is the last day of this one.
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  return { fromDate: `${month}-01`, toDate: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
+/**
+ * The global filters as search link parameters, so a click-through lists the
+ * same newsletters the chart counted. Panels whose data ignores the topic or
+ * relevance filter (the term index, the ward x topic comparison) opt out.
+ */
+export function searchScopeForFilters(
+  filters: AnalyticsFilters,
+  options: { includeTopic: boolean; includeRelevance: boolean },
+): SearchLinkParams {
+  const scope: SearchLinkParams = {};
+  if (filters.fromMonth) scope.fromDate = monthDateRange(filters.fromMonth).fromDate;
+  if (filters.toMonth) scope.toDate = monthDateRange(filters.toMonth).toDate;
+  if (options.includeTopic && filters.topic) scope.topic = filters.topic;
+  if (options.includeRelevance && filters.minRelevance > 0) scope.minRelevance = filters.minRelevance;
+  return scope;
+}
+
 /** Link to the search page; multi-word terms are quoted as a phrase. */
-export function buildSearchUrl(params: { q?: string; ward?: string; topic?: string }): string {
+export function buildSearchUrl(params: SearchLinkParams): string {
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q.includes(" ") ? `"${params.q}"` : params.q);
   if (params.ward) search.set("ward", params.ward);
   if (params.topic) search.set("topic", params.topic);
+  if (params.fromDate) search.set("from", params.fromDate);
+  if (params.toDate) search.set("to", params.toDate);
+  if (params.minRelevance) search.set("min_relevance", String(params.minRelevance));
   const query = search.toString();
   return query ? `/search?${query}` : "/search";
 }

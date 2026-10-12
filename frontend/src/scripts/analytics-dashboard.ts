@@ -14,6 +14,7 @@ import {
   lookupTermPostings,
   monthOf,
   normalizeTermQuery,
+  searchScopeForFilters,
   selectCoverage,
   suggestTerms,
   summarizeFacts,
@@ -49,6 +50,8 @@ const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
 const GAP_LIMIT = 10;
 const RESIZE_DEBOUNCE_MS = 200;
+/** Search link scope for panels computed from fully filtered newsletters. */
+const ALL_FILTERS_SCOPE = { includeTopic: true, includeRelevance: true };
 const numberFormat = new Intl.NumberFormat("en-US");
 
 interface DashboardState {
@@ -230,7 +233,15 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   }
   timeline.replaceChildren(renderTermTimeline(trimSparseEdges(months), chartWidth(timeline)));
   wardsTitle.classList.remove("hidden");
-  wardsChart.replaceChildren(renderTermWards(wards.slice(0, TERM_WARD_LIMIT), term, chartWidth(wardsChart)));
+  wardsChart.replaceChildren(
+    renderTermWards(
+      wards.slice(0, TERM_WARD_LIMIT),
+      term,
+      // The term index has no topic or relevance, so neither do its search links.
+      searchScopeForFilters(filters, { includeTopic: false, includeRelevance: false }),
+      chartWidth(wardsChart),
+    ),
+  );
   setTable(
     table,
     [
@@ -260,7 +271,12 @@ function renderWardTopicPanel(
   if (cells.length === 0) {
     replaceContent(chart, emptyMessage("Not enough processed newsletters for these filters."));
   } else {
-    replaceContent(chart, renderWardTopicHeatmap(cells, filters.topic, chartWidth(chart)));
+    replaceContent(chart, renderWardTopicHeatmap(
+        cells,
+        filters.topic,
+        searchScopeForFilters(filters, { includeTopic: false, includeRelevance: true }),
+        chartWidth(chart),
+      ));
   }
   setTable(
     table,
@@ -368,7 +384,7 @@ function renderRisingPanel(state: DashboardState): void {
   );
 }
 
-function renderCadencePanel(facts: NewsletterFact[]): void {
+function renderCadencePanel(facts: NewsletterFact[], filters: AnalyticsFilters): void {
   const { section, chart, caption, table } = panel("sending-cadence");
   const counts = countNewslettersByWardMonth(facts);
   const factMonths = facts.map((fact) => monthOf(fact.date)).sort();
@@ -377,7 +393,7 @@ function renderCadencePanel(facts: NewsletterFact[]): void {
   if (!chart) return;
   replaceContent(
     chart,
-    counts.length ? renderCadenceHeatmap(counts, months, chartWidth(chart)) : emptyMessage("No newsletters for these filters."),
+    counts.length ? renderCadenceHeatmap(counts, months, searchScopeForFilters(filters, ALL_FILTERS_SCOPE), chartWidth(chart)) : emptyMessage("No newsletters for these filters."),
   );
   setTable(
     table,
@@ -401,7 +417,7 @@ function renderCadencePanel(facts: NewsletterFact[]): void {
   );
 }
 
-function renderRelevancePanel(facts: NewsletterFact[]): void {
+function renderRelevancePanel(facts: NewsletterFact[], filters: AnalyticsFilters): void {
   const { chart, caption, table } = panel("relevance-by-ward");
   const rows = computeRelevanceByWard(facts);
   const scored = rows.reduce((total, row) => total + row.scoredNewsletters, 0);
@@ -409,7 +425,7 @@ function renderRelevancePanel(facts: NewsletterFact[]): void {
   if (!chart) return;
   replaceContent(
     chart,
-    rows.length ? renderRelevanceByWard(rows, chartWidth(chart)) : emptyMessage("No scored newsletters for these filters."),
+    rows.length ? renderRelevanceByWard(rows, searchScopeForFilters(filters, ALL_FILTERS_SCOPE), chartWidth(chart)) : emptyMessage("No scored newsletters for these filters."),
   );
   setTable(
     table,
@@ -464,8 +480,8 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   renderTopicTrendsPanel(factsIgnoringTopic, filters);
   renderDistinctivePanel(state);
   renderRisingPanel(state);
-  renderCadencePanel(facts);
-  renderRelevancePanel(facts);
+  renderCadencePanel(facts, filters);
+  renderRelevancePanel(facts, filters);
   renderCoveragePanel(state, filters);
 }
 

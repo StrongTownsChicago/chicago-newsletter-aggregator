@@ -15,7 +15,9 @@ import {
   listTopics,
   listWards,
   lookupTermPostings,
+  monthDateRange,
   normalizeTermQuery,
+  searchScopeForFilters,
   selectCoverage,
   shareOrNull,
   trimSparseEdges,
@@ -178,6 +180,12 @@ describe("term explorer", () => {
   it("looks up postings and reports misses as null", () => {
     expect(lookupTermPostings(index, "Bike Lanes")).toEqual([0, 2, 2, 1]);
     expect(lookupTermPostings(index, "streetcar")).toBeNull();
+  });
+
+  it("ignores inherited object keys instead of returning prototype members", () => {
+    for (const query of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(lookupTermPostings(index, query)).toBeNull();
+    }
   });
 
   it("suggests longer indexed terms by prefix, shortest first", () => {
@@ -360,5 +368,40 @@ describe("buildSearchUrl", () => {
     expect(buildSearchUrl({ q: "bike lanes" })).toBe("/search?q=%22bike+lanes%22");
     expect(buildSearchUrl({ q: "zoning", ward: "1" })).toBe("/search?q=zoning&ward=1");
     expect(buildSearchUrl({})).toBe("/search");
+  });
+});
+
+describe("monthDateRange", () => {
+  it("returns the first and last day of the month, including leap years", () => {
+    expect(monthDateRange("2026-01")).toEqual({ fromDate: "2026-01-01", toDate: "2026-01-31" });
+    expect(monthDateRange("2024-02")).toEqual({ fromDate: "2024-02-01", toDate: "2024-02-29" });
+    expect(monthDateRange("2026-02")).toEqual({ fromDate: "2026-02-01", toDate: "2026-02-28" });
+    expect(monthDateRange("2026-12")).toEqual({ fromDate: "2026-12-01", toDate: "2026-12-31" });
+  });
+});
+
+describe("searchScopeForFilters", () => {
+  const filters: AnalyticsFilters = {
+    wards: ["3"],
+    topic: "bike_lanes",
+    fromMonth: "2025-11",
+    toMonth: "2026-02",
+    minRelevance: 7,
+  };
+
+  it("carries the date range, topic, and relevance into search links", () => {
+    const scope = searchScopeForFilters(filters, { includeTopic: true, includeRelevance: true });
+    expect(scope).toEqual({ fromDate: "2025-11-01", toDate: "2026-02-28", topic: "bike_lanes", minRelevance: 7 });
+    expect(buildSearchUrl({ ...scope, ward: "3" })).toBe(
+      "/search?ward=3&topic=bike_lanes&from=2025-11-01&to=2026-02-28&min_relevance=7",
+    );
+  });
+
+  it("omits filters the panel ignores and unset filters", () => {
+    expect(searchScopeForFilters(filters, { includeTopic: false, includeRelevance: false })).toEqual({
+      fromDate: "2025-11-01",
+      toDate: "2026-02-28",
+    });
+    expect(searchScopeForFilters(EMPTY_FILTERS, { includeTopic: true, includeRelevance: true })).toEqual({});
   });
 });

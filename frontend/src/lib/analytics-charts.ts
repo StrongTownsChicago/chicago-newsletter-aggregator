@@ -4,8 +4,10 @@
 import * as Plot from "@observablehq/plot";
 import {
   buildSearchUrl,
+  monthDateRange,
   type DistinctiveTerm,
   type RisingTerm,
+  type SearchLinkParams,
   type SourceCoverage,
   type TermMonthPoint,
   type TermWardRow,
@@ -158,7 +160,12 @@ export function renderTopicTrend(points: TopicMonthPoint[], maxShare: number, wi
   });
 }
 
-export function renderTermWards(rows: TermWardRow[], term: string, width: number): Element {
+export function renderTermWards(
+  rows: TermWardRow[],
+  term: string,
+  searchScope: SearchLinkParams,
+  width: number,
+): Element {
   return Plot.plot({
     ...baseOptions(width),
     height: rows.length * BAR_ROW_HEIGHT + AXIS_BAND,
@@ -172,7 +179,7 @@ export function renderTermWards(rows: TermWardRow[], term: string, width: number
         y: "ward",
         fill: CHART_COLORS.series,
         rx: 4,
-        href: (row: TermWardRow) => buildSearchUrl({ q: term, ward: row.ward }),
+        href: (row: TermWardRow) => buildSearchUrl({ ...searchScope, q: term, ward: row.ward }),
         title: (row: TermWardRow) =>
           `${formatWard(row.ward)}: ${row.mentions} of ${row.newsletters} newsletters (${formatPercent(row.share)})\nClick to search`,
         tip: true,
@@ -193,6 +200,7 @@ export function renderTermWards(rows: TermWardRow[], term: string, width: number
 export function renderWardTopicHeatmap(
   cells: WardTopicCell[],
   selectedTopic: string | null,
+  searchScope: SearchLinkParams,
   width: number,
 ): Element {
   const wards = [...new Set(cells.map((cell) => cell.ward))];
@@ -220,7 +228,7 @@ export function renderWardTopicHeatmap(
         y: "topic",
         fill: "logRatio",
         rx: 2,
-        href: (cell: WardTopicCell) => buildSearchUrl({ ward: cell.ward, topic: cell.topic }),
+        href: (cell: WardTopicCell) => buildSearchUrl({ ...searchScope, ward: cell.ward, topic: cell.topic }),
         title: (cell: WardTopicCell) =>
           `${formatWard(cell.ward)} · ${humanizeIdentifier(cell.topic)}\n` +
           `${cell.wardTopicNewsletters} of ${cell.wardNewsletters} newsletters (${formatPercent(cell.wardShare)})\n` +
@@ -323,7 +331,12 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
   );
 }
 
-export function renderCadenceHeatmap(counts: WardMonthCount[], months: string[], width: number): Element {
+export function renderCadenceHeatmap(
+  counts: WardMonthCount[],
+  months: string[],
+  searchScope: SearchLinkParams,
+  width: number,
+): Element {
   const wards = [...new Set(counts.map((count) => count.ward))];
   const plot = Plot.plot({
     ...baseOptions(width),
@@ -344,7 +357,7 @@ export function renderCadenceHeatmap(counts: WardMonthCount[], months: string[],
         y: "ward",
         fill: "newsletters",
         rx: 2,
-        href: (count: WardMonthCount) => buildSearchUrl({ ward: count.ward }),
+        href: (count: WardMonthCount) => buildSearchUrl({ ...searchScope, ...monthDateRange(count.month), ward: count.ward }),
         title: (count: WardMonthCount) => `${formatWard(count.ward)} · ${count.month}\n${count.newsletters} newsletters`,
         tip: true,
       }),
@@ -353,7 +366,7 @@ export function renderCadenceHeatmap(counts: WardMonthCount[], months: string[],
   return withColorLegend(plot);
 }
 
-export function renderRelevanceByWard(rows: WardRelevance[], width: number): Element {
+export function renderRelevanceByWard(rows: WardRelevance[], searchScope: SearchLinkParams, width: number): Element {
   return Plot.plot({
     ...baseOptions(width),
     height: rows.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
@@ -368,7 +381,7 @@ export function renderRelevanceByWard(rows: WardRelevance[], width: number): Ele
         y: "ward",
         fill: CHART_COLORS.series,
         rx: 4,
-        href: (row: WardRelevance) => buildSearchUrl({ ward: row.ward }),
+        href: (row: WardRelevance) => buildSearchUrl({ ...searchScope, ward: row.ward }),
         title: (row: WardRelevance) =>
           `${formatWard(row.ward)}: ${row.averageRelevance.toFixed(2)} average over ${row.scoredNewsletters} scored newsletters\nClick to search`,
         tip: true,
