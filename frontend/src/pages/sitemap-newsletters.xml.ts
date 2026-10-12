@@ -3,11 +3,10 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase } from "../lib/supabase";
 import {
+  SITEMAP_RESPONSE_HEADERS,
   buildNewsletterSitemapXml,
   fetchNewsletterSitemapEntries,
 } from "../lib/sitemap";
-
-const CACHE_MAX_AGE_SECONDS = 60 * 60;
 
 export const GET: APIRoute = async ({ site, url }) => {
   try {
@@ -16,10 +15,7 @@ export const GET: APIRoute = async ({ site, url }) => {
 
     return new Response(xml, {
       status: 200,
-      headers: {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": `public, max-age=${CACHE_MAX_AGE_SECONDS}`,
-      },
+      headers: SITEMAP_RESPONSE_HEADERS,
     });
   } catch (error) {
     console.error("Error generating newsletter sitemap:", error);

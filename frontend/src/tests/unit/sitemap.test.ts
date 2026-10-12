@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildNewsletterSitemapXml,
+  buildSitemapXml,
+  buildWardSitemapPages,
   fetchNewsletterSitemapEntries,
   type NewsletterSitemapEntry,
 } from '../../lib/sitemap';
@@ -110,5 +112,24 @@ describe('fetchNewsletterSitemapEntries', () => {
     await expect(fetchNewsletterSitemapEntries(supabase)).rejects.toThrow(
       'Failed to fetch newsletters for sitemap: boom',
     );
+  });
+});
+
+describe('buildSitemapXml', () => {
+  it('renders arbitrary site paths with optional lastmod', () => {
+    const xml = buildSitemapXml(
+      [{ path: '/wards' }, { path: '/ward/1', lastmod: '2026-03-16' }],
+      SITE,
+    );
+    expect(xml).toContain(`<url><loc>${SITE}/wards</loc></url>`);
+    expect(xml).toContain(`<url><loc>${SITE}/ward/1</loc><lastmod>2026-03-16T00:00:00.000Z</lastmod></url>`);
+  });
+});
+
+describe('buildWardSitemapPages', () => {
+  it('lists the ward directory followed by every ward page', () => {
+    const paths = buildWardSitemapPages().map((page) => page.path);
+    expect(paths[0]).toBe('/wards');
+    expect(paths.slice(1)).toEqual(Array.from({ length: 50 }, (_, index) => `/ward/${index + 1}`));
   });
 });
