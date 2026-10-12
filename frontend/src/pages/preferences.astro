@@ -2,7 +2,6 @@
 export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
-import AuthButton from '../components/AuthButton.astro';
 import { notificationsEnabled } from '../lib/supabase';
 import type { UserProfile, NotificationRule } from '../lib/supabase';
 import { STARTER_RULE, shouldShowWelcome } from '../lib/onboarding';
@@ -83,11 +82,6 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
   description="Manage your email alerts for Chicago alderman newsletters."
 >
   <div class="container mx-auto px-4 py-8 max-w-5xl">
-    <!-- Top Bar with Auth -->
-    <div class="mb-6 flex justify-end">
-      <AuthButton />
-    </div>
-
     <!-- Header -->
     <header class="mb-8">
       <div class="flex items-center justify-between">
@@ -102,13 +96,6 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
       </div>
     </header>
 
-    <!-- Navigation -->
-    <nav class="mb-8 flex gap-6 border-b border-gray-200 pb-4">
-      <a href="/" class="text-gray-600 hover:text-blue-600 pb-3">Recent</a>
-      <a href="/search" class="text-gray-600 hover:text-blue-600 pb-3">Search</a>
-      <a href="/wards" class="text-gray-600 hover:text-blue-600 pb-3">Wards</a>
-      <a href="/preferences" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-3">Preferences</a>
-    </nav>
 
     {isWelcome && (
       <div data-testid="welcome-banner" class="mb-6 bg-blue-50 border border-blue-200 text-blue-900 px-5 py-4 rounded-lg">

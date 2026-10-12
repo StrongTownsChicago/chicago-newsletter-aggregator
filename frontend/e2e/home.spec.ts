@@ -7,7 +7,7 @@ test('has title', async ({ page }) => {
 
 test('has main heading', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Chicago Alderman Newsletter Tracker', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recent Newsletters from Chicago Alders', level: 1 })).toBeVisible();
 });
 
 test('displays newsletter cards', async ({ page }) => {
