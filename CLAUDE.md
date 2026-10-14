@@ -72,8 +72,10 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 uv run python -m utils.calculate_token_costs --list-models              # List available models
 uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
 
-# Local analytics dashboard data (read-only DB access; writes gitignored JSON for /analytics)
-uv run python -m utils.compute_analytics
+# Local analytics dashboard data (writes gitignored JSON for /analytics)
+uv run python -m utils.compute_analytics                  # Fetch only new newsletters into the local snapshot, then compute
+uv run python -m utils.compute_analytics --offline        # Compute from the snapshot; no database access
+uv run python -m utils.compute_analytics --full-refresh   # Rebuild the snapshot from every newsletter (heavy; rarely)
 uv run python -m utils.compute_analytics --min-term-newsletters 30 --output-dir <dir>
 
 # Run all tests
@@ -188,7 +190,8 @@ backend/
 │   └── error_logger.py           # Timestamped error logging
 ├── analytics/                    # Pure metric logic for the local analytics dashboard (no I/O)
 ├── utils/
-│   ├── compute_analytics.py      # Fetch → compute → write analytics JSON for /analytics
+│   ├── compute_analytics.py      # Refresh snapshot → compute → write analytics JSON for /analytics
+│   ├── analytics_snapshot.py     # Read/write the local analytics snapshot (backend/data/, gitignored)
 │   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary, relevance score)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
@@ -291,7 +294,7 @@ frontend/src/
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
 
-**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` fetches newsletters and sources once (paginated, read-only), computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to the gitignored `frontend/src/data/analytics/`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`.
+**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to the gitignored `frontend/src/data/analytics/`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`.
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
