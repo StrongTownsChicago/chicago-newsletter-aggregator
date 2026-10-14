@@ -1,19 +1,36 @@
 """
 Compute analytics JSON files for the local /analytics dashboard.
 
-Fetches newsletters and sources from Supabase (read-only), computes metrics
-with the pure functions in `analytics/`, and writes compact JSON files that
-the frontend loads at build/dev time.
+Reads newsletters and sources from a local snapshot (see
+`utils/analytics_snapshot.py`), computes metrics with the pure functions in
+`analytics/`, and writes compact JSON files that the frontend loads at
+build/dev time.
+
+The production database has a small disk IO budget, so it is read gently:
+
+- default: fetch all sources plus only the newsletters created since the
+  snapshot's cursor (with a short overlap), merge them into the snapshot,
+  then compute.
+- --offline: never contact the database; compute from the snapshot as-is.
+- --full-refresh: rebuild the snapshot by reading every newsletter. Heavy;
+  use rarely, e.g. after bulk LLM or privacy reprocessing, which edits
+  existing rows that incremental refreshes do not revisit.
 
 Usage:
     uv run python -m utils.compute_analytics
+    uv run python -m utils.compute_analytics --offline
+    uv run python -m utils.compute_analytics --full-refresh
     uv run python -m utils.compute_analytics --output-dir /tmp/analytics
     uv run python -m utils.compute_analytics --min-term-newsletters 30
 """
 
 import argparse
+import io
 import json
-from datetime import datetime
+import sys
+import time
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +47,12 @@ from analytics.records import (
     parse_newsletter_row,
     parse_source_row,
 )
+from analytics.snapshot import (
+    Snapshot,
+    advance_cursor,
+    merge_newsletters,
+    newest_created_at,
+)
 from analytics.terms import (
     NewsletterTerms,
     build_name_tokens_by_ward,
@@ -41,14 +64,25 @@ from analytics.terms import (
     select_vocabulary,
 )
 from shared.db import get_supabase_client
+from utils.analytics_snapshot import (
+    DEFAULT_SNAPSHOT_DIR,
+    SnapshotNotFoundError,
+    load_snapshot,
+    save_snapshot,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "src" / "data" / "analytics"
 
-# PostgREST caps rows per request; smaller pages also keep plain_text payloads manageable.
-FETCH_PAGE_SIZE = 500
+# Small pages with a pause between them keep reads well under the database's
+# disk IO budget; repeated full reads of every plain_text exhausted it once.
+FETCH_PAGE_SIZE = 100
+FETCH_PAUSE_SECONDS = 1.0
+# Re-fetch this far behind the cursor so rows committed late are not missed.
+INCREMENTAL_OVERLAP = timedelta(days=1)
 NEWSLETTER_COLUMNS = (
-    "id, received_date, source_id, subject, plain_text, topics, relevance_score"
+    "id, created_at, received_date, source_id, subject, plain_text, topics, "
+    "relevance_score"
 )
 SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
@@ -66,16 +100,25 @@ RISING_TOP_N = 30
 SAMPLE_SIZE = 8
 
 
-def fetch_all_rows(
-    supabase: Any, table: str, columns: str, order_column: str
+def fetch_rows(
+    supabase: Any,
+    table: str,
+    columns: str,
+    created_since: datetime | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[dict[str, Any]]:
-    """Fetch every row of a table, one page at a time."""
+    """Fetch rows one small page at a time, pausing between pages.
+
+    Pages are ordered by the unique `id`, so offsets stay stable. Errors are
+    not retried: a struggling database should be left alone, not hammered.
+    """
     rows: list[dict[str, Any]] = []
     while True:
+        query = supabase.table(table).select(columns)
+        if created_since is not None:
+            query = query.gte("created_at", created_since.isoformat())
         page = (
-            supabase.table(table)
-            .select(columns)
-            .order(order_column)
+            query.order("id")
             .range(len(rows), len(rows) + FETCH_PAGE_SIZE - 1)
             .execute()
             .data
@@ -83,20 +126,50 @@ def fetch_all_rows(
         rows.extend(page)
         if len(page) < FETCH_PAGE_SIZE:
             return rows
+        sleep(FETCH_PAUSE_SECONDS)
 
 
-def fetch_records() -> tuple[list[SourceRecord], list[NewsletterRecord]]:
-    """Load all sources and newsletters as typed records."""
-    supabase = get_supabase_client()
-    sources = [
+def fetch_sources(
+    supabase: Any, sleep: Callable[[float], None] = time.sleep
+) -> list[SourceRecord]:
+    """Fetch every source (a small table, so always read in full)."""
+    return [
         parse_source_row(row)
-        for row in fetch_all_rows(supabase, "sources", SOURCE_COLUMNS, "id")
+        for row in fetch_rows(supabase, "sources", SOURCE_COLUMNS, sleep=sleep)
     ]
-    newsletters = [
-        parse_newsletter_row(row)
-        for row in fetch_all_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, "id")
-    ]
-    return sources, newsletters
+
+
+def refresh_snapshot(
+    supabase: Any, snapshot: Snapshot, sleep: Callable[[float], None] = time.sleep
+) -> tuple[Snapshot, int]:
+    """Merge newsletters created since the snapshot's cursor into it.
+
+    Returns the updated snapshot and how many newsletter rows were fetched.
+    """
+    created_since = snapshot.fetched_through - INCREMENTAL_OVERLAP
+    sources = fetch_sources(supabase, sleep)
+    rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, created_since, sleep)
+    updated = Snapshot(
+        sources=sources,
+        newsletters=merge_newsletters(
+            snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
+        ),
+        fetched_through=advance_cursor(snapshot.fetched_through, rows),
+    )
+    return updated, len(rows)
+
+
+def build_full_snapshot(
+    supabase: Any, now: datetime, sleep: Callable[[float], None] = time.sleep
+) -> Snapshot:
+    """Read every newsletter to build a snapshot from scratch."""
+    sources = fetch_sources(supabase, sleep)
+    rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, sleep=sleep)
+    newsletters: list[NewsletterRecord] = merge_newsletters(
+        [], (parse_newsletter_row(row) for row in rows)
+    )
+    # An empty table has nothing to resume from, so the cursor starts now.
+    return Snapshot(sources, newsletters, newest_created_at(rows) or now)
 
 
 def compute_outputs(
@@ -222,18 +295,74 @@ def parse_args() -> argparse.Namespace:
         help="Only index terms found in at least this many newsletters "
         f"(default: {DEFAULT_MIN_TERM_NEWSLETTERS})",
     )
+    parser.add_argument(
+        "--snapshot-dir",
+        type=Path,
+        default=DEFAULT_SNAPSHOT_DIR,
+        help=f"Local snapshot directory (default: {DEFAULT_SNAPSHOT_DIR})",
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--offline",
+        action="store_true",
+        help="Compute from the snapshot only; never contact the database",
+    )
+    mode.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Rebuild the snapshot by reading every newsletter (heavy; use rarely)",
+    )
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    print("Fetching sources and newsletters from Supabase...")
-    sources, newsletters = fetch_records()
+def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapshot:
+    """Produce the snapshot to compute from, according to the chosen mode."""
+    if args.full_refresh:
+        print(
+            "Full refresh: reading every newsletter from Supabase in pages of "
+            f"{FETCH_PAGE_SIZE}, pausing {FETCH_PAUSE_SECONDS}s between pages..."
+        )
+        snapshot = build_full_snapshot(get_supabase_client(), now)
+        save_snapshot(args.snapshot_dir, snapshot, now)
+        print(f"Saved a snapshot of {len(snapshot.newsletters)} newsletters.")
+        return snapshot
+
+    snapshot = load_snapshot(args.snapshot_dir)
     print(
-        f"Fetched {len(sources)} sources and {len(newsletters)} newsletters. Computing..."
+        f"Loaded a snapshot of {len(snapshot.newsletters)} newsletters "
+        f"(fetched through {snapshot.fetched_through.isoformat()})."
     )
+    if args.offline:
+        return snapshot
+
+    print("Fetching sources and newsletters created since the snapshot...")
+    snapshot, fetched_count = refresh_snapshot(get_supabase_client(), snapshot)
+    save_snapshot(args.snapshot_dir, snapshot, now)
+    print(
+        f"Fetched {fetched_count} newsletter rows; the snapshot now has "
+        f"{len(snapshot.newsletters)} newsletters."
+    )
+    return snapshot
+
+
+def main() -> None:
+    # Newsletter terms include accented words (e.g. Spanish), which the default
+    # Windows console encoding cannot print when output is redirected.
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    args = parse_args()
+    now = datetime.now(CHICAGO_TIMEZONE)
+    try:
+        snapshot = load_or_refresh_snapshot(args, now)
+    except SnapshotNotFoundError as error:
+        sys.exit(
+            f"{error}\nCreate it once with --full-refresh (reads every newsletter, "
+            "so run it when the site is quiet), or restore a saved snapshot there."
+        )
+
+    print("Computing...")
     outputs = compute_outputs(
-        sources, newsletters, args.min_term_newsletters, datetime.now(CHICAGO_TIMEZONE)
+        snapshot.sources, snapshot.newsletters, args.min_term_newsletters, now
     )
     sizes = write_outputs(outputs, args.output_dir)
     print_report(outputs, sizes, args.output_dir)
