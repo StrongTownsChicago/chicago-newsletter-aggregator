@@ -6,7 +6,7 @@ only fetch newsletters created since `fetched_through` and merge them in.
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
 
@@ -84,6 +84,36 @@ def merge_newsletters(
     by_id = {newsletter.id: newsletter for newsletter in existing}
     by_id.update((newsletter.id, newsletter) for newsletter in updates)
     return sorted(by_id.values(), key=lambda item: (item.received_date, item.id))
+
+
+def ids_missing_llm_metadata(newsletters: Iterable[NewsletterRecord]) -> list[str]:
+    """Ids of newsletters whose LLM topics or relevance score are not set yet.
+
+    LLM processing often runs days after ingestion, outside the incremental
+    overlap window, so these rows are re-checked on every refresh.
+    """
+    return [
+        newsletter.id
+        for newsletter in newsletters
+        if newsletter.topics is None or newsletter.relevance_score is None
+    ]
+
+
+def apply_llm_metadata(
+    newsletters: Iterable[NewsletterRecord], rows: Iterable[dict[str, Any]]
+) -> list[NewsletterRecord]:
+    """Overlay fetched topics and relevance scores onto matching newsletters."""
+    metadata_by_id = {str(row["id"]): row for row in rows}
+    return [
+        replace(
+            newsletter,
+            topics=metadata_by_id[newsletter.id].get("topics"),
+            relevance_score=metadata_by_id[newsletter.id].get("relevance_score"),
+        )
+        if newsletter.id in metadata_by_id
+        else newsletter
+        for newsletter in newsletters
+    ]
 
 
 def newest_created_at(rows: Iterable[dict[str, Any]]) -> datetime | None:

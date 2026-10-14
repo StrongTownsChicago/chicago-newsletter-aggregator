@@ -1,11 +1,14 @@
 """Unit tests for analytics/snapshot.py row format, merging, and cursor rules."""
 
 import unittest
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import (
     advance_cursor,
+    apply_llm_metadata,
+    ids_missing_llm_metadata,
     merge_newsletters,
     newest_created_at,
     newsletter_from_row,
@@ -74,6 +77,29 @@ class TestMergeNewsletters(unittest.TestCase):
         updates = [make_newsletter("a", date(2026, 2, 1))]
         merged = merge_newsletters(existing, updates)
         self.assertEqual([item.id for item in merged], ["z", "a", "b"])
+
+
+class TestLlmMetadata(unittest.TestCase):
+    def test_ids_missing_llm_metadata_flags_null_topics_or_score(self):
+        processed = replace(
+            make_newsletter("done", date(2026, 1, 1)), topics=[], relevance_score=0
+        )
+        no_topics = replace(processed, id="no_topics", topics=None)
+        no_score = replace(processed, id="no_score", relevance_score=None)
+        self.assertEqual(
+            ids_missing_llm_metadata([processed, no_topics, no_score]),
+            ["no_topics", "no_score"],
+        )
+
+    def test_apply_llm_metadata_updates_only_matching_newsletters(self):
+        pending = make_newsletter("pending", date(2026, 1, 1))
+        other = make_newsletter("other", date(2026, 1, 2))
+        rows = [{"id": "pending", "topics": ["transit"], "relevance_score": 6}]
+        updated = apply_llm_metadata([pending, other], rows)
+        self.assertEqual(
+            updated[0], replace(pending, topics=["transit"], relevance_score=6)
+        )
+        self.assertEqual(updated[1], other)
 
 
 class TestCursor(unittest.TestCase):

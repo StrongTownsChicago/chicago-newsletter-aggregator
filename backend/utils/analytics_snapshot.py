@@ -32,7 +32,11 @@ SOURCES_FILE = "sources.json"
 METADATA_FILE = "metadata.json"
 
 
-class SnapshotNotFoundError(FileNotFoundError):
+class SnapshotError(Exception):
+    """Raised when a snapshot cannot be used; rebuilding it fixes the problem."""
+
+
+class SnapshotNotFoundError(SnapshotError):
     """Raised when a snapshot directory is missing or incomplete."""
 
 
@@ -47,11 +51,28 @@ def load_snapshot(directory: Path) -> Snapshot:
             f"Snapshot at {directory} is missing {', '.join(missing)}"
         )
 
+    try:
+        return _read_snapshot(directory)
+    except SnapshotError:
+        raise
+    except (OSError, EOFError, ValueError, KeyError, TypeError) as error:
+        # Truncated gzip, malformed JSON, or missing fields all mean the same thing.
+        raise SnapshotError(
+            f"Snapshot at {directory} is unreadable: {error!r}"
+        ) from error
+
+
+def _read_snapshot(directory: Path) -> Snapshot:
     metadata = json.loads((directory / METADATA_FILE).read_text(encoding="utf-8"))
     if metadata.get("format_version") != SNAPSHOT_FORMAT_VERSION:
-        raise ValueError(
+        raise SnapshotError(
             f"Unsupported snapshot format {metadata.get('format_version')!r} in "
             f"{directory}; expected {SNAPSHOT_FORMAT_VERSION}"
+        )
+    fetched_through = datetime.fromisoformat(metadata["fetched_through"])
+    if fetched_through.tzinfo is None:
+        raise SnapshotError(
+            f"Snapshot at {directory} has a fetched_through without a timezone"
         )
 
     sources_rows = json.loads((directory / SOURCES_FILE).read_text(encoding="utf-8"))
@@ -63,7 +84,7 @@ def load_snapshot(directory: Path) -> Snapshot:
     return Snapshot(
         sources=[source_from_row(row) for row in sources_rows],
         newsletters=newsletters,
-        fetched_through=datetime.fromisoformat(metadata["fetched_through"]),
+        fetched_through=fetched_through,
     )
 
 

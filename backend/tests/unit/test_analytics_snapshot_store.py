@@ -12,6 +12,8 @@ from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import (
     METADATA_FILE,
     NEWSLETTERS_FILE,
+    SOURCES_FILE,
+    SnapshotError,
     SnapshotNotFoundError,
     load_snapshot,
     save_snapshot,
@@ -81,16 +83,55 @@ class TestSnapshotStore(unittest.TestCase):
                 load_snapshot(Path(directory) / "absent")
             self.assertIn("metadata.json", str(context.exception))
 
+    def edit_metadata(self, path: Path, **changes) -> None:
+        metadata_path = path / METADATA_FILE
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata.update(changes)
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
     def test_rejects_unknown_format_versions(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             save_snapshot(path, make_snapshot(), SAVED_AT)
-            metadata_path = path / METADATA_FILE
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            metadata["format_version"] = 99
-            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
-            with self.assertRaises(ValueError):
+            self.edit_metadata(path, format_version=99)
+            with self.assertRaisesRegex(SnapshotError, "Unsupported snapshot format"):
                 load_snapshot(path)
+
+    def test_rejects_a_cursor_without_a_timezone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            save_snapshot(path, make_snapshot(), SAVED_AT)
+            self.edit_metadata(path, fetched_through="2026-10-12T20:31:02")
+            with self.assertRaisesRegex(SnapshotError, "timezone"):
+                load_snapshot(path)
+
+    def test_corrupt_files_raise_snapshot_error(self):
+        corruptions = {
+            "truncated newsletters": (NEWSLETTERS_FILE, b"\x1f\x8b\x08\x00"),
+            "not gzip": (NEWSLETTERS_FILE, b"plain text"),
+            "malformed metadata": (METADATA_FILE, b"{not json"),
+            "metadata without cursor": (METADATA_FILE, b'{"format_version": 1}'),
+            "malformed sources": (SOURCES_FILE, b"[{"),
+        }
+        for label, (file_name, content) in corruptions.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)
+                save_snapshot(path, make_snapshot(), SAVED_AT)
+                (path / file_name).write_bytes(content)
+                with self.assertRaisesRegex(SnapshotError, "unreadable"):
+                    load_snapshot(path)
+
+    def test_missing_snapshot_is_a_snapshot_error(self):
+        self.assertTrue(issubclass(SnapshotNotFoundError, SnapshotError))
+
+    def test_leftover_temp_files_do_not_block_a_save(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / f"{NEWSLETTERS_FILE}.tmp").write_bytes(b"partial")
+            (path / f"{METADATA_FILE}.tmp").write_text("partial", encoding="utf-8")
+            save_snapshot(path, make_snapshot(), SAVED_AT)
+            self.assertEqual(load_snapshot(path), make_snapshot())
+            self.assertEqual(list(path.glob("*.tmp")), [])
 
 
 if __name__ == "__main__":

@@ -16,9 +16,12 @@ from utils.compute_analytics import (
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
+    LLM_METADATA_COLUMNS,
+    RefreshCounts,
     build_full_snapshot,
     compute_outputs,
     fetch_rows,
+    fetch_rows_by_id,
     load_or_refresh_snapshot,
     refresh_snapshot,
     write_outputs,
@@ -87,6 +90,7 @@ class FakeQuery:
         self.database = database
         self.table = table
         self.created_since: str | None = None
+        self.ids: list[str] | None = None
         self.order_column: str | None = None
         self.start = 0
         self.end = 0
@@ -98,6 +102,11 @@ class FakeQuery:
     def gte(self, column: str, value: str) -> "FakeQuery":
         assert column == "created_at"
         self.created_since = value
+        return self
+
+    def in_(self, column: str, values: list[str]) -> "FakeQuery":
+        assert column == "id"
+        self.ids = values
         return self
 
     def order(self, column: str) -> "FakeQuery":
@@ -118,6 +127,9 @@ class FakeQuery:
                 for row in rows
                 if datetime.fromisoformat(row["created_at"]) >= since
             ]
+        if self.ids is not None:
+            # in_() queries are not paged; return every matching row.
+            return SimpleNamespace(data=[row for row in rows if row["id"] in self.ids])
         return SimpleNamespace(data=rows[self.start : self.end + 1])
 
 
@@ -130,7 +142,13 @@ class FakeSupabase:
         return FakeQuery(self, name)
 
 
-def newsletter_row(newsletter_id: str, created_at: str, subject: str = "News"):
+def newsletter_row(
+    newsletter_id: str,
+    created_at: str,
+    subject: str = "News",
+    topics: list[str] | None = None,
+    relevance_score: int | None = 0,
+):
     return {
         "id": newsletter_id,
         "created_at": created_at,
@@ -138,8 +156,8 @@ def newsletter_row(newsletter_id: str, created_at: str, subject: str = "News"):
         "source_id": 1,
         "subject": subject,
         "plain_text": "Bike lanes",
-        "topics": None,
-        "relevance_score": None,
+        "topics": [] if topics is None else topics,
+        "relevance_score": relevance_score,
     }
 
 
@@ -194,6 +212,25 @@ class TestFetchRows(unittest.TestCase):
         self.assertEqual(supabase.table.call_count, 1)
 
 
+class TestFetchRowsById(unittest.TestCase):
+    def test_batches_ids_with_a_pause_between_batches(self):
+        ids = [f"{index:05d}" for index in range(FETCH_PAGE_SIZE + 1)]
+        supabase = FakeSupabase({"newsletters": [{"id": item} for item in ids]})
+        sleep = MagicMock()
+        fetched = fetch_rows_by_id(supabase, "newsletters", "id", ids, sleep)
+        self.assertEqual([row["id"] for row in fetched], ids)
+        self.assertEqual(
+            [len(query.ids or []) for query in supabase.executed],
+            [FETCH_PAGE_SIZE, 1],
+        )
+        sleep.assert_called_once_with(FETCH_PAUSE_SECONDS)
+
+    def test_no_ids_means_no_queries(self):
+        supabase = FakeSupabase({"newsletters": []})
+        self.assertEqual(fetch_rows_by_id(supabase, "newsletters", "id", []), [])
+        self.assertEqual(supabase.executed, [])
+
+
 class TestRefreshSnapshot(unittest.TestCase):
     def setUp(self):
         self.cursor = datetime(2026, 10, 11, 20, 0, tzinfo=UTC)
@@ -217,7 +254,7 @@ class TestRefreshSnapshot(unittest.TestCase):
                 ],
             }
         )
-        updated, fetched_count = refresh_snapshot(supabase, self.snapshot, MagicMock())
+        updated, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
 
         newsletter_query = next(
             query for query in supabase.executed if query.table == "newsletters"
@@ -226,7 +263,7 @@ class TestRefreshSnapshot(unittest.TestCase):
             newsletter_query.created_since,
             (self.cursor - INCREMENTAL_OVERLAP).isoformat(),
         )
-        self.assertEqual(fetched_count, 2)
+        self.assertEqual(counts, RefreshCounts(new_rows=2, metadata_rows=0))
         self.assertEqual(
             {item.id: item.subject for item in updated.newsletters},
             {"kept": "Kept", "edited": "After edit", "added": "News"},
@@ -238,10 +275,61 @@ class TestRefreshSnapshot(unittest.TestCase):
 
     def test_no_new_rows_keeps_snapshot_and_cursor(self):
         supabase = FakeSupabase({"sources": SOURCE_ROWS, "newsletters": []})
-        updated, fetched_count = refresh_snapshot(supabase, self.snapshot, MagicMock())
-        self.assertEqual(fetched_count, 0)
+        updated, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
+        self.assertEqual(counts, RefreshCounts(new_rows=0, metadata_rows=0))
         self.assertEqual(updated.newsletters, self.snapshot.newsletters)
         self.assertEqual(updated.fetched_through, self.cursor)
+        # Nothing was waiting on LLM metadata, so only the cursor query ran.
+        self.assertEqual(
+            [query.ids for query in supabase.executed if query.table == "newsletters"],
+            [None],
+        )
+
+    def test_picks_up_llm_metadata_added_after_the_overlap_window(self):
+        # Ingested weeks ago without LLM metadata; processed since then.
+        pending = newsletter_record(
+            "pending", date(2026, 9, 2), "Pending", has_llm_metadata=False
+        )
+        snapshot = Snapshot([], [*self.snapshot.newsletters, pending], self.cursor)
+        supabase = FakeSupabase(
+            {
+                "sources": SOURCE_ROWS,
+                "newsletters": [
+                    newsletter_row(
+                        "pending",
+                        "2026-09-02T15:00:00+00:00",
+                        topics=["bike_lanes"],
+                        relevance_score=8,
+                    )
+                ],
+            }
+        )
+        updated, counts = refresh_snapshot(supabase, snapshot, MagicMock())
+
+        self.assertEqual(counts, RefreshCounts(new_rows=0, metadata_rows=1))
+        refreshed = next(item for item in updated.newsletters if item.id == "pending")
+        self.assertEqual(refreshed.topics, ["bike_lanes"])
+        self.assertEqual(refreshed.relevance_score, 8)
+        metadata_query = next(q for q in supabase.executed if q.ids is not None)
+        self.assertEqual(metadata_query.ids, ["pending"])
+        # Old text is never re-read; only the metadata columns are requested.
+        self.assertEqual(metadata_query.columns, LLM_METADATA_COLUMNS)
+        self.assertNotIn("plain_text", metadata_query.columns)
+
+    def test_rows_fetched_by_the_cursor_are_not_fetched_again(self):
+        supabase = FakeSupabase(
+            {
+                "sources": SOURCE_ROWS,
+                "newsletters": [
+                    newsletter_row(
+                        "fresh", "2026-10-12T15:00:00+00:00", relevance_score=None
+                    )
+                ],
+            }
+        )
+        _, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
+        self.assertEqual(counts, RefreshCounts(new_rows=1, metadata_rows=0))
+        self.assertTrue(all(q.ids is None for q in supabase.executed))
 
 
 class TestBuildFullSnapshot(unittest.TestCase):
@@ -271,6 +359,12 @@ class TestBuildFullSnapshot(unittest.TestCase):
 
 class TestLoadOrRefreshSnapshot(unittest.TestCase):
     NOW = datetime(2026, 10, 13, tzinfo=UTC)
+
+    def setUp(self):
+        # Progress messages are for the CLI; keep test output clean.
+        silence = patch("builtins.print")
+        silence.start()
+        self.addCleanup(silence.stop)
 
     def make_args(self, directory: Path, **flags) -> argparse.Namespace:
         return argparse.Namespace(
@@ -354,15 +448,17 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             self.assertEqual([item.id for item in snapshot.newsletters], ["a"])
 
 
-def newsletter_record(newsletter_id: str, day: date, subject: str) -> NewsletterRecord:
+def newsletter_record(
+    newsletter_id: str, day: date, subject: str, has_llm_metadata: bool = True
+) -> NewsletterRecord:
     return NewsletterRecord(
         id=newsletter_id,
         received_date=day,
         source_id=1,
         subject=subject,
         plain_text="Bike lanes",
-        topics=None,
-        relevance_score=None,
+        topics=[] if has_llm_metadata else None,
+        relevance_score=0 if has_llm_metadata else None,
     )
 
 

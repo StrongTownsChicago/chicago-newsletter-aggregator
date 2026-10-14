@@ -8,13 +8,14 @@ build/dev time.
 
 The production database has a small disk IO budget, so it is read gently:
 
-- default: fetch all sources plus only the newsletters created since the
-  snapshot's cursor (with a short overlap), merge them into the snapshot,
-  then compute.
+- default: fetch all sources, the newsletters created since the snapshot's
+  cursor (with a short overlap), and the topics/relevance score of older rows
+  that had no LLM metadata yet; merge them into the snapshot, then compute.
 - --offline: never contact the database; compute from the snapshot as-is.
 - --full-refresh: rebuild the snapshot by reading every newsletter. Heavy;
-  use rarely, e.g. after bulk LLM or privacy reprocessing, which edits
-  existing rows that incremental refreshes do not revisit.
+  use rarely: on a fresh checkout, or after reprocessing that edits rows the
+  default mode does not revisit (privacy re-sanitization of plain_text, LLM
+  re-runs over already-processed rows) or after deletions.
 
 Usage:
     uv run python -m utils.compute_analytics
@@ -30,6 +31,7 @@ import json
 import sys
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -50,6 +52,8 @@ from analytics.records import (
 from analytics.snapshot import (
     Snapshot,
     advance_cursor,
+    apply_llm_metadata,
+    ids_missing_llm_metadata,
     merge_newsletters,
     newest_created_at,
 )
@@ -66,7 +70,7 @@ from analytics.terms import (
 from shared.db import get_supabase_client
 from utils.analytics_snapshot import (
     DEFAULT_SNAPSHOT_DIR,
-    SnapshotNotFoundError,
+    SnapshotError,
     load_snapshot,
     save_snapshot,
 )
@@ -84,6 +88,8 @@ NEWSLETTER_COLUMNS = (
     "id, created_at, received_date, source_id, subject, plain_text, topics, "
     "relevance_score"
 )
+# Only these columns change when LLM processing runs after ingestion.
+LLM_METADATA_COLUMNS = "id, topics, relevance_score"
 SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
 # Terms in fewer newsletters are mostly one-off names and typos; 20 keeps the
@@ -129,6 +135,25 @@ def fetch_rows(
         sleep(FETCH_PAUSE_SECONDS)
 
 
+def fetch_rows_by_id(
+    supabase: Any,
+    table: str,
+    columns: str,
+    ids: list[str],
+    sleep: Callable[[float], None] = time.sleep,
+) -> list[dict[str, Any]]:
+    """Fetch specific rows in batches of FETCH_PAGE_SIZE ids, pausing between batches."""
+    rows: list[dict[str, Any]] = []
+    for start in range(0, len(ids), FETCH_PAGE_SIZE):
+        if start:
+            sleep(FETCH_PAUSE_SECONDS)
+        batch = ids[start : start + FETCH_PAGE_SIZE]
+        rows.extend(
+            supabase.table(table).select(columns).in_("id", batch).execute().data
+        )
+    return rows
+
+
 def fetch_sources(
     supabase: Any, sleep: Callable[[float], None] = time.sleep
 ) -> list[SourceRecord]:
@@ -139,24 +164,44 @@ def fetch_sources(
     ]
 
 
+@dataclass(frozen=True)
+class RefreshCounts:
+    new_rows: int
+    metadata_rows: int
+
+
 def refresh_snapshot(
     supabase: Any, snapshot: Snapshot, sleep: Callable[[float], None] = time.sleep
-) -> tuple[Snapshot, int]:
-    """Merge newsletters created since the snapshot's cursor into it.
+) -> tuple[Snapshot, RefreshCounts]:
+    """Bring the snapshot up to date without re-reading old newsletter text.
 
-    Returns the updated snapshot and how many newsletter rows were fetched.
+    Fetches newsletters created since the snapshot's cursor (minus an
+    overlap), then re-checks only the LLM metadata columns of older rows that
+    were still unprocessed, since LLM processing often runs days later.
     """
     created_since = snapshot.fetched_through - INCREMENTAL_OVERLAP
     sources = fetch_sources(supabase, sleep)
     rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, created_since, sleep)
+    newsletters = merge_newsletters(
+        snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
+    )
+
+    fetched_ids = {str(row["id"]) for row in rows}
+    pending_ids = [
+        newsletter_id
+        for newsletter_id in ids_missing_llm_metadata(newsletters)
+        if newsletter_id not in fetched_ids
+    ]
+    metadata_rows = fetch_rows_by_id(
+        supabase, "newsletters", LLM_METADATA_COLUMNS, pending_ids, sleep
+    )
+
     updated = Snapshot(
         sources=sources,
-        newsletters=merge_newsletters(
-            snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
-        ),
+        newsletters=apply_llm_metadata(newsletters, metadata_rows),
         fetched_through=advance_cursor(snapshot.fetched_through, rows),
     )
-    return updated, len(rows)
+    return updated, RefreshCounts(len(rows), len(metadata_rows))
 
 
 def build_full_snapshot(
@@ -165,9 +210,7 @@ def build_full_snapshot(
     """Read every newsletter to build a snapshot from scratch."""
     sources = fetch_sources(supabase, sleep)
     rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, sleep=sleep)
-    newsletters: list[NewsletterRecord] = merge_newsletters(
-        [], (parse_newsletter_row(row) for row in rows)
-    )
+    newsletters = merge_newsletters([], (parse_newsletter_row(row) for row in rows))
     # An empty table has nothing to resume from, so the cursor starts now.
     return Snapshot(sources, newsletters, newest_created_at(rows) or now)
 
@@ -336,10 +379,11 @@ def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapsho
         return snapshot
 
     print("Fetching sources and newsletters created since the snapshot...")
-    snapshot, fetched_count = refresh_snapshot(get_supabase_client(), snapshot)
+    snapshot, counts = refresh_snapshot(get_supabase_client(), snapshot)
     save_snapshot(args.snapshot_dir, snapshot, now)
     print(
-        f"Fetched {fetched_count} newsletter rows; the snapshot now has "
+        f"Fetched {counts.new_rows} recent newsletter rows and LLM metadata for "
+        f"{counts.metadata_rows} older ones; the snapshot now has "
         f"{len(snapshot.newsletters)} newsletters."
     )
     return snapshot
@@ -354,9 +398,9 @@ def main() -> None:
     now = datetime.now(CHICAGO_TIMEZONE)
     try:
         snapshot = load_or_refresh_snapshot(args, now)
-    except SnapshotNotFoundError as error:
+    except SnapshotError as error:
         sys.exit(
-            f"{error}\nCreate it once with --full-refresh (reads every newsletter, "
+            f"{error}\nRebuild it with --full-refresh (reads every newsletter, "
             "so run it when the site is quiet), or restore a saved snapshot there."
         )
 
