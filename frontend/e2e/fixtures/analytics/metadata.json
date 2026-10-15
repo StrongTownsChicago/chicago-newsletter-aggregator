@@ -1,0 +1,13 @@
+{
+ "generated_at": "2026-05-01T09:00:00-05:00",
+ "newsletter_count": 26,
+ "source_count": 4,
+ "first_date": "2026-01-10",
+ "last_date": "2026-04-24",
+ "term_count": 1,
+ "min_term_newsletters": 2,
+ "boilerplate": {
+  "min_share_percent": 30,
+  "min_source_newsletters": 10
+ }
+}

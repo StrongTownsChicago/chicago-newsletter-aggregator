@@ -1,0 +1,14 @@
+{
+ "wards": {
+  "1": [
+   {
+    "term": "zoning",
+    "score": 1.5,
+    "lift": 4.0,
+    "ward_newsletters": 6,
+    "ward_share": 0.5,
+    "rest_share": 0.07
+   }
+  ]
+ }
+}

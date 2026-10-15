@@ -1,9 +1,11 @@
 // Client-side wiring for /analytics: reads the filter form, recomputes every
 // panel with the pure functions in lib/analytics.ts, and renders the charts.
 // The page script loads the core data; the term index is fetched here on demand.
+// The view (filters, ward profile, term) is mirrored in the URL so it can be
+// shared, and restored on load and on back/forward.
 import {
-  BROAD_COVERAGE_PEAK_FRACTION,
   buildCoverageGrid,
+  describeDataAsOf,
   buildLensWardGrid,
   classifyDateWindow,
   computeLensWardReach,
@@ -55,13 +57,35 @@ import {
   renderLensWardGrid,
   renderReachTrend,
   renderRisingTerms,
-  renderTable,
   renderTermTimeline,
   renderTermWards,
+  renderWardCadence,
+  renderWardTopicComparison,
+  renderWardTopicGrid,
   sourceLabel,
-  type TableColumn,
 } from "../lib/analytics-charts";
 import { createLazyLoader, fetchTermIndex } from "../lib/analytics-data";
+import { renderTable, type TableColumn } from "../lib/analytics-table";
+import {
+  describeBroadCoverageRule,
+  describeTopicDefinition,
+  describeTopicMatching,
+  pluralize,
+} from "../lib/analytics-methodology";
+import {
+  parseDashboardUrlState,
+  serializeDashboardUrlState,
+  type DashboardUrlContext,
+  type DashboardViewState,
+} from "../lib/analytics-url-state";
+import {
+  buildWardProfile,
+  MIN_WARD_MONTHS_FOR_SHARES,
+  MIN_WARD_NEWSLETTERS_FOR_SHARES,
+  type WardProfile,
+} from "../lib/analytics-ward-profile";
+import { downloadChartPng } from "../lib/chart-export";
+import { SITE_NAME } from "../lib/seo";
 
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
@@ -76,7 +100,6 @@ const RESIZE_DEBOUNCE_MS = 200;
 const LENS_TREND_HEIGHT = 140;
 const SELECTED_LENS_TREND_HEIGHT = 260;
 const numberFormat = new Intl.NumberFormat("en-US");
-const percentFormat = new Intl.NumberFormat("en-US", { style: "percent" });
 
 interface DashboardState {
   data: AnalyticsDataset;
@@ -88,6 +111,8 @@ interface DashboardState {
   dataMonths: string[];
   wardActivity: MonthWardActivity[];
   broadWindow: BroadCoverageWindow | null;
+  /** The values a shared URL may choose from. */
+  urlContext: DashboardUrlContext;
   term: string;
   /** Null until the term explorer first needs it. */
   terms: TermIndex | null;
@@ -137,10 +162,6 @@ function tableHeading(text: string): HTMLElement {
   heading.className = "text-sm font-semibold text-gray-700 mt-3 mb-1";
   heading.textContent = text;
   return heading;
-}
-
-function pluralize(count: number, noun: string): string {
-  return `${numberFormat.format(count)} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /** "3 wards", or "1–32 wards" when the count varied. */
@@ -219,13 +240,6 @@ function updateWardSummary(filters: AnalyticsFilters): void {
       : filters.wards.length <= 3
         ? filters.wards.map(formatWard).join(", ")
         : `${filters.wards.length} wards`;
-}
-
-function describeBroadCoverageRule(broadWindow: BroadCoverageWindow): string {
-  return (
-    `months when at least ${broadWindow.minActiveWards} wards sent newsletters ` +
-    `(${percentFormat.format(BROAD_COVERAGE_PEAK_FRACTION)} of the ${broadWindow.peakActiveWards} in the busiest month)`
-  );
 }
 
 function renderDateWindowStatus(state: DashboardState, filters: AnalyticsFilters): void {
@@ -506,30 +520,21 @@ function renderCivicCalendarPanel(
 
 function renderLensDefinitions(state: DashboardState): void {
   const container = requireElement<HTMLElement>("[data-lens-definitions]");
-  const { text, min_mentions: minMentions, readable_newsletters: readable } = state.data.lenses;
+  const summary = state.data.lenses;
   const rules = document.createElement("p");
   rules.textContent =
-    `A newsletter mentions a topic when the topic's words and phrases appear at least ${pluralize(minMentions, "separate time")} ` +
-    "in its subject and text (whole words within one sentence, any capitalization, singular or plural). " +
-    'The same phrase twice counts twice, but phrases that overlap or sit side by side, as in "city council meeting", count once, ' +
-    "so a single passing mention does not count. " +
-    (text === "cleaned"
-      ? "Matching skips text a ward repeats across many of its issues (footers, standing resource lists), so a standing block does not count as news every month. "
-      : "Matching reads the full text, including standing blocks a ward repeats in every issue. ") +
-    `Counts below are out of the ${numberFormat.format(readable)} newsletters analyzed across the whole archive. ` +
+    `${describeTopicMatching(summary)} ` +
+    `Counts below are out of the ${numberFormat.format(summary.readable_newsletters)} newsletters analyzed across the whole archive. ` +
     "Topics marked Strong Towns Chicago focus are narrower slices of the broader topics.";
   const list = document.createElement("dl");
   list.className = "space-y-2";
-  for (const lens of state.data.lenses.lenses) {
+  for (const lens of summary.lenses) {
+    const { title, body } = describeTopicDefinition(lens, summary.readable_newsletters);
     const term = document.createElement("dt");
     term.className = "font-semibold text-gray-900";
-    term.textContent =
-      `${lens.label}${lens.strong_towns_focus ? " (Strong Towns Chicago focus)" : ""}: ` +
-      `${pluralize(lens.newsletters, "newsletter")} (${formatPercent(readable ? lens.newsletters / readable : 0)})`;
+    term.textContent = title;
     const definition = document.createElement("dd");
-    definition.textContent =
-      `${lens.description} Phrases (newsletters containing each): ` +
-      lens.phrases.map((item) => `${item.phrase} (${numberFormat.format(item.newsletters)})`).join(", ");
+    definition.textContent = body;
     list.append(term, definition);
   }
   container.replaceChildren(rules, list);
@@ -620,30 +625,168 @@ function renderLensWardsPanel(
   );
 }
 
-function renderDistinctivePanel(state: DashboardState): void {
-  const { chart, caption, table } = panel("distinctive-terms");
-  const ward = requireElement<HTMLSelectElement>("#distinctive-ward").value;
-  const terms = state.data.distinctiveByWard[ward] ?? [];
-  const wardNewsletters = state.data.newsletters.filter((fact) => fact.ward === ward).length;
-  caption.textContent = `${formatWard(ward)}: ${pluralize(wardNewsletters, "newsletter")} compared with the rest of the city.`;
-  if (!chart) return;
-  replaceContent(
-    chart,
-    terms.length
-      ? renderDistinctiveTerms(terms, ward, chartWidth(chart))
-      : emptyMessage("Not enough newsletters from this ward to find distinctive terms."),
+const medianFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+function formatMedian(value: number | null): string {
+  return value === null ? "–" : medianFormat.format(value);
+}
+
+function setProfileTiles(tiles: [string, string][]): void {
+  const values = document.querySelectorAll<HTMLElement>("#profile-tiles [data-tile-value]");
+  const details = document.querySelectorAll<HTMLElement>("#profile-tiles [data-tile-detail]");
+  tiles.forEach(([value, detail], index) => {
+    values[index].textContent = value;
+    details[index].textContent = detail;
+  });
+}
+
+function renderProfileTiles(profile: WardProfile, windowSpan: string): void {
+  const { cadence, archiveCadence } = profile;
+  setProfileTiles([
+    [
+      numberFormat.format(profile.windowNewsletters),
+      `${windowSpan} · sent in ${cadence.monthsWithNewsletters} of ${pluralize(cadence.trackedMonths, "tracked month")}`,
+    ],
+    [
+      numberFormat.format(profile.archiveNewsletters),
+      profile.firstDate ? `${profile.firstDate} to ${profile.lastDate}` : "",
+    ],
+    [
+      formatMedian(cadence.medianPerTrackedMonth),
+      `median · all dates ${formatMedian(archiveCadence.medianPerTrackedMonth)} · all wards ${formatMedian(profile.cityMedianPerTrackedMonth)}`,
+    ],
+    [
+      formatMedian(cadence.medianDaysBetween),
+      `median · all dates ${formatMedian(archiveCadence.medianDaysBetween)}`,
+    ],
+  ]);
+}
+
+function wardProfileColumns(state: DashboardState): TableColumn<WardProfile["topics"][number]>[] {
+  return [
+    { label: "Topic", value: (topic) => lensLabel(state, topic.lens) },
+    { label: "Months mentioning", value: (topic) => topic.monthsMentioning, numeric: true },
+    { label: "Months with newsletters", value: (topic) => topic.monthsChecked, numeric: true },
+    { label: "Newsletters mentioning", value: (topic) => topic.newslettersMentioning, numeric: true },
+    { label: "Share of months", value: (topic) => (topic.wardShare === null ? "–" : formatPercent(topic.wardShare)), numeric: true },
+    {
+      label: "All wards (average)",
+      value: (topic) => (topic.cityShare === null ? "–" : formatPercent(topic.cityShare)),
+      numeric: true,
+    },
+  ];
+}
+
+/** The selected ward's profile over the window's months; the ward and topic filters do not apply. */
+function renderWardProfilePanel(state: DashboardState, months: string[]): void {
+  const { section, caption, table } = panel("ward-profile");
+  const ward = requireElement<HTMLSelectElement>("#profile-ward", section).value;
+  const message = requireElement<HTMLElement>("#profile-message", section);
+  const content = requireElement<HTMLElement>("#profile-content", section);
+  const showMessage = (text: string) => {
+    message.textContent = text;
+    message.hidden = false;
+    content.hidden = true;
+    caption.textContent = "";
+    replaceContent(table, emptyMessage("Choose a ward."));
+  };
+  if (!ward) {
+    showMessage("Choose a ward.");
+    return;
+  }
+  const lenses = state.data.lenses.lenses;
+  const profile = buildWardProfile(
+    state.data.newsletters,
+    state.data.sources,
+    ward,
+    months,
+    state.dataMonths,
+    lenses.map((lens) => lens.id),
   );
+  if (profile.archiveNewsletters === 0) {
+    showMessage(`No ${formatWard(ward)} newsletters in the archive yet.`);
+    return;
+  }
+  message.hidden = true;
+  content.hidden = false;
+  const aldermen = profile.aldermen.join(", ");
+  requireElement<HTMLElement>("#profile-heading", section).textContent = aldermen
+    ? `${formatWard(ward)} · ${aldermen}`
+    : formatWard(ward);
+  caption.textContent = `${pluralize(profile.windowNewsletters, "newsletter")} in these dates, ${numberFormat.format(profile.archiveNewsletters)} in all.`;
+  renderProfileTiles(profile, describeMonthSpan(months));
+
+  const cadenceChart = requireElement<HTMLElement>("#profile-cadence", section);
+  replaceContent(
+    cadenceChart,
+    months.length ? renderWardCadence(profile.months, months, chartWidth(cadenceChart)) : emptyMessage("No months in the selected window."),
+  );
+  const topicsChart = requireElement<HTMLElement>("#profile-topics", section);
+  replaceContent(
+    topicsChart,
+    months.length
+      ? renderWardTopicGrid(profile.topicCells, lenses, months, ward, chartWidth(topicsChart))
+      : emptyMessage("No months in the selected window."),
+  );
+
+  const comparisonChart = requireElement<HTMLElement>("#profile-comparison", section);
+  const comparisonNote = requireElement<HTMLElement>("#profile-comparison-note", section);
+  if (profile.sharesShown) {
+    comparisonNote.textContent = `Dark: share of ${formatWard(ward)}'s months mentioning the topic. Light: average share of active wards, same months.`;
+    replaceContent(
+      comparisonChart,
+      renderWardTopicComparison(profile.topics, lenses, ward, chartWidth(comparisonChart)),
+    );
+  } else {
+    comparisonNote.textContent = "";
+    replaceContent(
+      comparisonChart,
+      emptyMessage(
+        `Too few newsletters to compare (needs ${MIN_WARD_NEWSLETTERS_FOR_SHARES} across ${MIN_WARD_MONTHS_FOR_SHARES} months).`,
+      ),
+    );
+  }
+
+  const distinctiveChart = requireElement<HTMLElement>("#profile-distinctive", section);
+  const terms = state.data.distinctiveByWard[ward] ?? [];
+  replaceContent(
+    distinctiveChart,
+    terms.length
+      ? renderDistinctiveTerms(terms, ward, profile.archiveNewsletters, chartWidth(distinctiveChart))
+      : emptyMessage("Too few newsletters for distinctive terms."),
+  );
+
+  const topicTable = document.createElement("div");
+  setTable(topicTable, wardProfileColumns(state), profile.topics);
+  const monthTable = document.createElement("div");
   setTable(
-    table,
+    monthTable,
+    [
+      { label: "Month", value: (cell) => cell.month },
+      { label: "Status", value: (cell) => COVERAGE_STATUS_LABELS[cell.status] },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
+    ],
+    profile.months,
+  );
+  const termTable = document.createElement("div");
+  setTable(
+    termTable,
     [
       { label: "Term", value: (item) => item.term },
-      { label: "Score", value: (item) => item.score, numeric: true },
-      { label: "Times more likely", value: (item) => item.lift, numeric: true },
       { label: "Ward newsletters", value: (item) => item.ward_newsletters, numeric: true },
       { label: "Ward share", value: (item) => formatPercent(item.ward_share), numeric: true },
       { label: "Rest of city share", value: (item) => formatPercent(item.rest_share), numeric: true },
     ],
     terms,
+  );
+  replaceContent(
+    table,
+    tableHeading("Topics"),
+    topicTable,
+    tableHeading("Newsletters by month"),
+    monthTable,
+    tableHeading("Distinctive vocabulary (all dates)"),
+    termTable,
   );
 }
 
@@ -703,6 +846,69 @@ function renderCadencePanel(facts: NewsletterFact[]): void {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// PNG export
+
+/** Panels whose numbers ignore the global filters, described as such in the export. */
+const CITY_WIDE_PANELS = new Set(["rising-terms"]);
+
+function describeWardScope(filters: AnalyticsFilters): string {
+  if (filters.wards.length === 0) return "All wards";
+  return filters.wards.length === 1
+    ? formatWard(filters.wards[0])
+    : `Wards ${filters.wards.join(", ")}`;
+}
+
+function describeExportScope(state: DashboardState, panelId: string, view: DashboardViewState): string {
+  if (CITY_WIDE_PANELS.has(panelId)) return "City-wide";
+  const span = describeMonthSpan(listWindowMonths(view.filters, state.dataMonths));
+  const wards =
+    panelId === "ward-profile" && view.profileWard ? formatWard(view.profileWard) : describeWardScope(view.filters);
+  return `${span} · ${wards}`;
+}
+
+function describeExportTitle(state: DashboardState, panelId: string, title: string, view: DashboardViewState): string {
+  const lens = view.filters.lens ? lensLabel(state, view.filters.lens) : null;
+  if ((panelId === "lens-wards" || panelId === "lens-trends") && lens) return `${title}: ${lens}`;
+  if (panelId === "term-explorer" && view.term) return `${title}: "${view.term}"`;
+  if (panelId === "ward-profile" && view.profileWard) return `${title}: ${formatWard(view.profileWard)}`;
+  return title;
+}
+
+function exportRegion(section: HTMLElement): HTMLElement | null {
+  return section.querySelector<HTMLElement>("[data-export-region]") ?? section.querySelector<HTMLElement>("[data-chart]");
+}
+
+/** Enable each export button only while its panel shows a chart. */
+function refreshExportButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>("button[data-export-png]").forEach((button) => {
+    const section = button.closest<HTMLElement>("section");
+    button.disabled = !section || !exportRegion(section)?.querySelector("svg");
+  });
+}
+
+async function exportPanel(state: DashboardState, button: HTMLButtonElement, view: DashboardViewState): Promise<void> {
+  const section = button.closest<HTMLElement>("section");
+  const region = section ? exportRegion(section) : null;
+  if (!section || !region) return;
+  const panelId = button.dataset.exportPng ?? section.id;
+  const title = requireElement<HTMLElement>("h2", section).textContent?.trim() ?? "";
+  button.disabled = true;
+  try {
+    await downloadChartPng(region, {
+      title: describeExportTitle(state, panelId, title, view),
+      scope: describeExportScope(state, panelId, view),
+      caption: requireElement<HTMLElement>("[data-caption]", section).textContent?.trim() ?? "",
+      dataAsOf: describeDataAsOf(state.data.metadata),
+      siteName: SITE_NAME,
+      pageUrl: window.location.href,
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Orchestration
 
@@ -720,9 +926,10 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   renderLensTrendsPanel(state, filters, factsIgnoringLens, months);
   renderLensWardsPanel(state, filters, factsIgnoringLens, months);
   renderTermExplorer(state, filters);
-  renderDistinctivePanel(state);
+  renderWardProfilePanel(state, months);
   renderRisingPanel(state);
   renderCadencePanel(factsIgnoringLens);
+  refreshExportButtons();
 }
 
 /** Fetch the term index once, then redraw the term explorer with it (or with the error). */
@@ -736,89 +943,172 @@ function requestTermIndex(state: DashboardState, readCurrentFilters: () => Analy
     .catch((error: unknown) => {
       state.termsError = error instanceof Error ? error.message : String(error);
     })
-    .finally(() => renderTermExplorer(state, readCurrentFilters()));
+    .finally(() => {
+      renderTermExplorer(state, readCurrentFilters());
+      refreshExportButtons();
+    });
 }
 
 function buildDashboardState(data: AnalyticsDataset): DashboardState {
   const factMonths = data.newsletters.map((fact) => monthOf(fact.date)).sort();
+  const allWards = listSourceWards(data.sources);
+  const dataMonths = listWindowMonths(EMPTY_FILTERS, factMonths);
+  const broadWindow = findBroadCoverageWindow(data.newsletters);
   return {
     data,
     wardBySource: new Map(data.sources.map((source) => [source.id, source.ward])),
     lensById: new Map(data.lenses.lenses.map((lens) => [lens.id, lens])),
-    allWards: listSourceWards(data.sources),
-    dataMonths: listWindowMonths(EMPTY_FILTERS, factMonths),
+    allWards,
+    dataMonths,
     wardActivity: countActiveWardsByMonth(data.newsletters),
-    broadWindow: findBroadCoverageWindow(data.newsletters),
+    broadWindow,
+    urlContext: {
+      filterWards: listWards(data.newsletters),
+      profileWards: allWards,
+      months: dataMonths,
+      lensIds: data.lenses.lenses.map((lens) => lens.id),
+      defaultFromMonth: broadWindow?.startMonth ?? null,
+    },
     term: "",
     terms: null,
     termsError: null,
   };
 }
 
+/** The dashboard's controls, looked up once. */
+interface DashboardControls {
+  form: HTMLFormElement;
+  profileSelect: HTMLSelectElement;
+  termInput: HTMLInputElement;
+}
+
+function readViewState(state: DashboardState, controls: DashboardControls): DashboardViewState {
+  return {
+    filters: readFilters(controls.form),
+    profileWard: controls.profileSelect.value || null,
+    term: normalizeTermQuery(state.term),
+  };
+}
+
+/** Set every control to a view (from the URL) without rendering. */
+function applyViewState(state: DashboardState, controls: DashboardControls, view: DashboardViewState): void {
+  const { form, profileSelect, termInput } = controls;
+  form.querySelectorAll<HTMLInputElement>('input[name="ward"]').forEach((input) => {
+    input.checked = view.filters.wards.includes(input.value);
+  });
+  requireElement<HTMLSelectElement>('select[name="lens"]', form).value = view.filters.lens ?? "";
+  requireElement<HTMLSelectElement>('select[name="from"]', form).value = view.filters.fromMonth ?? "";
+  requireElement<HTMLSelectElement>('select[name="to"]', form).value = view.filters.toMonth ?? "";
+  profileSelect.value = view.profileWard ?? "";
+  termInput.value = view.term;
+  state.term = view.term;
+}
+
+function dashboardUrl(query: string): string {
+  return `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+}
+
+/** Record the current view in the URL: a new history entry for a change, or a replacement. */
+function syncUrl(state: DashboardState, controls: DashboardControls, mode: "push" | "replace"): void {
+  const url = dashboardUrl(serializeDashboardUrlState(readViewState(state, controls), state.urlContext));
+  if (mode === "replace") {
+    window.history.replaceState(null, "", url);
+  } else if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+    window.history.pushState(null, "", url);
+  }
+}
+
 export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const state = buildDashboardState(data);
-  const form = requireElement<HTMLFormElement>("#analytics-filters");
+  const controls: DashboardControls = {
+    form: requireElement<HTMLFormElement>("#analytics-filters"),
+    profileSelect: requireElement<HTMLSelectElement>("#profile-ward"),
+    termInput: requireElement<HTMLInputElement>("#term-input"),
+  };
+  const { form, profileSelect, termInput } = controls;
   populateFilterOptions(
     form,
-    listWards(data.newsletters),
+    state.urlContext.filterWards,
     state.dataMonths,
     data.lenses.lenses,
-    state.broadWindow?.startMonth ?? null,
+    state.urlContext.defaultFromMonth,
   );
+  profileSelect.append(...state.allWards.map((ward) => new Option(formatWard(ward), ward)));
   renderLensDefinitions(state);
 
-  const distinctiveSelect = requireElement<HTMLSelectElement>("#distinctive-ward");
-  const distinctiveWards = Object.keys(data.distinctiveByWard);
-  distinctiveSelect.append(...distinctiveWards.map((ward) => new Option(formatWard(ward), ward)));
-
+  const filtersNow = () => readFilters(form);
   const rerender = () => renderDashboard(state, form);
+  /** Render a change the reader made and record it as a new history entry. */
+  const commit = () => {
+    rerender();
+    syncUrl(state, controls, "push");
+  };
+  const restoreFromUrl = () => {
+    applyViewState(state, controls, parseDashboardUrlState(new URLSearchParams(window.location.search), state.urlContext));
+    if (state.term) requestTermIndex(state, filtersNow);
+    rerender();
+  };
 
   form.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
-    // Follow a single selected ward in the distinctive-vocabulary panel.
+    // Follow a single selected ward in the ward profile.
     if (target.name === "ward") {
       const selected = readFilters(form).wards;
-      if (selected.length === 1 && distinctiveWards.includes(selected[0])) {
-        distinctiveSelect.value = selected[0];
-      }
+      if (selected.length === 1) profileSelect.value = selected[0];
     }
-    rerender();
+    commit();
   });
   form.addEventListener("reset", () => {
     requireElement<HTMLDetailsElement>("#ward-picker").open = false;
     // Form reset updates control values after the event; render on the next tick.
-    setTimeout(rerender);
+    setTimeout(commit);
   });
   requireElement<HTMLButtonElement>("#clear-wards").addEventListener("click", () => {
     form.querySelectorAll<HTMLInputElement>('input[name="ward"]').forEach((input) => {
       input.checked = false;
     });
-    rerender();
+    commit();
   });
   requireElement<HTMLButtonElement>("#date-window-toggle").addEventListener("click", () => {
     const showingFullArchive = classifyDateWindow(readFilters(form), state.broadWindow) === "full";
     setDateWindow(form, showingFullArchive ? (state.broadWindow?.startMonth ?? null) : null);
-    rerender();
+    commit();
   });
-  distinctiveSelect.addEventListener("change", () => renderDistinctivePanel(state));
+  profileSelect.addEventListener("change", () => {
+    renderWardProfilePanel(state, listWindowMonths(filtersNow(), state.dataMonths));
+    refreshExportButtons();
+    syncUrl(state, controls, "push");
+  });
 
-  const termInput = requireElement<HTMLInputElement>("#term-input");
-  const filtersNow = () => readFilters(form);
+  const showTerm = (term: string) => {
+    state.term = term;
+    requestTermIndex(state, filtersNow);
+    renderTermExplorer(state, filtersNow());
+    refreshExportButtons();
+    syncUrl(state, controls, "push");
+  };
   // Start downloading the term index as soon as someone reaches for the explorer.
   termInput.addEventListener("focus", () => requestTermIndex(state, filtersNow));
   requireElement<HTMLFormElement>("#term-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    state.term = termInput.value;
-    requestTermIndex(state, filtersNow);
-    renderTermExplorer(state, filtersNow());
+    showTerm(termInput.value);
   });
   requireElement<HTMLElement>("#term-suggestions").addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-term]");
     if (!button?.dataset.term) return;
     termInput.value = button.dataset.term;
-    state.term = button.dataset.term;
-    renderTermExplorer(state, filtersNow());
+    showTerm(button.dataset.term);
   });
+
+  document.querySelectorAll<HTMLButtonElement>("button[data-export-png]").forEach((button) => {
+    button.addEventListener("click", () => {
+      exportPanel(state, button, readViewState(state, controls)).catch((error: unknown) => {
+        console.error("Chart export failed", error);
+      });
+    });
+  });
+
+  window.addEventListener("popstate", restoreFromUrl);
 
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
   let lastWidth = window.innerWidth;
@@ -829,5 +1119,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     resizeTimer = setTimeout(rerender, RESIZE_DEBOUNCE_MS);
   });
 
-  rerender();
+  restoreFromUrl();
+  // Drop any invalid or default parameters from the address the reader shares.
+  syncUrl(state, controls, "replace");
 }

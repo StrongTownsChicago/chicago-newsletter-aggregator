@@ -72,6 +72,13 @@ export interface AnalyticsMetadata {
   last_date: string | null;
   term_count: number;
   min_term_newsletters: number;
+  /** The per-source boilerplate rule applied before counting terms and topics. */
+  boilerplate?: {
+    /** Text repeated in at least this percent of one source's newsletters is removed. */
+    min_share_percent: number;
+    /** Sources with fewer newsletters keep all their text. */
+    min_source_newsletters: number;
+  };
 }
 
 /** One keyword lens: its reviewed phrase list and how many newsletters each phrase was found in. */
@@ -587,7 +594,7 @@ export interface LensReachCell {
 }
 
 /** Readable newsletters can mention a lens; image-only ones cannot be read for any. */
-function isReadable(fact: NewsletterFact): boolean {
+export function isReadable(fact: NewsletterFact): boolean {
   return !fact.text_unavailable;
 }
 
@@ -868,7 +875,15 @@ export function buildSearchUrl(params: SearchLinkParams): string {
 // ---------------------------------------------------------------------------
 // Helpers
 
-function countBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, number> {
+/** The middle value (mean of the middle two for an even count), or null for no values. */
+export function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+export function countBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, number> {
   const counts = new Map<K, number>();
   for (const item of items) {
     const key = keyOf(item);
@@ -877,7 +892,7 @@ function countBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, number> {
   return counts;
 }
 
-function groupBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, T[]> {
+export function groupBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, T[]> {
   const groups = new Map<K, T[]>();
   for (const item of items) {
     const key = keyOf(item);

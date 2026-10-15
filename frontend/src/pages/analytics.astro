@@ -9,8 +9,9 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
+import { METHODOLOGY_PATH } from '../lib/analytics-methodology';
 
-// Unlisted: keep it out of search indexes (Layout has no noindex option).
+// Unlisted: keep it out of search indexes (also disallowed in robots.txt).
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
 
 const controlClass =
@@ -20,6 +21,7 @@ const controlClass =
 <Layout
   title="Analytics - Chicago Alderman Newsletter Tracker"
   description="Local analytics dashboard exploring subjects, vocabulary, and sending patterns across alderman newsletters."
+  noindex
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <header class="mb-6">
@@ -28,6 +30,11 @@ const controlClass =
         What aldermen talk about, how often, and how it differs across the city.
       </p>
       <p id="analytics-data-as-of" class="text-sm text-gray-500 mt-2" hidden></p>
+      <p class="text-sm mt-2">
+        <a href={METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-700 font-medium" data-testid="methodology-link">
+          Methodology
+        </a>
+      </p>
     </header>
 
     <p id="analytics-loading" class="text-gray-600" role="status">Loading analytics data…</p>
@@ -115,6 +122,7 @@ const controlClass =
         <details class="mt-4 text-sm" id="lens-definitions">
           <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">How topics are matched, and their phrase lists</summary>
           <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
+          <p class="mt-3"><a href={METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-700 font-medium">Methodology</a></p>
         </details>
       </AnalyticsPanel>
 
@@ -146,21 +154,59 @@ const controlClass =
         </form>
         <div id="term-suggestions" class="flex flex-wrap gap-2 mb-3"></div>
         <p id="term-message" class="text-sm text-gray-700 mb-3" aria-live="polite"></p>
-        <div id="term-timeline" class="overflow-x-auto"></div>
-        <h3 id="term-wards-title" class="text-sm font-semibold text-gray-700 mt-4 mb-2 hidden">Top wards using this term</h3>
-        <div id="term-wards" class="overflow-x-auto"></div>
+        <div data-export-region>
+          <div id="term-timeline" class="overflow-x-auto"></div>
+          <h3 id="term-wards-title" class="text-sm font-semibold text-gray-700 mt-4 mb-2 hidden" data-export-text>Top wards using this term</h3>
+          <div id="term-wards" class="overflow-x-auto"></div>
+        </div>
       </AnalyticsPanel>
 
       <AnalyticsPanel
-        id="distinctive-terms"
-        title="Distinctive vocabulary"
-        description="Words and phrases a ward uses far more than the rest of the city (computed over all dates; the alderman's own name and footer boilerplate are excluded). Click a bar to search."
+        id="ward-profile"
+        title="Ward profile"
+        description="One ward's newsletters in the selected dates, compared with its own history and with all wards. Not a ranking."
       >
         <label class="block mb-3 max-w-xs">
           <span class="block text-sm font-semibold text-gray-700 mb-2">Ward</span>
-          <select id="distinctive-ward" class={controlClass}></select>
+          <select id="profile-ward" class={controlClass}>
+            <option value="">Choose a ward</option>
+          </select>
         </label>
-        <div data-chart class="overflow-x-auto"></div>
+        <div data-export-region>
+          <p id="profile-message" class="text-sm text-gray-600" aria-live="polite"></p>
+          <div id="profile-content" class="space-y-5" hidden>
+            <h3 id="profile-heading" class="text-lg font-semibold text-gray-900" data-export-text></h3>
+            <dl id="profile-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {['In these dates', 'All dates', 'Per month', 'Days between'].map((label) => (
+                <div class="rounded-lg border border-gray-200 p-3">
+                  <dt class="text-xs text-gray-600" data-export-text>{label}</dt>
+                  <dd class="text-lg font-semibold text-gray-900 mt-1" data-tile-value data-export-text></dd>
+                  <dd class="text-xs text-gray-500 mt-1" data-tile-detail data-export-text></dd>
+                </div>
+              ))}
+            </dl>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Newsletters per month</h4>
+              <div id="profile-cadence" class="overflow-x-auto"></div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics by month</h4>
+              <div id="profile-topics" class="overflow-x-auto"></div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Topics compared with all wards</h4>
+              <p id="profile-comparison-note" class="text-xs text-gray-500 mb-2" data-export-text></p>
+              <div id="profile-comparison" class="overflow-x-auto"></div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Distinctive vocabulary</h4>
+              <p class="text-xs text-gray-500 mb-2" data-export-text>
+                Words and phrases a ward uses far more than the rest of the city (computed over all dates; the alderman's own name and footer boilerplate are excluded). Click a bar to search.
+              </p>
+              <div id="profile-distinctive" class="overflow-x-auto"></div>
+            </div>
+          </div>
+        </div>
       </AnalyticsPanel>
 
       <AnalyticsPanel
@@ -176,6 +222,7 @@ const controlClass =
         title="Sending cadence"
         description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
         hasTable={false}
+        exportable={false}
       >
         <div id="cadence-gaps" class="overflow-x-auto"></div>
       </AnalyticsPanel>

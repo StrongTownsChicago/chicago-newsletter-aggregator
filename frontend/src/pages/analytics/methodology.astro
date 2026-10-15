@@ -1,0 +1,126 @@
+---
+export const prerender = false;
+
+// Static prose; data-dependent parts are filled from the dashboard's JSON so
+// the two cannot disagree. Unlisted like /analytics.
+import Layout from '../../layouts/Layout.astro';
+import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../../lib/analytics';
+import { MIN_WARD_MONTHS_FOR_SHARES, MIN_WARD_NEWSLETTERS_FOR_SHARES } from '../../lib/analytics-ward-profile';
+import { REPORT_ISSUE_URL } from '../../lib/analytics-methodology';
+
+Astro.response.headers.set('X-Robots-Tag', 'noindex');
+
+const sectionClass = 'bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200 space-y-3 text-gray-700';
+const headingClass = 'text-xl font-bold text-gray-900';
+const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
+---
+
+<Layout
+  title="Analytics methodology - Chicago Alderman Newsletter Tracker"
+  description="How the newsletter analytics are computed and what they cannot tell you."
+  noindex
+>
+  <div class="container mx-auto px-4 py-8 max-w-3xl space-y-6">
+    <header>
+      <p class="text-sm mb-2"><a href="/analytics" class={linkClass} data-testid="dashboard-link">← Analytics</a></p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">How the analytics work</h1>
+      <p id="methodology-data-as-of" class="text-sm text-gray-500" data-testid="methodology-data-as-of">Loading…</p>
+    </header>
+
+    <section class={sectionClass} aria-labelledby="fair-reading">
+      <h2 id="fair-reading" class={headingClass}>What the numbers describe</h2>
+      <p>
+        Newsletters in this archive, not aldermen. A newsletter is not a record of what an alderman did or voted for,
+        and a ward without newsletters here may still communicate in other ways. Wards are compared with their own
+        history and with all wards, never ranked.
+      </p>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="archive">
+      <h2 id="archive" class={headingClass}>What's in the archive</h2>
+      <p>
+        Newsletters arrive by email subscription; a few older ones come from public web archives. A ward's coverage
+        starts with the first newsletter we received from it.
+      </p>
+      <p id="archive-summary"></p>
+      <p id="absent-wards" hidden></p>
+      <details class="text-sm">
+        <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Coverage by ward</summary>
+        <div id="coverage-table" class="mt-2 overflow-x-auto max-h-96 overflow-y-auto"></div>
+      </details>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="topics">
+      <h2 id="topics" class={headingClass}>Topics</h2>
+      <p>Topics are reviewed phrase lists, not AI labels, applied the same way to every month.</p>
+      <p id="topic-rules"></p>
+      <dl id="topic-definitions" class="space-y-3 text-sm"></dl>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="boilerplate">
+      <h2 id="boilerplate" class={headingClass}>Repeated text</h2>
+      <p id="boilerplate-rule"></p>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="ward-reach">
+      <h2 id="ward-reach" class={headingClass}>Ward reach</h2>
+      <p>
+        Most charts count wards, not newsletters: "14 of 38 wards" means 14 of the 38 wards that sent newsletters that
+        month mentioned the topic. One prolific ward can't set the trend.
+      </p>
+      <ul class="list-disc pl-6 space-y-1">
+        <li>City-wide months with fewer than {MIN_ACTIVE_WARDS_FOR_REACH} active wards are faded.</li>
+        <li>The term explorer counts newsletters and skips months with fewer than {MIN_MONTH_NEWSLETTERS_FOR_SHARES}.</li>
+        <li>
+          Ward profiles compare a ward's share of months mentioning a topic with the average share of active wards in
+          the same months. They need {MIN_WARD_NEWSLETTERS_FOR_SHARES} newsletters across {MIN_WARD_MONTHS_FOR_SHARES} months.
+        </li>
+        <li>Months without a newsletter show as "not tracked yet" or "none received", not as zero mentions.</li>
+      </ul>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="default-window">
+      <h2 id="default-window" class={headingClass}>Default dates</h2>
+      <p id="default-window-rule"></p>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="limits">
+      <h2 id="limits" class={headingClass}>What the data can't tell you</h2>
+      <ul class="list-disc pl-6 space-y-1">
+        <li>How aldermen voted or what they did.</li>
+        <li>Anything about wards before their coverage starts, or wards with no newsletters here.</li>
+        <li>That a ward ignores a topic. Words inside images aren't read.</li>
+        <li>Year-over-year trends: broad coverage spans less than a year.</li>
+        <li>How many residents read a newsletter.</li>
+        <li>Which sense of an ambiguous word was meant ("ice": weather or immigration enforcement).</li>
+      </ul>
+    </section>
+
+    <section class={sectionClass} aria-labelledby="corrections">
+      <h2 id="corrections" class={headingClass}>Corrections</h2>
+      <p>
+        Missing newsletter or wrong number? <a href={REPORT_ISSUE_URL} class={linkClass} rel="noopener">Open an issue on GitHub</a>.
+      </p>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  import { loadAnalyticsFiles } from '../../lib/analytics-data';
+  import { startMethodologyPage } from '../../scripts/analytics-methodology';
+
+  const METHODOLOGY_FILES = ['metadata', 'sources', 'lenses', 'newsletters'] as const;
+
+  function showLoadProblem(text: string): void {
+    const element = document.getElementById('methodology-data-as-of');
+    if (element) element.textContent = text;
+  }
+
+  loadAnalyticsFiles(METHODOLOGY_FILES)
+    .then((result) => {
+      if (result.status === 'ready') startMethodologyPage(result.data);
+      else if (result.status === 'missing') showLoadProblem(`Analytics data not generated (missing ${result.missingFiles.join(', ')}).`);
+      else showLoadProblem(`Could not load analytics data: ${result.message}`);
+    })
+    .catch((error: unknown) => showLoadProblem(`Could not load analytics data: ${error instanceof Error ? error.message : String(error)}`));
+</script>

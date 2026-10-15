@@ -1,0 +1,40 @@
+{
+ "sources": [
+  {
+   "id": 1,
+   "name": "Ada Example",
+   "ward": "1",
+   "source_type": "alderman",
+   "first_date": "2026-01-10",
+   "last_date": "2026-04-24",
+   "newsletters": 12
+  },
+  {
+   "id": 2,
+   "name": "Bo Example",
+   "ward": "2",
+   "source_type": "alderman",
+   "first_date": "2026-01-10",
+   "last_date": "2026-04-17",
+   "newsletters": 8
+  },
+  {
+   "id": 3,
+   "name": "Cy Example",
+   "ward": "3",
+   "source_type": "alderman",
+   "first_date": "2026-02-10",
+   "last_date": "2026-04-17",
+   "newsletters": 6
+  },
+  {
+   "id": 4,
+   "name": "Di Example",
+   "ward": "4",
+   "source_type": "alderman",
+   "first_date": null,
+   "last_date": null,
+   "newsletters": 0
+  }
+ ]
+}
