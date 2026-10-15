@@ -272,9 +272,20 @@ def compute_outputs(
     )
 
     return {
-        "metadata": build_metadata(
-            newsletters, sources, len(vocabulary), min_term_newsletters, generated_at
-        ),
+        "metadata": {
+            **build_metadata(
+                newsletters,
+                sources,
+                len(vocabulary),
+                min_term_newsletters,
+                generated_at,
+            ),
+            # Published so the methodology page states the rule that was applied.
+            "boilerplate": {
+                "min_share_percent": BOILERPLATE_MIN_SHARE_PERCENT,
+                "min_source_newsletters": BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
+            },
+        },
         "newsletters": {
             "newsletters": build_newsletter_facts(
                 newsletters, sources_by_id, lenses_by_newsletter
