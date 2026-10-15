@@ -5,7 +5,9 @@ import * as Plot from "@observablehq/plot";
 import {
   buildSearchUrl,
   formatMonth,
+  isTopicLabeledInMonth,
   monthDateRange,
+  monthTickLabeler,
   type CoverageCell,
   type DistinctiveTerm,
   type RisingTerm,
@@ -20,7 +22,6 @@ export const CHART_COLORS = {
   series: "#2a78d6",
   seriesLight: "#86b6ef",
   seriesDark: "#1c5cab",
-  sequentialLow: "#cde2fb",
   sequentialHigh: "#104281",
   untracked: "#ebeae6",
   mutedInk: "#52514e",
@@ -38,8 +39,6 @@ const LEGEND_MARGIN = 16;
 const MAX_BAR_THICKNESS = 0.7;
 /** Coverage grid columns never get narrower than this; wider grids scroll. */
 const MIN_COVERAGE_CELL_WIDTH = 12;
-/** With at most this many months the coverage grid labels every month, otherwise only years. */
-const MAX_LABELED_MONTHS = 18;
 
 export const formatPercent = (value: number): string => `${(value * 100).toFixed(1)}%`;
 export const formatWard = (ward: string): string => `Ward ${ward}`;
@@ -49,14 +48,14 @@ export const formatOptionalShare = (share: number | null): string =>
 const MAX_DISPLAYED_LIFT = 100;
 export const formatLift = (lift: number): string =>
   lift > MAX_DISPLAYED_LIFT ? `>${MAX_DISPLAYED_LIFT}×` : `${lift.toFixed(1)}×`;
-const yearTickFormat = (month: string): string => (month.endsWith("-01") ? month.slice(0, 4) : "");
 
-/** Short month names, with the year under the first month and every January. */
-function monthTickFormat(months: string[]): (month: string) => string {
-  if (months.length > MAX_LABELED_MONTHS) return yearTickFormat;
-  return (month) => {
-    const [name, year] = formatMonth(month).split(" ");
-    return month === months[0] || month.endsWith("-01") ? `${name}\n${year}` : name;
+/** A band x axis of consecutive months, labeled to fit the plot's inner width. */
+function monthAxis(months: string[], width: number, marginLeft: number, marginRight: number): Plot.ScaleOptions {
+  return {
+    type: "band",
+    domain: months,
+    label: null,
+    tickFormat: monthTickLabeler(months, width - marginLeft - marginRight),
   };
 }
 
@@ -141,11 +140,15 @@ function monthlyShareMarks<T extends { month: string; share: number | null }>(
 }
 
 export function renderTermTimeline(points: TermMonthPoint[], width: number): Element {
+  const marginLeft = 48;
+  const marginRight = 20;
   return Plot.plot({
     ...baseOptions(width),
-    height: 260,
-    marginLeft: 48,
-    x: { type: "band", label: null, tickFormat: yearTickFormat },
+    height: 260 + AXIS_BAND,
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    x: monthAxis(points.map((point) => point.month), width, marginLeft, marginRight),
     y: { label: "Share of newsletters (%)", percent: true, grid: true, nice: true },
     marks: monthlyShareMarks(
       points,
@@ -155,17 +158,27 @@ export function renderTermTimeline(points: TermMonthPoint[], width: number): Ele
   });
 }
 
-export function renderTopicTrend(points: TopicMonthPoint[], maxShare: number, width: number): Element {
+/** One topic's monthly shares on the x axis every topic card shares (`months`). */
+export function renderTopicTrend(
+  points: TopicMonthPoint[],
+  months: string[],
+  maxShare: number,
+  width: number,
+): Element {
+  const marginLeft = 40;
+  const marginRight = 20;
   return Plot.plot({
     ...baseOptions(width),
-    height: 140,
-    marginLeft: 40,
-    x: { type: "band", label: null, tickFormat: yearTickFormat },
+    height: 140 + AXIS_BAND,
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    x: monthAxis(months, width, marginLeft, marginRight),
     y: { label: null, percent: true, domain: [0, maxShare * 100 || 1], ticks: 3, grid: true },
-    marks: monthlyShareMarks(
-      points,
-      (point) =>
-        `${point.month}\n${point.newsletters} of ${point.monthNewsletters} newsletters (${formatOptionalShare(point.share)})`,
+    marks: monthlyShareMarks(points, (point) =>
+      isTopicLabeledInMonth(point.topic, point.month)
+        ? `${point.month}\n${point.newsletters} of ${point.monthNewsletters} newsletters (${formatOptionalShare(point.share)})`
+        : `${point.month}\nNot yet in the LLM topic list`,
     ),
   });
 }
@@ -290,32 +303,39 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
   );
 }
 
+/**
+ * Ward × month coverage grid. `wardsNeverArchived` (wards with no newsletter in
+ * the whole archive) get a text label, since an all-gray row in a short window
+ * can also mean the ward simply joined later.
+ */
 export function renderCoverageGrid(
   cells: CoverageCell[],
   wards: string[],
   months: string[],
+  wardsNeverArchived: string[],
   searchScope: SearchLinkParams,
   width: number,
 ): Element {
   const marginLeft = 70;
   const marginRight = 10;
   const cellsByStatus = (status: CoverageCell["status"]) => cells.filter((cell) => cell.status === status);
-  const wardsWithoutNewsletters = wards.filter((ward) =>
-    cells.every((cell) => cell.ward !== ward || cell.status === "untracked"),
-  );
+  const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
   const plot = Plot.plot({
-    ...baseOptions(Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight)),
+    ...baseOptions(plotWidth),
     height: wards.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
     marginLeft,
     marginRight,
     marginBottom: AXIS_BAND,
     padding: 0.08,
-    x: { type: "band", domain: months, label: null, tickFormat: monthTickFormat(months), axis: "both" },
+    x: { ...monthAxis(months, plotWidth, marginLeft, marginRight), axis: "both" },
     y: { label: null, domain: wards, tickFormat: formatWard },
     color: {
-      type: "linear",
-      range: [CHART_COLORS.sequentialLow, CHART_COLORS.sequentialHigh],
+      // Square-root scale starting at a clearly blue tint: one newsletter must not
+      // read as the gray "not tracked" state, and one prolific ward must not wash
+      // out every other ward's counts.
+      type: "sqrt",
+      range: [CHART_COLORS.seriesLight, CHART_COLORS.sequentialHigh],
       label: "Newsletters received that month",
     },
     marks: [
@@ -348,7 +368,7 @@ export function renderCoverageGrid(
           `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"}\nClick to search`,
         tip: true,
       }),
-      Plot.text(wardsWithoutNewsletters, {
+      Plot.text(wardsNeverArchived, {
         x: () => months[0],
         y: (ward: string) => ward,
         text: () => "No newsletters archived",

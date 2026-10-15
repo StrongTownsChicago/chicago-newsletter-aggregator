@@ -102,7 +102,7 @@ const controlClass =
         <AnalyticsPanel
           id="coverage"
           title="What the archive covers"
-          description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. Every other panel only reflects the wards and months shown here. Ignores the topic filter."
+          description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the topic filter."
         >
           <div data-chart class="overflow-x-auto"></div>
         </AnalyticsPanel>
@@ -155,7 +155,7 @@ const controlClass =
         <AnalyticsPanel
           id="sending-cadence"
           title="Sending cadence"
-          description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates. Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
+          description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
           hasTable={false}
         >
           <div id="cadence-gaps" class="overflow-x-auto"></div>

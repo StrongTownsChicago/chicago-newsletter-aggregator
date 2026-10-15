@@ -18,12 +18,15 @@ import {
   formatMonth,
   isTopicLabeledInMonth,
   listMonths,
+  listMonthsWithShares,
   listSourceWards,
   listTopics,
   listWards,
   listWindowMonths,
   lookupTermPostings,
+  MIN_MONTH_LABEL_WIDTH,
   monthDateRange,
+  monthTickLabeler,
   normalizeTermQuery,
   searchScopeForFilters,
   shareOrNull,
@@ -143,6 +146,35 @@ describe("trimSparseEdges", () => {
   });
 });
 
+describe("listMonthsWithShares", () => {
+  it("spans every series' shares so small multiples share one axis", () => {
+    const points = [
+      { month: "2026-01", share: 0.2 },
+      { month: "2026-01", share: null },
+      { month: "2026-02", share: null },
+      { month: "2026-03", share: null },
+      { month: "2026-03", share: 0.1 },
+      { month: "2026-04", share: null },
+    ];
+    expect(listMonthsWithShares(points)).toEqual(["2026-01", "2026-02", "2026-03"]);
+    expect(listMonthsWithShares([{ month: "2026-01", share: null }])).toEqual([]);
+  });
+
+  it("keeps a late-added topic on the same axis as the others, blank before it was labeled", () => {
+    const topic = "street_safety_or_traffic_calming";
+    const points = computeTopicTrends(
+      [
+        fact({ date: "2026-01-02", topics: ["bike_lanes"] }),
+        fact({ date: "2026-02-02", topics: [topic] }),
+      ],
+      [topic, "bike_lanes"],
+      1,
+    );
+    expect(listMonthsWithShares(points)).toEqual(["2026-01", "2026-02"]);
+    expect(points.find((point) => point.topic === topic && point.month === "2026-01")?.share).toBeNull();
+  });
+});
+
 describe("summarizeFacts", () => {
   it("summarizes the newsletter count and date span", () => {
     const summary = summarizeFacts([
@@ -229,16 +261,50 @@ describe("date windows", () => {
       endMonth: "2026-03",
       minActiveWards: 9,
       peakActiveWards: 10,
+      minActiveWardsBefore: 0,
       maxActiveWardsBefore: 1,
       months: 2,
     });
     expect(findBroadCoverageWindow([])).toBeNull();
   });
 
-  it("starts at the first month when coverage was broad from the beginning", () => {
-    const window = findBroadCoverageWindow([fact({ date: "2026-01-02" }), fact({ date: "2026-02-02" })]);
-    expect(window?.startMonth).toBe("2026-01");
-    expect(window?.maxActiveWardsBefore).toBe(0);
+  it("offers no narrower window when coverage was broad from the first month", () => {
+    expect(findBroadCoverageWindow([fact({ date: "2026-01-02" }), fact({ date: "2026-02-02" })])).toBeNull();
+    expect(findBroadCoverageWindow([fact({ date: "2026-01-02" })])).toBeNull();
+  });
+
+  it("keeps a peak in the latest, partial month as the window start", () => {
+    const window = findBroadCoverageWindow([
+      fact({ ward: "1", date: "2026-01-02" }),
+      fact({ ward: "1", date: "2026-02-02" }),
+      fact({ ward: "2", date: "2026-02-03" }),
+    ]);
+    expect(window).toMatchObject({ startMonth: "2026-02", endMonth: "2026-02", months: 1, maxActiveWardsBefore: 1 });
+  });
+
+  it("labels month names when there is room, with the year at the first month and January", () => {
+    const months = ["2025-11", "2025-12", "2026-01", "2026-02"];
+    const label = monthTickLabeler(months, months.length * MIN_MONTH_LABEL_WIDTH);
+    expect(months.map(label)).toEqual(["Nov\n2025", "Dec", "Jan\n2026", "Feb"]);
+  });
+
+  it("labels a Feb–Oct series with its year", () => {
+    const months = listMonths("2026-02", "2026-10");
+    const label = monthTickLabeler(months, 600);
+    expect(label("2026-02")).toBe("Feb\n2026");
+    expect(label("2026-03")).toBe("Mar");
+  });
+
+  it("falls back to year labels on narrow axes, labeling the first month only when it has room", () => {
+    const months = listMonths("2023-03", "2026-10");
+    const narrow = monthTickLabeler(months, months.length * (MIN_MONTH_LABEL_WIDTH - 1));
+    expect(narrow("2023-03")).toBe("2023");
+    expect(narrow("2024-01")).toBe("2024");
+    expect(narrow("2024-02")).toBe("");
+    const lateStart = listMonths("2023-11", "2026-10");
+    const crowded = monthTickLabeler(lateStart, lateStart.length * 10);
+    expect(crowded("2023-11")).toBe("");
+    expect(crowded("2024-01")).toBe("2024");
   });
 
   it("counts broadly covered months within a window", () => {

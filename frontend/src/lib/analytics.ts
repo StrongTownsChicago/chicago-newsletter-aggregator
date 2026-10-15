@@ -129,6 +129,33 @@ export function formatMonth(month: string): string {
   return `${monthNameFormat.format(new Date(Date.UTC(year, monthNumber - 1, 1)))} ${year}`;
 }
 
+/** Month names need about this many pixels each; tighter axes label years only. */
+export const MIN_MONTH_LABEL_WIDTH = 30;
+/** A year label needs about this many pixels before the next one. */
+export const MIN_YEAR_LABEL_WIDTH = 36;
+
+/**
+ * Tick labels for a band axis of consecutive YYYY-MM months, sized to the
+ * axis: month names with the year under the first month and every January
+ * when there is room, otherwise the year at every January (and at the first
+ * month, when it is far enough from the next January not to collide).
+ */
+export function monthTickLabeler(months: string[], axisWidth: number): (month: string) => string {
+  const pixelsPerMonth = months.length ? axisWidth / months.length : axisWidth;
+  const first = months[0];
+  if (pixelsPerMonth >= MIN_MONTH_LABEL_WIDTH) {
+    return (month) => {
+      const [name, year] = formatMonth(month).split(" ");
+      return month === first || month.endsWith("-01") ? `${name}\n${year}` : name;
+    };
+  }
+  const monthsPerYear = 12;
+  // Months from the first month to the next January (12 when the first month is a January).
+  const monthsUntilJanuary = first ? monthsPerYear + 1 - Number(first.slice(5, 7)) : 0;
+  const labelFirst = first !== undefined && monthsUntilJanuary * pixelsPerMonth >= MIN_YEAR_LABEL_WIDTH;
+  return (month) => (month.endsWith("-01") || (labelFirst && month === first) ? month.slice(0, 4) : "");
+}
+
 export function daysBetween(start: string, end: string): number {
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   return Math.round((Date.parse(end) - Date.parse(start)) / millisecondsPerDay);
@@ -288,13 +315,18 @@ export interface BroadCoverageWindow {
   /** Active wards a month needs to count as broadly covered. */
   minActiveWards: number;
   peakActiveWards: number;
-  /** Most wards active in any month before the window (0 when it starts at the first month). */
+  /** Fewest and most wards active in any month before the window. */
+  minActiveWardsBefore: number;
   maxActiveWardsBefore: number;
   /** Months in the window. */
   months: number;
 }
 
-/** The span from the first broadly covered month to the latest month, or null without data. */
+/**
+ * The span from the first broadly covered month to the latest month. Null
+ * without data, or when coverage was broad from the first month (the window
+ * would be the whole archive, so there is nothing narrower to offer).
+ */
 export function findBroadCoverageWindow(
   facts: NewsletterFact[],
   peakFraction: number = BROAD_COVERAGE_PEAK_FRACTION,
@@ -304,12 +336,15 @@ export function findBroadCoverageWindow(
   const peakActiveWards = Math.max(...activity.map((month) => month.activeWards));
   const minActiveWards = Math.ceil(peakActiveWards * peakFraction);
   const startIndex = activity.findIndex((month) => month.activeWards >= minActiveWards);
+  if (startIndex === 0) return null;
+  const activeWardsBefore = activity.slice(0, startIndex).map((month) => month.activeWards);
   return {
     startMonth: activity[startIndex].month,
     endMonth: activity[activity.length - 1].month,
     minActiveWards,
     peakActiveWards,
-    maxActiveWardsBefore: Math.max(0, ...activity.slice(0, startIndex).map((month) => month.activeWards)),
+    minActiveWardsBefore: Math.min(...activeWardsBefore),
+    maxActiveWardsBefore: Math.max(...activeWardsBefore),
     months: activity.length - startIndex,
   };
 }
@@ -345,6 +380,19 @@ export function trimSparseEdges<T extends { share: number | null }>(points: T[])
   if (first === -1) return [];
   const last = points.findLastIndex((point) => point.share !== null);
   return points.slice(first, last + 1);
+}
+
+/**
+ * The months from the first to the last point with a share in any series, so
+ * small multiples share one x axis instead of each starting where its own
+ * data does.
+ */
+export function listMonthsWithShares(points: { month: string; share: number | null }[]): string[] {
+  const months = points
+    .filter((point) => point.share !== null)
+    .map((point) => point.month)
+    .sort();
+  return months.length ? listMonths(months[0], months[months.length - 1]) : [];
 }
 
 // ---------------------------------------------------------------------------

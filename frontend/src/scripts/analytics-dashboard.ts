@@ -13,10 +13,12 @@ import {
   findBroadCoverageWindow,
   findLongestGaps,
   formatMonth,
+  listMonthsWithShares,
   listSourceWards,
   listWards,
   listWindowMonths,
   lookupTermPostings,
+  MIN_MONTH_NEWSLETTERS_FOR_SHARES,
   monthOf,
   normalizeTermQuery,
   searchScopeForFilters,
@@ -31,6 +33,7 @@ import {
   type AnalyticsDataset,
   type AnalyticsFilters,
   type BroadCoverageWindow,
+  type CoverageStatus,
   type MonthWardActivity,
   type NewsletterFact,
 } from "../lib/analytics";
@@ -55,6 +58,11 @@ import { ALL_TOPICS } from "../lib/topics";
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
 const GAP_LIMIT = 10;
+const COVERAGE_STATUS_LABELS: Record<CoverageStatus, string> = {
+  untracked: "Not tracked yet",
+  silent: "Tracked, none received",
+  received: "Received",
+};
 const RESIZE_DEBOUNCE_MS = 200;
 const numberFormat = new Intl.NumberFormat("en-US");
 const percentFormat = new Intl.NumberFormat("en-US", { style: "percent" });
@@ -106,8 +114,20 @@ function setTable<T>(container: HTMLElement | null, columns: TableColumn<T>[], r
   replaceContent(container, rows.length ? renderTable(columns, rows) : emptyMessage("No rows."));
 }
 
+function tableHeading(text: string): HTMLElement {
+  const heading = document.createElement("h3");
+  heading.className = "text-sm font-semibold text-gray-700 mt-3 mb-1";
+  heading.textContent = text;
+  return heading;
+}
+
 function pluralize(count: number, noun: string): string {
   return `${numberFormat.format(count)} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** "3 wards", or "1–32 wards" when the count varied. */
+function describeWardRange(fewest: number, most: number): string {
+  return fewest === most ? pluralize(most, "ward") : `${numberFormat.format(fewest)}–${pluralize(most, "ward")}`;
 }
 
 function describeMonthSpan(months: string[]): string {
@@ -200,8 +220,9 @@ function renderDateWindowStatus(state: DashboardState, filters: AnalyticsFilters
     status.textContent = `Showing ${span}, the period of broad coverage: ${describeBroadCoverageRule(broadWindow)}.`;
   } else if (kind === "full") {
     status.textContent =
-      `Showing the full archive, ${span}. Before ${formatMonth(broadWindow.startMonth)} no more than ` +
-      `${pluralize(broadWindow.maxActiveWardsBefore, "ward")} a month sent newsletters, so pooled numbers mix real change with wards being added.`;
+      `Showing the full archive, ${span}. Before ${formatMonth(broadWindow.startMonth)} only ` +
+      `${describeWardRange(broadWindow.minActiveWardsBefore, broadWindow.maxActiveWardsBefore)} a month sent newsletters, ` +
+      "so pooled numbers mix real change with wards being added.";
   } else {
     status.textContent = `Showing a custom window, ${span}. Broad coverage starts ${formatMonth(broadWindow.startMonth)}.`;
   }
@@ -259,26 +280,32 @@ function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): 
   const wards = wardsInScope(state.allWards, filters);
   const months = listWindowMonths(filters, state.dataMonths);
   const coverage = summarizeWardCoverage(state.data.sources, wards);
-  const archivedWards = coverage.filter((ward) => ward.newsletters > 0).length;
+  const wardsNeverArchived = coverage.filter((ward) => ward.newsletters === 0).map((ward) => ward.ward);
+  const archivedWards = wards.length - wardsNeverArchived.length;
   caption.textContent =
     `${archivedWards} of ${pluralize(wards.length, "ward")} ${wards.length === 1 ? "has" : "have"} newsletters in the archive` +
-    (archivedWards < wards.length ? `; ${wards.length - archivedWards} have none.` : ".");
+    (wardsNeverArchived.length
+      ? `; ${wardsNeverArchived.length} ${wardsNeverArchived.length === 1 ? "has" : "have"} none.`
+      : ".");
   if (!chart) return;
+  const cells = buildCoverageGrid(state.data.newsletters, wards, months);
   replaceContent(
     chart,
     wards.length && months.length
       ? renderCoverageGrid(
-          buildCoverageGrid(state.data.newsletters, wards, months),
+          cells,
           wards,
           months,
+          wardsNeverArchived,
           // Coverage ignores the topic filter, so its search links do too.
           searchScopeForFilters(filters, { includeTopic: false }),
           chartWidth(chart),
         )
       : emptyMessage("No wards or months in the selected window."),
   );
+  const wardTable = document.createElement("div");
   setTable(
-    table,
+    wardTable,
     [
       { label: "Ward", value: (row) => row.ward },
       { label: "Aldermen", value: (row) => row.aldermen.join(", ") },
@@ -288,6 +315,19 @@ function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): 
     ],
     coverage,
   );
+  // The grid's per-month cells, so its counts and states are not available by color alone.
+  const monthTable = document.createElement("div");
+  setTable(
+    monthTable,
+    [
+      { label: "Ward", value: (cell) => cell.ward },
+      { label: "Month", value: (cell) => cell.month },
+      { label: "Status", value: (cell) => COVERAGE_STATUS_LABELS[cell.status] },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
+    ],
+    cells,
+  );
+  replaceContent(table, tableHeading("By ward"), wardTable, tableHeading("By ward and month"), monthTable);
 }
 
 function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): void {
@@ -346,7 +386,14 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     clearResults();
     return;
   }
-  timeline.replaceChildren(renderTermTimeline(trimSparseEdges(months), chartWidth(timeline)));
+  const timelinePoints = trimSparseEdges(months);
+  timeline.replaceChildren(
+    timelinePoints.length
+      ? renderTermTimeline(timelinePoints, chartWidth(timeline))
+      : emptyMessage(
+          `No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} or more newsletters in the selected wards and dates, so there is no monthly share to chart. See the table for counts.`,
+        ),
+  );
   wardsTitle.classList.remove("hidden");
   wardsChart.replaceChildren(
     renderTermWards(
@@ -382,19 +429,23 @@ function renderTopicTrendsPanel(facts: NewsletterFact[], filters: AnalyticsFilte
     return;
   }
   const maxShare = Math.max(...points.map((point) => point.share ?? 0));
+  const months = listMonthsWithShares(points);
+  const monthsShown = new Set(months);
   chart.classList.toggle("md:grid-cols-2", !filters.topic);
   const cardWidth = filters.topic ? chartWidth(chart) : Math.max(chartWidth(chart) / 2 - 12, 300);
   replaceContent(
     chart,
-    ...topics.map((topic) => {
-      const figure = document.createElement("figure");
-      const title = document.createElement("figcaption");
-      title.className = "text-sm font-semibold text-gray-700";
-      title.textContent = humanizeIdentifier(topic);
-      const topicPoints = trimSparseEdges(points.filter((point) => point.topic === topic));
-      figure.append(title, renderTopicTrend(topicPoints, maxShare, cardWidth));
-      return figure;
-    }),
+    ...(months.length
+      ? topics.map((topic) => {
+          const figure = document.createElement("figure");
+          const title = document.createElement("figcaption");
+          title.className = "text-sm font-semibold text-gray-700";
+          title.textContent = humanizeIdentifier(topic);
+          const topicPoints = points.filter((point) => point.topic === topic && monthsShown.has(point.month));
+          figure.append(title, renderTopicTrend(topicPoints, months, maxShare, cardWidth));
+          return figure;
+        })
+      : [emptyMessage(`No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} or more processed newsletters for these filters.`)]),
   );
   setTable(
     table,
@@ -493,7 +544,7 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   renderTopicTrendsPanel(factsIgnoringTopic, filters);
   renderDistinctivePanel(state);
   renderRisingPanel(state);
-  renderCadencePanel(facts);
+  renderCadencePanel(factsIgnoringTopic);
 }
 
 function showLoadError(error: unknown): void {
