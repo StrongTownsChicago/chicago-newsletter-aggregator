@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BROAD_COVERAGE_PEAK_FRACTION, type BroadCoverageWindow, type LensDefinition } from "../../lib/analytics";
+import { type BroadCoverageWindow, type LensDefinition } from "../../lib/analytics";
 import {
-  describeBoilerplateRule,
   describeBroadCoverageRule,
-  describeDefaultWindow,
   describeTopicDefinition,
   describeTopicMatching,
   pluralize,
-} from "../../lib/analytics-methodology";
+} from "../../lib/analytics-descriptions";
 
 const window: BroadCoverageWindow = {
   startMonth: "2026-01",
@@ -69,29 +67,8 @@ describe("describeTopicDefinition", () => {
   });
 });
 
-describe("describeBoilerplateRule", () => {
-  it("states the recorded thresholds", () => {
-    const text = describeBoilerplateRule({ boilerplate: { min_share_percent: 30, min_source_newsletters: 10 } });
-    expect(text).toContain("at least 30% of one ward's newsletters");
-    expect(text).toContain("fewer than 10 newsletters");
-  });
-
-  it("falls back to a general description for data without the rule", () => {
-    expect(describeBoilerplateRule({})).toContain("removed before counting");
-  });
-});
-
-describe("describeDefaultWindow", () => {
-  it("explains where the default window starts and why", () => {
-    const text = describeDefaultWindow(window);
-    expect(text).toContain("Jan 2026");
-    expect(text).toContain(describeBroadCoverageRule(window));
-    expect(text).toContain("at most 13 wards a month");
-    expect(text).not.toMatch(/\d–\d/);
-    expect(text).toContain(`${BROAD_COVERAGE_PEAK_FRACTION * 100}% of the busiest month's 38`);
-  });
-
-  it("says when the default is the whole archive", () => {
-    expect(describeDefaultWindow(null)).toContain("whole archive");
+describe("describeBroadCoverageRule", () => {
+  it("states the minimum number of sending wards", () => {
+    expect(describeBroadCoverageRule(window)).toBe("at least 34 wards sent newsletters");
   });
 });

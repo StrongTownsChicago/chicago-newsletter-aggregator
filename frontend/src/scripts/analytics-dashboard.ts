@@ -68,7 +68,7 @@ import {
   describeTopicDefinition,
   describeTopicMatching,
   pluralize,
-} from "../lib/analytics-methodology";
+} from "../lib/analytics-descriptions";
 import {
   buildCanonicalViewUrl,
   chooseHistoryMode,

@@ -360,20 +360,13 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
     )
 
     return {
-        "metadata": {
-            **build_metadata(
-                newsletters,
-                sources,
-                len(vocabulary),
-                min_term_newsletters,
-                analysis.generated_at,
-            ),
-            # Published so the methodology page states the rule that was applied.
-            "boilerplate": {
-                "min_share_percent": BOILERPLATE_MIN_SHARE_PERCENT,
-                "min_source_newsletters": BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
-            },
-        },
+        "metadata": build_metadata(
+            newsletters,
+            sources,
+            len(vocabulary),
+            min_term_newsletters,
+            analysis.generated_at,
+        ),
         "newsletters": {
             "newsletters": build_newsletter_facts(
                 newsletters, analysis.sources_by_id, lenses_by_newsletter

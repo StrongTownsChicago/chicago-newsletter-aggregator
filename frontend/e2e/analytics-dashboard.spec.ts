@@ -1,4 +1,4 @@
-// /analytics and /analytics/methodology on small committed fixture data.
+// /analytics on small committed fixture data.
 // Run with `npm run test:e2e:analytics` (playwright.analytics.config.ts), which
 // starts its own dev server with placeholder Supabase settings. The analytics
 // pages never query Supabase; as a guard, every request that leaves the dev
@@ -128,20 +128,6 @@ test('shows a ward with no archived newsletters neutrally', async ({ page }) => 
   await openDashboard(page, '?ward=4');
   await expect(page.locator('#profile-message')).toHaveText('No Ward 4 newsletters in the archive yet.');
   await expect(page.locator('#profile-content')).toBeHidden();
-});
-
-test('links to the methodology page', async ({ page }) => {
-  await openDashboard(page);
-  await page.getByTestId('methodology-link').click();
-  await expect(page).toHaveURL(/\/analytics\/methodology$/);
-  await expect(page.locator('h1')).toHaveText('How the analytics work');
-  await expect(page.getByTestId('methodology-data-as-of')).toContainText('from 26 newsletters');
-  await expect(page.locator('#topic-definitions')).toContainText('Public safety');
-  await expect(page.locator('#topic-definitions')).toContainText('police');
-  await expect(page.locator('#absent-wards')).toContainText('No newsletters in the archive: 4.');
-  await expect(page.locator('#boilerplate-rule')).toContainText('at least 30%');
-  await expect(page.locator('main')).not.toContainText(/\blens(es)?\b/i);
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
 });
 
 test('downloads a chart as a PNG', async ({ page }) => {

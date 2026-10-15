@@ -72,13 +72,6 @@ export interface AnalyticsMetadata {
   last_date: string | null;
   term_count: number;
   min_term_newsletters: number;
-  /** The per-source boilerplate rule applied before counting terms and topics. */
-  boilerplate?: {
-    /** Text repeated in at least this percent of one source's newsletters is removed. */
-    min_share_percent: number;
-    /** Sources with fewer newsletters keep all their text. */
-    min_source_newsletters: number;
-  };
 }
 
 /** One keyword lens: its reviewed phrase list and how many newsletters each phrase was found in. */

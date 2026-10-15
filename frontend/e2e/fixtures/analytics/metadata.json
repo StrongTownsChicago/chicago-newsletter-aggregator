@@ -5,9 +5,5 @@
  "first_date": "2026-01-10",
  "last_date": "2026-04-24",
  "term_count": 1,
- "min_term_newsletters": 2,
- "boilerplate": {
-  "min_share_percent": 30,
-  "min_source_newsletters": 10
- }
+ "min_term_newsletters": 2
 }
