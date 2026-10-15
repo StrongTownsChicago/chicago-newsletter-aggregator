@@ -56,6 +56,26 @@ class TestBuildNewsletterTerms(unittest.TestCase):
         # Subject and body are separate phrases.
         self.assertNotIn("lanes zoning", document.terms)
 
+    def test_merges_plurals_under_the_most_common_written_form(self):
+        texts = ["New speed humps", "More speed humps", "One speed hump"]
+        newsletters = [
+            NewsletterRecord(
+                id=f"n{index}",
+                received_date=date(2026, 3, 4),
+                source_id=None,
+                subject="",
+                plain_text=text,
+                topics=None,
+                relevance_score=None,
+            )
+            for index, text in enumerate(texts)
+        ]
+        documents = build_newsletter_terms(newsletters, {})
+        self.assertTrue(all("speed humps" in document.terms for document in documents))
+        self.assertTrue(
+            all("speed hump" not in document.terms for document in documents)
+        )
+
 
 class TestVocabulary(unittest.TestCase):
     def test_counts_newsletters_not_occurrences(self):

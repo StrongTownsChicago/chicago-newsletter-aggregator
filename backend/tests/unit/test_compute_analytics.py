@@ -13,6 +13,7 @@ from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
 from utils.compute_analytics import (
+    BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
@@ -63,6 +64,26 @@ class TestComputeOutputs(unittest.TestCase):
         self.assertIn("bike lanes", outputs["terms"]["terms"])
         self.assertEqual(outputs["terms"]["min_newsletters"], 2)
         self.assertEqual(outputs["rising"]["latest_month"], "2026-09")
+
+    def test_term_metrics_exclude_text_a_source_repeats_in_every_issue(self):
+        sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
+        footer = "Ada Alder | 1 Main St | Unsubscribe | Update Profile | Constant Contact Data Notice"
+        newsletters = [
+            make_newsletter(
+                str(index),
+                date(2026, 9, 1 + index),
+                1,
+                f"Zoning item {index}. {footer}",
+            )
+            for index in range(BOILERPLATE_MIN_SOURCE_NEWSLETTERS)
+        ]
+        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+
+        self.assertNotIn("data notice", outputs["terms"]["terms"])
+        self.assertIn("zoning", outputs["terms"]["terms"])
+        # Facts still describe the newsletter as received.
+        fact_words = outputs["newsletters"]["newsletters"][0]["words"]
+        self.assertEqual(fact_words, len(newsletters[0].plain_text.split()))
 
     def test_handles_dataset_without_complete_month(self):
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
