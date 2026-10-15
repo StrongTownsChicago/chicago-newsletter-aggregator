@@ -29,7 +29,14 @@ const stripTrailingSlash = (/** @type {string} */ page) => {
 export default defineConfig({
   site: SITE_URL,
   output: "static",
-  adapter: cloudflare(),
+  // Prerendered pages are written as `reports/2026-09.html` rather than
+  // `reports/2026-09/index.html`: Cloudflare Pages serves the former at the
+  // slash-free URL that canonicals and the sitemap use, but redirects the
+  // latter to a trailing-slash URL.
+  build: { format: "file" },
+  // The adapter excludes `/reports/*` from the worker but not the prerendered
+  // index at `/reports` itself, so serve it as a static file too.
+  adapter: cloudflare({ routes: { extend: { exclude: [{ pattern: "/reports" }] } } }),
   integrations: [
     sitemap({
       filter: isIndexablePage,

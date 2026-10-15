@@ -8,3 +8,11 @@
 /analytics-data/*
   X-Robots-Tag: noindex
   Cache-Control: no-cache
+
+# Prerendered pages (/reports) skip the middleware that marks preview hosts
+# noindex, so mark them here.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex

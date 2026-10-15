@@ -1,0 +1,15 @@
+---
+import { formatLongDate } from '../../lib/archive-months';
+
+interface Props {
+  dataThrough: string | null;
+}
+
+const { dataThrough } = Astro.props;
+---
+
+{dataThrough && (
+  <footer class="mt-10 border-t border-gray-200 pt-4 text-sm text-gray-600" data-testid="report-footnote">
+    <p>Data through {formatLongDate(dataThrough)}.</p>
+  </footer>
+)}

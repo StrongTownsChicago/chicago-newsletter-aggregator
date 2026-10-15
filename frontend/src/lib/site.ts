@@ -15,6 +15,7 @@ export const SOURCE_CODE_LINK_LABEL = "Source code on GitHub";
 
 export const HOME_PATH = "/";
 export const PREFERENCES_PATH = "/preferences";
+export const REPORTS_INDEX_PATH = "/reports";
 const WARD_PROFILE_PATH_PREFIX = "/ward";
 
 export interface NavItem {

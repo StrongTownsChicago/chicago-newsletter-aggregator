@@ -101,6 +101,11 @@ describe('buildCanonicalUrl', () => {
     expect(buildCanonicalUrl('/search/', SITE)).toBe(`${SITE}/search`);
   });
 
+  it('drops the .html of prerendered output files', () => {
+    expect(buildCanonicalUrl('/reports/2026-09.html', SITE)).toBe(`${SITE}/reports/2026-09`);
+    expect(buildCanonicalUrl('/reports.html', SITE)).toBe(`${SITE}/reports`);
+  });
+
   it('keeps newsletter detail paths', () => {
     expect(buildCanonicalUrl('/newsletter/abc-123', new URL(SITE))).toBe(
       `${SITE}/newsletter/abc-123`,

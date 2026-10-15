@@ -4,6 +4,7 @@ export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import NewsletterCard from '../../components/NewsletterCard.astro';
 import Pagination from '../../components/Pagination.astro';
+import WardGlance from '../../components/WardGlance.astro';
 import { supabase } from '../../lib/supabase';
 import type { WardProfileSource } from '../../lib/newsletter-queries';
 import { countPages, parsePageParam } from '../../lib/pagination';
@@ -159,6 +160,8 @@ const description = wardNumber === null
             </>
           )}
         </section>
+
+        {page === 1 && <WardGlance wardNumber={wardNumber} />}
       </>
     )}
   </div>
