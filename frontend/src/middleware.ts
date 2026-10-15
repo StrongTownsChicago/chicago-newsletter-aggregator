@@ -14,9 +14,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     },
   });
 
-  // Try to restore session from cookies
-  const accessToken = context.cookies.get("sb-access-token")?.value;
-  const refreshToken = context.cookies.get("sb-refresh-token")?.value;
+  // Try to restore session from cookies. Prerendered pages are built without a
+  // visitor's request, so there are no cookies to read.
+  const accessToken = context.isPrerendered
+    ? undefined
+    : context.cookies.get("sb-access-token")?.value;
+  const refreshToken = context.isPrerendered
+    ? undefined
+    : context.cookies.get("sb-refresh-token")?.value;
 
   if (accessToken && refreshToken) {
     await supabase.auth.setSession({

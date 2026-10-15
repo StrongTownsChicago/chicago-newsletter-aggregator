@@ -23,7 +23,9 @@ from utils.compute_analytics import (
     INCREMENTAL_OVERLAP,
     NEWSLETTER_COLUMNS,
     build_full_snapshot,
+    analyze_archive,
     compute_outputs,
+    compute_site_outputs,
     fetch_rows,
     load_or_refresh_snapshot,
     refresh_snapshot,
@@ -52,8 +54,12 @@ class TestComputeOutputs(unittest.TestCase):
         newsletters = [
             make_newsletter("a", date(2026, 8, 3), 1, "Protected bike lanes"),
             make_newsletter("b", date(2026, 9, 3), 2, "Protected bike lanes"),
+            # An October newsletter shows the snapshot holds all of September.
+            make_newsletter("c", date(2026, 10, 2), 1, "Leaf pickup"),
         ]
-        outputs = compute_outputs(sources, newsletters, 2, datetime(2026, 10, 11))
+        outputs = compute_outputs(
+            analyze_archive(sources, newsletters, 2, datetime(2026, 10, 11))
+        )
 
         self.assertEqual(
             set(outputs),
@@ -67,7 +73,7 @@ class TestComputeOutputs(unittest.TestCase):
                 "lenses",
             },
         )
-        self.assertEqual(outputs["metadata"]["newsletter_count"], 2)
+        self.assertEqual(outputs["metadata"]["newsletter_count"], 3)
         self.assertEqual(
             outputs["metadata"]["boilerplate"],
             {
@@ -75,7 +81,7 @@ class TestComputeOutputs(unittest.TestCase):
                 "min_source_newsletters": BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
             },
         )
-        self.assertEqual(len(outputs["newsletters"]["newsletters"]), 2)
+        self.assertEqual(len(outputs["newsletters"]["newsletters"]), 3)
         self.assertIn("bike lanes", outputs["terms"]["terms"])
         self.assertEqual(outputs["terms"]["min_newsletters"], 2)
         self.assertEqual(outputs["rising"]["latest_month"], "2026-09")
@@ -92,7 +98,9 @@ class TestComputeOutputs(unittest.TestCase):
             )
             for index in range(BOILERPLATE_MIN_SOURCE_NEWSLETTERS)
         ]
-        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+        outputs = compute_outputs(
+            analyze_archive(sources, newsletters, 1, datetime(2026, 10, 11))
+        )
 
         self.assertNotIn("data notice", outputs["terms"]["terms"])
         self.assertIn("zoning", outputs["terms"]["terms"])
@@ -110,7 +118,9 @@ class TestComputeOutputs(unittest.TestCase):
             # Image-only issue: too little text to say what it mentions.
             make_newsletter("image", date(2026, 9, 3), 1, mention),
         ]
-        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+        outputs = compute_outputs(
+            analyze_archive(sources, newsletters, 1, datetime(2026, 10, 11))
+        )
 
         lenses_by_id = {
             fact["id"]: fact["lenses"] for fact in outputs["newsletters"]["newsletters"]
@@ -144,7 +154,9 @@ class TestComputeOutputs(unittest.TestCase):
             )
             for index in range(BOILERPLATE_MIN_SOURCE_NEWSLETTERS)
         ]
-        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+        outputs = compute_outputs(
+            analyze_archive(sources, newsletters, 1, datetime(2026, 10, 11))
+        )
 
         self.assertEqual(outputs["lenses"]["text"], "cleaned")
         for fact in outputs["newsletters"]["newsletters"]:
@@ -153,9 +165,83 @@ class TestComputeOutputs(unittest.TestCase):
     def test_handles_dataset_without_complete_month(self):
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         newsletters = [make_newsletter("a", date(2026, 10, 3), 1, "Bike lanes")]
-        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+        outputs = compute_outputs(
+            analyze_archive(sources, newsletters, 1, datetime(2026, 10, 11))
+        )
         self.assertIsNone(outputs["rising"]["latest_month"])
         self.assertEqual(outputs["rising"]["terms"], [])
+
+
+class TestComputeSiteOutputs(unittest.TestCase):
+    sources = [
+        SourceRecord(1, "Ada Alder", "1", "alderman"),
+        SourceRecord(2, "Bo Alder", "2", "alderman"),
+        SourceRecord(3, "Cy Alder", "3", "alderman"),
+        SourceRecord(4, "Transit agency", None, "agency"),
+    ]
+    filler = "word " * MIN_EXTRACTED_WORDS
+    mention = " ".join(["New speed humps."] * LENS_MIN_MENTIONS)
+
+    def test_summarizes_wards_and_broad_complete_months(self):
+        newsletters = [
+            make_newsletter("a", date(2026, 8, 3), 1, self.filler),
+            make_newsletter("b", date(2026, 9, 3), 1, f"{self.mention} {self.filler}"),
+            make_newsletter("c", date(2026, 9, 4), 2, f"{self.mention} {self.filler}"),
+            # The current month is incomplete, so it gets no report yet.
+            make_newsletter("d", date(2026, 10, 2), 1, self.filler),
+            make_newsletter("e", date(2026, 10, 2), 2, self.filler),
+        ]
+        with patch("utils.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
+            outputs = compute_site_outputs(
+                analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
+            )
+
+        glance = outputs["ward-glance"]
+        self.assertEqual(glance["data_through"], "2026-10-02")
+        self.assertEqual(glance["latest_month"], "2026-09")
+        self.assertEqual(set(glance["wards"]), {"1", "2"})
+        self.assertEqual(
+            glance["topics"]["street_safety"], "Street safety & traffic calming"
+        )
+        ward_one_topics = glance["wards"]["1"]["topics"]
+        self.assertIn(
+            {"id": "street_safety", "newsletters": 1, "city_wards": 2}, ward_one_topics
+        )
+
+        reports = outputs["monthly-reports"]["reports"]
+        self.assertEqual([report["month"] for report in reports], ["2026-09"])
+        self.assertEqual(reports[0]["sending_wards"], ["1", "2"])
+        street_safety = next(
+            topic for topic in reports[0]["topics"] if topic["id"] == "street_safety"
+        )
+        self.assertEqual(street_safety["wards"], 2)
+
+    def test_without_a_complete_month_both_summaries_are_empty(self):
+        newsletters = [make_newsletter("a", date(2026, 10, 3), 1, self.filler)]
+        outputs = compute_site_outputs(
+            analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
+        )
+        self.assertEqual(outputs["ward-glance"]["wards"], {})
+        self.assertIsNone(outputs["ward-glance"]["latest_month"])
+        self.assertEqual(outputs["monthly-reports"]["reports"], [])
+
+    def test_a_stale_snapshot_leaves_its_newest_month_out(self):
+        # Refreshed mid-September but computed in October: September is partial.
+        newsletters = [
+            make_newsletter("a", date(2026, 8, 3), 1, self.filler),
+            make_newsletter("b", date(2026, 8, 4), 2, self.filler),
+            make_newsletter("c", date(2026, 9, 14), 1, self.filler),
+            make_newsletter("d", date(2026, 9, 15), 2, self.filler),
+        ]
+        with patch("utils.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
+            outputs = compute_site_outputs(
+                analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
+            )
+        self.assertEqual(outputs["ward-glance"]["latest_month"], "2026-08")
+        self.assertEqual(
+            [report["month"] for report in outputs["monthly-reports"]["reports"]],
+            ["2026-08"],
+        )
 
 
 class TestWriteOutputs(unittest.TestCase):
