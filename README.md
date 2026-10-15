@@ -89,6 +89,11 @@ uv run python -m utils.process_llm_metadata --latest 10
 
 # Reapply privacy sanitization to existing newsletters
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
+
+# Generate data for the local analytics dashboard, then open http://localhost:4321/analytics
+# (fetches only newsletters newer than the local snapshot in backend/data/; --offline skips the database,
+#  --full-refresh rebuilds it from every newsletter: needed once on a fresh checkout; run it when the site is quiet)
+uv run python -m utils.compute_analytics
 ```
 
 #### Notifications

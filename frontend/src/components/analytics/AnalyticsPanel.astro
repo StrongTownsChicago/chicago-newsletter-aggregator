@@ -1,0 +1,26 @@
+---
+// A dashboard card: title, description, a caption the client script fills
+// with the newsletter count behind the figure, the chart slot, and a
+// collapsible table view.
+interface Props {
+  id: string;
+  title: string;
+  description: string;
+  hasTable?: boolean;
+}
+
+const { id, title, description, hasTable = true } = Astro.props;
+---
+
+<section id={id} class="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200" aria-labelledby={`${id}-title`}>
+  <h2 id={`${id}-title`} class="text-xl font-bold text-gray-900 mb-1">{title}</h2>
+  <p class="text-sm text-gray-600 mb-1">{description}</p>
+  <p class="text-xs text-gray-500 mb-4" data-caption></p>
+  <slot />
+  {hasTable && (
+    <details class="mt-4 text-sm">
+      <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Show table</summary>
+      <div class="mt-2 overflow-x-auto max-h-96 overflow-y-auto" data-table></div>
+    </details>
+  )}
+</section>

@@ -72,6 +72,12 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 uv run python -m utils.calculate_token_costs --list-models              # List available models
 uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
 
+# Local analytics dashboard data (writes gitignored JSON for /analytics)
+uv run python -m utils.compute_analytics                  # Fetch only new newsletters into the local snapshot, then compute
+uv run python -m utils.compute_analytics --offline        # Compute from the snapshot; no database access
+uv run python -m utils.compute_analytics --full-refresh   # Rebuild the snapshot from every newsletter (heavy; rarely)
+uv run python -m utils.compute_analytics --min-term-newsletters 30 --output-dir <dir>
+
 # Run all tests
 uv run python -m unittest discover -s tests
 
@@ -175,14 +181,17 @@ backend/
 │       └── process_scraped_newsletters.py  # Orchestrates scraping workflow
 ├── processing/
 │   ├── llm_client.py             # Multi-provider LLM dispatch (Ollama + OpenAI adapters)
-│   └── llm_processor.py          # LLM topic/summary/scoring with Pydantic schemas
+│   └── llm_processor.py          # LLM topic extraction and summarization with Pydantic schemas
 ├── notifications/
 │   ├── rule_matcher.py           # Match newsletters to user notification rules
 │   ├── email_sender.py           # Send digest emails via Resend API
 │   ├── process_notification_queue.py  # Daily digest orchestration
 │   ├── test_matcher.py           # Testing utility for rule matching
 │   └── error_logger.py           # Timestamped error logging
+├── analytics/                    # Pure metric logic for the local analytics dashboard (no I/O)
 ├── utils/
+│   ├── compute_analytics.py      # Refresh snapshot → compute → write analytics JSON for /analytics
+│   ├── analytics_snapshot.py     # Read/write the local analytics snapshot (backend/data/, gitignored)
 │   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
@@ -213,6 +222,7 @@ frontend/src/
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
+│   ├── analytics.astro           # Local-only analytics dashboard (not linked, noindex)
 │   └── api/notifications/        # Notification management API routes
 │       ├── create-rule.ts        # Create notification rule
 │       ├── update-rule.ts        # Update existing rule
@@ -234,7 +244,12 @@ frontend/src/
 │   ├── SiteFooter.astro          # Strong Towns Chicago credit + source link
 │   ├── NewsletterCard.astro      # Reusable card component
 │   └── AuthButton.astro          # Auth UI
+├── scripts/
+│   └── analytics-dashboard.ts    # Client wiring for /analytics (filters → panels)
 └── lib/
+    ├── analytics.ts              # Pure dashboard aggregations (unit tested)
+    ├── analytics-charts.ts       # Observable Plot chart builders
+    ├── analytics-data.ts         # Loads generated analytics JSON (tolerates missing files)
     ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
     ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
@@ -278,6 +293,8 @@ frontend/src/
 
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
+
+**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to the gitignored `frontend/src/data/analytics/`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`.
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
