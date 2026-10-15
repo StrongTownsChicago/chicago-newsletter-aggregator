@@ -227,7 +227,6 @@ describe("date windows", () => {
       endMonth: "2026-03",
       minActiveWards: 9,
       peakActiveWards: 10,
-      minActiveWardsBefore: 0,
       maxActiveWardsBefore: 1,
       months: 2,
     });

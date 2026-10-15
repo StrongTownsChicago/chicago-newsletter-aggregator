@@ -366,8 +366,7 @@ export interface BroadCoverageWindow {
   /** Active wards a month needs to count as broadly covered. */
   minActiveWards: number;
   peakActiveWards: number;
-  /** Fewest and most wards active in any month before the window. */
-  minActiveWardsBefore: number;
+  /** Most wards active in any month before the window. */
   maxActiveWardsBefore: number;
   /** Months in the window. */
   months: number;
@@ -388,14 +387,12 @@ export function findBroadCoverageWindow(
   const minActiveWards = Math.ceil(peakActiveWards * peakFraction);
   const startIndex = activity.findIndex((month) => month.activeWards >= minActiveWards);
   if (startIndex === 0) return null;
-  const activeWardsBefore = activity.slice(0, startIndex).map((month) => month.activeWards);
   return {
     startMonth: activity[startIndex].month,
     endMonth: activity[activity.length - 1].month,
     minActiveWards,
     peakActiveWards,
-    minActiveWardsBefore: Math.min(...activeWardsBefore),
-    maxActiveWardsBefore: Math.max(...activeWardsBefore),
+    maxActiveWardsBefore: Math.max(...activity.slice(0, startIndex).map((month) => month.activeWards)),
     months: activity.length - startIndex,
   };
 }

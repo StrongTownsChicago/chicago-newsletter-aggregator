@@ -294,8 +294,8 @@ const LENS_WARD_COLORS: Record<LensWardCell["status"], { fill: string; stroke?: 
 
 export const LENS_WARD_STATUS_LABELS: Record<LensWardCell["status"], string> = {
   mentioned: "Mentioned it",
-  not_mentioned: "Sent newsletters, did not mention it",
-  no_newsletter: "No newsletter archived that month",
+  not_mentioned: "Didn't mention it",
+  no_newsletter: "No newsletter",
 };
 
 interface MentionGridOptions<T extends Pick<LensWardCell, "month" | "status" | "mentioning" | "newsletters">> {
@@ -467,7 +467,7 @@ export function renderWardCadence(cells: CoverageCell[], months: string[], width
           r: 3,
           fill: CHART_COLORS.surface,
           stroke: CHART_COLORS.mutedInk,
-          title: (cell: CoverageCell) => `${label(cell)}\nTracked, none received`,
+          title: (cell: CoverageCell) => `${label(cell)}\nNone received`,
           tip: true,
         },
       ),
@@ -478,7 +478,7 @@ export function renderWardCadence(cells: CoverageCell[], months: string[], width
     renderKey(
       [
         { label: "Newsletters received", color: CHART_COLORS.series },
-        { label: "Tracked, none received", color: CHART_COLORS.surface, outline: CHART_COLORS.mutedInk },
+        { label: "None received", color: CHART_COLORS.surface, outline: CHART_COLORS.mutedInk },
         { label: "Not tracked yet", color: CHART_COLORS.untracked },
       ],
       "square",
@@ -746,7 +746,7 @@ export function renderCoverageGrid(
         inset: 0.5,
         rx: 2,
         title: (cell: CoverageCell) =>
-          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nTracked, no newsletters received`,
+          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nNone received`,
         tip: true,
       }),
       Plot.cell(cellsByStatus("received"), {
@@ -762,7 +762,7 @@ export function renderCoverageGrid(
       Plot.text(wardsNeverArchived, {
         x: () => months[0],
         y: (ward: string) => ward,
-        text: () => "No newsletters archived",
+        text: () => "No newsletters",
         textAnchor: "start",
         frameAnchor: "left",
         dx: 4,
@@ -773,8 +773,8 @@ export function renderCoverageGrid(
   return wrap(
     renderKey(
       [
-        { label: "Not tracked yet (before the ward's first archived newsletter)", color: CHART_COLORS.untracked },
-        { label: "Tracked, none received", color: CHART_COLORS.surface, outline: CHART_COLORS.baseline },
+        { label: "Not tracked yet", color: CHART_COLORS.untracked },
+        { label: "None received", color: CHART_COLORS.surface, outline: CHART_COLORS.baseline },
       ],
       "square",
     ),

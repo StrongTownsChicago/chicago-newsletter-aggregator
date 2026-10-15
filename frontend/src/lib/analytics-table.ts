@@ -14,6 +14,7 @@ export function renderTable<T>(columns: TableColumn<T>[], rows: T[]): HTMLTableE
   const headerRow = table.createTHead().insertRow();
   for (const column of columns) {
     const cell = document.createElement("th");
+    cell.scope = "col";
     cell.textContent = column.label;
     cell.className = `px-2 py-1 font-semibold text-gray-700 border-b border-gray-200 ${column.numeric ? "text-right" : ""}`;
     headerRow.appendChild(cell);

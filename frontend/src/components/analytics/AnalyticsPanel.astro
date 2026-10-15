@@ -1,9 +1,7 @@
 ---
-// A dashboard card: title, description, a caption the client script fills
-// with the newsletter count behind the figure, the chart slot, and a
-// collapsible table view. Exportable panels get a "Download PNG" button; the
-// client script exports the slot element marked data-export-region (or the
-// data-chart element when there is none).
+// A dashboard card: title, description, a caption the client script fills,
+// the chart slot and a table view. "Download PNG" exports the slot's
+// [data-export-region] (or [data-chart]).
 interface Props {
   id: string;
   title: string;
@@ -22,6 +20,7 @@ const { id, title, description, hasTable = true, exportable = true } = Astro.pro
       <button
         type="button"
         data-export-png={id}
+        aria-label={`Download ${title} as PNG`}
         disabled
         class="px-3 py-1 text-sm bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
       >

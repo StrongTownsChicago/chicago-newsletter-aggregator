@@ -1,8 +1,8 @@
-// PNG export for dashboard charts, with title, window, caption, data date,
-// site and caveat baked in. Each SVG in the region is drawn onto a canvas at
-// its on-page position, plus HTML legend swatches and marked text.
+// PNG export for dashboard charts with title, window, caption, data date, site
+// and caveat. SVGs, legend swatches and marked text are drawn onto a canvas at
+// their on-page positions.
 
-export const EXPORT_CAVEAT = "Archived newsletters only; not every ward is covered. A mention is not an alderman's action.";
+export const EXPORT_CAVEAT = "Newsletters in the archive only; not every ward is covered.";
 
 /** Marks an HTML element whose text is drawn into the export (SVGs are always drawn). */
 export const EXPORT_TEXT_ATTRIBUTE = "data-export-text";
@@ -13,6 +13,9 @@ const EXPORT_PADDING = 24;
 const EXPORT_MIN_WIDTH = 640;
 /** Pixel density of the exported image, so it stays sharp on high-resolution screens. */
 const EXPORT_SCALE = 2;
+/** Canvas limits that hold on every major browser (iOS Safari is the tightest). */
+const MAX_CANVAS_PIXELS = 16_777_216;
+const MAX_CANVAS_SIDE = 16_384;
 const SECTION_GAP = 12;
 const FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const EXPORT_COLORS = { background: "#ffffff", ink: "#111827", mutedInk: "#4b5563" };
@@ -89,6 +92,19 @@ export function wrapText(text: string, maxWidth: number, measure: (text: string)
   return lines;
 }
 
+/**
+ * The export's pixel density: EXPORT_SCALE, lowered for very large charts so
+ * the canvas stays within browser limits instead of failing to encode.
+ */
+export function chooseExportScale(width: number, height: number): number {
+  return Math.min(
+    EXPORT_SCALE,
+    Math.sqrt(MAX_CANVAS_PIXELS / (width * height)),
+    MAX_CANVAS_SIDE / width,
+    MAX_CANVAS_SIDE / height,
+  );
+}
+
 /** "civic-calendar-2026-10-14.png": a readable file name from the chart title. */
 export function buildExportFileName(title: string, date: Date): string {
   const slug =
@@ -119,6 +135,16 @@ type ExportItem =
 
 /** Line height when the computed style says "normal", as a multiple of the font size. */
 const NORMAL_LINE_HEIGHT = 1.2;
+
+/** The canvas font for an element; the computed `font` shorthand is empty in some browsers. */
+function canvasFontOf(style: CSSStyleDeclaration): string {
+  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+}
+
+/** Rounded fully enough to read as a dot (Tailwind's rounded-full computes to a huge radius). */
+function isRound(style: CSSStyleDeclaration, box: Box): boolean {
+  return Number.parseFloat(style.borderRadius) >= Math.min(box.width, box.height) / 2;
+}
 
 function lineHeightOf(style: CSSStyleDeclaration): number {
   const lineHeight = Number.parseFloat(style.lineHeight);
@@ -164,14 +190,14 @@ function collectExportItems(container: HTMLElement): ExportItem[] {
         kind: "swatch",
         color: style.backgroundColor,
         outline: element.getAttribute(EXPORT_SWATCH_ATTRIBUTE) ?? "",
-        round: style.borderRadius === "9999px" || style.borderRadius === "50%",
+        round: isRound(style, box),
         box,
       });
     } else {
       items.push({
         kind: "text",
         text: element.textContent?.trim() ?? "",
-        font: style.font,
+        font: canvasFontOf(style),
         color: style.color,
         lineHeight: lineHeightOf(style),
         box,
@@ -239,9 +265,10 @@ export async function renderChartCanvas(container: HTMLElement, exportContext: C
   const footerTop = chartTop + Math.ceil(contentHeight) + SECTION_GAP;
   const height = footerTop + linesHeight(footer) + EXPORT_PADDING;
 
-  canvas.width = width * EXPORT_SCALE;
-  canvas.height = height * EXPORT_SCALE;
-  context.scale(EXPORT_SCALE, EXPORT_SCALE);
+  const scale = chooseExportScale(width, height);
+  canvas.width = Math.floor(width * scale);
+  canvas.height = Math.floor(height * scale);
+  context.scale(scale, scale);
   context.fillStyle = EXPORT_COLORS.background;
   context.fillRect(0, 0, width, height);
   drawLines(context, header, EXPORT_PADDING);

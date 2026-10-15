@@ -3,6 +3,7 @@ import {
   buildExportFileName,
   buildExportFooter,
   buildExportHeader,
+  chooseExportScale,
   EXPORT_CAVEAT,
   wrapText,
   type ChartExportContext,
@@ -42,9 +43,9 @@ describe("buildExportHeader and buildExportFooter", () => {
     expect(header).toHaveLength(2);
   });
 
-  it("states the caveat about coverage and actions", () => {
-    expect(EXPORT_CAVEAT).toMatch(/Archived newsletters only/);
-    expect(EXPORT_CAVEAT).toMatch(/not an alderman's action/);
+  it("states the coverage caveat once, briefly", () => {
+    expect(EXPORT_CAVEAT).toMatch(/not every ward is covered/);
+    expect(EXPORT_CAVEAT.split(".").filter(Boolean)).toHaveLength(1);
     expect(EXPORT_CAVEAT).not.toMatch(/\balders?\b/i);
   });
 });
@@ -76,5 +77,18 @@ describe("buildExportFileName", () => {
 
   it("keeps long titles short", () => {
     expect(buildExportFileName("word ".repeat(40), date).length).toBeLessThanOrEqual(60 + "-2026-10-14.png".length);
+  });
+});
+
+describe("chooseExportScale", () => {
+  it("doubles ordinary charts", () => {
+    expect(chooseExportScale(1000, 600)).toBe(2);
+  });
+
+  it("scales very large charts down to fit browser canvas limits", () => {
+    const scale = chooseExportScale(3000, 4000);
+    expect(scale).toBeLessThan(2);
+    expect(3000 * scale * 4000 * scale).toBeLessThanOrEqual(16_777_216 + 1);
+    expect(20_000 * chooseExportScale(20_000, 300)).toBeLessThanOrEqual(16_384);
   });
 });

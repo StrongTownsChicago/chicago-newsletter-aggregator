@@ -14,7 +14,6 @@ const window: BroadCoverageWindow = {
   endMonth: "2026-10",
   minActiveWards: 34,
   peakActiveWards: 38,
-  minActiveWardsBefore: 1,
   maxActiveWardsBefore: 13,
   months: 10,
 };
@@ -46,9 +45,11 @@ describe("pluralize", () => {
 describe("describeTopicMatching", () => {
   it("states the minimum mentions and whether repeated text is skipped", () => {
     const cleaned = describeTopicMatching({ text: "cleaned", min_mentions: 2 });
-    expect(cleaned).toContain("at least 2 separate times");
-    expect(cleaned).toContain("skips text a ward repeats");
-    expect(describeTopicMatching({ text: "raw", min_mentions: 1 })).toContain("at least 1 separate time ");
+    expect(cleaned).toContain("2 separate times or more");
+    expect(cleaned).toContain("Text a ward repeats");
+    const raw = describeTopicMatching({ text: "raw", min_mentions: 1 });
+    expect(raw).toContain("1 separate time or more");
+    expect(raw).not.toContain("repeats");
     wordingRules(cleaned);
   });
 });
@@ -85,8 +86,9 @@ describe("describeDefaultWindow", () => {
     const text = describeDefaultWindow(window);
     expect(text).toContain("Jan 2026");
     expect(text).toContain(describeBroadCoverageRule(window));
-    expect(text).toContain("had 1–13 wards a month");
-    expect(describeBroadCoverageRule(window)).toContain(`${BROAD_COVERAGE_PEAK_FRACTION * 100}%`);
+    expect(text).toContain("at most 13 wards a month");
+    expect(text).not.toMatch(/\d–\d/);
+    expect(text).toContain(`${BROAD_COVERAGE_PEAK_FRACTION * 100}% of the busiest month's 38`);
   });
 
   it("says when the default is the whole archive", () => {

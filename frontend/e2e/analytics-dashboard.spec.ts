@@ -95,6 +95,27 @@ test('restores a shared view from the URL and supports back and forward', async 
   await expect(page.locator('select[name="lens"]')).toHaveValue('public_safety');
 });
 
+test('a burst of filter clicks is one history entry', async ({ page }) => {
+  await openDashboard(page);
+  await page.locator('#ward-summary').click();
+  await page.locator('input[name="ward"][value="1"]').check();
+  await page.locator('input[name="ward"][value="3"]').check();
+  await expect(page).toHaveURL(/[?&]wards=1,3(&|$)/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/analytics$/);
+  await expect(page.locator('#ward-summary')).toHaveText('All wards');
+});
+
+test('keeps the date window from ending before it starts', async ({ page }) => {
+  await openDashboard(page, '?from=2026-03&to=2026-04');
+  await page.locator('select[name="to"]').selectOption('2026-02');
+  await expect(page.locator('select[name="from"]')).toHaveValue('2026-02');
+  await expect(page).toHaveURL(/[?&]to=2026-02(&|$)/);
+  await page.locator('select[name="from"]').selectOption('2026-04');
+  await expect(page.locator('select[name="to"]')).toHaveValue('');
+  await expect(page).toHaveURL(/[?&]from=2026-04$/);
+});
+
 test('ignores invalid URL parameters', async ({ page }) => {
   await openDashboard(page, '?topic=nope&ward=99&from=2030-01&to=bad&wards=x');
   await expect(page.locator('select[name="lens"]')).toHaveValue('');
@@ -125,7 +146,7 @@ test('links to the methodology page', async ({ page }) => {
 
 test('downloads a chart as a PNG', async ({ page }) => {
   await openDashboard(page);
-  const button = page.locator('[data-export-png="civic-calendar"]');
+  const button = page.getByRole('button', { name: 'Download Civic calendar as PNG' });
   await expect(button).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
   expect(download.suggestedFilename()).toMatch(/^civic-calendar-\d{4}-\d{2}-\d{2}\.png$/);

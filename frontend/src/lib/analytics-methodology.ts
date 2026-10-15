@@ -1,6 +1,5 @@
-// Plain-language descriptions of how the analytics are computed, built from
-// the generated data and the dashboard's own constants so the dashboard and
-// the methodology page cannot drift from what the numbers actually do.
+// Plain-language descriptions of how the analytics are computed, built from the
+// data and the dashboard's constants so the page and the numbers cannot drift.
 import {
   BROAD_COVERAGE_PEAK_FRACTION,
   formatMonth,
@@ -11,7 +10,7 @@ import {
 } from "./analytics";
 
 export const METHODOLOGY_PATH = "/analytics/methodology";
-/** Where readers can report a missing newsletter or a correction. */
+/** Where readers report a missing newsletter or a correction. */
 export const REPORT_ISSUE_URL = "https://github.com/StrongTownsChicago/chicago-newsletter-aggregator/issues";
 
 const numberFormat = new Intl.NumberFormat("en-US");
@@ -22,24 +21,17 @@ export function pluralize(count: number, noun: string): string {
   return `${numberFormat.format(count)} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-/** "months when at least 34 wards sent newsletters (90% of the 38 in the busiest month)". */
+/** "at least 34 wards sent newsletters". */
 export function describeBroadCoverageRule(window: BroadCoverageWindow): string {
-  return (
-    `months when at least ${window.minActiveWards} wards sent newsletters ` +
-    `(${percentFormat.format(BROAD_COVERAGE_PEAK_FRACTION)} of the ${window.peakActiveWards} in the busiest month)`
-  );
+  return `at least ${window.minActiveWards} wards sent newsletters`;
 }
 
 /** How a newsletter is found to mention a topic, from the rules recorded with the data. */
 export function describeTopicMatching(summary: Pick<LensSummary, "text" | "min_mentions">): string {
   return (
-    `A newsletter mentions a topic when the topic's words and phrases appear at least ${pluralize(summary.min_mentions, "separate time")} ` +
-    "in its subject and text (whole words within one sentence, any capitalization, singular or plural). " +
-    'The same phrase twice counts twice, but phrases that overlap or sit side by side, as in "city council meeting", count once, ' +
-    "so a single passing mention does not count. " +
-    (summary.text === "cleaned"
-      ? "Matching skips text a ward repeats across many of its issues (footers, standing resource lists), so a standing block does not count as news every month."
-      : "Matching reads the full text, including standing blocks a ward repeats in every issue.")
+    `A newsletter mentions a topic when the topic's phrases appear ${pluralize(summary.min_mentions, "separate time")} or more ` +
+    "(whole words, any case, singular or plural; overlapping phrases count once)." +
+    (summary.text === "cleaned" ? " Text a ward repeats in many issues, like footers, is skipped." : "")
   );
 }
 
@@ -56,30 +48,27 @@ export function describeTopicDefinition(lens: LensDefinition, analyzedNewsletter
       `${lens.label}${lens.strong_towns_focus ? " (Strong Towns Chicago focus)" : ""}: ` +
       `${pluralize(lens.newsletters, "newsletter")} (${sharePercentFormat.format(share)})`,
     body:
-      `${lens.description} Phrases (newsletters containing each): ` +
+      `${lens.description} Phrases (newsletters with each): ` +
       lens.phrases.map((item) => `${item.phrase} (${numberFormat.format(item.newsletters)})`).join(", "),
   };
 }
 
-/** The boilerplate rule recorded with the data, or a general description for older data. */
+/** The repeated-text rule recorded with the data, or a general description for older data. */
 export function describeBoilerplateRule(metadata: Pick<AnalyticsMetadata, "boilerplate">): string {
   const rule = metadata.boilerplate;
   if (!rule) return "Text a ward repeats across many of its newsletters is removed before counting.";
   return (
-    `Text that appears in at least ${rule.min_share_percent}% of one ward's newsletters is removed before counting. ` +
+    `Text found in at least ${rule.min_share_percent}% of one ward's newsletters is removed before counting. ` +
     `Wards with fewer than ${rule.min_source_newsletters} newsletters keep all their text.`
   );
 }
 
 export function describeDefaultWindow(window: BroadCoverageWindow | null): string {
   if (!window) return "The dashboard shows the whole archive by default.";
-  const before =
-    window.minActiveWardsBefore === window.maxActiveWardsBefore
-      ? `${window.maxActiveWardsBefore}`
-      : `${window.minActiveWardsBefore}–${window.maxActiveWardsBefore}`;
   return (
-    `The dashboard starts at ${formatMonth(window.startMonth)}, the first of the ${describeBroadCoverageRule(window)}. ` +
-    `Earlier months had ${before} wards a month, so pooled numbers would mostly show wards being added. ` +
-    '"Show full archive" includes them.'
+    `The dashboard starts at ${formatMonth(window.startMonth)}, the first month ${describeBroadCoverageRule(window)} ` +
+    `(${percentFormat.format(BROAD_COVERAGE_PEAK_FRACTION)} of the busiest month's ${window.peakActiveWards}). ` +
+    `Before that, at most ${window.maxActiveWardsBefore} wards a month did, so totals mostly track wards being added. ` +
+    '"Show all dates" includes those months.'
   );
 }

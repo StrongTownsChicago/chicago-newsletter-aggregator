@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCanonicalViewUrl,
+  chooseHistoryMode,
   DASHBOARD_URL_PARAMS,
+  HISTORY_COALESCE_MS,
+  reconcileDateWindow,
   FULL_ARCHIVE_WINDOW,
   MAX_TERM_QUERY_LENGTH,
   parseDashboardUrlState,
@@ -104,5 +108,49 @@ describe("serializeDashboardUrlState", () => {
       expect(parse(query)).toEqual(view);
       expect(serializeDashboardUrlState(parse(query), context)).toBe(query);
     }
+  });
+});
+
+describe("chooseHistoryMode", () => {
+  it("pushes the first change and changes after a pause", () => {
+    expect(chooseHistoryMode(5000, null)).toBe("push");
+    expect(chooseHistoryMode(5000 + HISTORY_COALESCE_MS, 5000)).toBe("push");
+  });
+
+  it("folds a quick burst of changes into one history entry", () => {
+    expect(chooseHistoryMode(5000 + HISTORY_COALESCE_MS - 1, 5000)).toBe("replace");
+  });
+});
+
+describe("reconcileDateWindow", () => {
+  const filters = { wards: [], lens: null, fromMonth: "2026-03", toMonth: "2026-01" };
+
+  it("clears the end when the start moves past it", () => {
+    expect(reconcileDateWindow(filters, "from")).toEqual({ ...filters, toMonth: null });
+  });
+
+  it("moves the start back when the end moves before it", () => {
+    expect(reconcileDateWindow(filters, "to")).toEqual({ ...filters, fromMonth: "2026-01" });
+  });
+
+  it("leaves a valid or open window alone", () => {
+    const valid = { ...filters, fromMonth: "2026-01", toMonth: "2026-03" };
+    expect(reconcileDateWindow(valid, "from")).toBe(valid);
+    const open = { ...filters, fromMonth: null };
+    expect(reconcileDateWindow(open, "to")).toBe(open);
+  });
+
+  it("gives a window the URL parser keeps", () => {
+    const view = { filters: reconcileDateWindow(filters, "to"), profileWard: null, term: "" };
+    expect(parse(serializeDashboardUrlState(view, context))).toEqual(view);
+  });
+});
+
+describe("buildCanonicalViewUrl", () => {
+  it("keeps the view's query on the canonical site, not the current origin", () => {
+    expect(buildCanonicalViewUrl("https://example.org/analytics", "wards=1,2&topic=budget_taxes")).toBe(
+      "https://example.org/analytics?wards=1,2&topic=budget_taxes",
+    );
+    expect(buildCanonicalViewUrl("https://example.org/analytics", "")).toBe("https://example.org/analytics");
   });
 });

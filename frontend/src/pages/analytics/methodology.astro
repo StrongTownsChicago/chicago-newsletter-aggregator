@@ -1,8 +1,7 @@
 ---
 export const prerender = false;
 
-// Static prose; data-dependent parts are filled from the dashboard's JSON so
-// the two cannot disagree. Unlisted like /analytics.
+// Static prose; data-dependent parts come from the dashboard's JSON. Unlisted like /analytics.
 import Layout from '../../layouts/Layout.astro';
 import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../../lib/analytics';
 import { MIN_WARD_MONTHS_FOR_SHARES, MIN_WARD_NEWSLETTERS_FOR_SHARES } from '../../lib/analytics-ward-profile';
@@ -17,7 +16,7 @@ const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
 
 <Layout
   title="Analytics methodology - Chicago Alderman Newsletter Tracker"
-  description="How the newsletter analytics are computed and what they cannot tell you."
+  description="How the newsletter analytics are computed."
   noindex
 >
   <div class="container mx-auto px-4 py-8 max-w-3xl space-y-6">
@@ -30,17 +29,16 @@ const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
     <section class={sectionClass} aria-labelledby="fair-reading">
       <h2 id="fair-reading" class={headingClass}>What the numbers describe</h2>
       <p>
-        Newsletters in this archive, not aldermen. A newsletter is not a record of what an alderman did or voted for,
-        and a ward without newsletters here may still communicate in other ways. Wards are compared with their own
-        history and with all wards, never ranked.
+        Newsletters in this archive, not what aldermen did. Wards are compared with their own history and with all
+        wards, not ranked.
       </p>
     </section>
 
     <section class={sectionClass} aria-labelledby="archive">
       <h2 id="archive" class={headingClass}>What's in the archive</h2>
       <p>
-        Newsletters arrive by email subscription; a few older ones come from public web archives. A ward's coverage
-        starts with the first newsletter we received from it.
+        Newsletters arrive by email subscription; some older ones come from web archives. A ward is tracked from its
+        first newsletter here. A ward with none here may still publish one.
       </p>
       <p id="archive-summary"></p>
       <p id="absent-wards" hidden></p>
@@ -52,7 +50,7 @@ const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
 
     <section class={sectionClass} aria-labelledby="topics">
       <h2 id="topics" class={headingClass}>Topics</h2>
-      <p>Topics are reviewed phrase lists, not AI labels, applied the same way to every month.</p>
+      <p>Each topic is a reviewed phrase list, not an AI label, applied the same way every month.</p>
       <p id="topic-rules"></p>
       <dl id="topic-definitions" class="space-y-3 text-sm"></dl>
     </section>
@@ -63,19 +61,20 @@ const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
     </section>
 
     <section class={sectionClass} aria-labelledby="ward-reach">
-      <h2 id="ward-reach" class={headingClass}>Ward reach</h2>
+      <h2 id="ward-reach" class={headingClass}>Counting wards</h2>
       <p>
         Most charts count wards, not newsletters: "14 of 38 wards" means 14 of the 38 wards that sent newsletters that
-        month mentioned the topic. One prolific ward can't set the trend.
+        month mentioned the topic, so one prolific ward can't set a trend.
       </p>
       <ul class="list-disc pl-6 space-y-1">
-        <li>City-wide months with fewer than {MIN_ACTIVE_WARDS_FOR_REACH} active wards are faded.</li>
+        <li>City-wide months with fewer than {MIN_ACTIVE_WARDS_FOR_REACH} wards sending are faded.</li>
         <li>The term explorer counts newsletters and skips months with fewer than {MIN_MONTH_NEWSLETTERS_FOR_SHARES}.</li>
         <li>
-          Ward profiles compare a ward's share of months mentioning a topic with the average share of active wards in
-          the same months. They need {MIN_WARD_NEWSLETTERS_FOR_SHARES} newsletters across {MIN_WARD_MONTHS_FOR_SHARES} months.
+          A ward profile compares the share of the ward's months that mention a topic with the average share of wards
+          in the same months. It needs {MIN_WARD_NEWSLETTERS_FOR_SHARES} newsletters across {MIN_WARD_MONTHS_FOR_SHARES} months.
         </li>
-        <li>Months without a newsletter show as "not tracked yet" or "none received", not as zero mentions.</li>
+        <li>"Per month" is the median, counting tracked months with no newsletter as zero.</li>
+        <li>Rising terms skip a term that is part of a higher-ranked phrase ("labor" after "labor day").</li>
       </ul>
     </section>
 
@@ -85,12 +84,12 @@ const linkClass = 'text-blue-600 hover:text-blue-700 font-medium';
     </section>
 
     <section class={sectionClass} aria-labelledby="limits">
-      <h2 id="limits" class={headingClass}>What the data can't tell you</h2>
+      <h2 id="limits" class={headingClass}>What the data can't show</h2>
       <ul class="list-disc pl-6 space-y-1">
         <li>How aldermen voted or what they did.</li>
-        <li>Anything about wards before their coverage starts, or wards with no newsletters here.</li>
-        <li>That a ward ignores a topic. Words inside images aren't read.</li>
-        <li>Year-over-year trends: broad coverage spans less than a year.</li>
+        <li>Wards before their coverage starts, or wards with no newsletters here.</li>
+        <li>That a ward ignores a topic.</li>
+        <li>Year-over-year change: broad coverage spans less than a year.</li>
         <li>How many residents read a newsletter.</li>
         <li>Which sense of an ambiguous word was meant ("ice": weather or immigration enforcement).</li>
       </ul>

@@ -1,17 +1,15 @@
 ---
 export const prerender = false;
 
-// Unlisted exploration dashboard. The page itself carries no data: the browser
-// fetches the committed JSON in public/analytics-data/ at runtime (see
-// lib/analytics-data.ts), so nothing is bundled into the server or client code.
-// It stays server-rendered like the rest of the site so the header reflects the
-// signed-in user.
+// Unlisted dashboard. The browser fetches the committed JSON in
+// public/analytics-data/ at runtime (lib/analytics-data.ts); server-rendered so
+// the header reflects the signed-in user.
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
 import { METHODOLOGY_PATH } from '../lib/analytics-methodology';
 
-// Unlisted: keep it out of search indexes (also disallowed in robots.txt).
+// Unlisted: noindex (also disallowed in robots.txt).
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
 
 const controlClass =
@@ -20,14 +18,14 @@ const controlClass =
 
 <Layout
   title="Analytics - Chicago Alderman Newsletter Tracker"
-  description="Local analytics dashboard exploring subjects, vocabulary, and sending patterns across alderman newsletters."
+  description="What aldermen's newsletters cover, how often they're sent, and how wards differ."
   noindex
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <header class="mb-6">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Newsletter Analytics</h1>
       <p class="text-base sm:text-lg text-gray-600">
-        What aldermen talk about, how often, and how it differs across the city.
+        What aldermen's newsletters cover, how often they're sent, and how wards differ.
       </p>
       <p id="analytics-data-as-of" class="text-sm text-gray-500 mt-2" hidden></p>
       <p class="text-sm mt-2">
@@ -42,9 +40,7 @@ const controlClass =
     <div class="bg-white rounded-lg shadow-md p-6 border border-gray-200" id="analytics-no-data" data-testid="analytics-no-data" hidden>
       <h2 class="text-xl font-bold text-gray-900 mb-2">No analytics data yet</h2>
       <p class="text-gray-700 mb-3">
-        This dashboard reads JSON files generated from a local snapshot and committed to
-        <code>frontend/public/analytics-data/</code>. Generate them from the <code>backend/</code> directory,
-        then reload this page (or commit the folder and push to publish them):
+        Generate <code>frontend/public/analytics-data/</code> from <code>backend/</code>, then reload:
       </p>
       <pre class="bg-gray-100 rounded p-3 text-sm overflow-x-auto"><code>uv run python -m utils.compute_analytics</code></pre>
       <p class="text-sm text-gray-500 mt-3">Missing: <span id="analytics-missing-files"></span></p>
@@ -52,7 +48,7 @@ const controlClass =
 
     <div class="bg-white rounded-lg shadow-md p-6 border border-gray-200" id="analytics-load-error" role="alert" hidden>
       <h2 class="text-xl font-bold text-gray-900 mb-2">Could not load analytics data</h2>
-      <p class="text-gray-700 mb-3">The data files exist but could not be loaded. Reload the page to try again.</p>
+      <p class="text-gray-700 mb-3">Reload the page to try again.</p>
       <p class="text-sm text-gray-500" id="analytics-load-error-detail"></p>
     </div>
 
@@ -60,12 +56,12 @@ const controlClass =
       <form id="analytics-filters" class="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200" aria-label="Dashboard filters">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="col-span-2 lg:col-span-1">
-            <span class="block text-sm font-semibold text-gray-700 mb-2">Wards</span>
+            <span class="block text-sm font-semibold text-gray-700 mb-2" id="ward-picker-label">Wards</span>
             <details class="relative" id="ward-picker">
-              <summary class={`${controlClass} cursor-pointer list-none`} id="ward-summary">All wards</summary>
+              <summary class={`${controlClass} cursor-pointer list-none`} id="ward-summary" aria-describedby="ward-picker-label">All wards</summary>
               <div class="absolute z-20 mt-1 w-64 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg p-2">
                 <button type="button" id="clear-wards" class="w-full text-left text-sm text-blue-600 hover:bg-gray-50 rounded px-2 py-1 mb-1">All wards</button>
-                <div id="ward-options" class="grid grid-cols-3 gap-1"></div>
+                <div id="ward-options" class="grid grid-cols-3 gap-1" role="group" aria-labelledby="ward-picker-label"></div>
               </div>
             </details>
           </div>
@@ -96,7 +92,7 @@ const controlClass =
       </form>
 
       <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite">
-        {['Newsletters', 'Wards with newsletters', 'Date span', 'Data as of'].map((label) => (
+        {['Newsletters', 'Wards with newsletters', 'Dates', 'Latest newsletter'].map((label) => (
           <div class="bg-white rounded-lg shadow-md p-4 border border-gray-200">
             <p class="text-sm text-gray-600">{label}</p>
             <p class="text-xl sm:text-2xl font-semibold text-gray-900 mt-1" data-tile-value></p>
@@ -108,7 +104,7 @@ const controlClass =
       <AnalyticsPanel
         id="coverage"
         title="What the archive covers"
-        description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the topic filter."
+        description="Newsletters per ward per month. Every other panel only reflects what's here; a ward with none here may still publish a newsletter."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -116,11 +112,11 @@ const controlClass =
       <AnalyticsPanel
         id="civic-calendar"
         title="Civic calendar"
-        description={`How many wards' newsletters mentioned each topic, month by month, out of the wards that sent newsletters that month. Topics are found with reviewed keyword and phrase lists you can read below. Months with fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} such wards are faded when all wards are shown. Respects the ward and date filters; the topic filter outlines its row.`}
+        description={`Wards mentioning each topic, by month, out of wards that sent newsletters. Faded: fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} wards sent.`}
       >
         <div data-chart class="overflow-x-auto"></div>
         <details class="mt-4 text-sm" id="lens-definitions">
-          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">How topics are matched, and their phrase lists</summary>
+          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
           <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
           <p class="mt-3"><a href={METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-700 font-medium">Methodology</a></p>
         </details>
@@ -129,7 +125,7 @@ const controlClass =
       <AnalyticsPanel
         id="lens-trends"
         title="Ward reach over time"
-        description="Share of active wards whose newsletters mentioned each topic, by month, on a shared vertical scale. Hover for the ward counts behind each point. Choose a topic in the filters to enlarge one."
+        description="Share of wards sending newsletters that mentioned each topic. Choose a topic to enlarge it."
       >
         <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
       </AnalyticsPanel>
@@ -137,7 +133,7 @@ const controlClass =
       <AnalyticsPanel
         id="lens-wards"
         title="Which wards mentioned it"
-        description="For the topic chosen in the filters: each ward's newsletters, month by month. Read gaps against the coverage grid; a ward that sent no newsletter could not be seen mentioning anything."
+        description="Each ward's newsletters by month, for the chosen topic."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -145,7 +141,7 @@ const controlClass =
       <AnalyticsPanel
         id="term-explorer"
         title="Term explorer"
-        description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by topic). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
+        description={`Search a word or two-word phrase. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are blank.`}
       >
         <form id="term-form" class="flex gap-2 mb-2" role="search">
           <label for="term-input" class="sr-only">Term</label>
@@ -164,7 +160,7 @@ const controlClass =
       <AnalyticsPanel
         id="ward-profile"
         title="Ward profile"
-        description="One ward's newsletters in the selected dates, compared with its own history and with all wards. Not a ranking."
+        description="One ward's newsletters against its own history and all wards."
       >
         <label class="block mb-3 max-w-xs">
           <span class="block text-sm font-semibold text-gray-700 mb-2">Ward</span>
@@ -194,14 +190,13 @@ const controlClass =
               <div id="profile-topics" class="overflow-x-auto"></div>
             </div>
             <div>
-              <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Topics compared with all wards</h4>
-              <p id="profile-comparison-note" class="text-xs text-gray-500 mb-2" data-export-text></p>
+              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics compared with all wards</h4>
               <div id="profile-comparison" class="overflow-x-auto"></div>
             </div>
             <div>
               <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Distinctive vocabulary</h4>
               <p class="text-xs text-gray-500 mb-2" data-export-text>
-                Words and phrases a ward uses far more than the rest of the city (computed over all dates; the alderman's own name and footer boilerplate are excluded). Click a bar to search.
+                Words this ward uses far more than the rest of the city, all dates. Click a bar to search.
               </p>
               <div id="profile-distinctive" class="overflow-x-auto"></div>
             </div>
@@ -212,7 +207,7 @@ const controlClass =
       <AnalyticsPanel
         id="rising-terms"
         title="Rising terms"
-        description="Words and phrases mentioned by many more wards in the latest complete month than in a typical month of the three before it (the median). Counting wards, not newsletters, keeps one prolific sender from making a trend. With less than a year of data, seasonal events (holidays, festivals) cannot be told apart from new issues. Computed city-wide."
+        description="Terms far more wards used in the latest full month than in a typical recent month. All wards and dates. With under a year of data, seasonal events look like trends."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -220,7 +215,7 @@ const controlClass =
       <AnalyticsPanel
         id="sending-cadence"
         title="Sending cadence"
-        description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
+        description="Longest gaps between newsletters from the same alderman. A gap may be missed newsletters, not a pause."
         hasTable={false}
         exportable={false}
       >

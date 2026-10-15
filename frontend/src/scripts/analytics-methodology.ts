@@ -35,13 +35,9 @@ function renderCoverage(sources: SourceCoverage[]): void {
   const coverage = summarizeWardCoverage(sources, listSourceWards(sources));
   const absent = coverage.filter((ward) => ward.newsletters === 0).map((ward) => ward.ward);
   const archived = coverage.length - absent.length;
-  setText("archive-summary", `${archived} of ${pluralize(coverage.length, "ward")} have newsletters here.`);
+  setText("archive-summary", `${archived} of ${pluralize(coverage.length, "ward")} have newsletters here; city-wide figures cover only these.`);
   if (absent.length) {
-    // Stated once: "city-wide" means the wards we receive, and the gaps are not random.
-    const absentWards = setText(
-      "absent-wards",
-      `No newsletters in the archive: ${absent.join(", ")}. City-wide figures cover only the wards we receive.`,
-    );
+    const absentWards = setText("absent-wards", `No newsletters in the archive: ${absent.join(", ")}.`);
     absentWards?.removeAttribute("hidden");
   }
   document.getElementById("coverage-table")?.replaceChildren(
@@ -49,7 +45,7 @@ function renderCoverage(sources: SourceCoverage[]): void {
       [
         { label: "Ward", value: (row) => row.ward },
         { label: "Aldermen", value: (row) => row.aldermen.join(", ") },
-        { label: "First newsletter", value: (row) => row.firstDate ?? "None archived" },
+        { label: "First newsletter", value: (row) => row.firstDate ?? "None" },
         { label: "Latest newsletter", value: (row) => row.lastDate ?? "" },
         { label: "Newsletters", value: (row) => row.newsletters, numeric: true },
       ],
@@ -61,7 +57,7 @@ function renderCoverage(sources: SourceCoverage[]): void {
 function renderTopics(summary: LensSummary): void {
   setText(
     "topic-rules",
-    `${describeTopicMatching(summary)} Counts are out of ${summary.readable_newsletters.toLocaleString("en-US")} newsletters.`,
+    `${describeTopicMatching(summary)} Counts are of ${pluralize(summary.readable_newsletters, "newsletter")}.`,
   );
   const list = document.getElementById("topic-definitions");
   list?.replaceChildren(

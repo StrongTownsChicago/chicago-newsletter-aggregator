@@ -1,9 +1,8 @@
-// The /analytics view state as a URL query string, so a view can be shared and
-// restored. Parsing never throws: unknown or invalid values fall back to the
-// defaults, the same way the search page treats its parameters.
+// The /analytics view as a query string, for sharing and back/forward.
+// Parsing never throws: invalid values fall back to the defaults.
 import { compareWards, normalizeTermQuery, type AnalyticsFilters } from "./analytics";
 
-/** Query parameter names. Visible to readers, so they say "topic", not the internal "lens". */
+/** Query parameter names; readers see "topic", never the internal "lens". */
 export const DASHBOARD_URL_PARAMS = {
   wards: "wards",
   topic: "topic",
@@ -106,4 +105,29 @@ export function serializeDashboardUrlState(state: DashboardViewState, context: D
   if (term) params.set(DASHBOARD_URL_PARAMS.term, term);
   // Commas are valid in a query string; leaving them unescaped keeps shared links readable ("wards=1,2").
   return params.toString().replaceAll(ENCODED_WARD_LIST_SEPARATOR, WARD_LIST_SEPARATOR);
+}
+
+/** Changes closer together than this share one history entry, so Back skips a burst of clicks. */
+export const HISTORY_COALESCE_MS = 1000;
+
+/** Push a new history entry, or replace the current one when the last push was moments ago. */
+export function chooseHistoryMode(nowMs: number, lastPushMs: number | null): "push" | "replace" {
+  return lastPushMs !== null && nowMs - lastPushMs < HISTORY_COALESCE_MS ? "replace" : "push";
+}
+
+/**
+ * Keep a window from ending before it starts: moving "from" past "to" clears
+ * "to" (latest), and moving "to" before "from" moves "from" to the same month.
+ */
+export function reconcileDateWindow(filters: AnalyticsFilters, changed: "from" | "to"): AnalyticsFilters {
+  const { fromMonth, toMonth } = filters;
+  if (fromMonth === null || toMonth === null || fromMonth <= toMonth) return filters;
+  return changed === "from" ? { ...filters, toMonth: null } : { ...filters, fromMonth: toMonth };
+}
+
+/** The production link to a view: the page's canonical URL with the view's query string. */
+export function buildCanonicalViewUrl(canonicalUrl: string, query: string): string {
+  const url = new URL(canonicalUrl);
+  url.search = query;
+  return url.href;
 }
