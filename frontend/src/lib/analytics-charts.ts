@@ -1,10 +1,12 @@
 // Observable Plot chart builders for the /analytics dashboard (browser only).
 // Colors follow the dataviz reference palette: one blue hue for magnitude,
-// blue <-> red with a gray midpoint for above/below the city average.
+// gray for context (months before a ward was tracked).
 import * as Plot from "@observablehq/plot";
 import {
   buildSearchUrl,
+  formatMonth,
   monthDateRange,
+  type CoverageCell,
   type DistinctiveTerm,
   type RisingTerm,
   type SearchLinkParams,
@@ -12,11 +14,7 @@ import {
   type TermMonthPoint,
   type TermWardRow,
   type TopicMonthPoint,
-  type WardMonthCount,
-  type WardRelevance,
-  type WardTopicCell,
 } from "./analytics";
-import { humanizeIdentifier } from "./format";
 
 export const CHART_COLORS = {
   series: "#2a78d6",
@@ -24,10 +22,7 @@ export const CHART_COLORS = {
   seriesDark: "#1c5cab",
   sequentialLow: "#cde2fb",
   sequentialHigh: "#104281",
-  divergingLow: "#e34948",
-  divergingMid: "#f0efec",
-  divergingHigh: "#2a78d6",
-  ink: "#0b0b0b",
+  untracked: "#ebeae6",
   mutedInk: "#52514e",
   baseline: "#c3c2b7",
   surface: "#ffffff",
@@ -41,12 +36,10 @@ const TOP_AXIS_MARGIN = 30;
 const LEGEND_MARGIN = 16;
 /** Bars fill at most this fraction of their band; the rest is air. */
 const MAX_BAR_THICKNESS = 0.7;
-const HEATMAP_CELL_WIDTH = 22;
-const HEATMAP_ROW_HEIGHT = 28;
-const HEATMAP_LABEL_MARGIN = 280;
-/** Heatmap colors clamp at log2 ratio +/-2: four times or a quarter of the city rate. */
-const LOG_RATIO_LABELS: Record<number, string> = { [-2]: "¼×", [-1]: "½×", 0: "same", 1: "2×", 2: "4×" };
-const MAX_LOG_RATIO = 2;
+/** Coverage grid columns never get narrower than this; wider grids scroll. */
+const MIN_COVERAGE_CELL_WIDTH = 12;
+/** With at most this many months the coverage grid labels every month, otherwise only years. */
+const MAX_LABELED_MONTHS = 18;
 
 export const formatPercent = (value: number): string => `${(value * 100).toFixed(1)}%`;
 export const formatWard = (ward: string): string => `Ward ${ward}`;
@@ -57,6 +50,15 @@ const MAX_DISPLAYED_LIFT = 100;
 export const formatLift = (lift: number): string =>
   lift > MAX_DISPLAYED_LIFT ? `>${MAX_DISPLAYED_LIFT}×` : `${lift.toFixed(1)}×`;
 const yearTickFormat = (month: string): string => (month.endsWith("-01") ? month.slice(0, 4) : "");
+
+/** Short month names, with the year under the first month and every January. */
+function monthTickFormat(months: string[]): (month: string) => string {
+  if (months.length > MAX_LABELED_MONTHS) return yearTickFormat;
+  return (month) => {
+    const [name, year] = formatMonth(month).split(" ");
+    return month === months[0] || month.endsWith("-01") ? `${name}\n${year}` : name;
+  };
+}
 
 export function sourceLabel(source: Pick<SourceCoverage, "name" | "ward">): string {
   return source.ward ? `${source.name} (Ward ${source.ward})` : source.name;
@@ -80,16 +82,24 @@ function withColorLegend(plot: ReturnType<typeof Plot.plot>): HTMLElement {
   return wrapper;
 }
 
-/** A legend row of colored dots for charts whose series are encoded by color. */
-function renderDotKey(items: { label: string; color: string }[]): HTMLElement {
+interface KeyItem {
+  label: string;
+  color: string;
+  /** Outline color, for swatches that would otherwise vanish on white. */
+  outline?: string;
+}
+
+/** A legend row of colored swatches (dots or squares) for categories encoded by color. */
+function renderKey(items: KeyItem[], shape: "dot" | "square" = "dot"): HTMLElement {
   const key = document.createElement("div");
   key.className = "flex flex-wrap gap-4 text-xs text-gray-600 mb-2";
   for (const item of items) {
     const entry = document.createElement("span");
     entry.className = "inline-flex items-center gap-1.5";
     const swatch = document.createElement("span");
-    swatch.className = "inline-block w-2.5 h-2.5 rounded-full";
+    swatch.className = `inline-block w-2.5 h-2.5 ${shape === "dot" ? "rounded-full" : "rounded-sm"}`;
     swatch.style.backgroundColor = item.color;
+    if (item.outline) swatch.style.boxShadow = `inset 0 0 0 1px ${item.outline}`;
     entry.append(swatch, item.label);
     key.append(entry);
   }
@@ -197,57 +207,6 @@ export function renderTermWards(
   });
 }
 
-export function renderWardTopicHeatmap(
-  cells: WardTopicCell[],
-  selectedTopic: string | null,
-  searchScope: SearchLinkParams,
-  width: number,
-): Element {
-  const wards = [...new Set(cells.map((cell) => cell.ward))];
-  const topics = [...new Set(cells.map((cell) => cell.topic))];
-  const plot = Plot.plot({
-    ...baseOptions(Math.max(width, wards.length * HEATMAP_CELL_WIDTH + HEATMAP_LABEL_MARGIN + 10)),
-    height: topics.length * HEATMAP_ROW_HEIGHT + 70,
-    marginLeft: HEATMAP_LABEL_MARGIN,
-    marginBottom: 40,
-    padding: 0.08,
-    x: { label: "Ward", domain: wards },
-    y: { label: null, domain: topics, tickFormat: humanizeIdentifier },
-    color: {
-      type: "linear",
-      domain: [-MAX_LOG_RATIO, 0, MAX_LOG_RATIO],
-      range: [CHART_COLORS.divergingLow, CHART_COLORS.divergingMid, CHART_COLORS.divergingHigh],
-      clamp: true,
-      label: "Topic share vs city average",
-      ticks: Object.keys(LOG_RATIO_LABELS).map(Number),
-      tickFormat: (value: number) => LOG_RATIO_LABELS[value] ?? "",
-    },
-    marks: [
-      Plot.cell(cells, {
-        x: "ward",
-        y: "topic",
-        fill: "logRatio",
-        rx: 2,
-        href: (cell: WardTopicCell) => buildSearchUrl({ ...searchScope, ward: cell.ward, topic: cell.topic }),
-        title: (cell: WardTopicCell) =>
-          `${formatWard(cell.ward)} · ${humanizeIdentifier(cell.topic)}\n` +
-          `${cell.wardTopicNewsletters} of ${cell.wardNewsletters} newsletters (${formatPercent(cell.wardShare)})\n` +
-          `City: ${formatPercent(cell.cityShare)}\nClick to search`,
-        tip: true,
-      }),
-      ...(selectedTopic
-        ? [
-            Plot.cell(
-              cells.filter((cell) => cell.topic === selectedTopic),
-              { x: "ward", y: "topic", stroke: CHART_COLORS.ink, strokeWidth: 1.5, fill: "none" },
-            ),
-          ]
-        : []),
-    ],
-  });
-  return withColorLegend(plot);
-}
-
 export function renderDistinctiveTerms(terms: DistinctiveTerm[], ward: string, width: number): Element {
   return Plot.plot({
     ...baseOptions(width),
@@ -323,7 +282,7 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
     ],
   });
   return wrap(
-    renderDotKey([
+    renderKey([
       { label: baselineLabel, color: CHART_COLORS.seriesLight },
       { label: latestLabel, color: CHART_COLORS.seriesDark },
     ]),
@@ -331,113 +290,85 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
   );
 }
 
-export function renderCadenceHeatmap(
-  counts: WardMonthCount[],
+export function renderCoverageGrid(
+  cells: CoverageCell[],
+  wards: string[],
   months: string[],
   searchScope: SearchLinkParams,
   width: number,
 ): Element {
-  const wards = [...new Set(counts.map((count) => count.ward))];
+  const marginLeft = 70;
+  const marginRight = 10;
+  const cellsByStatus = (status: CoverageCell["status"]) => cells.filter((cell) => cell.status === status);
+  const wardsWithoutNewsletters = wards.filter((ward) =>
+    cells.every((cell) => cell.ward !== ward || cell.status === "untracked"),
+  );
   const plot = Plot.plot({
-    ...baseOptions(width),
+    ...baseOptions(Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight)),
     height: wards.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
-    marginLeft: 70,
-    padding: 0.06,
-    x: { type: "band", domain: months, label: null, tickFormat: yearTickFormat, axis: "both" },
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    padding: 0.08,
+    x: { type: "band", domain: months, label: null, tickFormat: monthTickFormat(months), axis: "both" },
     y: { label: null, domain: wards, tickFormat: formatWard },
     color: {
       type: "linear",
       range: [CHART_COLORS.sequentialLow, CHART_COLORS.sequentialHigh],
-      label: "Newsletters per month",
+      label: "Newsletters received that month",
     },
     marks: [
-      Plot.cell(counts, {
+      Plot.cell(cellsByStatus("untracked"), {
+        x: "month",
+        y: "ward",
+        fill: CHART_COLORS.untracked,
+        rx: 2,
+        title: (cell: CoverageCell) => `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nNot tracked yet`,
+        tip: true,
+      }),
+      Plot.cell(cellsByStatus("silent"), {
+        x: "month",
+        y: "ward",
+        fill: CHART_COLORS.surface,
+        stroke: CHART_COLORS.baseline,
+        inset: 0.5,
+        rx: 2,
+        title: (cell: CoverageCell) =>
+          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nTracked, no newsletters received`,
+        tip: true,
+      }),
+      Plot.cell(cellsByStatus("received"), {
         x: "month",
         y: "ward",
         fill: "newsletters",
         rx: 2,
-        href: (count: WardMonthCount) => buildSearchUrl({ ...searchScope, ...monthDateRange(count.month), ward: count.ward }),
-        title: (count: WardMonthCount) => `${formatWard(count.ward)} · ${count.month}\n${count.newsletters} newsletters`,
+        href: (cell: CoverageCell) => buildSearchUrl({ ...searchScope, ...monthDateRange(cell.month), ward: cell.ward }),
+        title: (cell: CoverageCell) =>
+          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"}\nClick to search`,
         tip: true,
       }),
-    ],
-  });
-  return withColorLegend(plot);
-}
-
-export function renderRelevanceByWard(rows: WardRelevance[], searchScope: SearchLinkParams, width: number): Element {
-  return Plot.plot({
-    ...baseOptions(width),
-    height: rows.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
-    marginTop: TOP_AXIS_MARGIN,
-    marginLeft: 70,
-    marginRight: 70,
-    x: { label: "Average relevance score (0-10)", domain: [0, 10], grid: true, axis: "both" },
-    y: { label: null, domain: rows.map((row) => row.ward), tickFormat: formatWard, padding: 1 - MAX_BAR_THICKNESS },
-    marks: [
-      Plot.barX(rows, {
-        x: "averageRelevance",
-        y: "ward",
-        fill: CHART_COLORS.series,
-        rx: 4,
-        href: (row: WardRelevance) => buildSearchUrl({ ...searchScope, ward: row.ward }),
-        title: (row: WardRelevance) =>
-          `${formatWard(row.ward)}: ${row.averageRelevance.toFixed(2)} average over ${row.scoredNewsletters} scored newsletters\nClick to search`,
-        tip: true,
-      }),
-      Plot.text(rows, {
-        x: "averageRelevance",
-        y: "ward",
-        text: (row: WardRelevance) => `${row.averageRelevance.toFixed(1)} (n=${row.scoredNewsletters})`,
+      Plot.text(wardsWithoutNewsletters, {
+        x: () => months[0],
+        y: (ward: string) => ward,
+        text: () => "No newsletters archived",
         textAnchor: "start",
-        dx: 6,
-        fill: CHART_COLORS.mutedInk,
-      }),
-      Plot.ruleX([0], { stroke: CHART_COLORS.baseline }),
-    ],
-  });
-}
-
-export function renderCoverage(sources: SourceCoverage[], width: number): Element {
-  // Noon avoids time-zone shifts moving a date to the neighboring day.
-  const rows = sources.map((source) => ({
-    ...source,
-    label: sourceLabel(source),
-    first: new Date(`${source.first_date}T12:00:00`),
-    last: new Date(`${source.last_date}T12:00:00`),
-  }));
-  type Row = (typeof rows)[number];
-  return Plot.plot({
-    ...baseOptions(width),
-    height: rows.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
-    marginTop: TOP_AXIS_MARGIN,
-    marginLeft: 230,
-    marginRight: 50,
-    x: { type: "utc", label: null, grid: true, axis: "both" },
-    y: { label: null, domain: rows.map((row) => row.label) },
-    marks: [
-      Plot.ruleY(rows, { y: "label", x1: "first", x2: "last", stroke: CHART_COLORS.series, strokeWidth: 2 }),
-      Plot.dot(rows, {
-        x: "first",
-        y: "label",
-        r: 4,
-        fill: CHART_COLORS.series,
-        stroke: CHART_COLORS.surface,
-        strokeWidth: 2,
-        title: (row: Row) => `${row.label}\n${row.newsletters} newsletters, ${row.first_date} to ${row.last_date}`,
-        tip: true,
-      }),
-      Plot.text(rows, {
-        x: "last",
-        y: "label",
-        text: (row: Row) => String(row.newsletters),
-        textAnchor: "start",
-        dx: 6,
+        frameAnchor: "left",
+        dx: 4,
         fill: CHART_COLORS.mutedInk,
       }),
     ],
   });
+  return wrap(
+    renderKey(
+      [
+        { label: "Not tracked yet (before the ward's first archived newsletter)", color: CHART_COLORS.untracked },
+        { label: "Tracked, none received", color: CHART_COLORS.surface, outline: CHART_COLORS.baseline },
+      ],
+      "square",
+    ),
+    withColorLegend(plot),
+  );
 }
 
 // ---------------------------------------------------------------------------

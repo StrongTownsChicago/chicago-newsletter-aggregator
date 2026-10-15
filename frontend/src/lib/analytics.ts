@@ -8,7 +8,6 @@ export interface NewsletterFact {
   ward: string | null;
   alder: string | null;
   topics: string[] | null; // null = not yet processed by the LLM
-  relevance: number | null;
   words: number;
 }
 
@@ -82,7 +81,6 @@ export interface AnalyticsFilters {
   topic: string | null;
   fromMonth: string | null; // YYYY-MM inclusive
   toMonth: string | null; // YYYY-MM inclusive
-  minRelevance: number; // 0 = no relevance filter
 }
 
 export const EMPTY_FILTERS: AnalyticsFilters = {
@@ -90,11 +88,7 @@ export const EMPTY_FILTERS: AnalyticsFilters = {
   topic: null,
   fromMonth: null,
   toMonth: null,
-  minRelevance: 0,
 };
-
-/** Wards with fewer processed newsletters than this are left out of share comparisons. */
-export const MIN_WARD_NEWSLETTERS_FOR_SHARES = 5;
 
 /** Months with fewer newsletters than this get no share (a gap in trend lines). */
 export const MIN_MONTH_NEWSLETTERS_FOR_SHARES = 10;
@@ -125,6 +119,14 @@ export function listMonths(start: string, end: string): string[] {
     }
   }
   return months;
+}
+
+const monthNameFormat = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+
+/** "Feb 2026" for a YYYY-MM month. */
+export function formatMonth(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return `${monthNameFormat.format(new Date(Date.UTC(year, monthNumber - 1, 1)))} ${year}`;
 }
 
 export function daysBetween(start: string, end: string): number {
@@ -179,34 +181,159 @@ export function filterFacts(
     (fact) =>
       isInSelectedWards(fact.ward, filters) &&
       isWithinMonths(monthOf(fact.date), filters) &&
-      (filters.minRelevance <= 0 ||
-        (fact.relevance !== null && fact.relevance >= filters.minRelevance)) &&
       (options.ignoreTopic || !filters.topic || (fact.topics ?? []).includes(filters.topic)),
   );
 }
 
 export interface FactSummary {
   newsletters: number;
-  activeSources: number;
   firstDate: string | null;
   lastDate: string | null;
-  averageRelevance: number | null;
-  scoredNewsletters: number;
 }
 
 export function summarizeFacts(facts: NewsletterFact[]): FactSummary {
   const dates = facts.map((fact) => fact.date).sort();
-  const scores = facts.flatMap((fact) => (fact.relevance === null ? [] : [fact.relevance]));
   return {
     newsletters: facts.length,
-    activeSources: new Set(facts.map((fact) => fact.source_id)).size,
     firstDate: dates[0] ?? null,
     lastDate: dates.at(-1) ?? null,
-    averageRelevance: scores.length
-      ? scores.reduce((total, score) => total + score, 0) / scores.length
-      : null,
-    scoredNewsletters: scores.length,
   };
+}
+
+/** Every ward with a source in the database, including wards with no newsletters yet. */
+export function listSourceWards(sources: SourceCoverage[]): string[] {
+  return [...new Set(sources.flatMap((source) => (source.ward ? [source.ward] : [])))].sort(compareWards);
+}
+
+/** The wards a view covers: the selected wards, or every ward when none are selected. */
+export function wardsInScope(allWards: string[], filters: AnalyticsFilters): string[] {
+  return filters.wards.length === 0 ? allWards : allWards.filter((ward) => filters.wards.includes(ward));
+}
+
+/**
+ * The YYYY-MM months a filter window spans, defaulting open ends to the
+ * first and last month with data.
+ */
+export function listWindowMonths(filters: AnalyticsFilters, dataMonths: string[]): string[] {
+  const start = filters.fromMonth ?? dataMonths[0];
+  const end = filters.toMonth ?? dataMonths.at(-1);
+  return start && end ? listMonths(start, end) : [];
+}
+
+export interface WardCountSummary {
+  /** Wards the view covers (the denominator). */
+  scopeWards: number;
+  /** Of those, wards with at least one newsletter in `windowFacts`. */
+  wardsWithNewsletters: number;
+  /** Of those, wards with no newsletter anywhere in the archive. */
+  wardsNeverArchived: string[];
+}
+
+/**
+ * How many of the wards in scope sent newsletters in the window, and which
+ * have never had one archived. `archiveFacts` must not be date-filtered.
+ */
+export function summarizeWardCounts(
+  scopeWards: string[],
+  windowFacts: NewsletterFact[],
+  archiveFacts: NewsletterFact[],
+): WardCountSummary {
+  const windowWards = new Set(listWards(windowFacts));
+  const archivedWards = new Set(listWards(archiveFacts));
+  return {
+    scopeWards: scopeWards.length,
+    wardsWithNewsletters: scopeWards.filter((ward) => windowWards.has(ward)).length,
+    wardsNeverArchived: scopeWards.filter((ward) => !archivedWards.has(ward)),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Broad-coverage date window
+
+/**
+ * The default date window starts in the first month in which at least this
+ * fraction of the peak number of active wards sent newsletters. Before that
+ * only a handful of wards were tracked, so pooled metrics would mix "more
+ * wards were added" with real change.
+ */
+export const BROAD_COVERAGE_PEAK_FRACTION = 0.9;
+
+export interface MonthWardActivity {
+  month: string;
+  activeWards: number;
+}
+
+/** Distinct wards that sent at least one newsletter, for every month in the span. */
+export function countActiveWardsByMonth(facts: NewsletterFact[]): MonthWardActivity[] {
+  const wardsByMonth = new Map<string, Set<string>>();
+  for (const fact of facts) {
+    if (fact.ward === null) continue;
+    const month = monthOf(fact.date);
+    const wards = wardsByMonth.get(month) ?? new Set<string>();
+    wards.add(fact.ward);
+    wardsByMonth.set(month, wards);
+  }
+  const months = [...wardsByMonth.keys()].sort();
+  if (months.length === 0) return [];
+  return listMonths(months[0], months[months.length - 1]).map((month) => ({
+    month,
+    activeWards: wardsByMonth.get(month)?.size ?? 0,
+  }));
+}
+
+export interface BroadCoverageWindow {
+  /** First month (YYYY-MM) with broad coverage; the window runs to the latest month. */
+  startMonth: string;
+  endMonth: string;
+  /** Active wards a month needs to count as broadly covered. */
+  minActiveWards: number;
+  peakActiveWards: number;
+  /** Most wards active in any month before the window (0 when it starts at the first month). */
+  maxActiveWardsBefore: number;
+  /** Months in the window. */
+  months: number;
+}
+
+/** The span from the first broadly covered month to the latest month, or null without data. */
+export function findBroadCoverageWindow(
+  facts: NewsletterFact[],
+  peakFraction: number = BROAD_COVERAGE_PEAK_FRACTION,
+): BroadCoverageWindow | null {
+  const activity = countActiveWardsByMonth(facts);
+  if (activity.length === 0) return null;
+  const peakActiveWards = Math.max(...activity.map((month) => month.activeWards));
+  const minActiveWards = Math.ceil(peakActiveWards * peakFraction);
+  const startIndex = activity.findIndex((month) => month.activeWards >= minActiveWards);
+  return {
+    startMonth: activity[startIndex].month,
+    endMonth: activity[activity.length - 1].month,
+    minActiveWards,
+    peakActiveWards,
+    maxActiveWardsBefore: Math.max(0, ...activity.slice(0, startIndex).map((month) => month.activeWards)),
+    months: activity.length - startIndex,
+  };
+}
+
+/** How many of the listed months had at least `minActiveWards` wards sending. */
+export function countBroadlyCoveredMonths(
+  months: string[],
+  activity: MonthWardActivity[],
+  minActiveWards: number,
+): number {
+  const activeWardsByMonth = new Map(activity.map((month) => [month.month, month.activeWards]));
+  return months.filter((month) => (activeWardsByMonth.get(month) ?? 0) >= minActiveWards).length;
+}
+
+export type DateWindowKind = "broad" | "full" | "custom";
+
+/** Whether the date filters match the broad-coverage window, the full archive, or neither. */
+export function classifyDateWindow(
+  filters: AnalyticsFilters,
+  window: BroadCoverageWindow | null,
+): DateWindowKind {
+  if (!filters.fromMonth && !filters.toMonth) return "full";
+  if (window && filters.fromMonth === window.startMonth && !filters.toMonth) return "broad";
+  return "custom";
 }
 
 /**
@@ -280,8 +407,7 @@ export interface TermMonthPoint {
 /**
  * Newsletters mentioning a term per month, as a share of all newsletters that
  * month (null for sparse months). `scopeFacts` must be filtered by ward and
- * date only, matching the term index (which cannot be filtered by topic or
- * relevance).
+ * date only, matching the term index (which cannot be filtered by topic).
  */
 export function termMentionsByMonth(
   bucketCounts: TermBucketCount[],
@@ -349,67 +475,6 @@ function processedFacts(facts: NewsletterFact[]): NewsletterFact[] {
   return facts.filter((fact) => fact.topics !== null);
 }
 
-export interface WardTopicCell {
-  ward: string;
-  topic: string;
-  wardTopicNewsletters: number;
-  wardNewsletters: number;
-  wardShare: number;
-  cityShare: number;
-  /** log2(ward share / city share): +1 = twice the city rate, -1 = half. */
-  logRatio: number;
-}
-
-/**
- * Each ward's share of newsletters mentioning each topic, relative to the
- * city-wide share. `wardFacts` supplies the ward rows (e.g. the selected
- * wards); `cityFacts` supplies the baseline, normally the same filters minus
- * the ward filter so "city average" always means the whole city. Only
- * LLM-processed newsletters count, and wards below minWardNewsletters are
- * omitted as too noisy. Shares are smoothed by half a newsletter so zero
- * counts stay finite.
- */
-export function computeWardTopicCells(
-  wardFacts: NewsletterFact[],
-  cityFacts: NewsletterFact[],
-  topics: string[],
-  minWardNewsletters: number = MIN_WARD_NEWSLETTERS_FOR_SHARES,
-): WardTopicCell[] {
-  const cityProcessed = processedFacts(cityFacts);
-  const cityTotal = cityProcessed.length;
-  if (cityTotal === 0) return [];
-  const cityTopicCounts = countTopics(cityProcessed);
-  const factsByWard = groupBy(
-    processedFacts(wardFacts).filter((fact) => fact.ward !== null),
-    (fact) => fact.ward as string,
-  );
-  const smoothing = 0.5;
-
-  return [...factsByWard.entries()]
-    .filter(([, factsInWard]) => factsInWard.length >= minWardNewsletters)
-    .sort(([a], [b]) => compareWards(a, b))
-    .flatMap(([ward, factsInWard]) => {
-      const wardTopicCounts = countTopics(factsInWard);
-      return topics.map((topic) => {
-        const wardTopicNewsletters = wardTopicCounts.get(topic) ?? 0;
-        const cityTopicNewsletters = cityTopicCounts.get(topic) ?? 0;
-        const smoothedWardShare =
-          (wardTopicNewsletters + smoothing) / (factsInWard.length + 2 * smoothing);
-        const smoothedCityShare =
-          (cityTopicNewsletters + smoothing) / (cityTotal + 2 * smoothing);
-        return {
-          ward,
-          topic,
-          wardTopicNewsletters,
-          wardNewsletters: factsInWard.length,
-          wardShare: wardTopicNewsletters / factsInWard.length,
-          cityShare: cityTopicNewsletters / cityTotal,
-          logRatio: Math.log2(smoothedWardShare / smoothedCityShare),
-        };
-      });
-    });
-}
-
 export interface TopicMonthPoint {
   month: string;
   topic: string;
@@ -419,8 +484,31 @@ export interface TopicMonthPoint {
 }
 
 /**
+ * First complete month labeled with `street_safety_or_traffic_calming`, which
+ * joined the LLM topic list on 2026-01-31 (commit c574312) without a backfill.
+ */
+export const STREET_SAFETY_LABELING_START_MONTH = "2026-02";
+
+/**
+ * Topics added to the LLM taxonomy after labeling began, mapped to the first
+ * complete month labeled with them. Earlier newsletters were never re-labeled,
+ * so their months would show a false 0%. Add an entry (with its own named
+ * constant) whenever a topic joins backend/processing/llm_processor.py:TOPICS
+ * without a backfill.
+ */
+export const TOPIC_LABELING_START_MONTH: Readonly<Record<string, string>> = {
+  street_safety_or_traffic_calming: STREET_SAFETY_LABELING_START_MONTH,
+};
+
+/** Whether newsletters from this month could have been labeled with the topic. */
+export function isTopicLabeledInMonth(topic: string, month: string): boolean {
+  return !Object.hasOwn(TOPIC_LABELING_START_MONTH, topic) || month >= TOPIC_LABELING_START_MONTH[topic];
+}
+
+/**
  * Share of processed newsletters mentioning each topic, per month. Every month
- * in the span is listed; sparse months get a null share.
+ * in the span is listed; sparse months, and months before a topic entered the
+ * taxonomy, get a null share.
  */
 export function computeTopicTrends(
   facts: NewsletterFact[],
@@ -440,14 +528,16 @@ export function computeTopicTrends(
         topic,
         newsletters,
         monthNewsletters: monthFacts.length,
-        share: shareOrNull(newsletters, monthFacts.length, minMonthNewsletters),
+        share: isTopicLabeledInMonth(topic, month)
+          ? shareOrNull(newsletters, monthFacts.length, minMonthNewsletters)
+          : null,
       };
     });
   });
 }
 
 // ---------------------------------------------------------------------------
-// Cadence, relevance, coverage
+// Coverage and cadence
 
 export interface WardMonthCount {
   ward: string;
@@ -502,36 +592,77 @@ export function findLongestGaps(facts: NewsletterFact[], limit: number): Sending
   return gaps.sort((a, b) => b.days - a.days || a.from.localeCompare(b.from)).slice(0, limit);
 }
 
-export interface WardRelevance {
+export type CoverageStatus = "untracked" | "silent" | "received";
+
+export interface CoverageCell {
   ward: string;
-  averageRelevance: number;
-  scoredNewsletters: number;
+  month: string;
+  /**
+   * untracked: before the ward's first archived newsletter (or none ever);
+   * silent: tracked, but nothing received that month; received: newsletters > 0.
+   */
+  status: CoverageStatus;
+  newsletters: number;
 }
 
-export function computeRelevanceByWard(facts: NewsletterFact[]): WardRelevance[] {
-  const scored = facts.filter((fact) => fact.ward !== null && fact.relevance !== null);
-  return [...groupBy(scored, (fact) => fact.ward as string).entries()]
-    .map(([ward, wardFacts]) => ({
+/**
+ * One cell per ward per month. A ward counts as tracked from the month of its
+ * first archived newsletter, so `allFacts` must not be date-filtered; only the
+ * listed months are returned.
+ */
+export function buildCoverageGrid(
+  allFacts: NewsletterFact[],
+  wards: string[],
+  months: string[],
+): CoverageCell[] {
+  const counts = new Map(
+    countNewslettersByWardMonth(allFacts).map((count) => [`${count.ward}|${count.month}`, count.newsletters]),
+  );
+  const firstMonthByWard = new Map<string, string>();
+  for (const fact of allFacts) {
+    if (fact.ward === null) continue;
+    const month = monthOf(fact.date);
+    const first = firstMonthByWard.get(fact.ward);
+    if (!first || month < first) firstMonthByWard.set(fact.ward, month);
+  }
+  return wards.flatMap((ward) =>
+    months.map((month) => {
+      const newsletters = counts.get(`${ward}|${month}`) ?? 0;
+      const firstMonth = firstMonthByWard.get(ward);
+      const status: CoverageStatus =
+        newsletters > 0 ? "received" : firstMonth && month >= firstMonth ? "silent" : "untracked";
+      return { ward, month, status, newsletters };
+    }),
+  );
+}
+
+export interface WardCoverage {
+  ward: string;
+  aldermen: string[];
+  firstDate: string | null;
+  lastDate: string | null;
+  /** Newsletters in the whole archive. */
+  newsletters: number;
+}
+
+/** Archive coverage for every listed ward, merging wards served by several sources. */
+export function summarizeWardCoverage(sources: SourceCoverage[], wards: string[]): WardCoverage[] {
+  const sourcesByWard = groupBy(
+    sources.filter((source) => source.ward !== null),
+    (source) => source.ward as string,
+  );
+  return wards.map((ward) => {
+    const wardSources = sourcesByWard.get(ward) ?? [];
+    const firstDates = wardSources.flatMap((source) => (source.first_date ? [source.first_date] : [])).sort();
+    const lastDates = wardSources.flatMap((source) => (source.last_date ? [source.last_date] : [])).sort();
+    return {
       ward,
-      averageRelevance:
-        wardFacts.reduce((total, fact) => total + (fact.relevance as number), 0) /
-        wardFacts.length,
-      scoredNewsletters: wardFacts.length,
-    }))
-    .sort((a, b) => b.averageRelevance - a.averageRelevance || compareWards(a.ward, b.ward));
-}
-
-/** Sources with newsletters, limited to the selected wards, earliest first. */
-export function selectCoverage(
-  sources: SourceCoverage[],
-  filters: AnalyticsFilters,
-): SourceCoverage[] {
-  return sources
-    .filter((source) => source.newsletters > 0 && isInSelectedWards(source.ward, filters))
-    .sort(
-      (a, b) =>
-        (a.first_date ?? "").localeCompare(b.first_date ?? "") || a.name.localeCompare(b.name),
-    );
+      aldermen: wardSources.map((source) => source.name),
+      firstDate: firstDates[0] ?? null,
+      lastDate: lastDates.at(-1) ?? null,
+      newsletters: wardSources.reduce((total, source) => total + source.newsletters, 0),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +675,6 @@ export interface SearchLinkParams {
   topic?: string;
   fromDate?: string;
   toDate?: string;
-  minRelevance?: number;
 }
 
 /** First and last calendar day (YYYY-MM-DD) of a YYYY-MM month. */
@@ -557,18 +687,17 @@ export function monthDateRange(month: string): { fromDate: string; toDate: strin
 
 /**
  * The global filters as search link parameters, so a click-through lists the
- * same newsletters the chart counted. Panels whose data ignores the topic or
- * relevance filter (the term index, the ward x topic comparison) opt out.
+ * same newsletters the chart counted. Panels whose data ignores the topic
+ * filter (the term index, the coverage grid) opt out.
  */
 export function searchScopeForFilters(
   filters: AnalyticsFilters,
-  options: { includeTopic: boolean; includeRelevance: boolean },
+  options: { includeTopic: boolean },
 ): SearchLinkParams {
   const scope: SearchLinkParams = {};
   if (filters.fromMonth) scope.fromDate = monthDateRange(filters.fromMonth).fromDate;
   if (filters.toMonth) scope.toDate = monthDateRange(filters.toMonth).toDate;
   if (options.includeTopic && filters.topic) scope.topic = filters.topic;
-  if (options.includeRelevance && filters.minRelevance > 0) scope.minRelevance = filters.minRelevance;
   return scope;
 }
 
@@ -580,7 +709,6 @@ export function buildSearchUrl(params: SearchLinkParams): string {
   if (params.topic) search.set("topic", params.topic);
   if (params.fromDate) search.set("from", params.fromDate);
   if (params.toDate) search.set("to", params.toDate);
-  if (params.minRelevance) search.set("min_relevance", String(params.minRelevance));
   const query = search.toString();
   return query ? `/search?${query}` : "/search";
 }
