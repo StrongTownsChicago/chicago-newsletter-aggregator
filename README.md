@@ -14,8 +14,8 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 - **Email Ingestion**: Gmail IMAP polling with automatic source matching
 - **Web Scraping**: MailChimp archive scraping for historical newsletters
-- **LLM Processing**: Topic extraction, summarization, relevance scoring
-- **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range, minimum relevance score) and sorting (newest, oldest, highest relevance)
+- **LLM Processing**: Topic extraction, summarization
+- **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range) and sorting (newest, oldest)
 - **Ward Pages**: A page per ward (`/ward/N`) with the alderman's contact info and newsletters, plus a ward directory (`/wards`)
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
@@ -28,7 +28,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 - `sources` - Aldermen and officials (name, ward, email, archive URLs)
 - `email_source_mappings` - Pattern matching for email → source identification
-- `newsletters` - Full newsletter content with LLM-extracted metadata (topics, summary, relevance)
+- `newsletters` - Full newsletter content with LLM-extracted metadata (topics, summary)
 
 **Notification Tables:**
 
@@ -189,7 +189,7 @@ frontend/
 
 ## LLM Processing
 
-Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings. See `backend/processing/llm_client.py` for provider dispatch and `backend/processing/llm_processor.py` for topic definitions.
+Two LLM calls per newsletter for topic extraction and summarization. Supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings. See `backend/processing/llm_client.py` for provider dispatch and `backend/processing/llm_processor.py` for topic definitions.
 
 ## Notification System
 

@@ -16,7 +16,6 @@ export const NEWSLETTER_CARD_COLUMNS = [
   "received_date",
   "summary",
   "topics",
-  "relevance_score",
 ] as const satisfies readonly (keyof Newsletter)[];
 
 /** Source columns rendered by NewsletterCard. */

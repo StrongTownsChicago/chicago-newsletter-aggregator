@@ -10,7 +10,6 @@ import type { NewsletterCardRow } from '../lib/newsletter-queries';
 import { TOPIC_CATEGORIES } from '../lib/topics';
 import { humanizeIdentifier } from '../lib/format';
 import {
-  RELEVANCE_THRESHOLD_OPTIONS,
   SEARCH_PAGE_SIZE,
   SEARCH_PARAM_NAMES,
   SEARCH_PATH,
@@ -193,18 +192,6 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
             class={inputClass}
             data-testid="to-date-filter"
           />
-        </div>
-
-        <div>
-          <label for="search-min-relevance" class={labelClass}>Min. Relevance</label>
-          <select id="search-min-relevance" name={SEARCH_PARAM_NAMES.minRelevance} class={inputClass} data-testid="min-relevance-filter">
-            <option value="">Any Score</option>
-            {RELEVANCE_THRESHOLD_OPTIONS.map((threshold) => (
-              <option value={threshold} selected={filters.minRelevance === threshold}>
-                {threshold}+
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

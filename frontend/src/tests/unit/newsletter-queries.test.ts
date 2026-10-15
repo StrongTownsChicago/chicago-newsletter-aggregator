@@ -22,7 +22,7 @@ const parseSelect = (select: string) => {
 };
 
 // Every field NewsletterCard.astro reads from its `newsletter` prop.
-const CARD_NEWSLETTER_FIELDS = ['id', 'subject', 'received_date', 'summary', 'topics', 'relevance_score'];
+const CARD_NEWSLETTER_FIELDS = ['id', 'subject', 'received_date', 'summary', 'topics'];
 const CARD_SOURCE_FIELDS = ['name', 'ward_number'];
 
 const NEWSLETTER_BODY_FIELDS = ['raw_html', 'plain_text'];

@@ -41,9 +41,7 @@ class TestFetchNewsletters(unittest.TestCase):
         fetch_newsletters(self.mock_supabase, args)
 
         # Assert
-        self.mock_table.or_.assert_called_once_with(
-            "topics.is.null,summary.is.null,relevance_score.is.null"
-        )
+        self.mock_table.or_.assert_called_once_with("topics.is.null,summary.is.null")
 
     def test_missing_metadata_not_applied_when_flag_false(self):
         """Test no filter added when --missing-metadata not set."""
@@ -120,7 +118,6 @@ class TestNotificationQueuing(unittest.TestCase):
         mock_llm.return_value = {
             "topics": ["bike_lanes"],
             "summary": "Test summary",
-            "relevance_score": 7,
         }
 
         # Mock rule matching
@@ -150,6 +147,9 @@ class TestNotificationQueuing(unittest.TestCase):
 
         # Assert
         self.assertTrue(result)
+        mock_table.update.assert_called_once_with(
+            {"topics": ["bike_lanes"], "summary": "Test summary"}
+        )
         mock_match.assert_called_once()
         mock_queue.assert_called_once()
 
@@ -170,7 +170,6 @@ class TestNotificationQueuing(unittest.TestCase):
         mock_llm.return_value = {
             "topics": ["bike_lanes"],
             "summary": "Test summary",
-            "relevance_score": 7,
         }
 
         newsletter = {

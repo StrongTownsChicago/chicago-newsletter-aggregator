@@ -29,7 +29,6 @@ def create_test_rule(
     topics: list[str] | None = None,
     search_term: str | None = None,
     ward_numbers: list[int] | None = None,
-    min_relevance_score: int | None = None,
     is_active: bool = True,
     **overrides,
 ) -> dict[str, Any]:
@@ -41,7 +40,6 @@ def create_test_rule(
         "topics": topics or [],
         "search_term": search_term,
         "ward_numbers": ward_numbers or [],
-        "min_relevance_score": min_relevance_score,
         "is_active": is_active,
     }
     rule.update(overrides)

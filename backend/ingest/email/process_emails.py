@@ -199,7 +199,6 @@ def process_new_newsletters() -> None:
                             "plain_text": newsletter.get("plain_text", ""),
                             "source_id": newsletter.get("source_id"),
                             "ward_number": ward_number,
-                            "relevance_score": newsletter.get("relevance_score"),
                         }
 
                         # Match and queue

@@ -30,7 +30,6 @@ class NewsletterCreate(NewsletterBase):
     source_id: SourceID | None = None
     topics: TopicList = Field(default_factory=list)
     summary: str | None = None
-    relevance_score: int | None = Field(None, ge=0, le=10)
 
 
 class Newsletter(NewsletterCreate):
@@ -57,4 +56,3 @@ class NewsletterMatching(BaseModel):
     plain_text: str = ""
     source_id: SourceID | None = None
     ward_number: WardNumber | None = None
-    relevance_score: int | None = Field(None, ge=0, le=10)

@@ -60,7 +60,7 @@ Main table for ingested newsletters.
 | entities        | jsonb       |                            | Extracted entities (deprecated)    |
 | source_id       | integer     | NOT NULL, FK → sources(id) | Source reference                   |
 | search_vector   | tsvector    | GENERATED                  | Full-text search index             |
-| relevance_score | integer     | CHECK (0-10)               | Strong Towns Chicago relevance     |
+| relevance_score | integer     | CHECK (0-10)               | LLM relevance score (deprecated)   |
 
 **Foreign Keys**:
 
@@ -73,6 +73,8 @@ Main table for ingested newsletters.
 - `idx_newsletters_source_id` on `source_id`
 - `idx_newsletters_search` (GIN) on `search_vector`
 - `idx_newsletters_relevance` on `relevance_score`
+
+**Deprecated columns**: `entities` and `relevance_score` are no longer written or read by the app. Existing values are kept as unused data; there is no migration to drop them.
 
 ---
 
@@ -153,7 +155,7 @@ User-defined notification rules.
 | updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time                 |
 | topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match                  |
 | search_term         | text        | CHECK (length <= 100)                  | Search word or phrase to match   |
-| min_relevance_score | integer     |                                        | Minimum relevance score          |
+| min_relevance_score | integer     |                                        | Unused (deprecated)              |
 | source_ids          | integer[]   |                                        | Specific sources to match        |
 | ward_numbers        | text[]      |                                        | Specific wards to match          |
 | delivery_frequency  | text        | DEFAULT 'daily'                        | Delivery frequency: daily/weekly |
