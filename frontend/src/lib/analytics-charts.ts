@@ -5,23 +5,25 @@ import * as Plot from "@observablehq/plot";
 import {
   buildSearchUrl,
   formatMonth,
-  isTopicLabeledInMonth,
+  isReachFaded,
   monthDateRange,
   monthTickLabeler,
   type CoverageCell,
   type DistinctiveTerm,
+  type LensReachCell,
+  type LensWardCell,
   type RisingTerm,
   type SearchLinkParams,
   type SourceCoverage,
   type TermMonthPoint,
   type TermWardRow,
-  type TopicMonthPoint,
 } from "./analytics";
 
 export const CHART_COLORS = {
   series: "#2a78d6",
   seriesLight: "#86b6ef",
   seriesDark: "#1c5cab",
+  sequentialLow: "#e6eefa",
   sequentialHigh: "#104281",
   untracked: "#ebeae6",
   mutedInk: "#52514e",
@@ -39,6 +41,19 @@ const LEGEND_MARGIN = 16;
 const MAX_BAR_THICKNESS = 0.7;
 /** Coverage grid columns never get narrower than this; wider grids scroll. */
 const MIN_COVERAGE_CELL_WIDTH = 12;
+/** Civic calendar columns never get narrower than this, so ward counts fit; wider calendars scroll. */
+const MIN_CALENDAR_CELL_WIDTH = 32;
+/** Approximate width of one 12px label character, for sizing label margins. */
+const LABEL_CHARACTER_WIDTH = 6.5;
+/** Space between a y-axis label and the plot, including the tick. */
+const AXIS_TICK_ROOM = 14;
+const CALENDAR_ROW_HEIGHT = 26;
+/** Civic calendar cells print their ward count when at least this share of active wards mentioned the lens. */
+const CALENDAR_LABEL_MIN_SHARE = 0.25;
+/** Above this share, calendar labels switch to light ink to stay readable on dark cells. */
+const CALENDAR_DARK_CELL_SHARE = 0.5;
+/** Opacity of calendar cells resting on too few wards to describe the city. */
+const FADED_OPACITY = 0.35;
 
 export const formatPercent = (value: number): string => `${(value * 100).toFixed(1)}%`;
 export const formatWard = (ward: string): string => `Ward ${ward}`;
@@ -158,29 +173,179 @@ export function renderTermTimeline(points: TermMonthPoint[], width: number): Ele
   });
 }
 
-/** One topic's monthly shares on the x axis every topic card shares (`months`). */
-export function renderTopicTrend(
-  points: TopicMonthPoint[],
+/** "14 of 38 wards (37%)": a ward-reach cell with its denominator. */
+export function describeWardReach(cell: LensReachCell): string {
+  return cell.share === null
+    ? "no ward sent newsletters"
+    : `${cell.wardsMentioning} of ${cell.activeWards} wards (${formatPercent(cell.share)})`;
+}
+
+/** One lens's monthly ward reach, on the x axis and scale every lens card shares. */
+export function renderReachTrend(
+  points: LensReachCell[],
   months: string[],
   maxShare: number,
+  height: number,
   width: number,
 ): Element {
   const marginLeft = 40;
   const marginRight = 20;
   return Plot.plot({
     ...baseOptions(width),
-    height: 140 + AXIS_BAND,
+    height: height + AXIS_BAND,
     marginLeft,
     marginRight,
     marginBottom: AXIS_BAND,
     x: monthAxis(months, width, marginLeft, marginRight),
     y: { label: null, percent: true, domain: [0, maxShare * 100 || 1], ticks: 3, grid: true },
-    marks: monthlyShareMarks(points, (point) =>
-      isTopicLabeledInMonth(point.topic, point.month)
-        ? `${point.month}\n${point.newsletters} of ${point.monthNewsletters} newsletters (${formatOptionalShare(point.share)})`
-        : `${point.month}\nNot yet in the LLM topic list`,
+    marks: monthlyShareMarks(points, (point) => `${formatMonth(point.month)}\n${describeWardReach(point)}`),
+  });
+}
+
+/**
+ * The civic calendar: lens × month cells shaded by the share of active wards
+ * that mentioned the lens, labeled with the ward count when it is notable.
+ * Months resting on fewer than `minActiveWards` wards are faded.
+ */
+export function renderCivicCalendar(
+  cells: LensReachCell[],
+  lenses: { id: string; label: string }[],
+  months: string[],
+  selectedLens: string | null,
+  minActiveWards: number,
+  width: number,
+): Element {
+  // Room for the longest lens name; narrow screens scroll the grid rather than clip names.
+  const marginLeft = Math.max(...lenses.map((lens) => lens.label.length), 0) * LABEL_CHARACTER_WIDTH + AXIS_TICK_ROOM;
+  const marginRight = 10;
+  const plotWidth = Math.max(width, months.length * MIN_CALENDAR_CELL_WIDTH + marginLeft + marginRight);
+  const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
+  const shaded = cells.filter((cell) => cell.share !== null);
+  const isFaded = (cell: LensReachCell) => isReachFaded(cell, minActiveWards);
+  const plot = Plot.plot({
+    ...baseOptions(plotWidth),
+    height: lenses.length * CALENDAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
+    marginTop: TOP_AXIS_MARGIN,
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    padding: 0.06,
+    x: { ...monthAxis(months, plotWidth, marginLeft, marginRight), axis: "both" },
+    y: {
+      label: null,
+      domain: lenses.map((lens) => lens.id),
+      tickFormat: (id: string) => labelOf.get(id) ?? id,
+    },
+    color: {
+      type: "linear",
+      // percent: true scales shares to 0-100 before the domain applies.
+      domain: [0, 100],
+      range: [CHART_COLORS.sequentialLow, CHART_COLORS.sequentialHigh],
+      percent: true,
+      label: "Share of active wards mentioning it (%)",
+    },
+    marks: [
+      Plot.cell(shaded, {
+        x: "month",
+        y: "lens",
+        fill: "share",
+        fillOpacity: (cell: LensReachCell) => (isFaded(cell) ? FADED_OPACITY : 1),
+        rx: 2,
+        title: (cell: LensReachCell) =>
+          `${labelOf.get(cell.lens)} · ${formatMonth(cell.month)}\n${describeWardReach(cell)}` +
+          (isFaded(cell) ? `\nFaded: fewer than ${minActiveWards} wards sent newsletters` : ""),
+        tip: true,
+      }),
+      Plot.text(
+        shaded.filter((cell) => (cell.share ?? 0) >= CALENDAR_LABEL_MIN_SHARE),
+        {
+          x: "month",
+          y: "lens",
+          text: (cell: LensReachCell) => String(cell.wardsMentioning),
+          fill: (cell: LensReachCell) =>
+            (cell.share ?? 0) >= CALENDAR_DARK_CELL_SHARE && !isFaded(cell) ? CHART_COLORS.surface : CHART_COLORS.mutedInk,
+          fontSize: 11,
+        },
+      ),
+      ...(selectedLens
+        ? [
+            // Outline the selected lens's row.
+            Plot.cell(
+              months.map((month) => ({ month, lens: selectedLens })),
+              { x: "month", y: "lens", fill: "none", stroke: CHART_COLORS.mutedInk, strokeWidth: 1.5 },
+            ),
+          ]
+        : []),
+    ],
+  });
+  return withColorLegend(plot);
+}
+
+const LENS_WARD_COLORS: Record<LensWardCell["status"], { fill: string; stroke?: string }> = {
+  mentioned: { fill: CHART_COLORS.series },
+  not_mentioned: { fill: CHART_COLORS.surface, stroke: CHART_COLORS.baseline },
+  no_newsletter: { fill: CHART_COLORS.untracked },
+};
+
+export const LENS_WARD_STATUS_LABELS: Record<LensWardCell["status"], string> = {
+  mentioned: "Mentioned it",
+  not_mentioned: "Sent newsletters, did not mention it",
+  no_newsletter: "No newsletter archived that month",
+};
+
+/** Ward × month grid for one lens: which wards' newsletters mentioned it each month. */
+export function renderLensWardGrid(
+  cells: LensWardCell[],
+  wards: string[],
+  months: string[],
+  lensLabel: string,
+  width: number,
+): Element {
+  const marginLeft = 70;
+  const marginRight = 10;
+  const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
+  const statuses = Object.keys(LENS_WARD_COLORS) as LensWardCell["status"][];
+  const plot = Plot.plot({
+    ...baseOptions(plotWidth),
+    height: wards.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
+    marginTop: TOP_AXIS_MARGIN,
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    padding: 0.08,
+    x: { ...monthAxis(months, plotWidth, marginLeft, marginRight), axis: "both" },
+    y: { label: null, domain: wards, tickFormat: formatWard },
+    marks: statuses.map((status) =>
+      Plot.cell(
+        cells.filter((cell) => cell.status === status),
+        {
+          x: "month",
+          y: "ward",
+          fill: LENS_WARD_COLORS[status].fill,
+          stroke: LENS_WARD_COLORS[status].stroke,
+          inset: LENS_WARD_COLORS[status].stroke ? 0.5 : 0,
+          rx: 2,
+          title: (cell: LensWardCell) =>
+            `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${LENS_WARD_STATUS_LABELS[status]}` +
+            (cell.newsletters
+              ? `\n${cell.mentioning} of ${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"} mentioned ${lensLabel}`
+              : ""),
+          tip: true,
+        },
+      ),
     ),
   });
+  return wrap(
+    renderKey(
+      statuses.map((status) => ({
+        label: LENS_WARD_STATUS_LABELS[status],
+        color: LENS_WARD_COLORS[status].fill,
+        outline: LENS_WARD_COLORS[status].stroke,
+      })),
+      "square",
+    ),
+    plot,
+  );
 }
 
 export function renderTermWards(
@@ -253,26 +418,38 @@ export function renderDistinctiveTerms(terms: DistinctiveTerm[], ward: string, w
   });
 }
 
-export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, latestLabel: string, width: number): Element {
+/**
+ * Dot plot of rising terms: wards mentioning each term in a typical baseline
+ * month (light) and in the latest month (dark), on an axis running to the
+ * number of wards active in the latest month.
+ */
+export function renderRisingTerms(
+  terms: RisingTerm[],
+  activeWards: number,
+  baselineLabel: string,
+  latestLabel: string,
+  width: number,
+): Element {
+  const marginLeft = Math.max(...terms.map((item) => item.term.length), 0) * LABEL_CHARACTER_WIDTH + AXIS_TICK_ROOM;
   const plot = Plot.plot({
     ...baseOptions(width),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
-    marginLeft: 170,
+    marginLeft,
     marginRight: 30,
-    x: { label: "Share of newsletters (%)", percent: true, grid: true, axis: "both" },
+    x: { label: `Wards mentioning it (of ${activeWards} active)`, domain: [0, activeWards], grid: true, axis: "both" },
     y: { label: null, domain: terms.map((item) => item.term) },
     marks: [
       Plot.link(terms, {
-        x1: "baseline_share",
-        x2: "latest_share",
+        x1: "baseline_wards",
+        x2: "latest_wards",
         y1: "term",
         y2: "term",
         stroke: CHART_COLORS.seriesLight,
         strokeWidth: 2,
       }),
       Plot.dot(terms, {
-        x: "baseline_share",
+        x: "baseline_wards",
         y: "term",
         r: 4,
         fill: CHART_COLORS.seriesLight,
@@ -280,7 +457,7 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
         strokeWidth: 2,
       }),
       Plot.dot(terms, {
-        x: "latest_share",
+        x: "latest_wards",
         y: "term",
         r: 5,
         fill: CHART_COLORS.seriesDark,
@@ -288,8 +465,8 @@ export function renderRisingTerms(terms: RisingTerm[], baselineLabel: string, la
         strokeWidth: 2,
         href: (item: RisingTerm) => buildSearchUrl({ q: item.term }),
         title: (item: RisingTerm) =>
-          `"${item.term}"\n${latestLabel}: ${item.latest_newsletters} newsletters from ${item.latest_sources} sources (${formatPercent(item.latest_share)})\n` +
-          `${baselineLabel}: ${item.baseline_newsletters} newsletters (${formatPercent(item.baseline_share)})\nClick to search`,
+          `"${item.term}"\n${latestLabel}: ${item.latest_wards} of ${activeWards} wards (${item.latest_newsletters} newsletters)\n` +
+          `${baselineLabel}: ${item.baseline_wards} wards (median; ${item.baseline_month_wards.join(", ")} by month)\nClick to search`,
         tip: true,
       }),
     ],

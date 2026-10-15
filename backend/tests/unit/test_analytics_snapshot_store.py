@@ -29,8 +29,8 @@ def make_snapshot() -> Snapshot:
             SourceRecord(51, "CTA", None, "agency"),
         ],
         newsletters=[
-            NewsletterRecord("a", date(2026, 1, 5), 1, "Snow", "Plows: café", ["snow"]),
-            NewsletterRecord("b", date(2026, 2, 6), None, "Bus", "Route 9", None),
+            NewsletterRecord("a", date(2026, 1, 5), 1, "Snow", "Plows: café"),
+            NewsletterRecord("b", date(2026, 2, 6), None, "Bus", "Route 9"),
         ],
         fetched_through=datetime(2026, 10, 12, 20, 31, 2, 123456, tzinfo=UTC),
     )

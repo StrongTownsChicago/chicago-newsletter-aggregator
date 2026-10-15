@@ -6,7 +6,7 @@ only fetch newsletters created since `fetched_through` and merge them in.
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
@@ -29,7 +29,6 @@ def newsletter_to_row(newsletter: NewsletterRecord) -> dict[str, Any]:
         "source_id": newsletter.source_id,
         "subject": newsletter.subject,
         "plain_text": newsletter.plain_text,
-        "topics": newsletter.topics,
     }
 
 
@@ -37,7 +36,8 @@ def newsletter_from_row(row: dict[str, Any]) -> NewsletterRecord:
     """Rebuild a newsletter from a snapshot row.
 
     Unlike `parse_newsletter_row`, `received_date` is already a Chicago
-    calendar date here, so it is not converted again.
+    calendar date here, so it is not converted again. Keys this version no
+    longer reads (such as the `topics` older snapshots stored) are ignored.
     """
     source_id = row.get("source_id")
     return NewsletterRecord(
@@ -46,7 +46,6 @@ def newsletter_from_row(row: dict[str, Any]) -> NewsletterRecord:
         source_id=int(source_id) if source_id is not None else None,
         subject=row.get("subject") or "",
         plain_text=row.get("plain_text") or "",
-        topics=row.get("topics"),
     )
 
 
@@ -82,31 +81,6 @@ def merge_newsletters(
     by_id = {newsletter.id: newsletter for newsletter in existing}
     by_id.update((newsletter.id, newsletter) for newsletter in updates)
     return sorted(by_id.values(), key=lambda item: (item.received_date, item.id))
-
-
-def ids_missing_llm_metadata(newsletters: Iterable[NewsletterRecord]) -> list[str]:
-    """Ids of newsletters whose LLM topics are not set yet.
-
-    LLM processing often runs days after ingestion, outside the incremental
-    overlap window, so these rows are re-checked on every refresh.
-    """
-    return [newsletter.id for newsletter in newsletters if newsletter.topics is None]
-
-
-def apply_llm_metadata(
-    newsletters: Iterable[NewsletterRecord], rows: Iterable[dict[str, Any]]
-) -> list[NewsletterRecord]:
-    """Overlay fetched topics onto matching newsletters."""
-    metadata_by_id = {str(row["id"]): row for row in rows}
-    return [
-        replace(
-            newsletter,
-            topics=metadata_by_id[newsletter.id].get("topics"),
-        )
-        if newsletter.id in metadata_by_id
-        else newsletter
-        for newsletter in newsletters
-    ]
 
 
 def newest_created_at(rows: Iterable[dict[str, Any]]) -> datetime | None:

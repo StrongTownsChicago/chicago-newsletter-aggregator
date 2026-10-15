@@ -4,8 +4,9 @@
 import {
   BROAD_COVERAGE_PEAK_FRACTION,
   buildCoverageGrid,
+  buildLensWardGrid,
   classifyDateWindow,
-  computeTopicTrends,
+  computeLensWardReach,
   countActiveWardsByMonth,
   countBroadlyCoveredMonths,
   EMPTY_FILTERS,
@@ -14,11 +15,13 @@ import {
   findBroadCoverageWindow,
   findLongestGaps,
   formatMonth,
-  listMonthsWithShares,
+  isReachFaded,
   listSourceWards,
   listWards,
   listWindowMonths,
+  MIN_ACTIVE_WARDS_FOR_REACH,
   MIN_MONTH_NEWSLETTERS_FOR_SHARES,
+  monthDateRange,
   monthOf,
   normalizeTermQuery,
   resolveIndexedTerm,
@@ -35,6 +38,8 @@ import {
   type AnalyticsFilters,
   type BroadCoverageWindow,
   type CoverageStatus,
+  type LensDefinition,
+  type LensReachCell,
   type MonthWardActivity,
   type NewsletterFact,
   type TermIndex,
@@ -43,19 +48,20 @@ import {
   formatOptionalShare,
   formatPercent,
   formatWard,
+  LENS_WARD_STATUS_LABELS,
+  renderCivicCalendar,
   renderCoverageGrid,
   renderDistinctiveTerms,
+  renderLensWardGrid,
+  renderReachTrend,
   renderRisingTerms,
   renderTable,
   renderTermTimeline,
   renderTermWards,
-  renderTopicTrend,
   sourceLabel,
   type TableColumn,
 } from "../lib/analytics-charts";
 import { createLazyLoader, fetchTermIndex } from "../lib/analytics-data";
-import { humanizeIdentifier } from "../lib/format";
-import { ALL_TOPICS } from "../lib/topics";
 
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
@@ -66,12 +72,16 @@ const COVERAGE_STATUS_LABELS: Record<CoverageStatus, string> = {
   received: "Received",
 };
 const RESIZE_DEBOUNCE_MS = 200;
+/** Plot heights of the lens trend cards: small multiples, or one enlarged lens. */
+const LENS_TREND_HEIGHT = 140;
+const SELECTED_LENS_TREND_HEIGHT = 260;
 const numberFormat = new Intl.NumberFormat("en-US");
 const percentFormat = new Intl.NumberFormat("en-US", { style: "percent" });
 
 interface DashboardState {
   data: AnalyticsDataset;
   wardBySource: Map<number, string | null>;
+  lensById: Map<string, LensDefinition>;
   /** Every ward with a source, including wards with no newsletters archived. */
   allWards: string[];
   /** Every month from the first to the latest newsletter. */
@@ -152,7 +162,7 @@ function readFilters(form: HTMLFormElement): AnalyticsFilters {
   );
   return {
     wards,
-    topic: (formData.get("topic") as string) || null,
+    lens: (formData.get("lens") as string) || null,
     fromMonth: (formData.get("from") as string) || null,
     toMonth: (formData.get("to") as string) || null,
   };
@@ -162,8 +172,12 @@ function populateFilterOptions(
   form: HTMLFormElement,
   wards: string[],
   months: string[],
+  lenses: LensDefinition[],
   defaultFromMonth: string | null,
 ): void {
+  requireElement<HTMLSelectElement>('select[name="lens"]', form).append(
+    ...lenses.map((lens) => new Option(lens.label, lens.id)),
+  );
   const wardOptions = requireElement<HTMLElement>("#ward-options");
   wardOptions.replaceChildren(
     ...wards.map((ward) => {
@@ -243,12 +257,12 @@ function renderSummary(
   state: DashboardState,
   filters: AnalyticsFilters,
   facts: NewsletterFact[],
-  factsIgnoringTopic: NewsletterFact[],
+  factsIgnoringLens: NewsletterFact[],
 ): void {
   const summary = summarizeFacts(facts);
   const wardCounts = summarizeWardCounts(
     wardsInScope(state.allWards, filters),
-    factsIgnoringTopic,
+    factsIgnoringLens,
     state.data.newsletters,
   );
   const windowMonths = listWindowMonths(filters, state.dataMonths);
@@ -305,8 +319,7 @@ function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): 
           wards,
           months,
           wardsNeverArchived,
-          // Coverage ignores the topic filter, so its search links do too.
-          searchScopeForFilters(filters, { includeTopic: false }),
+          searchScopeForFilters(filters),
           chartWidth(chart),
         )
       : emptyMessage("No wards or months in the selected window."),
@@ -394,7 +407,7 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     return;
   }
 
-  const scopeFacts = filterFacts(state.data.newsletters, { ...filters, topic: null });
+  const scopeFacts = filterFacts(state.data.newsletters, filters, { ignoreLens: true });
   const postings = index.terms[indexedTerm];
   const bucketCounts = expandTermPostings(index, postings, state.wardBySource, filters);
   const months = termMentionsByMonth(bucketCounts, scopeFacts);
@@ -420,8 +433,7 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     renderTermWards(
       wards.slice(0, TERM_WARD_LIMIT),
       indexedTerm,
-      // The term index has no topic, so neither do its search links.
-      searchScopeForFilters(filters, { includeTopic: false }),
+      searchScopeForFilters(filters),
       chartWidth(wardsChart),
     ),
   );
@@ -437,46 +449,174 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   );
 }
 
-function renderTopicTrendsPanel(facts: NewsletterFact[], filters: AnalyticsFilters): void {
-  const { chart, caption, table } = panel("topic-trends");
+/** City-wide views fade thin months; a ward selection is small by design, and its denominator is always shown. */
+function reachFadeThreshold(filters: AnalyticsFilters): number {
+  return filters.wards.length ? 0 : MIN_ACTIVE_WARDS_FOR_REACH;
+}
+
+function lensLabel(state: DashboardState, lensId: string): string {
+  return state.lensById.get(lensId)?.label ?? lensId;
+}
+
+function reachColumns(state: DashboardState, minActiveWards: number): TableColumn<LensReachCell>[] {
+  return [
+    { label: "Topic", value: (cell) => lensLabel(state, cell.lens) },
+    { label: "Month", value: (cell) => cell.month },
+    { label: "Wards mentioning", value: (cell) => cell.wardsMentioning, numeric: true },
+    { label: "Active wards", value: (cell) => cell.activeWards, numeric: true },
+    { label: "Share", value: (cell) => (cell.share === null ? "–" : formatPercent(cell.share)), numeric: true },
+    { label: "Note", value: (cell) => (isReachFaded(cell, minActiveWards) ? "Few wards (faded)" : "") },
+  ];
+}
+
+/** A note when the window ends in the archive's latest month and that month is not over in the data. */
+function describePartialLastMonth(lastDate: string | null, months: string[]): string {
+  const lastMonth = months.at(-1);
+  if (!lastDate || !lastMonth || monthOf(lastDate) !== lastMonth) return "";
+  return lastDate < monthDateRange(lastMonth).toDate
+    ? `${formatMonth(lastMonth)} is partial: newsletters through ${lastDate}.`
+    : "";
+}
+
+function renderCivicCalendarPanel(
+  state: DashboardState,
+  filters: AnalyticsFilters,
+  scopeFacts: NewsletterFact[],
+  months: string[],
+): void {
+  const { chart, caption, table } = panel("civic-calendar");
+  const lenses = state.data.lenses.lenses;
+  const cells = computeLensWardReach(scopeFacts, lenses.map((lens) => lens.id), months);
+  const threshold = reachFadeThreshold(filters);
+  caption.textContent = [
+    "Numbers are wards (shown when at least a quarter of active wards mentioned the topic).",
+    describePartialLastMonth(state.data.metadata.last_date, months),
+  ]
+    .filter(Boolean)
+    .join(" ");
   if (!chart) return;
-  const topics = filters.topic ? [filters.topic] : ALL_TOPICS;
-  const points = computeTopicTrends(facts, topics);
-  const processed = facts.filter((fact) => fact.topics !== null).length;
-  caption.textContent = `Based on ${pluralize(processed, "LLM-processed newsletter")}.`;
-  if (points.length === 0) {
-    replaceContent(chart, emptyMessage("No processed newsletters for these filters."));
-    replaceContent(table, emptyMessage("No rows."));
-    return;
-  }
-  const maxShare = Math.max(...points.map((point) => point.share ?? 0));
-  const months = listMonthsWithShares(points);
-  const monthsShown = new Set(months);
-  chart.classList.toggle("md:grid-cols-2", !filters.topic);
-  const cardWidth = filters.topic ? chartWidth(chart) : Math.max(chartWidth(chart) / 2 - 12, 300);
   replaceContent(
     chart,
-    ...(months.length
-      ? topics.map((topic) => {
+    months.length && lenses.length
+      ? renderCivicCalendar(cells, lenses, months, filters.lens, threshold, chartWidth(chart))
+      : emptyMessage("No months in the selected window."),
+  );
+  setTable(table, reachColumns(state, threshold), cells);
+}
+
+function renderLensDefinitions(state: DashboardState): void {
+  const container = requireElement<HTMLElement>("[data-lens-definitions]");
+  const { text, min_mentions: minMentions, readable_newsletters: readable } = state.data.lenses;
+  const rules = document.createElement("p");
+  rules.textContent =
+    `A newsletter mentions a topic when the topic's words and phrases appear at least ${pluralize(minMentions, "separate time")} ` +
+    "in its subject and text (whole words within one sentence, any capitalization, singular or plural). " +
+    'The same phrase twice counts twice, but phrases that overlap or sit side by side, as in "city council meeting", count once, ' +
+    "so a single passing mention does not count. " +
+    (text === "cleaned"
+      ? "Matching skips text a ward repeats across many of its issues (footers, standing resource lists), so a standing block does not count as news every month. "
+      : "Matching reads the full text, including standing blocks a ward repeats in every issue. ") +
+    `Counts below are out of the ${numberFormat.format(readable)} newsletters analyzed across the whole archive. ` +
+    "Topics marked Strong Towns Chicago focus are narrower slices of the broader topics.";
+  const list = document.createElement("dl");
+  list.className = "space-y-2";
+  for (const lens of state.data.lenses.lenses) {
+    const term = document.createElement("dt");
+    term.className = "font-semibold text-gray-900";
+    term.textContent =
+      `${lens.label}${lens.strong_towns_focus ? " (Strong Towns Chicago focus)" : ""}: ` +
+      `${pluralize(lens.newsletters, "newsletter")} (${formatPercent(readable ? lens.newsletters / readable : 0)})`;
+    const definition = document.createElement("dd");
+    definition.textContent =
+      `${lens.description} Phrases (newsletters containing each): ` +
+      lens.phrases.map((item) => `${item.phrase} (${numberFormat.format(item.newsletters)})`).join(", ");
+    list.append(term, definition);
+  }
+  container.replaceChildren(rules, list);
+}
+
+function renderLensTrendsPanel(
+  state: DashboardState,
+  filters: AnalyticsFilters,
+  scopeFacts: NewsletterFact[],
+  months: string[],
+): void {
+  const { chart, caption, table } = panel("lens-trends");
+  if (!chart) return;
+  const lenses = filters.lens
+    ? state.data.lenses.lenses.filter((lens) => lens.id === filters.lens)
+    : state.data.lenses.lenses;
+  const cells = computeLensWardReach(scopeFacts, lenses.map((lens) => lens.id), months);
+  const threshold = reachFadeThreshold(filters);
+  // Thin months are left out of the lines (a gap), as the calendar fades them.
+  const points = cells.map((cell) => (isReachFaded(cell, threshold) ? { ...cell, share: null } : cell));
+  caption.textContent = threshold
+    ? `Months with fewer than ${threshold} wards sending newsletters are left blank.`
+    : "Shares are out of the selected wards that sent newsletters each month.";
+  const maxShare = Math.max(0, ...points.map((point) => point.share ?? 0));
+  const single = lenses.length === 1;
+  chart.classList.toggle("md:grid-cols-2", !single);
+  const cardWidth = single ? chartWidth(chart) : Math.max(chartWidth(chart) / 2 - 12, 300);
+  replaceContent(
+    chart,
+    ...(points.some((point) => point.share !== null)
+      ? lenses.map((lens) => {
           const figure = document.createElement("figure");
           const title = document.createElement("figcaption");
           title.className = "text-sm font-semibold text-gray-700";
-          title.textContent = humanizeIdentifier(topic);
-          const topicPoints = points.filter((point) => point.topic === topic && monthsShown.has(point.month));
-          figure.append(title, renderTopicTrend(topicPoints, months, maxShare, cardWidth));
+          title.textContent = lens.label;
+          figure.append(
+            title,
+            renderReachTrend(
+              points.filter((point) => point.lens === lens.id),
+              months,
+              maxShare,
+              single ? SELECTED_LENS_TREND_HEIGHT : LENS_TREND_HEIGHT,
+              cardWidth,
+            ),
+          );
           return figure;
         })
-      : [emptyMessage(`No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} or more processed newsletters for these filters.`)]),
+      : [emptyMessage("No month in the selected window has enough wards sending newsletters.")]),
+  );
+  setTable(table, reachColumns(state, threshold), cells);
+}
+
+function renderLensWardsPanel(
+  state: DashboardState,
+  filters: AnalyticsFilters,
+  scopeFacts: NewsletterFact[],
+  months: string[],
+): void {
+  const { chart, caption, table } = panel("lens-wards");
+  if (!chart) return;
+  if (!filters.lens) {
+    caption.textContent = "";
+    replaceContent(chart, emptyMessage("Choose a topic in the filters above to see which wards mentioned it."));
+    replaceContent(table, emptyMessage("Choose a topic to see its table."));
+    return;
+  }
+  const label = lensLabel(state, filters.lens);
+  const wards = listWards(state.data.newsletters).filter((ward) => !filters.wards.length || filters.wards.includes(ward));
+  const cells = buildLensWardGrid(scopeFacts, filters.lens, wards, months);
+  const wardsMentioning = new Set(cells.filter((cell) => cell.status === "mentioned").map((cell) => cell.ward));
+  caption.textContent = `${label}: ${wardsMentioning.size} of ${pluralize(wards.length, "ward")} mentioned it at least once in the selected window. Wards with no newsletters archived are not listed (see the coverage grid).`;
+  replaceContent(
+    chart,
+    wards.length && months.length
+      ? renderLensWardGrid(cells, wards, months, label, chartWidth(chart))
+      : emptyMessage("No wards or months in the selected window."),
   );
   setTable(
     table,
     [
-      { label: "Month", value: (point) => point.month },
-      { label: "Topic", value: (point) => humanizeIdentifier(point.topic) },
-      { label: "Newsletters", value: (point) => `${point.newsletters} / ${point.monthNewsletters}`, numeric: true },
-      { label: "Share", value: (point) => formatOptionalShare(point.share), numeric: true },
+      { label: "Ward", value: (cell) => cell.ward },
+      { label: "Month", value: (cell) => cell.month },
+      { label: "Status", value: (cell) => LENS_WARD_STATUS_LABELS[cell.status] },
+      { label: "Newsletters mentioning", value: (cell) => cell.mentioning, numeric: true },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
     ],
-    points.filter((point) => point.newsletters > 0),
+    cells.filter((cell) => cell.status !== "no_newsletter"),
   );
 }
 
@@ -510,25 +650,39 @@ function renderDistinctivePanel(state: DashboardState): void {
 function renderRisingPanel(state: DashboardState): void {
   const { chart, caption, table } = panel("rising-terms");
   const rising = state.data.rising;
-  caption.textContent = rising.latest_month
-    ? `${rising.latest_month} (${pluralize(rising.latest_newsletters, "newsletter")}) vs ${rising.baseline_months[0]} – ${rising.baseline_months.at(-1)} (${pluralize(rising.baseline_newsletters, "newsletter")}).`
-    : "No complete month of data yet.";
+  if (!rising.latest_month) {
+    caption.textContent = "No complete month of data yet.";
+    replaceContent(chart, emptyMessage("No rising terms."));
+    replaceContent(table, emptyMessage("No rows."));
+    return;
+  }
+  const baselineSpan = `${formatMonth(rising.baseline_months[0])} – ${formatMonth(rising.baseline_months[rising.baseline_months.length - 1])}`;
+  const latest = formatMonth(rising.latest_month);
+  caption.textContent =
+    `${latest}: ${pluralize(rising.latest_active_wards, "ward")} sent newsletters ` +
+    `(${rising.baseline_active_wards.join(", ")} in ${baselineSpan}). Terms that are part of a higher-ranked term's phrase (such as "labor" or "day weekend" after "labor day") are left out.`;
   if (!chart) return;
   replaceContent(
     chart,
     rising.terms.length
-      ? renderRisingTerms(rising.terms, `Baseline (${rising.baseline_months[0]} – ${rising.baseline_months.at(-1)})`, `Latest (${rising.latest_month})`, chartWidth(chart))
+      ? renderRisingTerms(
+          rising.terms,
+          rising.latest_active_wards,
+          `Typical month (median, ${baselineSpan})`,
+          latest,
+          chartWidth(chart),
+        )
       : emptyMessage("No rising terms."),
   );
   setTable(
     table,
     [
       { label: "Term", value: (item) => item.term },
-      { label: "Latest newsletters", value: (item) => item.latest_newsletters, numeric: true },
-      { label: "Sources", value: (item) => item.latest_sources, numeric: true },
-      { label: "Latest share", value: (item) => formatPercent(item.latest_share), numeric: true },
-      { label: "Baseline share", value: (item) => formatPercent(item.baseline_share), numeric: true },
-      { label: "Rise", value: (item) => (item.baseline_newsletters === 0 ? "new" : `${item.ratio}×`), numeric: true },
+      { label: `Wards in ${latest}`, value: (item) => `${item.latest_wards} of ${rising.latest_active_wards}`, numeric: true },
+      { label: "Wards in a typical month (median)", value: (item) => item.baseline_wards, numeric: true },
+      { label: "Wards by baseline month", value: (item) => item.baseline_month_wards.join(", "), numeric: true },
+      { label: "Gain in wards", value: (item) => `+${item.ward_gain}`, numeric: true },
+      { label: `Newsletters in ${latest}`, value: (item) => item.latest_newsletters, numeric: true },
     ],
     rising.terms,
   );
@@ -556,16 +710,19 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   const filters = readFilters(form);
   updateWardSummary(filters);
   const facts = filterFacts(state.data.newsletters, filters);
-  const factsIgnoringTopic = filterFacts(state.data.newsletters, filters, { ignoreTopic: true });
+  const factsIgnoringLens = filterFacts(state.data.newsletters, filters, { ignoreLens: true });
+  const months = listWindowMonths(filters, state.dataMonths);
 
   renderDateWindowStatus(state, filters);
-  renderSummary(state, filters, facts, factsIgnoringTopic);
+  renderSummary(state, filters, facts, factsIgnoringLens);
   renderCoveragePanel(state, filters);
+  renderCivicCalendarPanel(state, filters, factsIgnoringLens, months);
+  renderLensTrendsPanel(state, filters, factsIgnoringLens, months);
+  renderLensWardsPanel(state, filters, factsIgnoringLens, months);
   renderTermExplorer(state, filters);
-  renderTopicTrendsPanel(factsIgnoringTopic, filters);
   renderDistinctivePanel(state);
   renderRisingPanel(state);
-  renderCadencePanel(factsIgnoringTopic);
+  renderCadencePanel(factsIgnoringLens);
 }
 
 /** Fetch the term index once, then redraw the term explorer with it (or with the error). */
@@ -587,6 +744,7 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
   return {
     data,
     wardBySource: new Map(data.sources.map((source) => [source.id, source.ward])),
+    lensById: new Map(data.lenses.lenses.map((lens) => [lens.id, lens])),
     allWards: listSourceWards(data.sources),
     dataMonths: listWindowMonths(EMPTY_FILTERS, factMonths),
     wardActivity: countActiveWardsByMonth(data.newsletters),
@@ -600,7 +758,14 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
 export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const state = buildDashboardState(data);
   const form = requireElement<HTMLFormElement>("#analytics-filters");
-  populateFilterOptions(form, listWards(data.newsletters), state.dataMonths, state.broadWindow?.startMonth ?? null);
+  populateFilterOptions(
+    form,
+    listWards(data.newsletters),
+    state.dataMonths,
+    data.lenses.lenses,
+    state.broadWindow?.startMonth ?? null,
+  );
+  renderLensDefinitions(state);
 
   const distinctiveSelect = requireElement<HTMLSelectElement>("#distinctive-ward");
   const distinctiveWards = Object.keys(data.distinctiveByWard);

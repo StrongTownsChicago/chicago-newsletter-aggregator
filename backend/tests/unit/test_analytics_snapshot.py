@@ -1,14 +1,11 @@
 """Unit tests for analytics/snapshot.py row format, merging, and cursor rules."""
 
 import unittest
-from dataclasses import replace
 from datetime import UTC, date, datetime
 
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import (
     advance_cursor,
-    apply_llm_metadata,
-    ids_missing_llm_metadata,
     merge_newsletters,
     newest_created_at,
     newsletter_from_row,
@@ -25,7 +22,6 @@ def make_newsletter(newsletter_id: str, day: date, subject: str = "Update"):
         source_id=1,
         subject=subject,
         plain_text="Text",
-        topics=None,
     )
 
 
@@ -37,7 +33,6 @@ class TestRowRoundTrip(unittest.TestCase):
             source_id=7,
             subject="Ward news",
             plain_text="Bike lanes",
-            topics=["bike_lanes"],
         )
         row = newsletter_to_row(newsletter)
         self.assertEqual(row["received_date"], "2026-09-30")
@@ -51,6 +46,13 @@ class TestRowRoundTrip(unittest.TestCase):
         self.assertIsNone(newsletter.source_id)
         self.assertEqual(newsletter.subject, "")
         self.assertEqual(newsletter.plain_text, "")
+
+    def test_newsletter_from_row_ignores_topics_saved_by_older_snapshots(self):
+        newsletter = newsletter_from_row(
+            {"id": "a", "received_date": "2026-01-02", "topics": ["bike_lanes"]}
+        )
+        self.assertEqual(newsletter.id, "a")
+        self.assertNotIn("topics", newsletter_to_row(newsletter))
 
     def test_source_round_trips(self):
         for source in (
@@ -75,24 +77,6 @@ class TestMergeNewsletters(unittest.TestCase):
         updates = [make_newsletter("a", date(2026, 2, 1))]
         merged = merge_newsletters(existing, updates)
         self.assertEqual([item.id for item in merged], ["z", "a", "b"])
-
-
-class TestLlmMetadata(unittest.TestCase):
-    def test_ids_missing_llm_metadata_flags_only_null_topics(self):
-        # An empty list means the LLM ran and found no topic; only None is pending.
-        processed = replace(make_newsletter("done", date(2026, 1, 1)), topics=[])
-        no_topics = replace(processed, id="no_topics", topics=None)
-        self.assertEqual(
-            ids_missing_llm_metadata([processed, no_topics]), ["no_topics"]
-        )
-
-    def test_apply_llm_metadata_updates_only_matching_newsletters(self):
-        pending = make_newsletter("pending", date(2026, 1, 1))
-        other = make_newsletter("other", date(2026, 1, 2))
-        rows = [{"id": "pending", "topics": ["transit"]}]
-        updated = apply_llm_metadata([pending, other], rows)
-        self.assertEqual(updated[0], replace(pending, topics=["transit"]))
-        self.assertEqual(updated[1], other)
 
 
 class TestCursor(unittest.TestCase):

@@ -12,17 +12,18 @@ from unittest.mock import MagicMock, patch
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
+from analytics.facts import MIN_EXTRACTED_WORDS
 from utils.compute_analytics import (
     BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
+    LENS_MIN_MENTIONS,
+    MATCH_LENSES_ON_CLEANED_TEXT,
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
-    LLM_METADATA_COLUMNS,
-    RefreshCounts,
+    NEWSLETTER_COLUMNS,
     build_full_snapshot,
     compute_outputs,
     fetch_rows,
-    fetch_rows_by_id,
     load_or_refresh_snapshot,
     refresh_snapshot,
     write_outputs,
@@ -38,7 +39,6 @@ def make_newsletter(
         source_id=source_id,
         subject="Update",
         plain_text=text,
-        topics=["bike_lanes"],
     )
 
 
@@ -56,7 +56,15 @@ class TestComputeOutputs(unittest.TestCase):
 
         self.assertEqual(
             set(outputs),
-            {"metadata", "newsletters", "sources", "terms", "distinctive", "rising"},
+            {
+                "metadata",
+                "newsletters",
+                "sources",
+                "terms",
+                "distinctive",
+                "rising",
+                "lenses",
+            },
         )
         self.assertEqual(outputs["metadata"]["newsletter_count"], 2)
         self.assertEqual(len(outputs["newsletters"]["newsletters"]), 2)
@@ -84,6 +92,56 @@ class TestComputeOutputs(unittest.TestCase):
         fact_words = outputs["newsletters"]["newsletters"][0]["words"]
         self.assertEqual(fact_words, len(newsletters[0].plain_text.split()))
 
+    def test_flags_each_newsletter_with_the_lenses_it_mentions(self):
+        sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
+        filler = "word " * MIN_EXTRACTED_WORDS
+        mention = " ".join(["New speed humps."] * LENS_MIN_MENTIONS)
+        newsletters = [
+            make_newsletter("calming", date(2026, 9, 1), 1, f"{mention} {filler}"),
+            make_newsletter("passing", date(2026, 9, 2), 1, f"A speed hump. {filler}"),
+            # Image-only issue: too little text to say what it mentions.
+            make_newsletter("image", date(2026, 9, 3), 1, mention),
+        ]
+        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+
+        lenses_by_id = {
+            fact["id"]: fact["lenses"] for fact in outputs["newsletters"]["newsletters"]
+        }
+        self.assertIn("street_safety", lenses_by_id["calming"])
+        self.assertEqual(lenses_by_id["passing"], [])
+        self.assertEqual(lenses_by_id["image"], [])
+        self.assertNotIn("topics", outputs["newsletters"]["newsletters"][0])
+
+        summary = outputs["lenses"]
+        self.assertEqual(summary["readable_newsletters"], 2)
+        self.assertEqual(summary["min_mentions"], LENS_MIN_MENTIONS)
+        street_safety = next(
+            lens for lens in summary["lenses"] if lens["id"] == "street_safety"
+        )
+        self.assertEqual(street_safety["newsletters"], 1)
+
+    @unittest.skipUnless(MATCH_LENSES_ON_CLEANED_TEXT, "lenses match raw text")
+    def test_lenses_ignore_a_standing_block_repeated_in_every_issue(self):
+        sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
+        standing_block = (
+            "Immigration resources: know your rights workshops for immigrant "
+            "neighbors every week at the ward office on Main Street"
+        )
+        newsletters = [
+            make_newsletter(
+                str(index),
+                date(2026, 9, 1 + index),
+                1,
+                f"Item {index} " + "word " * MIN_EXTRACTED_WORDS + standing_block,
+            )
+            for index in range(BOILERPLATE_MIN_SOURCE_NEWSLETTERS)
+        ]
+        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+
+        self.assertEqual(outputs["lenses"]["text"], "cleaned")
+        for fact in outputs["newsletters"]["newsletters"]:
+            self.assertNotIn("immigration", fact["lenses"])
+
     def test_handles_dataset_without_complete_month(self):
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         newsletters = [make_newsletter("a", date(2026, 10, 3), 1, "Bike lanes")]
@@ -110,7 +168,6 @@ class FakeQuery:
         self.database = database
         self.table = table
         self.created_since: str | None = None
-        self.ids: list[str] | None = None
         self.order_column: str | None = None
         self.start = 0
         self.end = 0
@@ -122,11 +179,6 @@ class FakeQuery:
     def gte(self, column: str, value: str) -> "FakeQuery":
         assert column == "created_at"
         self.created_since = value
-        return self
-
-    def in_(self, column: str, values: list[str]) -> "FakeQuery":
-        assert column == "id"
-        self.ids = values
         return self
 
     def order(self, column: str) -> "FakeQuery":
@@ -147,9 +199,6 @@ class FakeQuery:
                 for row in rows
                 if datetime.fromisoformat(row["created_at"]) >= since
             ]
-        if self.ids is not None:
-            # in_() queries are not paged; return every matching row.
-            return SimpleNamespace(data=[row for row in rows if row["id"] in self.ids])
         return SimpleNamespace(data=rows[self.start : self.end + 1])
 
 
@@ -166,8 +215,6 @@ def newsletter_row(
     newsletter_id: str,
     created_at: str,
     subject: str = "News",
-    topics: list[str] | None = None,
-    has_llm_metadata: bool = True,
 ):
     return {
         "id": newsletter_id,
@@ -176,7 +223,6 @@ def newsletter_row(
         "source_id": 1,
         "subject": subject,
         "plain_text": "Bike lanes",
-        "topics": topics if topics is not None else ([] if has_llm_metadata else None),
     }
 
 
@@ -231,25 +277,6 @@ class TestFetchRows(unittest.TestCase):
         self.assertEqual(supabase.table.call_count, 1)
 
 
-class TestFetchRowsById(unittest.TestCase):
-    def test_batches_ids_with_a_pause_between_batches(self):
-        ids = [f"{index:05d}" for index in range(FETCH_PAGE_SIZE + 1)]
-        supabase = FakeSupabase({"newsletters": [{"id": item} for item in ids]})
-        sleep = MagicMock()
-        fetched = fetch_rows_by_id(supabase, "newsletters", "id", ids, sleep)
-        self.assertEqual([row["id"] for row in fetched], ids)
-        self.assertEqual(
-            [len(query.ids or []) for query in supabase.executed],
-            [FETCH_PAGE_SIZE, 1],
-        )
-        sleep.assert_called_once_with(FETCH_PAUSE_SECONDS)
-
-    def test_no_ids_means_no_queries(self):
-        supabase = FakeSupabase({"newsletters": []})
-        self.assertEqual(fetch_rows_by_id(supabase, "newsletters", "id", []), [])
-        self.assertEqual(supabase.executed, [])
-
-
 class TestRefreshSnapshot(unittest.TestCase):
     def setUp(self):
         self.cursor = datetime(2026, 10, 11, 20, 0, tzinfo=UTC)
@@ -273,16 +300,20 @@ class TestRefreshSnapshot(unittest.TestCase):
                 ],
             }
         )
-        updated, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
+        updated, fetched = refresh_snapshot(supabase, self.snapshot, MagicMock())
 
-        newsletter_query = next(
+        newsletter_queries = [
             query for query in supabase.executed if query.table == "newsletters"
-        )
+        ]
+        # One query for recent rows only; older rows are never re-read.
+        self.assertEqual(len(newsletter_queries), 1)
         self.assertEqual(
-            newsletter_query.created_since,
+            newsletter_queries[0].created_since,
             (self.cursor - INCREMENTAL_OVERLAP).isoformat(),
         )
-        self.assertEqual(counts, RefreshCounts(new_rows=2, metadata_rows=0))
+        self.assertEqual(newsletter_queries[0].columns, NEWSLETTER_COLUMNS)
+        self.assertNotIn("topics", NEWSLETTER_COLUMNS)
+        self.assertEqual(fetched, 2)
         self.assertEqual(
             {item.id: item.subject for item in updated.newsletters},
             {"kept": "Kept", "edited": "After edit", "added": "News"},
@@ -294,59 +325,10 @@ class TestRefreshSnapshot(unittest.TestCase):
 
     def test_no_new_rows_keeps_snapshot_and_cursor(self):
         supabase = FakeSupabase({"sources": SOURCE_ROWS, "newsletters": []})
-        updated, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
-        self.assertEqual(counts, RefreshCounts(new_rows=0, metadata_rows=0))
+        updated, fetched = refresh_snapshot(supabase, self.snapshot, MagicMock())
+        self.assertEqual(fetched, 0)
         self.assertEqual(updated.newsletters, self.snapshot.newsletters)
         self.assertEqual(updated.fetched_through, self.cursor)
-        # Nothing was waiting on LLM metadata, so only the cursor query ran.
-        self.assertEqual(
-            [query.ids for query in supabase.executed if query.table == "newsletters"],
-            [None],
-        )
-
-    def test_picks_up_llm_metadata_added_after_the_overlap_window(self):
-        # Ingested weeks ago without LLM metadata; processed since then.
-        pending = newsletter_record(
-            "pending", date(2026, 9, 2), "Pending", has_llm_metadata=False
-        )
-        snapshot = Snapshot([], [*self.snapshot.newsletters, pending], self.cursor)
-        supabase = FakeSupabase(
-            {
-                "sources": SOURCE_ROWS,
-                "newsletters": [
-                    newsletter_row(
-                        "pending",
-                        "2026-09-02T15:00:00+00:00",
-                        topics=["bike_lanes"],
-                    )
-                ],
-            }
-        )
-        updated, counts = refresh_snapshot(supabase, snapshot, MagicMock())
-
-        self.assertEqual(counts, RefreshCounts(new_rows=0, metadata_rows=1))
-        refreshed = next(item for item in updated.newsletters if item.id == "pending")
-        self.assertEqual(refreshed.topics, ["bike_lanes"])
-        metadata_query = next(q for q in supabase.executed if q.ids is not None)
-        self.assertEqual(metadata_query.ids, ["pending"])
-        # Old text is never re-read; only the metadata columns are requested.
-        self.assertEqual(metadata_query.columns, LLM_METADATA_COLUMNS)
-        self.assertNotIn("plain_text", metadata_query.columns)
-
-    def test_rows_fetched_by_the_cursor_are_not_fetched_again(self):
-        supabase = FakeSupabase(
-            {
-                "sources": SOURCE_ROWS,
-                "newsletters": [
-                    newsletter_row(
-                        "fresh", "2026-10-12T15:00:00+00:00", has_llm_metadata=False
-                    )
-                ],
-            }
-        )
-        _, counts = refresh_snapshot(supabase, self.snapshot, MagicMock())
-        self.assertEqual(counts, RefreshCounts(new_rows=1, metadata_rows=0))
-        self.assertTrue(all(q.ids is None for q in supabase.executed))
 
 
 class TestBuildFullSnapshot(unittest.TestCase):
@@ -465,16 +447,13 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             self.assertEqual([item.id for item in snapshot.newsletters], ["a"])
 
 
-def newsletter_record(
-    newsletter_id: str, day: date, subject: str, has_llm_metadata: bool = True
-) -> NewsletterRecord:
+def newsletter_record(newsletter_id: str, day: date, subject: str) -> NewsletterRecord:
     return NewsletterRecord(
         id=newsletter_id,
         received_date=day,
         source_id=1,
         subject=subject,
         plain_text="Bike lanes",
-        topics=[] if has_llm_metadata else None,
     )
 
 

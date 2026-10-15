@@ -1,14 +1,15 @@
 """Term-level metrics: the searchable term index, distinctive ward vocabulary,
 and rising terms.
 
-All counts are newsletter counts (how many newsletters mention a term at least
+Counts are newsletter counts (how many newsletters mention a term at least
 once), not raw occurrences, so one long newsletter repeating a word cannot
-dominate a metric.
+dominate a metric. Rising terms go one step further and count wards.
 """
 
 import math
+import statistics
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -20,7 +21,12 @@ from analytics.records import (
     shift_month,
     ward_sort_key,
 )
-from analytics.text import MIN_TOKEN_LENGTH, WORD_PATTERN, extract_terms
+from analytics.text import (
+    MIN_TOKEN_LENGTH,
+    WORD_PATTERN,
+    contains_word_run,
+    extract_terms,
+)
 
 # Additive smoothing for share estimates so unseen terms never divide by zero.
 SHARE_SMOOTHING = 0.5
@@ -149,17 +155,6 @@ class DistinctiveTerm:
     rest_share: float
 
 
-@dataclass(frozen=True)
-class RisingTerm:
-    term: str
-    ratio: float
-    latest_newsletters: int
-    latest_sources: int
-    latest_share: float
-    baseline_newsletters: int
-    baseline_share: float
-
-
 def build_name_tokens_by_ward(sources: Iterable[SourceRecord]) -> dict[str, set[str]]:
     """Collect the lowercase name words of each ward's sources (e.g. alderman names)."""
     tokens_by_ward: dict[str, set[str]] = defaultdict(set)
@@ -267,70 +262,134 @@ def select_latest_complete_month(months: Iterable[str], as_of_month: str) -> str
     return max(complete) if complete else None
 
 
+@dataclass(frozen=True)
+class RisingTerm:
+    term: str
+    latest_wards: int
+    baseline_wards: float
+    baseline_month_wards: list[int]
+    ward_gain: float
+    latest_newsletters: int
+
+
+def group_wards_by_month(documents: Iterable[NewsletterTerms]) -> dict[str, set[str]]:
+    """The wards with at least one newsletter in each month (the ward-reach denominator)."""
+    wards_by_month: dict[str, set[str]] = defaultdict(set)
+    for document in documents:
+        if document.ward is not None:
+            wards_by_month[document.month].add(document.ward)
+    return wards_by_month
+
+
 def compute_rising_terms(
     documents: list[NewsletterTerms],
     vocabulary: set[str],
     latest_month: str,
     baseline_months: int,
-    min_latest_newsletters: int,
-    min_latest_sources: int,
+    min_latest_wards: int,
+    min_ward_gain: int,
     top_n: int,
 ) -> dict[str, Any]:
-    """Rank terms by how much their share of newsletters rose in latest_month
-    versus the preceding baseline_months.
+    """Rank terms by how many more wards mentioned them in latest_month than in a
+    typical recent month.
 
-    A term must appear in at least min_latest_newsletters newsletters from at
-    least min_latest_sources different sources in the latest month, so a
-    single prolific sender cannot manufacture a trend.
+    Counting wards rather than pooling newsletters means one prolific sender
+    cannot manufacture a trend. The baseline is the median ward count over the
+    baseline_months before latest_month, so one unusual month does not set it;
+    baseline months with no active ward (before the archive starts) are left
+    out of the median rather than counted as zero.
+    A term must reach at least min_latest_wards wards and gain at least
+    min_ward_gain wards over the baseline. Pass only newsletters whose text
+    could be read: the wards active each month are the denominator readers
+    compare against, and a ward whose text was unavailable could not mention
+    anything.
     """
-    baseline = [
+    baseline = sorted(
         shift_month(latest_month, -offset) for offset in range(1, baseline_months + 1)
+    )
+    window = {latest_month, *baseline}
+    window_documents = [
+        document
+        for document in documents
+        if document.month in window and document.ward is not None
     ]
-    baseline_set = set(baseline)
-    latest_documents = [d for d in documents if d.month == latest_month]
-    baseline_documents = [d for d in documents if d.month in baseline_set]
-    latest_total = len(latest_documents)
-    baseline_total = len(baseline_documents)
-
+    active_wards = group_wards_by_month(window_documents)
     result: dict[str, Any] = {
         "latest_month": latest_month,
-        "baseline_months": sorted(baseline),
-        "latest_newsletters": latest_total,
-        "baseline_newsletters": baseline_total,
+        "baseline_months": baseline,
+        "latest_active_wards": len(active_wards[latest_month]),
+        "baseline_active_wards": [len(active_wards[month]) for month in baseline],
         "terms": [],
     }
-    if not latest_total or not baseline_total:
+    observed_baseline = [month for month in baseline if active_wards[month]]
+    if not active_wards[latest_month] or not observed_baseline:
         return result
 
-    sources_by_term: dict[str, set[int | None]] = defaultdict(set)
-    for document in latest_documents:
-        for term in document.terms & vocabulary:
-            sources_by_term[term].add(document.source_id)
-
-    latest_counts = count_newsletters_per_term(latest_documents)
-    baseline_counts = count_newsletters_per_term(baseline_documents)
-
-    candidates = [
-        RisingTerm(
-            term=term,
-            ratio=round(
-                smoothed_share(latest_counts[term], latest_total)
-                / smoothed_share(baseline_counts[term], baseline_total),
-                2,
-            ),
-            latest_newsletters=latest_counts[term],
-            latest_sources=len(term_sources),
-            latest_share=round(latest_counts[term] / latest_total, 4),
-            baseline_newsletters=baseline_counts[term],
-            baseline_share=round(baseline_counts[term] / baseline_total, 4),
-        )
-        for term, term_sources in sources_by_term.items()
-        if latest_counts[term] >= min_latest_newsletters
-        and len(term_sources) >= min_latest_sources
-    ]
-    ranked = sorted(
-        (item for item in candidates if item.ratio > 1),
-        key=lambda item: (-item.ratio, -item.latest_newsletters, item.term),
+    wards_by_term: dict[str, dict[str, set[str]]] = defaultdict(
+        lambda: defaultdict(set)
     )
-    result["terms"] = [asdict(item) for item in ranked[:top_n]]
+    latest_newsletters: Counter[str] = Counter()
+    for document in window_documents:
+        for term in document.terms & vocabulary:
+            wards_by_term[term][document.month].add(str(document.ward))
+            if document.month == latest_month:
+                latest_newsletters[term] += 1
+
+    candidates: list[RisingTerm] = []
+    for term, wards_by_month in wards_by_term.items():
+        latest_wards = len(wards_by_month[latest_month])
+        month_wards = [len(wards_by_month[month]) for month in baseline]
+        baseline_wards = float(
+            statistics.median(len(wards_by_month[month]) for month in observed_baseline)
+        )
+        gain = latest_wards - baseline_wards
+        if latest_wards >= min_latest_wards and gain >= min_ward_gain:
+            candidates.append(
+                RisingTerm(
+                    term=term,
+                    latest_wards=latest_wards,
+                    baseline_wards=baseline_wards,
+                    baseline_month_wards=month_wards,
+                    ward_gain=gain,
+                    latest_newsletters=latest_newsletters[term],
+                )
+            )
+    ranked = sorted(
+        candidates, key=lambda item: (-item.ward_gain, -item.latest_wards, item.term)
+    )
+    result["terms"] = [
+        asdict(item) for item in drop_overlapping_terms(ranked, lambda i: i.term)
+    ][:top_n]
     return result
+
+
+def are_parts_of_one_phrase(first: list[str], second: list[str]) -> bool:
+    """True if one term contains the other ("labor" in "labor day") or the two
+    chain into a longer phrase ("labor day" and "day weekend").
+
+    Terms that merely share a word in the same position ("labor day" and
+    "election day") are different phrases, so they are not matched.
+    """
+    return (
+        contains_word_run(first, second)
+        or contains_word_run(second, first)
+        or first[-1] == second[0]
+        or second[-1] == first[0]
+    )
+
+
+def drop_overlapping_terms[T](ranked: list[T], term_of: Callable[[T], str]) -> list[T]:
+    """Keep each item unless its term is part of the same phrase as a
+    higher-ranked kept term (see `are_parts_of_one_phrase`).
+
+    One story shows up as several overlapping terms ("labor day", "labor",
+    "day weekend"); keeping only the highest-ranked leaves room for others.
+    """
+    kept: list[T] = []
+    kept_words: list[list[str]] = []
+    for item in ranked:
+        words = term_of(item).split(" ")
+        if not any(are_parts_of_one_phrase(words, other) for other in kept_words):
+            kept.append(item)
+            kept_words.append(words)
+    return kept

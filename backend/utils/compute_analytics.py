@@ -10,14 +10,15 @@ and push.
 
 The production database has a small disk IO budget, so it is read gently:
 
-- default: fetch all sources, the newsletters created since the snapshot's
-  cursor (with a short overlap), and the topics of older rows that had no
-  LLM topics yet; merge them into the snapshot, then compute.
+- default: fetch all sources and the newsletters created since the
+  snapshot's cursor (with a short overlap); merge them into the snapshot,
+  then compute. Older rows are never re-read: analytics uses only text and
+  dates, not the LLM metadata that processing adds to rows later.
 - --offline: never contact the database; compute from the snapshot as-is.
 - --full-refresh: rebuild the snapshot by reading every newsletter. Heavy;
-  use rarely: on a fresh checkout, or after reprocessing that edits rows the
-  default mode does not revisit (privacy re-sanitization of plain_text, LLM
-  re-runs over already-processed rows) or after deletions.
+  use rarely: on a fresh checkout, or after reprocessing that edits the text
+  of rows the default mode does not revisit (privacy re-sanitization of
+  plain_text) or after deletions.
 
 Usage:
     uv run python -m utils.compute_analytics
@@ -33,7 +34,6 @@ import json
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -43,6 +43,13 @@ from analytics.facts import (
     build_metadata,
     build_newsletter_facts,
     build_source_coverage,
+    is_text_unavailable,
+)
+from analytics.lenses import (
+    LENSES,
+    LensMatcher,
+    match_newsletters,
+    summarize_lens_hits,
 )
 from analytics.records import (
     CHICAGO_TIMEZONE,
@@ -55,8 +62,6 @@ from analytics.records import (
 from analytics.snapshot import (
     Snapshot,
     advance_cursor,
-    apply_llm_metadata,
-    ids_missing_llm_metadata,
     merge_newsletters,
     newest_created_at,
 )
@@ -87,11 +92,7 @@ FETCH_PAGE_SIZE = 100
 FETCH_PAUSE_SECONDS = 1.0
 # Re-fetch this far behind the cursor so rows committed late are not missed.
 INCREMENTAL_OVERLAP = timedelta(days=1)
-NEWSLETTER_COLUMNS = (
-    "id, created_at, received_date, source_id, subject, plain_text, topics"
-)
-# Only these columns change when LLM processing runs after ingestion.
-LLM_METADATA_COLUMNS = "id, topics"
+NEWSLETTER_COLUMNS = "id, created_at, received_date, source_id, subject, plain_text"
 SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
 # Text repeated in at least this share of one source's newsletters is template
@@ -107,11 +108,33 @@ DISTINCTIVE_TOP_N = 20
 DISTINCTIVE_MIN_WARD_NEWSLETTERS = 5
 DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD = 3
 DISTINCTIVE_MAX_WARD_SHARE = 0.6
-RISING_BASELINE_MONTHS = 6
-RISING_MIN_LATEST_NEWSLETTERS = 5
-RISING_MIN_LATEST_SOURCES = 2
-RISING_TOP_N = 30
+# Keyword lenses match on boilerplate-cleaned text. Lenses feed ward reach
+# ("did this ward write about X this month"), and a standing block such as a
+# resource directory repeated in every issue would answer yes every month
+# whether or not the ward said anything new, flattening the monthly calendar
+# (on raw text, immigration reaches 14-18 wards every month of 2026; cleaned,
+# it falls from 17 in January to 10 in August). The cost: a ward whose only
+# coverage of a subject is its standing block is not counted. Set False to
+# match raw text instead.
+MATCH_LENSES_ON_CLEANED_TEXT = True
+# A newsletter mentions a lens when the lens's phrases occur at least this
+# many separate times in it (the same phrase twice counts; phrases that
+# overlap or touch, like "city council meeting", count once). One passing
+# mention, such
+# as early voting "at the library" or "call 311 while our office is closed",
+# does not make a newsletter about parks or city services, and counting those
+# puts nearly every ward on nearly every lens every month.
+LENS_MIN_MENTIONS = 2
+# Rising terms compare the latest complete month with the median of this
+# many months before it, counting wards rather than newsletters.
+RISING_BASELINE_MONTHS = 3
+# A rising term must be mentioned by at least this many wards in the latest
+# month and by at least this many more wards than in a typical baseline month.
+RISING_MIN_LATEST_WARDS = 5
+RISING_MIN_WARD_GAIN = 3
+RISING_TOP_N = 15
 SAMPLE_SIZE = 8
+LENS_REPORT_TOP_PHRASES = 4
 
 
 def fetch_rows(
@@ -143,25 +166,6 @@ def fetch_rows(
         sleep(FETCH_PAUSE_SECONDS)
 
 
-def fetch_rows_by_id(
-    supabase: Any,
-    table: str,
-    columns: str,
-    ids: list[str],
-    sleep: Callable[[float], None] = time.sleep,
-) -> list[dict[str, Any]]:
-    """Fetch specific rows in batches of FETCH_PAGE_SIZE ids, pausing between batches."""
-    rows: list[dict[str, Any]] = []
-    for start in range(0, len(ids), FETCH_PAGE_SIZE):
-        if start:
-            sleep(FETCH_PAUSE_SECONDS)
-        batch = ids[start : start + FETCH_PAGE_SIZE]
-        rows.extend(
-            supabase.table(table).select(columns).in_("id", batch).execute().data
-        )
-    return rows
-
-
 def fetch_sources(
     supabase: Any, sleep: Callable[[float], None] = time.sleep
 ) -> list[SourceRecord]:
@@ -172,20 +176,13 @@ def fetch_sources(
     ]
 
 
-@dataclass(frozen=True)
-class RefreshCounts:
-    new_rows: int
-    metadata_rows: int
-
-
 def refresh_snapshot(
     supabase: Any, snapshot: Snapshot, sleep: Callable[[float], None] = time.sleep
-) -> tuple[Snapshot, RefreshCounts]:
-    """Bring the snapshot up to date without re-reading old newsletter text.
+) -> tuple[Snapshot, int]:
+    """Bring the snapshot up to date without re-reading old newsletters.
 
     Fetches newsletters created since the snapshot's cursor (minus an
-    overlap), then re-checks only the LLM metadata columns of older rows that
-    were still unprocessed, since LLM processing often runs days later.
+    overlap) and returns the updated snapshot with the number of rows fetched.
     """
     created_since = snapshot.fetched_through - INCREMENTAL_OVERLAP
     sources = fetch_sources(supabase, sleep)
@@ -193,23 +190,12 @@ def refresh_snapshot(
     newsletters = merge_newsletters(
         snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
     )
-
-    fetched_ids = {str(row["id"]) for row in rows}
-    pending_ids = [
-        newsletter_id
-        for newsletter_id in ids_missing_llm_metadata(newsletters)
-        if newsletter_id not in fetched_ids
-    ]
-    metadata_rows = fetch_rows_by_id(
-        supabase, "newsletters", LLM_METADATA_COLUMNS, pending_ids, sleep
-    )
-
     updated = Snapshot(
         sources=sources,
-        newsletters=apply_llm_metadata(newsletters, metadata_rows),
+        newsletters=newsletters,
         fetched_through=advance_cursor(snapshot.fetched_through, rows),
     )
-    return updated, RefreshCounts(len(rows), len(metadata_rows))
+    return updated, len(rows)
 
 
 def build_full_snapshot(
@@ -236,31 +222,52 @@ def compute_outputs(
         min_share_percent=BOILERPLATE_MIN_SHARE_PERCENT,
         min_source_newsletters=BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
     )
+    # Too little text was extracted from these to tell what they mention.
+    unavailable_ids = {
+        newsletter.id
+        for newsletter in newsletters
+        if is_text_unavailable(newsletter.plain_text)
+    }
     documents: list[NewsletterTerms] = build_newsletter_terms(
         content_newsletters, sources_by_id
     )
     vocabulary = select_vocabulary(documents, min_term_newsletters)
+
+    lens_newsletters = (
+        content_newsletters if MATCH_LENSES_ON_CLEANED_TEXT else newsletters
+    )
+    matcher = LensMatcher(LENSES)
+    lens_matches = match_newsletters(
+        (item for item in lens_newsletters if item.id not in unavailable_ids),
+        matcher,
+    )
+    lenses_by_newsletter = {
+        newsletter_id: matcher.lenses_mentioned(
+            matches.lens_mentions, LENS_MIN_MENTIONS
+        )
+        for newsletter_id, matches in lens_matches.items()
+    }
 
     latest_month = select_latest_complete_month(
         (document.month for document in documents), month_key(generated_at.date())
     )
     rising = (
         compute_rising_terms(
-            documents,
+            [doc for doc in documents if doc.newsletter_id not in unavailable_ids],
             vocabulary,
             latest_month=latest_month,
             baseline_months=RISING_BASELINE_MONTHS,
-            min_latest_newsletters=RISING_MIN_LATEST_NEWSLETTERS,
-            min_latest_sources=RISING_MIN_LATEST_SOURCES,
+            min_latest_wards=RISING_MIN_LATEST_WARDS,
+            min_ward_gain=RISING_MIN_WARD_GAIN,
             top_n=RISING_TOP_N,
         )
         if latest_month
         else {
             "latest_month": None,
             "baseline_months": [],
+            "latest_active_wards": 0,
+            "baseline_active_wards": [],
             "terms": [],
-            "latest_newsletters": 0,
-            "baseline_newsletters": 0,
         }
     )
 
@@ -269,7 +276,19 @@ def compute_outputs(
             newsletters, sources, len(vocabulary), min_term_newsletters, generated_at
         ),
         "newsletters": {
-            "newsletters": build_newsletter_facts(newsletters, sources_by_id)
+            "newsletters": build_newsletter_facts(
+                newsletters, sources_by_id, lenses_by_newsletter
+            )
+        },
+        "lenses": {
+            "text": "cleaned" if MATCH_LENSES_ON_CLEANED_TEXT else "raw",
+            "min_mentions": LENS_MIN_MENTIONS,
+            "readable_newsletters": len(lens_matches),
+            "lenses": summarize_lens_hits(
+                matcher,
+                {key: matches.phrases for key, matches in lens_matches.items()},
+                lenses_by_newsletter,
+            ),
         },
         "sources": {"sources": build_source_coverage(sources, newsletters)},
         "terms": {
@@ -317,14 +336,32 @@ def print_report(
         f"{metadata['term_count']} indexed terms (>= {metadata['min_term_newsletters']} newsletters)"
     )
 
-    rising = outputs["rising"]
+    lenses = outputs["lenses"]
+    readable = lenses["readable_newsletters"]
     print(
-        f"\nRising terms in {rising['latest_month']} vs {', '.join(rising['baseline_months'])}:"
+        f"\nLens hit rates over {readable} newsletters with readable text "
+        f"({lenses['text']} text, mentioned at least "
+        f"{lenses['min_mentions']} separate times):"
     )
+    for lens in lenses["lenses"]:
+        top_phrases = ", ".join(
+            f"{item['phrase']} ({item['newsletters']})"
+            for item in lens["phrases"][:LENS_REPORT_TOP_PHRASES]
+        )
+        share = lens["newsletters"] / readable if readable else 0
+        print(f"  {lens['label']:<34} {share:6.1%}  {top_phrases}")
+
+    rising = outputs["rising"]
+    if rising["latest_month"]:
+        print(
+            f"\nRising terms in {rising['latest_month']} "
+            f"({rising['latest_active_wards']} wards active) vs the median of "
+            f"{', '.join(rising['baseline_months'])}:"
+        )
     for item in rising["terms"][:SAMPLE_SIZE]:
         print(
-            f"  {item['term']:<30} x{item['ratio']:<6} "
-            f"({item['latest_newsletters']} newsletters, {item['latest_sources']} sources)"
+            f"  {item['term']:<30} {item['latest_wards']:>3} wards "
+            f"(baseline {item['baseline_wards']:g}, +{item['ward_gain']:g})"
         )
 
     print("\nDistinctive vocabulary (sample wards):")
@@ -392,11 +429,10 @@ def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapsho
         return snapshot
 
     print("Fetching sources and newsletters created since the snapshot...")
-    snapshot, counts = refresh_snapshot(get_supabase_client(), snapshot)
+    snapshot, fetched = refresh_snapshot(get_supabase_client(), snapshot)
     save_snapshot(args.snapshot_dir, snapshot, now)
     print(
-        f"Fetched {counts.new_rows} recent newsletter rows and LLM metadata for "
-        f"{counts.metadata_rows} older ones; the snapshot now has "
+        f"Fetched {fetched} recent newsletter rows; the snapshot now has "
         f"{len(snapshot.newsletters)} newsletters."
     )
     return snapshot

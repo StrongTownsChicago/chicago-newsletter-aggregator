@@ -9,7 +9,8 @@ export interface NewsletterFact {
   source_id: number | null;
   ward: string | null;
   alder: string | null;
-  topics: string[] | null; // null = not yet processed by the LLM
+  /** Ids of the keyword lenses the newsletter mentions; empty when its text is unavailable. */
+  lenses: string[];
   words: number;
   /** Too little text was extracted to analyze (image-only or "view in browser" issues). */
   text_unavailable?: boolean;
@@ -43,21 +44,23 @@ export interface DistinctiveTerm {
   rest_share: number;
 }
 
+/** A term mentioned by more wards in the latest month than in a typical recent month. */
 export interface RisingTerm {
   term: string;
-  ratio: number;
+  latest_wards: number;
+  /** Median of the baseline months' ward counts. */
+  baseline_wards: number;
+  baseline_month_wards: number[];
+  ward_gain: number;
   latest_newsletters: number;
-  latest_sources: number;
-  latest_share: number;
-  baseline_newsletters: number;
-  baseline_share: number;
 }
 
 export interface RisingTerms {
   latest_month: string | null;
   baseline_months: string[];
-  latest_newsletters: number;
-  baseline_newsletters: number;
+  /** Wards with readable newsletters in the latest month (the denominator). */
+  latest_active_wards: number;
+  baseline_active_wards: number[];
   terms: RisingTerm[];
 }
 
@@ -71,25 +74,50 @@ export interface AnalyticsMetadata {
   min_term_newsletters: number;
 }
 
+/** One keyword lens: its reviewed phrase list and how many newsletters each phrase was found in. */
+export interface LensDefinition {
+  id: string;
+  label: string;
+  description: string;
+  /** A Strong Towns Chicago focus area rather than a broad civic subject. */
+  strong_towns_focus: boolean;
+  /** Newsletters that mention the lens. */
+  newsletters: number;
+  phrases: { phrase: string; newsletters: number }[];
+}
+
+/** The lens definitions and the matching rules behind every lens flag (lenses.json). */
+export interface LensSummary {
+  /** Which text was matched: "cleaned" (standing boilerplate removed) or "raw". */
+  text: "cleaned" | "raw";
+  /** A newsletter mentions a lens when its phrases occur at least this many times. */
+  min_mentions: number;
+  /** Newsletters with enough extracted text to match. */
+  readable_newsletters: number;
+  lenses: LensDefinition[];
+}
+
 /** Everything the dashboard renders up front; the term index loads separately, on demand. */
 export interface AnalyticsDataset {
   metadata: AnalyticsMetadata;
   newsletters: NewsletterFact[];
   sources: SourceCoverage[];
+  lenses: LensSummary;
   distinctiveByWard: Record<string, DistinctiveTerm[]>;
   rising: RisingTerms;
 }
 
 export interface AnalyticsFilters {
   wards: string[]; // empty = all wards
-  topic: string | null;
+  /** Lens id; only newsletters mentioning it are counted where a panel applies it. */
+  lens: string | null;
   fromMonth: string | null; // YYYY-MM inclusive
   toMonth: string | null; // YYYY-MM inclusive
 }
 
 export const EMPTY_FILTERS: AnalyticsFilters = {
   wards: [],
-  topic: null,
+  lens: null,
   fromMonth: null,
   toMonth: null,
 };
@@ -196,10 +224,6 @@ export function listWards(facts: NewsletterFact[]): string[] {
   return [...wards].sort(compareWards);
 }
 
-export function listTopics(facts: NewsletterFact[]): string[] {
-  return [...new Set(facts.flatMap((fact) => fact.topics ?? []))].sort();
-}
-
 // ---------------------------------------------------------------------------
 // Filtering and summary
 
@@ -215,19 +239,20 @@ function isInSelectedWards(ward: string | null, filters: AnalyticsFilters): bool
 }
 
 /**
- * Apply the global filters. Panels that compare topics pass ignoreTopic so a
- * topic filter does not trivially make that topic 100% of everything.
+ * Apply the global filters. Panels that compare lenses, or count wards and
+ * newsletters regardless of subject, pass ignoreLens so a lens filter does not
+ * trivially make that lens 100% of everything.
  */
 export function filterFacts(
   facts: NewsletterFact[],
   filters: AnalyticsFilters,
-  options: { ignoreTopic?: boolean } = {},
+  options: { ignoreLens?: boolean } = {},
 ): NewsletterFact[] {
   return facts.filter(
     (fact) =>
       isInSelectedWards(fact.ward, filters) &&
       isWithinMonths(monthOf(fact.date), filters) &&
-      (options.ignoreTopic || !filters.topic || (fact.topics ?? []).includes(filters.topic)),
+      (options.ignoreLens || !filters.lens || fact.lenses.includes(filters.lens)),
   );
 }
 
@@ -401,19 +426,6 @@ export function trimSparseEdges<T extends { share: number | null }>(points: T[])
   return points.slice(first, last + 1);
 }
 
-/**
- * The months from the first to the last point with a share in any series, so
- * small multiples share one x axis instead of each starting where its own
- * data does.
- */
-export function listMonthsWithShares(points: { month: string; share: number | null }[]): string[] {
-  const months = points
-    .filter((point) => point.share !== null)
-    .map((point) => point.month)
-    .sort();
-  return months.length ? listMonths(months[0], months[months.length - 1]) : [];
-}
-
 // ---------------------------------------------------------------------------
 // Term explorer
 
@@ -493,7 +505,7 @@ export interface TermMonthPoint {
 /**
  * Newsletters mentioning a term per month, as a share of all newsletters that
  * month (null for sparse months). `scopeFacts` must be filtered by ward and
- * date only, matching the term index (which cannot be filtered by topic).
+ * date only, matching the term index (which cannot be filtered by lens).
  */
 export function termMentionsByMonth(
   bucketCounts: TermBucketCount[],
@@ -555,71 +567,131 @@ export function termMentionsByWard(
 }
 
 // ---------------------------------------------------------------------------
-// Topics
+// Lens ward reach
 
-function processedFacts(facts: NewsletterFact[]): NewsletterFact[] {
-  return facts.filter((fact) => fact.topics !== null);
-}
+/**
+ * City-wide ward-reach months with fewer wards sending readable newsletters
+ * than this are faded: a share of a dozen wards says little about the city.
+ */
+export const MIN_ACTIVE_WARDS_FOR_REACH = 20;
 
-export interface TopicMonthPoint {
+export interface LensReachCell {
+  lens: string;
   month: string;
-  topic: string;
-  newsletters: number;
-  monthNewsletters: number;
+  /** Wards with at least one newsletter mentioning the lens that month. */
+  wardsMentioning: number;
+  /** Wards with at least one readable newsletter that month (the denominator). */
+  activeWards: number;
+  /** wardsMentioning / activeWards, or null when no ward was active. */
   share: number | null;
 }
 
-/**
- * First complete month labeled with `street_safety_or_traffic_calming`, which
- * joined the LLM topic list on 2026-01-31 (commit c574312) without a backfill.
- */
-export const STREET_SAFETY_LABELING_START_MONTH = "2026-02";
+/** Readable newsletters can mention a lens; image-only ones cannot be read for any. */
+function isReadable(fact: NewsletterFact): boolean {
+  return !fact.text_unavailable;
+}
 
-/**
- * Topics added to the LLM taxonomy after labeling began, mapped to the first
- * complete month labeled with them. Earlier newsletters were never re-labeled,
- * so their months would show a false 0%. Add an entry (with its own named
- * constant) whenever a topic joins backend/processing/llm_processor.py:TOPICS
- * without a backfill.
- */
-export const TOPIC_LABELING_START_MONTH: Readonly<Record<string, string>> = {
-  street_safety_or_traffic_calming: STREET_SAFETY_LABELING_START_MONTH,
-};
+interface WardMonthActivity {
+  readableWards: Set<string>;
+  wardsByLens: Map<string, Set<string>>;
+}
 
-/** Whether newsletters from this month could have been labeled with the topic. */
-export function isTopicLabeledInMonth(topic: string, month: string): boolean {
-  return !Object.hasOwn(TOPIC_LABELING_START_MONTH, topic) || month >= TOPIC_LABELING_START_MONTH[topic];
+function groupWardActivityByMonth(facts: NewsletterFact[]): Map<string, WardMonthActivity> {
+  const byMonth = new Map<string, WardMonthActivity>();
+  for (const fact of facts) {
+    if (fact.ward === null) continue;
+    const month = monthOf(fact.date);
+    let activity = byMonth.get(month);
+    if (!activity) {
+      activity = { readableWards: new Set(), wardsByLens: new Map() };
+      byMonth.set(month, activity);
+    }
+    if (!isReadable(fact)) continue;
+    activity.readableWards.add(fact.ward);
+    for (const lens of fact.lenses) {
+      const wards = activity.wardsByLens.get(lens) ?? new Set<string>();
+      wards.add(fact.ward);
+      activity.wardsByLens.set(lens, wards);
+    }
+  }
+  return byMonth;
 }
 
 /**
- * Share of processed newsletters mentioning each topic, per month. Every month
- * in the span is listed; sparse months, and months before a topic entered the
- * taxonomy, get a null share.
+ * For each lens and month: how many wards mentioned the lens, out of the wards
+ * with at least one readable newsletter that month. Wards whose newsletters
+ * that month were all image-only are left out of the denominator, since they
+ * could not be seen mentioning anything.
+ * `facts` should be filtered by ward and date, never by lens.
  */
-export function computeTopicTrends(
+export function computeLensWardReach(
   facts: NewsletterFact[],
-  topics: string[],
-  minMonthNewsletters: number = MIN_MONTH_NEWSLETTERS_FOR_SHARES,
-): TopicMonthPoint[] {
-  const factsByMonth = groupBy(processedFacts(facts), (fact) => monthOf(fact.date));
-  const months = [...factsByMonth.keys()].sort();
-  if (months.length === 0) return [];
-  return listMonths(months[0], months[months.length - 1]).flatMap((month) => {
-    const monthFacts = factsByMonth.get(month) ?? [];
-    const topicCounts = countTopics(monthFacts);
-    return topics.map((topic) => {
-      const newsletters = topicCounts.get(topic) ?? 0;
+  lensIds: string[],
+  months: string[],
+): LensReachCell[] {
+  const byMonth = groupWardActivityByMonth(facts);
+  return lensIds.flatMap((lens) =>
+    months.map((month) => {
+      const activity = byMonth.get(month);
+      const activeWards = activity?.readableWards.size ?? 0;
+      const wardsMentioning = activity?.wardsByLens.get(lens)?.size ?? 0;
       return {
+        lens,
         month,
-        topic,
-        newsletters,
-        monthNewsletters: monthFacts.length,
-        share: isTopicLabeledInMonth(topic, month)
-          ? shareOrNull(newsletters, monthFacts.length, minMonthNewsletters)
-          : null,
+        wardsMentioning,
+        activeWards,
+        share: activeWards > 0 ? wardsMentioning / activeWards : null,
       };
-    });
-  });
+    }),
+  );
+}
+
+/** Whether a reach cell rests on too few wards to describe the city (always false when the threshold is 0). */
+export function isReachFaded(cell: Pick<LensReachCell, "activeWards">, minActiveWards: number): boolean {
+  return cell.activeWards < minActiveWards;
+}
+
+export type LensWardStatus = "mentioned" | "not_mentioned" | "no_newsletter";
+
+export interface LensWardCell {
+  ward: string;
+  month: string;
+  status: LensWardStatus;
+  /** Newsletters that month mentioning the lens. */
+  mentioning: number;
+  /** All newsletters that month. */
+  newsletters: number;
+}
+
+/**
+ * One cell per ward per month for a single lens: did the ward's newsletters
+ * mention it, not mention it, or not arrive at all. Newsletters without
+ * readable text cannot mention a lens, so a month of only those is "not
+ * mentioned".
+ */
+export function buildLensWardGrid(
+  facts: NewsletterFact[],
+  lens: string,
+  wards: string[],
+  months: string[],
+): LensWardCell[] {
+  const counts = new Map<string, { mentioning: number; newsletters: number }>();
+  for (const fact of facts) {
+    if (fact.ward === null) continue;
+    const key = `${fact.ward}|${monthOf(fact.date)}`;
+    const count = counts.get(key) ?? { mentioning: 0, newsletters: 0 };
+    count.newsletters += 1;
+    if (isReadable(fact) && fact.lenses.includes(lens)) count.mentioning += 1;
+    counts.set(key, count);
+  }
+  return wards.flatMap((ward) =>
+    months.map((month) => {
+      const count = counts.get(`${ward}|${month}`) ?? { mentioning: 0, newsletters: 0 };
+      const status: LensWardStatus =
+        count.mentioning > 0 ? "mentioned" : count.newsletters > 0 ? "not_mentioned" : "no_newsletter";
+      return { ward, month, status, ...count };
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -758,7 +830,6 @@ export function summarizeWardCoverage(sources: SourceCoverage[], wards: string[]
 export interface SearchLinkParams {
   q?: string;
   ward?: string;
-  topic?: string;
   fromDate?: string;
   toDate?: string;
 }
@@ -772,18 +843,14 @@ export function monthDateRange(month: string): { fromDate: string; toDate: strin
 }
 
 /**
- * The global filters as search link parameters, so a click-through lists the
- * same newsletters the chart counted. Panels whose data ignores the topic
- * filter (the term index, the coverage grid) opt out.
+ * The global date filters as search link parameters, so a click-through lists
+ * the newsletters in the same window. Search cannot filter by lens, so only
+ * panels that ignore the lens filter link to it.
  */
-export function searchScopeForFilters(
-  filters: AnalyticsFilters,
-  options: { includeTopic: boolean },
-): SearchLinkParams {
+export function searchScopeForFilters(filters: AnalyticsFilters): SearchLinkParams {
   const scope: SearchLinkParams = {};
   if (filters.fromMonth) scope.fromDate = monthDateRange(filters.fromMonth).fromDate;
   if (filters.toMonth) scope.toDate = monthDateRange(filters.toMonth).toDate;
-  if (options.includeTopic && filters.topic) scope.topic = filters.topic;
   return scope;
 }
 
@@ -792,7 +859,6 @@ export function buildSearchUrl(params: SearchLinkParams): string {
   const search = new URLSearchParams();
   if (params.q) search.set("q", params.q.includes(" ") ? `"${params.q}"` : params.q);
   if (params.ward) search.set("ward", params.ward);
-  if (params.topic) search.set("topic", params.topic);
   if (params.fromDate) search.set("from", params.fromDate);
   if (params.toDate) search.set("to", params.toDate);
   const query = search.toString();
@@ -820,14 +886,4 @@ function groupBy<T, K>(items: T[], keyOf: (item: T) => K): Map<K, T[]> {
     else groups.set(key, [item]);
   }
   return groups;
-}
-
-function countTopics(facts: NewsletterFact[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const fact of facts) {
-    for (const topic of new Set(fact.topics ?? [])) {
-      counts.set(topic, (counts.get(topic) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
