@@ -9,14 +9,13 @@ import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { findMissingAnalyticsFiles, loadAnalyticsMetadata } from '../lib/analytics-data';
 import { humanizeIdentifier } from '../lib/format';
 import { ALL_TOPICS } from '../lib/topics';
-import { MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
+import { formatMonth, MIN_MONTH_NEWSLETTERS_FOR_SHARES, STREET_SAFETY_LABELING_START_MONTH } from '../lib/analytics';
 
 // Local exploration only: keep it out of search indexes (Layout has no noindex option).
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
 
 const missingFiles = findMissingAnalyticsFiles();
 const metadata = missingFiles.length === 0 ? await loadAnalyticsMetadata() : null;
-const RELEVANCE_LEVELS = Array.from({ length: 10 }, (_, index) => index + 1);
 const controlClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
 ---
@@ -52,7 +51,7 @@ const controlClass =
     ) : (
       <div id="analytics-dashboard" class="space-y-6">
         <form id="analytics-filters" class="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200" aria-label="Dashboard filters">
-          <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="col-span-2 lg:col-span-1">
               <span class="block text-sm font-semibold text-gray-700 mb-2">Wards</span>
               <details class="relative" id="ward-picker">
@@ -78,23 +77,20 @@ const controlClass =
               <span class="block text-sm font-semibold text-gray-700 mb-2">To</span>
               <select name="to" class={controlClass}><option value="">Latest</option></select>
             </label>
-            <label class="col-span-2 lg:col-span-1 block">
-              <span class="block text-sm font-semibold text-gray-700 mb-2">Minimum relevance</span>
-              <select name="relevance" class={controlClass}>
-                <option value="0">Any</option>
-                {RELEVANCE_LEVELS.map((level) => <option value={level}>{level}+</option>)}
-              </select>
-            </label>
           </div>
-          <div class="mt-4 flex justify-end">
-            <button type="reset" class="px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors text-sm">
-              Reset filters
-            </button>
+          <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <p id="date-window-status" class="text-sm text-gray-700 flex-1" aria-live="polite"></p>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="date-window-toggle" class="px-4 py-2 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 transition-colors text-sm"></button>
+              <button type="reset" class="px-4 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                Reset filters
+              </button>
+            </div>
           </div>
         </form>
 
         <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite">
-          {['Newsletters', 'Active aldermen', 'Date span', 'Average relevance'].map((label) => (
+          {['Newsletters', 'Wards with newsletters', 'Date span', 'Data as of'].map((label) => (
             <div class="bg-white rounded-lg shadow-md p-4 border border-gray-200">
               <p class="text-sm text-gray-600">{label}</p>
               <p class="text-xl sm:text-2xl font-semibold text-gray-900 mt-1" data-tile-value></p>
@@ -104,9 +100,17 @@ const controlClass =
         </div>
 
         <AnalyticsPanel
+          id="coverage"
+          title="What the archive covers"
+          description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the topic filter."
+        >
+          <div data-chart class="overflow-x-auto"></div>
+        </AnalyticsPanel>
+
+        <AnalyticsPanel
           id="term-explorer"
           title="Term explorer"
-          description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by topic or relevance). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
+          description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by topic). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
         >
           <form id="term-form" class="flex gap-2 mb-2" role="search">
             <label for="term-input" class="sr-only">Term</label>
@@ -121,17 +125,9 @@ const controlClass =
         </AnalyticsPanel>
 
         <AnalyticsPanel
-          id="ward-topic-heatmap"
-          title="Ward × topic focus"
-          description="Each ward's share of newsletters mentioning a topic compared with the city-wide share for the same filters. Blue means the ward discusses it more than average, red less. Click a cell to see those newsletters. Ignores the topic filter (the selected topic is outlined)."
-        >
-          <div data-chart class="overflow-x-auto"></div>
-        </AnalyticsPanel>
-
-        <AnalyticsPanel
           id="topic-trends"
           title="Topic trends"
-          description={`Share of LLM-processed newsletters mentioning each topic, by month, on a shared vertical scale. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
+          description={`Share of LLM-processed newsletters mentioning each topic, by month, on a shared vertical scale. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank, and topics added to the LLM topic list later start in the first month they were labeled (street safety: ${formatMonth(STREET_SAFETY_LABELING_START_MONTH)}).`}
         >
           <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
         </AnalyticsPanel>
@@ -159,27 +155,10 @@ const controlClass =
         <AnalyticsPanel
           id="sending-cadence"
           title="Sending cadence"
-          description="Newsletters per ward per month (blank = none received), followed by the longest gaps between consecutive newsletters from the same source."
+          description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
+          hasTable={false}
         >
-          <div data-chart class="overflow-x-auto"></div>
-          <h3 class="text-sm font-semibold text-gray-700 mt-4 mb-2">Longest gaps</h3>
           <div id="cadence-gaps" class="overflow-x-auto"></div>
-        </AnalyticsPanel>
-
-        <AnalyticsPanel
-          id="relevance-by-ward"
-          title="Relevance score by ward"
-          description="Average LLM relevance score (0-10, relevance to Strong Towns Chicago priorities) per ward, with the number of scored newsletters."
-        >
-          <div data-chart class="overflow-x-auto"></div>
-        </AnalyticsPanel>
-
-        <AnalyticsPanel
-          id="coverage"
-          title="Data coverage"
-          description="When each source's newsletters begin and end in the archive, with total counts. Sources that joined later have fewer newsletters, so compare wards with this in mind. Respects the ward filter only."
-        >
-          <div data-chart class="overflow-x-auto"></div>
         </AnalyticsPanel>
       </div>
     )}
