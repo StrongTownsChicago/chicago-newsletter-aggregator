@@ -58,14 +58,12 @@ class TestParseRows(unittest.TestCase):
                 "subject": None,
                 "plain_text": None,
                 "topics": None,
-                "relevance_score": None,
             }
         )
         self.assertEqual(newsletter.received_date, date(2026, 1, 5))
         self.assertEqual(newsletter.subject, "")
         self.assertEqual(newsletter.plain_text, "")
         self.assertIsNone(newsletter.topics)
-        self.assertIsNone(newsletter.relevance_score)
 
 
 class TestWardSortKey(unittest.TestCase):

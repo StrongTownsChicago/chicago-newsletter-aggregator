@@ -30,7 +30,6 @@ def newsletter_to_row(newsletter: NewsletterRecord) -> dict[str, Any]:
         "subject": newsletter.subject,
         "plain_text": newsletter.plain_text,
         "topics": newsletter.topics,
-        "relevance_score": newsletter.relevance_score,
     }
 
 
@@ -48,7 +47,6 @@ def newsletter_from_row(row: dict[str, Any]) -> NewsletterRecord:
         subject=row.get("subject") or "",
         plain_text=row.get("plain_text") or "",
         topics=row.get("topics"),
-        relevance_score=row.get("relevance_score"),
     )
 
 
@@ -87,28 +85,23 @@ def merge_newsletters(
 
 
 def ids_missing_llm_metadata(newsletters: Iterable[NewsletterRecord]) -> list[str]:
-    """Ids of newsletters whose LLM topics or relevance score are not set yet.
+    """Ids of newsletters whose LLM topics are not set yet.
 
     LLM processing often runs days after ingestion, outside the incremental
     overlap window, so these rows are re-checked on every refresh.
     """
-    return [
-        newsletter.id
-        for newsletter in newsletters
-        if newsletter.topics is None or newsletter.relevance_score is None
-    ]
+    return [newsletter.id for newsletter in newsletters if newsletter.topics is None]
 
 
 def apply_llm_metadata(
     newsletters: Iterable[NewsletterRecord], rows: Iterable[dict[str, Any]]
 ) -> list[NewsletterRecord]:
-    """Overlay fetched topics and relevance scores onto matching newsletters."""
+    """Overlay fetched topics onto matching newsletters."""
     metadata_by_id = {str(row["id"]): row for row in rows}
     return [
         replace(
             newsletter,
             topics=metadata_by_id[newsletter.id].get("topics"),
-            relevance_score=metadata_by_id[newsletter.id].get("relevance_score"),
         )
         if newsletter.id in metadata_by_id
         else newsletter

@@ -24,7 +24,6 @@ class NewsletterRecord:
     subject: str
     plain_text: str
     topics: list[str] | None
-    relevance_score: int | None
 
 
 def to_chicago_date(timestamp: str) -> date:
@@ -71,7 +70,6 @@ def parse_newsletter_row(row: dict[str, Any]) -> NewsletterRecord:
         subject=row.get("subject") or "",
         plain_text=row.get("plain_text") or "",
         topics=row.get("topics"),
-        relevance_score=row.get("relevance_score"),
     )
 
 
