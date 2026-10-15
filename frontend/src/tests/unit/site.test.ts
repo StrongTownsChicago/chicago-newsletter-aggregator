@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ANALYTICS_PATH,
   HOME_PATH,
   PREFERENCES_PATH,
   buildPrimaryNavItems,
@@ -26,19 +27,20 @@ describe('buildPrimaryNavItems', () => {
       ['Recent', HOME_PATH],
       ['Search', SEARCH_PATH],
       ['Wards', WARD_DIRECTORY_PATH],
+      ['Analytics', ANALYTICS_PATH],
     ]);
   });
 
   it('appends Preferences when the visitor can use it', () => {
     const items = buildPrimaryNavItems({ showPreferences: true });
     expect(items.at(-1)).toMatchObject({ label: 'Preferences', href: PREFERENCES_PATH });
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(5);
   });
 
   it('returns a fresh array so callers cannot mutate the shared list', () => {
     const first = buildPrimaryNavItems({ showPreferences: false });
     first.pop();
-    expect(buildPrimaryNavItems({ showPreferences: false })).toHaveLength(3);
+    expect(buildPrimaryNavItems({ showPreferences: false })).toHaveLength(4);
   });
 });
 
@@ -55,6 +57,8 @@ describe('isNavItemActive', () => {
     ['Wards', '/ward/12/', true],
     ['Wards', '/wardrobe', false],
     ['Wards', '/newsletter/123', false],
+    ['Analytics', '/analytics', true],
+    ['Analytics', '/analytics-data/terms.json', false],
     ['Preferences', '/preferences', true],
     ['Preferences', '/', false],
   ])('%s is active on %s: %s', (label, pathname, expected) => {

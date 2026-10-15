@@ -91,7 +91,7 @@ uv run python -m utils.process_llm_metadata --latest 10
 # Reapply privacy sanitization to existing newsletters
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 
-# Refresh the unlisted /analytics dashboard, ward summaries and /reports: compute, check
+# Refresh the /analytics dashboard, ward summaries and /reports: compute, check
 # http://localhost:4321/analytics, then commit frontend/public/analytics-data/ and frontend/src/data/
 # and push; the deploy publishes them. The JSON files are public.
 # (fetches only newsletters newer than the local snapshot in backend/data/; --offline skips the database,

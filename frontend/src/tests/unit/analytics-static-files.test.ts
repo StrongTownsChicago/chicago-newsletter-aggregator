@@ -37,12 +37,13 @@ describe("published analytics data", () => {
     expect(rule).toContain("Cache-Control: no-cache");
   });
 
-  it("disallows the dashboard and its data in robots.txt", () => {
+  it("lets crawlers fetch the dashboard and its data", () => {
     const disallowed = readPublicFile("robots.txt")
       .split(/\r?\n/)
       .filter((line) => line.startsWith("Disallow:"))
       .map((line) => line.slice("Disallow:".length).trim());
-    expect(disallowed).toContain("/analytics");
-    expect(disallowed).toContain(`${ANALYTICS_DATA_BASE_PATH}/`);
+    const blocks = (path: string) => disallowed.some((rule) => rule !== "" && path.startsWith(rule));
+    expect(blocks("/analytics")).toBe(false);
+    expect(blocks(`${ANALYTICS_DATA_BASE_PATH}/terms.json`)).toBe(false);
   });
 });

@@ -8,7 +8,7 @@ const SITE_URL = "https://chicago-newsletter-aggregator.open-advocacy.com";
 
 // Account, token-driven, and local-only pages that should not appear in search results.
 // Keep in sync with the Disallow rules in public/robots.txt.
-const NON_INDEXABLE_PATHS = ["/preferences", "/unsubscribe", "/login", "/signup", "/analytics"];
+const NON_INDEXABLE_PATHS = ["/preferences", "/unsubscribe", "/login", "/signup"];
 
 const isIndexablePage = (/** @type {string} */ page) => {
   const { pathname } = new URL(page);

@@ -4,8 +4,6 @@ Disallow: /preferences
 Disallow: /unsubscribe
 Disallow: /login
 Disallow: /signup
-Disallow: /analytics
-Disallow: /analytics-data/
 Disallow: /api/
 
 Sitemap: https://chicago-newsletter-aggregator.open-advocacy.com/sitemap-index.xml
