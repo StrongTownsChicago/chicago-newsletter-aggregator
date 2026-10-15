@@ -23,7 +23,6 @@ class NewsletterRecord:
     source_id: int | None
     subject: str
     plain_text: str
-    topics: list[str] | None
 
 
 def to_chicago_date(timestamp: str) -> date:
@@ -69,7 +68,6 @@ def parse_newsletter_row(row: dict[str, Any]) -> NewsletterRecord:
         source_id=int(source_id) if source_id is not None else None,
         subject=row.get("subject") or "",
         plain_text=row.get("plain_text") or "",
-        topics=row.get("topics"),
     )
 
 

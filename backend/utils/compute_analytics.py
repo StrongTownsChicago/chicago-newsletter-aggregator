@@ -10,14 +10,15 @@ and push.
 
 The production database has a small disk IO budget, so it is read gently:
 
-- default: fetch all sources, the newsletters created since the snapshot's
-  cursor (with a short overlap), and the topics of older rows that had no
-  LLM topics yet; merge them into the snapshot, then compute.
+- default: fetch all sources and the newsletters created since the
+  snapshot's cursor (with a short overlap); merge them into the snapshot,
+  then compute. Older rows are never re-read: analytics uses only text and
+  dates, not the LLM metadata that processing adds to rows later.
 - --offline: never contact the database; compute from the snapshot as-is.
 - --full-refresh: rebuild the snapshot by reading every newsletter. Heavy;
-  use rarely: on a fresh checkout, or after reprocessing that edits rows the
-  default mode does not revisit (privacy re-sanitization of plain_text, LLM
-  re-runs over already-processed rows) or after deletions.
+  use rarely: on a fresh checkout, or after reprocessing that edits the text
+  of rows the default mode does not revisit (privacy re-sanitization of
+  plain_text) or after deletions.
 
 Usage:
     uv run python -m utils.compute_analytics
@@ -33,7 +34,6 @@ import json
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -48,7 +48,7 @@ from analytics.facts import (
 from analytics.lenses import (
     LENSES,
     LensMatcher,
-    count_newsletter_phrases,
+    match_newsletters,
     summarize_lens_hits,
 )
 from analytics.records import (
@@ -62,8 +62,6 @@ from analytics.records import (
 from analytics.snapshot import (
     Snapshot,
     advance_cursor,
-    apply_llm_metadata,
-    ids_missing_llm_metadata,
     merge_newsletters,
     newest_created_at,
 )
@@ -94,11 +92,7 @@ FETCH_PAGE_SIZE = 100
 FETCH_PAUSE_SECONDS = 1.0
 # Re-fetch this far behind the cursor so rows committed late are not missed.
 INCREMENTAL_OVERLAP = timedelta(days=1)
-NEWSLETTER_COLUMNS = (
-    "id, created_at, received_date, source_id, subject, plain_text, topics"
-)
-# Only these columns change when LLM processing runs after ingestion.
-LLM_METADATA_COLUMNS = "id, topics"
+NEWSLETTER_COLUMNS = "id, created_at, received_date, source_id, subject, plain_text"
 SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
 # Text repeated in at least this share of one source's newsletters is template
@@ -124,11 +118,13 @@ DISTINCTIVE_MAX_WARD_SHARE = 0.6
 # match raw text instead.
 MATCH_LENSES_ON_CLEANED_TEXT = True
 # A newsletter mentions a lens when the lens's phrases occur at least this
-# many times in it (the same phrase twice counts). One passing mention, such
+# many separate times in it (the same phrase twice counts; phrases that
+# overlap or touch, like "city council meeting", count once). One passing
+# mention, such
 # as early voting "at the library" or "call 311 while our office is closed",
 # does not make a newsletter about parks or city services, and counting those
 # puts nearly every ward on nearly every lens every month.
-LENS_MIN_PHRASE_OCCURRENCES = 2
+LENS_MIN_MENTIONS = 2
 # Rising terms compare the latest complete month with the median of this
 # many months before it, counting wards rather than newsletters.
 RISING_BASELINE_MONTHS = 3
@@ -170,25 +166,6 @@ def fetch_rows(
         sleep(FETCH_PAUSE_SECONDS)
 
 
-def fetch_rows_by_id(
-    supabase: Any,
-    table: str,
-    columns: str,
-    ids: list[str],
-    sleep: Callable[[float], None] = time.sleep,
-) -> list[dict[str, Any]]:
-    """Fetch specific rows in batches of FETCH_PAGE_SIZE ids, pausing between batches."""
-    rows: list[dict[str, Any]] = []
-    for start in range(0, len(ids), FETCH_PAGE_SIZE):
-        if start:
-            sleep(FETCH_PAUSE_SECONDS)
-        batch = ids[start : start + FETCH_PAGE_SIZE]
-        rows.extend(
-            supabase.table(table).select(columns).in_("id", batch).execute().data
-        )
-    return rows
-
-
 def fetch_sources(
     supabase: Any, sleep: Callable[[float], None] = time.sleep
 ) -> list[SourceRecord]:
@@ -199,20 +176,13 @@ def fetch_sources(
     ]
 
 
-@dataclass(frozen=True)
-class RefreshCounts:
-    new_rows: int
-    metadata_rows: int
-
-
 def refresh_snapshot(
     supabase: Any, snapshot: Snapshot, sleep: Callable[[float], None] = time.sleep
-) -> tuple[Snapshot, RefreshCounts]:
-    """Bring the snapshot up to date without re-reading old newsletter text.
+) -> tuple[Snapshot, int]:
+    """Bring the snapshot up to date without re-reading old newsletters.
 
     Fetches newsletters created since the snapshot's cursor (minus an
-    overlap), then re-checks only the LLM metadata columns of older rows that
-    were still unprocessed, since LLM processing often runs days later.
+    overlap) and returns the updated snapshot with the number of rows fetched.
     """
     created_since = snapshot.fetched_through - INCREMENTAL_OVERLAP
     sources = fetch_sources(supabase, sleep)
@@ -220,23 +190,12 @@ def refresh_snapshot(
     newsletters = merge_newsletters(
         snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
     )
-
-    fetched_ids = {str(row["id"]) for row in rows}
-    pending_ids = [
-        newsletter_id
-        for newsletter_id in ids_missing_llm_metadata(newsletters)
-        if newsletter_id not in fetched_ids
-    ]
-    metadata_rows = fetch_rows_by_id(
-        supabase, "newsletters", LLM_METADATA_COLUMNS, pending_ids, sleep
-    )
-
     updated = Snapshot(
         sources=sources,
-        newsletters=apply_llm_metadata(newsletters, metadata_rows),
+        newsletters=newsletters,
         fetched_through=advance_cursor(snapshot.fetched_through, rows),
     )
-    return updated, RefreshCounts(len(rows), len(metadata_rows))
+    return updated, len(rows)
 
 
 def build_full_snapshot(
@@ -278,13 +237,15 @@ def compute_outputs(
         content_newsletters if MATCH_LENSES_ON_CLEANED_TEXT else newsletters
     )
     matcher = LensMatcher(LENSES)
-    phrase_counts = count_newsletter_phrases(
+    lens_matches = match_newsletters(
         (item for item in lens_newsletters if item.id not in unavailable_ids),
         matcher,
     )
     lenses_by_newsletter = {
-        newsletter_id: matcher.lenses_mentioned(counts, LENS_MIN_PHRASE_OCCURRENCES)
-        for newsletter_id, counts in phrase_counts.items()
+        newsletter_id: matcher.lenses_mentioned(
+            matches.lens_mentions, LENS_MIN_MENTIONS
+        )
+        for newsletter_id, matches in lens_matches.items()
     }
 
     latest_month = select_latest_complete_month(
@@ -321,9 +282,13 @@ def compute_outputs(
         },
         "lenses": {
             "text": "cleaned" if MATCH_LENSES_ON_CLEANED_TEXT else "raw",
-            "min_phrase_occurrences": LENS_MIN_PHRASE_OCCURRENCES,
-            "readable_newsletters": len(phrase_counts),
-            "lenses": summarize_lens_hits(matcher, phrase_counts, lenses_by_newsletter),
+            "min_mentions": LENS_MIN_MENTIONS,
+            "readable_newsletters": len(lens_matches),
+            "lenses": summarize_lens_hits(
+                matcher,
+                {key: matches.phrases for key, matches in lens_matches.items()},
+                lenses_by_newsletter,
+            ),
         },
         "sources": {"sources": build_source_coverage(sources, newsletters)},
         "terms": {
@@ -375,8 +340,8 @@ def print_report(
     readable = lenses["readable_newsletters"]
     print(
         f"\nLens hit rates over {readable} newsletters with readable text "
-        f"({lenses['text']} text, phrases found at least "
-        f"{lenses['min_phrase_occurrences']} times):"
+        f"({lenses['text']} text, mentioned at least "
+        f"{lenses['min_mentions']} separate times):"
     )
     for lens in lenses["lenses"]:
         top_phrases = ", ".join(
@@ -464,11 +429,10 @@ def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapsho
         return snapshot
 
     print("Fetching sources and newsletters created since the snapshot...")
-    snapshot, counts = refresh_snapshot(get_supabase_client(), snapshot)
+    snapshot, fetched = refresh_snapshot(get_supabase_client(), snapshot)
     save_snapshot(args.snapshot_dir, snapshot, now)
     print(
-        f"Fetched {counts.new_rows} recent newsletter rows and LLM metadata for "
-        f"{counts.metadata_rows} older ones; the snapshot now has "
+        f"Fetched {fetched} recent newsletter rows; the snapshot now has "
         f"{len(snapshot.newsletters)} newsletters."
     )
     return snapshot

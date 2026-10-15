@@ -20,6 +20,10 @@ Matching is explainable by design:
 - Words with a common second meaning are only listed inside a qualifying
   phrase ("ice agents", not "ice"; "park district", not "park"). See
   AMBIGUOUS_WORDS, which `validate_lenses` enforces.
+- A lens counts mentions, not phrase hits: phrases of one lens that overlap
+  or sit side by side ("aldermanic menu money", "city council meeting",
+  "zoning map amendment") are one mention, so a single reference cannot
+  reach a minimum of two on its own.
 
 Lists may overlap: the two Strong Towns Chicago focus lenses are deliberately
 narrower slices of the broad housing and transportation lenses. Which text is
@@ -31,12 +35,12 @@ explained.
 import re
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from analytics.plurals import fold_plural
 from analytics.records import NewsletterRecord
-from analytics.text import WORD_PATTERN, normalize_text
+from analytics.text import WORD_PATTERN, contains_word_run, normalize_text
 
 POSSESSIVE_SUFFIX = "'s"
 # Sentence and list punctuation ends a phrase. Line breaks do not (see the
@@ -121,6 +125,8 @@ LENSES: tuple[Lens, ...] = (
             "burglary",
             "theft",
             "break-in",
+            # "ins" is too short to fold, so the plural is listed too.
+            "break-ins",
             "arrest",
             "violence prevention",
             "safe passage",
@@ -532,12 +538,10 @@ def split_into_sentences(text: str) -> Iterator[list[str]]:
                 yield words
 
 
-def contains_words(words: list[str], part: list[str]) -> bool:
-    """True if part occurs in words as a contiguous run."""
-    return any(
-        words[start : start + len(part)] == part
-        for start in range(len(words) - len(part) + 1)
-    )
+# Phrases are folded before the check, so "CAPS" (folded to "cap") is caught.
+FOLDED_AMBIGUOUS_WORDS: frozenset[str] = frozenset(
+    word for ambiguous in AMBIGUOUS_WORDS for word in tokenize_phrase(ambiguous)
+)
 
 
 def validate_lenses(lenses: Iterable[Lens]) -> list[str]:
@@ -557,7 +561,7 @@ def validate_lenses(lenses: Iterable[Lens]) -> list[str]:
         for phrase, words in tokenized:
             if not words:
                 problems.append(f"{lens.id}: phrase {phrase!r} has no words")
-            elif len(words) == 1 and words[0] in AMBIGUOUS_WORDS:
+            elif len(words) == 1 and words[0] in FOLDED_AMBIGUOUS_WORDS:
                 problems.append(f"{lens.id}: {phrase!r} is ambiguous on its own")
         for index, (phrase, words) in enumerate(tokenized):
             for other_phrase, other_words in tokenized[index + 1 :]:
@@ -565,14 +569,25 @@ def validate_lenses(lenses: Iterable[Lens]) -> list[str]:
                     words
                     and other_words
                     and (
-                        contains_words(words, other_words)
-                        or contains_words(other_words, words)
+                        contains_word_run(words, other_words)
+                        or contains_word_run(other_words, words)
                     )
                 ):
                     problems.append(
                         f"{lens.id}: {phrase!r} and {other_phrase!r} overlap"
                     )
     return problems
+
+
+@dataclass(frozen=True)
+class TextMatches:
+    """What the lens phrases found in one text."""
+
+    # Every occurrence of each phrase, keyed by `phrase_key`.
+    phrases: Counter[str] = field(default_factory=Counter)
+    # Separate mentions of each lens, keyed by lens id: phrases of one lens
+    # that overlap or touch count as a single mention.
+    lens_mentions: Counter[str] = field(default_factory=Counter)
 
 
 class LensMatcher:
@@ -584,52 +599,68 @@ class LensMatcher:
             lens.id: frozenset(phrase_key(phrase) for phrase in lens.phrases)
             for lens in self.lenses
         }
-        self.phrase_keys: frozenset[str] = frozenset().union(
-            *self.keys_by_lens.values()
-        )
-        self.first_words = {key.split(" ")[0] for key in self.phrase_keys}
+        self.lens_ids_by_key: dict[str, list[str]] = {}
+        for lens in self.lenses:
+            for key in sorted(self.keys_by_lens[lens.id]):
+                self.lens_ids_by_key.setdefault(key, []).append(lens.id)
+        self.first_words = {key.split(" ")[0] for key in self.lens_ids_by_key}
         self.max_phrase_words = max(
-            (len(key.split(" ")) for key in self.phrase_keys), default=0
+            (len(key.split(" ")) for key in self.lens_ids_by_key), default=0
         )
 
-    def count_phrases(self, text: str) -> Counter[str]:
-        """Count each lens phrase's occurrences in text, keyed by `phrase_key`."""
-        found: Counter[str] = Counter()
+    def find_phrases(self, words: list[str]) -> Iterator[tuple[int, int, str]]:
+        """Yield (start, end, phrase key) for every phrase in one sentence's words,
+        in order of start.
+        """
+        for start, word in enumerate(words):
+            if word not in self.first_words:
+                continue
+            for end in range(
+                start + 1, min(start + self.max_phrase_words, len(words)) + 1
+            ):
+                candidate = " ".join(words[start:end])
+                if candidate in self.lens_ids_by_key:
+                    yield start, end, candidate
+
+    def match(self, text: str) -> TextMatches:
+        """Count the phrase occurrences and the separate lens mentions in text."""
+        matches = TextMatches()
         for words in split_into_sentences(text):
-            for start, word in enumerate(words):
-                if word not in self.first_words:
-                    continue
-                for end in range(
-                    start + 1, min(start + self.max_phrase_words, len(words)) + 1
-                ):
-                    candidate = " ".join(words[start:end])
-                    if candidate in self.phrase_keys:
-                        found[candidate] += 1
-        return found
+            # Where each lens's current mention ends (exclusive) in this sentence.
+            mention_ends: dict[str, int] = {}
+            for start, end, key in self.find_phrases(words):
+                matches.phrases[key] += 1
+                for lens_id in self.lens_ids_by_key[key]:
+                    current_end = mention_ends.get(lens_id)
+                    # A phrase starting inside or right after the current
+                    # mention extends it rather than starting a new one.
+                    if current_end is None or start > current_end:
+                        matches.lens_mentions[lens_id] += 1
+                        mention_ends[lens_id] = end
+                    else:
+                        mention_ends[lens_id] = max(current_end, end)
+        return matches
 
     def lenses_mentioned(
-        self, phrase_counts: Mapping[str, int], min_occurrences: int
+        self, lens_mentions: Mapping[str, int], min_mentions: int
     ) -> list[str]:
-        """Return the ids of the lenses whose phrases occur at least min_occurrences
-        times in total, in lens order.
-        """
+        """Return the ids of the lenses mentioned at least min_mentions times, in lens order."""
         return [
             lens.id
             for lens in self.lenses
-            if sum(phrase_counts.get(key, 0) for key in self.keys_by_lens[lens.id])
-            >= min_occurrences
+            if lens_mentions.get(lens.id, 0) >= min_mentions
         ]
 
 
-def count_newsletter_phrases(
+def match_newsletters(
     newsletters: Iterable[NewsletterRecord], matcher: LensMatcher
-) -> dict[str, Counter[str]]:
-    """Count the lens phrases in each newsletter's subject and text, by newsletter id.
+) -> dict[str, TextMatches]:
+    """Match the lens phrases in each newsletter's subject and text, by newsletter id.
 
     The subject is its own paragraph, so no phrase spans subject and body.
     """
     return {
-        newsletter.id: matcher.count_phrases(
+        newsletter.id: matcher.match(
             f"{newsletter.subject}{SUBJECT_SEPARATOR}{newsletter.plain_text}"
         )
         for newsletter in newsletters
@@ -642,6 +673,8 @@ def summarize_lens_hits(
     lenses_by_newsletter: Mapping[str, list[str]],
 ) -> list[dict[str, Any]]:
     """Describe each lens with how many newsletters mention it and contain each phrase.
+
+    phrase_counts_by_newsletter holds each newsletter's `TextMatches.phrases`.
 
     This is the evidence a reader needs to audit a lens: its full definition
     plus which phrases do the work. Phrases are listed most-found first.

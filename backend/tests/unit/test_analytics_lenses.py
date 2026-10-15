@@ -9,7 +9,7 @@ from analytics.lenses import (
     LENSES,
     Lens,
     LensMatcher,
-    count_newsletter_phrases,
+    match_newsletters,
     phrase_key,
     split_into_sentences,
     summarize_lens_hits,
@@ -20,9 +20,9 @@ from analytics.records import NewsletterRecord
 MATCHER = LensMatcher(LENSES)
 
 
-def lenses_in(text: str, min_occurrences: int = 1) -> list[str]:
+def lenses_in(text: str, min_mentions: int = 1) -> list[str]:
     """The lens ids a text mentions with the reviewed lens list."""
-    return MATCHER.lenses_mentioned(MATCHER.count_phrases(text), min_occurrences)
+    return MATCHER.lenses_mentioned(MATCHER.match(text).lens_mentions, min_mentions)
 
 
 def make_newsletter(newsletter_id: str, subject: str, text: str) -> NewsletterRecord:
@@ -32,7 +32,6 @@ def make_newsletter(newsletter_id: str, subject: str, text: str) -> NewsletterRe
         source_id=1,
         subject=subject,
         plain_text=text,
-        topics=None,
     )
 
 
@@ -122,11 +121,10 @@ class TestFalsePositives(unittest.TestCase):
 
 class TestLensMatcher(unittest.TestCase):
     def test_counts_every_occurrence(self):
-        counts = MATCHER.count_phrases(
-            "Speed humps here. A speed hump there. Bike lanes."
-        )
-        self.assertEqual(counts["speed hump"], 2)
-        self.assertEqual(counts["bike lane"], 1)
+        matches = MATCHER.match("Speed humps here. A speed hump there. Bike lanes.")
+        self.assertEqual(matches.phrases["speed hump"], 2)
+        self.assertEqual(matches.phrases["bike lane"], 1)
+        self.assertEqual(matches.lens_mentions["street_safety"], 3)
 
     def test_one_phrase_can_belong_to_several_lenses(self):
         mentioned = lenses_in("New speed humps.")
@@ -135,10 +133,32 @@ class TestLensMatcher(unittest.TestCase):
 
     def test_min_occurrences_ignores_passing_mentions(self):
         passing = "Early voting is at the library."
-        self.assertIn("parks_libraries", lenses_in(passing, min_occurrences=1))
-        self.assertNotIn("parks_libraries", lenses_in(passing, min_occurrences=2))
+        self.assertIn("parks_libraries", lenses_in(passing, min_mentions=1))
+        self.assertNotIn("parks_libraries", lenses_in(passing, min_mentions=2))
         repeated = "The library reopens. Library hours are longer."
-        self.assertIn("parks_libraries", lenses_in(repeated, min_occurrences=2))
+        self.assertIn("parks_libraries", lenses_in(repeated, min_mentions=2))
+
+    def test_overlapping_or_adjacent_phrases_are_one_mention(self):
+        # Each text is one reference built from two phrases of the same lens.
+        for text, lens_id in (
+            ("Ask about aldermanic menu money.", "budget_taxes"),
+            ("At the city council meeting.", "city_council"),
+            ("A residential parking permit zone.", "transportation"),
+            ("A zoning map amendment.", "zoning_land_use"),
+            ("Small business owners welcome.", "local_business"),
+        ):
+            matches = MATCHER.match(text)
+            self.assertGreaterEqual(sum(matches.phrases.values()), 2, text)
+            self.assertEqual(matches.lens_mentions[lens_id], 1, text)
+            self.assertNotIn(lens_id, lenses_in(text, min_mentions=2), text)
+
+    def test_separated_phrases_are_separate_mentions(self):
+        matches = MATCHER.match("The city council voted on the ordinance.")
+        self.assertEqual(matches.lens_mentions["city_council"], 2)
+        # A word between the phrases separates them; a sentence break too.
+        self.assertEqual(
+            MATCHER.match("Zoning. Map amendment.").lens_mentions["zoning_land_use"], 2
+        )
 
     def test_lenses_are_returned_in_lens_order(self):
         lens_order = [lens.id for lens in LENSES]
@@ -147,6 +167,13 @@ class TestLensMatcher(unittest.TestCase):
 
 
 class TestValidateLenses(unittest.TestCase):
+    def test_ambiguous_words_are_caught_in_any_form(self):
+        # "CAPS" folds to "cap" and "Bears" to "bear"; the guard must still hold.
+        for phrase in ("CAPS", "Caps", "Bears", "ICE", "Parks"):
+            problems = validate_lenses([Lens("a", "A", "d", (phrase,))])
+            self.assertEqual(len(problems), 1, phrase)
+            self.assertIn("ambiguous", problems[0])
+
     def test_reports_ambiguous_overlapping_and_duplicate_definitions(self):
         ambiguous_word = sorted(AMBIGUOUS_WORDS)[0]
         problems = validate_lenses(
@@ -165,12 +192,13 @@ class TestValidateLenses(unittest.TestCase):
 
 class TestNewsletterPhrasesAndSummary(unittest.TestCase):
     def test_subject_counts_but_never_joins_the_body(self):
-        counts = count_newsletter_phrases(
+        matches = match_newsletters(
             [make_newsletter("n1", "Bike", "lanes and a crosswalk")], MATCHER
         )
-        self.assertEqual(counts["n1"]["crosswalk"], 1)
-        self.assertNotIn("bike lane", counts["n1"])
-        self.assertEqual(counts["n1"]["bike"], 1)
+        phrases = matches["n1"].phrases
+        self.assertEqual(phrases["crosswalk"], 1)
+        self.assertNotIn("bike lane", phrases)
+        self.assertEqual(phrases["bike"], 1)
 
     def test_summary_reports_lens_and_phrase_newsletter_counts(self):
         lens = Lens("transit", "Transit", "Buses and trains.", ("bus", "Red Line"))

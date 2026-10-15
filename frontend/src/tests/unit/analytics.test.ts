@@ -20,7 +20,6 @@ import {
   formatMonth,
   isReachFaded,
   listMonths,
-  listMonthsWithShares,
   listSourceWards,
   listWards,
   listWindowMonths,
@@ -139,21 +138,6 @@ describe("trimSparseEdges", () => {
     const points = [null, 0.1, null, 0.2, null].map((share, index) => ({ index, share }));
     expect(trimSparseEdges(points).map((point) => point.index)).toEqual([1, 2, 3]);
     expect(trimSparseEdges([{ share: null }])).toEqual([]);
-  });
-});
-
-describe("listMonthsWithShares", () => {
-  it("spans every series' shares so small multiples share one axis", () => {
-    const points = [
-      { month: "2026-01", share: 0.2 },
-      { month: "2026-01", share: null },
-      { month: "2026-02", share: null },
-      { month: "2026-03", share: null },
-      { month: "2026-03", share: 0.1 },
-      { month: "2026-04", share: null },
-    ];
-    expect(listMonthsWithShares(points)).toEqual(["2026-01", "2026-02", "2026-03"]);
-    expect(listMonthsWithShares([{ month: "2026-01", share: null }])).toEqual([]);
   });
 });
 
@@ -423,12 +407,12 @@ describe("lens ward reach", () => {
   it("counts wards mentioning each lens out of wards with readable newsletters", () => {
     const cells = computeLensWardReach(facts, ["schools", "events"], ["2026-01", "2026-02", "2026-03"]);
     expect(cells).toEqual([
-      { lens: "schools", month: "2026-01", wardsMentioning: 1, activeWards: 2, textUnavailableWards: 1, share: 0.5 },
-      { lens: "schools", month: "2026-02", wardsMentioning: 1, activeWards: 1, textUnavailableWards: 0, share: 1 },
-      { lens: "schools", month: "2026-03", wardsMentioning: 0, activeWards: 0, textUnavailableWards: 0, share: null },
-      { lens: "events", month: "2026-01", wardsMentioning: 1, activeWards: 2, textUnavailableWards: 1, share: 0.5 },
-      { lens: "events", month: "2026-02", wardsMentioning: 0, activeWards: 1, textUnavailableWards: 0, share: 0 },
-      { lens: "events", month: "2026-03", wardsMentioning: 0, activeWards: 0, textUnavailableWards: 0, share: null },
+      { lens: "schools", month: "2026-01", wardsMentioning: 1, activeWards: 2, share: 0.5 },
+      { lens: "schools", month: "2026-02", wardsMentioning: 1, activeWards: 1, share: 1 },
+      { lens: "schools", month: "2026-03", wardsMentioning: 0, activeWards: 0, share: null },
+      { lens: "events", month: "2026-01", wardsMentioning: 1, activeWards: 2, share: 0.5 },
+      { lens: "events", month: "2026-02", wardsMentioning: 0, activeWards: 1, share: 0 },
+      { lens: "events", month: "2026-03", wardsMentioning: 0, activeWards: 0, share: null },
     ]);
   });
 
@@ -443,12 +427,12 @@ describe("lens ward reach", () => {
     expect(isReachFaded({ activeWards: 1 }, 0)).toBe(false);
   });
 
-  it("grids one lens by ward and month, telling silence from missing text and missing newsletters", () => {
+  it("grids one lens by ward and month, showing a month of only image-only newsletters as not mentioned", () => {
     const cells = buildLensWardGrid(facts, "schools", ["1", "2", "3"], ["2026-01"]);
     expect(cells).toEqual([
-      { ward: "1", month: "2026-01", status: "mentioned", mentioning: 2, readable: 2, newsletters: 2 },
-      { ward: "2", month: "2026-01", status: "not_mentioned", mentioning: 0, readable: 1, newsletters: 1 },
-      { ward: "3", month: "2026-01", status: "text_unavailable", mentioning: 0, readable: 0, newsletters: 1 },
+      { ward: "1", month: "2026-01", status: "mentioned", mentioning: 2, newsletters: 2 },
+      { ward: "2", month: "2026-01", status: "not_mentioned", mentioning: 0, newsletters: 1 },
+      { ward: "3", month: "2026-01", status: "not_mentioned", mentioning: 0, newsletters: 1 },
     ]);
     expect(buildLensWardGrid(facts, "schools", ["4"], ["2026-01"])[0].status).toBe("no_newsletter");
   });

@@ -85,3 +85,11 @@ def extract_terms(text: str) -> set[str]:
 def count_words(text: str) -> int:
     """Count whitespace-separated words in text."""
     return len(text.split())
+
+
+def contains_word_run(words: list[str], part: list[str]) -> bool:
+    """True if part occurs in words as a contiguous run."""
+    return any(
+        words[start : start + len(part)] == part
+        for start in range(len(words) - len(part) + 1)
+    )

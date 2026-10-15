@@ -21,7 +21,12 @@ from analytics.records import (
     shift_month,
     ward_sort_key,
 )
-from analytics.text import MIN_TOKEN_LENGTH, WORD_PATTERN, extract_terms
+from analytics.text import (
+    MIN_TOKEN_LENGTH,
+    WORD_PATTERN,
+    contains_word_run,
+    extract_terms,
+)
 
 # Additive smoothing for share estimates so unseen terms never divide by zero.
 SHARE_SMOOTHING = 0.5
@@ -290,7 +295,9 @@ def compute_rising_terms(
 
     Counting wards rather than pooling newsletters means one prolific sender
     cannot manufacture a trend. The baseline is the median ward count over the
-    baseline_months before latest_month, so one unusual month does not set it.
+    baseline_months before latest_month, so one unusual month does not set it;
+    baseline months with no active ward (before the archive starts) are left
+    out of the median rather than counted as zero.
     A term must reach at least min_latest_wards wards and gain at least
     min_ward_gain wards over the baseline. Pass only newsletters whose text
     could be read: the wards active each month are the denominator readers
@@ -314,7 +321,8 @@ def compute_rising_terms(
         "baseline_active_wards": [len(active_wards[month]) for month in baseline],
         "terms": [],
     }
-    if not active_wards[latest_month] or not any(active_wards[m] for m in baseline):
+    observed_baseline = [month for month in baseline if active_wards[month]]
+    if not active_wards[latest_month] or not observed_baseline:
         return result
 
     wards_by_term: dict[str, dict[str, set[str]]] = defaultdict(
@@ -331,7 +339,9 @@ def compute_rising_terms(
     for term, wards_by_month in wards_by_term.items():
         latest_wards = len(wards_by_month[latest_month])
         month_wards = [len(wards_by_month[month]) for month in baseline]
-        baseline_wards = float(statistics.median(month_wards))
+        baseline_wards = float(
+            statistics.median(len(wards_by_month[month]) for month in observed_baseline)
+        )
         gain = latest_wards - baseline_wards
         if latest_wards >= min_latest_wards and gain >= min_ward_gain:
             candidates.append(
@@ -353,17 +363,33 @@ def compute_rising_terms(
     return result
 
 
+def are_parts_of_one_phrase(first: list[str], second: list[str]) -> bool:
+    """True if one term contains the other ("labor" in "labor day") or the two
+    chain into a longer phrase ("labor day" and "day weekend").
+
+    Terms that merely share a word in the same position ("labor day" and
+    "election day") are different phrases, so they are not matched.
+    """
+    return (
+        contains_word_run(first, second)
+        or contains_word_run(second, first)
+        or first[-1] == second[0]
+        or second[-1] == first[0]
+    )
+
+
 def drop_overlapping_terms[T](ranked: list[T], term_of: Callable[[T], str]) -> list[T]:
-    """Keep each item unless its term shares a word with a higher-ranked kept term.
+    """Keep each item unless its term is part of the same phrase as a
+    higher-ranked kept term (see `are_parts_of_one_phrase`).
 
     One story shows up as several overlapping terms ("labor day", "labor",
     "day weekend"); keeping only the highest-ranked leaves room for others.
     """
     kept: list[T] = []
-    kept_words: set[str] = set()
+    kept_words: list[list[str]] = []
     for item in ranked:
-        words = set(term_of(item).split(" "))
-        if not words & kept_words:
+        words = term_of(item).split(" ")
+        if not any(are_parts_of_one_phrase(words, other) for other in kept_words):
             kept.append(item)
-            kept_words |= words
+            kept_words.append(words)
     return kept

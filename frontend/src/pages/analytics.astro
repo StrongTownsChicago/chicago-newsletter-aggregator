@@ -63,9 +63,9 @@ const controlClass =
             </details>
           </div>
           <label class="col-span-2 lg:col-span-1 block">
-            <span class="block text-sm font-semibold text-gray-700 mb-2">Lens</span>
+            <span class="block text-sm font-semibold text-gray-700 mb-2">Topic</span>
             <select name="lens" class={controlClass}>
-              <option value="">All lenses</option>
+              <option value="">All topics</option>
             </select>
           </label>
           <label class="block">
@@ -101,7 +101,7 @@ const controlClass =
       <AnalyticsPanel
         id="coverage"
         title="What the archive covers"
-        description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the lens filter."
+        description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the topic filter."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -109,11 +109,11 @@ const controlClass =
       <AnalyticsPanel
         id="civic-calendar"
         title="Civic calendar"
-        description={`How many wards' newsletters mentioned each subject, month by month, out of the wards that sent newsletters with readable text that month. Subjects are keyword lenses: reviewed phrase lists you can read below. Months with fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} such wards are faded when all wards are shown. Respects the ward and date filters; the lens filter outlines its row.`}
+        description={`How many wards' newsletters mentioned each topic, month by month, out of the wards that sent newsletters that month. Topics are found with reviewed keyword and phrase lists you can read below. Months with fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} such wards are faded when all wards are shown. Respects the ward and date filters; the topic filter outlines its row.`}
       >
         <div data-chart class="overflow-x-auto"></div>
         <details class="mt-4 text-sm" id="lens-definitions">
-          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">How lenses are matched, and their phrase lists</summary>
+          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">How topics are matched, and their phrase lists</summary>
           <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
         </details>
       </AnalyticsPanel>
@@ -121,7 +121,7 @@ const controlClass =
       <AnalyticsPanel
         id="lens-trends"
         title="Ward reach over time"
-        description="Share of active wards whose newsletters mentioned each lens, by month, on a shared vertical scale. Hover for the ward counts behind each point. Choose a lens in the filters to enlarge one."
+        description="Share of active wards whose newsletters mentioned each topic, by month, on a shared vertical scale. Hover for the ward counts behind each point. Choose a topic in the filters to enlarge one."
       >
         <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
       </AnalyticsPanel>
@@ -129,7 +129,7 @@ const controlClass =
       <AnalyticsPanel
         id="lens-wards"
         title="Which wards mentioned it"
-        description="For the lens chosen in the filters: each ward's newsletters, month by month. Read gaps against the coverage grid; a ward that sent no newsletter, or only newsletters without readable text, could not be seen mentioning anything."
+        description="For the topic chosen in the filters: each ward's newsletters, month by month. Read gaps against the coverage grid; a ward that sent no newsletter could not be seen mentioning anything."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -137,7 +137,7 @@ const controlClass =
       <AnalyticsPanel
         id="term-explorer"
         title="Term explorer"
-        description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by lens). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
+        description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by topic). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
       >
         <form id="term-form" class="flex gap-2 mb-2" role="search">
           <label for="term-input" class="sr-only">Term</label>
@@ -174,7 +174,7 @@ const controlClass =
       <AnalyticsPanel
         id="sending-cadence"
         title="Sending cadence"
-        description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the lens filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
+        description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
         hasTable={false}
       >
         <div id="cadence-gaps" class="overflow-x-auto"></div>

@@ -45,7 +45,6 @@ class TestBuildNewsletterTerms(unittest.TestCase):
             source_id=5,
             subject="Bike lanes",
             plain_text="Zoning hearing",
-            topics=None,
         )
         source = SourceRecord(id=5, name="A", ward="40", source_type="alderman")
         [document] = build_newsletter_terms([newsletter], {5: source})
@@ -65,7 +64,6 @@ class TestBuildNewsletterTerms(unittest.TestCase):
                 source_id=None,
                 subject="",
                 plain_text=text,
-                topics=None,
             )
             for index, text in enumerate(texts)
         ]
@@ -264,13 +262,38 @@ class TestRisingTerms(unittest.TestCase):
         self.assertEqual(result["terms"], [])
         self.assertEqual(result["baseline_active_wards"], [0, 0, 0])
 
+    def test_months_before_the_archive_are_not_counted_as_zero(self):
+        # The archive starts in June: April and May had no active ward at all.
+        documents = [doc({"fest"}, ward="1", month="2026-06")]
+        documents += [doc({"fest"}, ward=w, month="2026-07") for w in "1234"]
+        result = compute_rising_terms(
+            documents,
+            {"fest"},
+            latest_month="2026-07",
+            baseline_months=3,
+            min_latest_wards=3,
+            min_ward_gain=2,
+            top_n=10,
+        )
+        self.assertEqual(result["baseline_active_wards"], [0, 0, 1])
+        (fest,) = result["terms"]
+        self.assertEqual(fest["baseline_month_wards"], [0, 0, 1])
+        # Median of June alone, not of 0, 0, 1.
+        self.assertEqual(fest["baseline_wards"], 1)
+        self.assertEqual(fest["ward_gain"], 3)
+
 
 class TestDropOverlappingTerms(unittest.TestCase):
-    def test_drops_terms_sharing_a_word_with_a_kept_term(self):
+    def test_drops_terms_that_are_part_of_a_kept_phrase(self):
         kept = drop_overlapping_terms(
-            ["labor day", "labor", "day weekend", "senior fest"], lambda term: term
+            ["labor day", "labor", "day weekend", "senior fest", "fest"],
+            lambda term: term,
         )
         self.assertEqual(kept, ["labor day", "senior fest"])
+
+    def test_keeps_distinct_phrases_that_share_a_word(self):
+        ranked = ["labor day", "election day", "next week", "next superintendent"]
+        self.assertEqual(drop_overlapping_terms(ranked, lambda term: term), ranked)
 
 
 if __name__ == "__main__":

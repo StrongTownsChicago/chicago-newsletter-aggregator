@@ -32,7 +32,6 @@ def make_newsletter(
         source_id=source_id,
         subject="Update",
         plain_text=plain_text,
-        topics=None,
     )
 
 

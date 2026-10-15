@@ -26,7 +26,6 @@ def make_newsletter(
         source_id=source_id,
         subject="Subject",
         plain_text="three word body",
-        topics=["bike_lanes"],
     )
 
 

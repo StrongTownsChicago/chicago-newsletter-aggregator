@@ -91,7 +91,7 @@ export interface LensSummary {
   /** Which text was matched: "cleaned" (standing boilerplate removed) or "raw". */
   text: "cleaned" | "raw";
   /** A newsletter mentions a lens when its phrases occur at least this many times. */
-  min_phrase_occurrences: number;
+  min_mentions: number;
   /** Newsletters with enough extracted text to match. */
   readable_newsletters: number;
   lenses: LensDefinition[];
@@ -426,19 +426,6 @@ export function trimSparseEdges<T extends { share: number | null }>(points: T[])
   return points.slice(first, last + 1);
 }
 
-/**
- * The months from the first to the last point with a share in any series, so
- * small multiples share one x axis instead of each starting where its own
- * data does.
- */
-export function listMonthsWithShares(points: { month: string; share: number | null }[]): string[] {
-  const months = points
-    .filter((point) => point.share !== null)
-    .map((point) => point.month)
-    .sort();
-  return months.length ? listMonths(months[0], months[months.length - 1]) : [];
-}
-
 // ---------------------------------------------------------------------------
 // Term explorer
 
@@ -595,8 +582,6 @@ export interface LensReachCell {
   wardsMentioning: number;
   /** Wards with at least one readable newsletter that month (the denominator). */
   activeWards: number;
-  /** Wards that sent newsletters that month, but none with readable text (left out of the denominator). */
-  textUnavailableWards: number;
   /** wardsMentioning / activeWards, or null when no ward was active. */
   share: number | null;
 }
@@ -608,7 +593,6 @@ function isReadable(fact: NewsletterFact): boolean {
 
 interface WardMonthActivity {
   readableWards: Set<string>;
-  sendingWards: Set<string>;
   wardsByLens: Map<string, Set<string>>;
 }
 
@@ -619,10 +603,9 @@ function groupWardActivityByMonth(facts: NewsletterFact[]): Map<string, WardMont
     const month = monthOf(fact.date);
     let activity = byMonth.get(month);
     if (!activity) {
-      activity = { readableWards: new Set(), sendingWards: new Set(), wardsByLens: new Map() };
+      activity = { readableWards: new Set(), wardsByLens: new Map() };
       byMonth.set(month, activity);
     }
-    activity.sendingWards.add(fact.ward);
     if (!isReadable(fact)) continue;
     activity.readableWards.add(fact.ward);
     for (const lens of fact.lenses) {
@@ -638,7 +621,7 @@ function groupWardActivityByMonth(facts: NewsletterFact[]): Map<string, WardMont
  * For each lens and month: how many wards mentioned the lens, out of the wards
  * with at least one readable newsletter that month. Wards whose newsletters
  * that month were all image-only are left out of the denominator, since they
- * could not be seen mentioning anything, and counted separately.
+ * could not be seen mentioning anything.
  * `facts` should be filtered by ward and date, never by lens.
  */
 export function computeLensWardReach(
@@ -657,7 +640,6 @@ export function computeLensWardReach(
         month,
         wardsMentioning,
         activeWards,
-        textUnavailableWards: (activity?.sendingWards.size ?? 0) - activeWards,
         share: activeWards > 0 ? wardsMentioning / activeWards : null,
       };
     }),
@@ -669,7 +651,7 @@ export function isReachFaded(cell: Pick<LensReachCell, "activeWards">, minActive
   return cell.activeWards < minActiveWards;
 }
 
-export type LensWardStatus = "mentioned" | "not_mentioned" | "text_unavailable" | "no_newsletter";
+export type LensWardStatus = "mentioned" | "not_mentioned" | "no_newsletter";
 
 export interface LensWardCell {
   ward: string;
@@ -677,15 +659,15 @@ export interface LensWardCell {
   status: LensWardStatus;
   /** Newsletters that month mentioning the lens. */
   mentioning: number;
-  /** Newsletters that month with readable text. */
-  readable: number;
   /** All newsletters that month. */
   newsletters: number;
 }
 
 /**
  * One cell per ward per month for a single lens: did the ward's newsletters
- * mention it, not mention it, have no readable text, or not arrive at all.
+ * mention it, not mention it, or not arrive at all. Newsletters without
+ * readable text cannot mention a lens, so a month of only those is "not
+ * mentioned".
  */
 export function buildLensWardGrid(
   facts: NewsletterFact[],
@@ -693,27 +675,20 @@ export function buildLensWardGrid(
   wards: string[],
   months: string[],
 ): LensWardCell[] {
-  const counts = new Map<string, { mentioning: number; readable: number; newsletters: number }>();
+  const counts = new Map<string, { mentioning: number; newsletters: number }>();
   for (const fact of facts) {
     if (fact.ward === null) continue;
     const key = `${fact.ward}|${monthOf(fact.date)}`;
-    const count = counts.get(key) ?? { mentioning: 0, readable: 0, newsletters: 0 };
+    const count = counts.get(key) ?? { mentioning: 0, newsletters: 0 };
     count.newsletters += 1;
-    if (isReadable(fact)) count.readable += 1;
     if (isReadable(fact) && fact.lenses.includes(lens)) count.mentioning += 1;
     counts.set(key, count);
   }
   return wards.flatMap((ward) =>
     months.map((month) => {
-      const count = counts.get(`${ward}|${month}`) ?? { mentioning: 0, readable: 0, newsletters: 0 };
+      const count = counts.get(`${ward}|${month}`) ?? { mentioning: 0, newsletters: 0 };
       const status: LensWardStatus =
-        count.mentioning > 0
-          ? "mentioned"
-          : count.readable > 0
-            ? "not_mentioned"
-            : count.newsletters > 0
-              ? "text_unavailable"
-              : "no_newsletter";
+        count.mentioning > 0 ? "mentioned" : count.newsletters > 0 ? "not_mentioned" : "no_newsletter";
       return { ward, month, status, ...count };
     }),
   );

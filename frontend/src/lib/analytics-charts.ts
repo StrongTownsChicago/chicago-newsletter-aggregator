@@ -175,14 +175,9 @@ export function renderTermTimeline(points: TermMonthPoint[], width: number): Ele
 
 /** "14 of 38 wards (37%)": a ward-reach cell with its denominator. */
 export function describeWardReach(cell: LensReachCell): string {
-  const reach =
-    cell.share === null
-      ? "no ward sent readable newsletters"
-      : `${cell.wardsMentioning} of ${cell.activeWards} wards (${formatPercent(cell.share)})`;
-  const unreadable = cell.textUnavailableWards
-    ? `\n${cell.textUnavailableWards} more sent only newsletters without readable text`
-    : "";
-  return `${reach}${unreadable}`;
+  return cell.share === null
+    ? "no ward sent newsletters"
+    : `${cell.wardsMentioning} of ${cell.activeWards} wards (${formatPercent(cell.share)})`;
 }
 
 /** One lens's monthly ward reach, on the x axis and scale every lens card shares. */
@@ -258,7 +253,7 @@ export function renderCivicCalendar(
         rx: 2,
         title: (cell: LensReachCell) =>
           `${labelOf.get(cell.lens)} · ${formatMonth(cell.month)}\n${describeWardReach(cell)}` +
-          (isFaded(cell) ? `\nFaded: fewer than ${minActiveWards} wards sent readable newsletters` : ""),
+          (isFaded(cell) ? `\nFaded: fewer than ${minActiveWards} wards sent newsletters` : ""),
         tip: true,
       }),
       Plot.text(
@@ -289,14 +284,12 @@ export function renderCivicCalendar(
 const LENS_WARD_COLORS: Record<LensWardCell["status"], { fill: string; stroke?: string }> = {
   mentioned: { fill: CHART_COLORS.series },
   not_mentioned: { fill: CHART_COLORS.surface, stroke: CHART_COLORS.baseline },
-  text_unavailable: { fill: CHART_COLORS.baseline },
   no_newsletter: { fill: CHART_COLORS.untracked },
 };
 
 export const LENS_WARD_STATUS_LABELS: Record<LensWardCell["status"], string> = {
   mentioned: "Mentioned it",
   not_mentioned: "Sent newsletters, did not mention it",
-  text_unavailable: "Sent only newsletters without readable text",
   no_newsletter: "No newsletter archived that month",
 };
 
@@ -335,8 +328,7 @@ export function renderLensWardGrid(
           title: (cell: LensWardCell) =>
             `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${LENS_WARD_STATUS_LABELS[status]}` +
             (cell.newsletters
-              ? `\n${cell.mentioning} of ${cell.readable} readable newsletters mentioned ${lensLabel}` +
-                (cell.newsletters > cell.readable ? ` (${cell.newsletters - cell.readable} without readable text)` : "")
+              ? `\n${cell.mentioning} of ${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"} mentioned ${lensLabel}`
               : ""),
           tip: true,
         },

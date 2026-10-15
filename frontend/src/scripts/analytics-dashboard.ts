@@ -460,21 +460,13 @@ function lensLabel(state: DashboardState, lensId: string): string {
 
 function reachColumns(state: DashboardState, minActiveWards: number): TableColumn<LensReachCell>[] {
   return [
-    { label: "Lens", value: (cell) => lensLabel(state, cell.lens) },
+    { label: "Topic", value: (cell) => lensLabel(state, cell.lens) },
     { label: "Month", value: (cell) => cell.month },
     { label: "Wards mentioning", value: (cell) => cell.wardsMentioning, numeric: true },
-    { label: "Wards with readable newsletters", value: (cell) => cell.activeWards, numeric: true },
+    { label: "Active wards", value: (cell) => cell.activeWards, numeric: true },
     { label: "Share", value: (cell) => (cell.share === null ? "–" : formatPercent(cell.share)), numeric: true },
-    { label: "Wards without readable text", value: (cell) => cell.textUnavailableWards, numeric: true },
     { label: "Note", value: (cell) => (isReachFaded(cell, minActiveWards) ? "Few wards (faded)" : "") },
   ];
-}
-
-function describeTextUnavailable(facts: NewsletterFact[]): string {
-  const unreadable = facts.filter((fact) => fact.text_unavailable).length;
-  return unreadable
-    ? `${pluralize(unreadable, "newsletter")} in this window had too little extracted text (usually image-only issues), so they cannot mention any lens; a ward is counted as active only in months it sent readable text.`
-    : "";
 }
 
 /** A note when the window ends in the archive's latest month and that month is not over in the data. */
@@ -497,9 +489,8 @@ function renderCivicCalendarPanel(
   const cells = computeLensWardReach(scopeFacts, lenses.map((lens) => lens.id), months);
   const threshold = reachFadeThreshold(filters);
   caption.textContent = [
-    "Numbers are wards (shown when at least a quarter of active wards mentioned the lens).",
+    "Numbers are wards (shown when at least a quarter of active wards mentioned the topic).",
     describePartialLastMonth(state.data.metadata.last_date, months),
-    describeTextUnavailable(scopeFacts),
   ]
     .filter(Boolean)
     .join(" ");
@@ -515,17 +506,18 @@ function renderCivicCalendarPanel(
 
 function renderLensDefinitions(state: DashboardState): void {
   const container = requireElement<HTMLElement>("[data-lens-definitions]");
-  const { text, min_phrase_occurrences: minOccurrences, readable_newsletters: readable } = state.data.lenses;
+  const { text, min_mentions: minMentions, readable_newsletters: readable } = state.data.lenses;
   const rules = document.createElement("p");
   rules.textContent =
-    `A newsletter mentions a lens when the lens's words and phrases appear at least ${pluralize(minOccurrences, "time")} ` +
-    "in its subject and text (whole words, any capitalization, singular or plural; the same phrase twice counts), " +
+    `A newsletter mentions a topic when the topic's words and phrases appear at least ${pluralize(minMentions, "separate time")} ` +
+    "in its subject and text (whole words within one sentence, any capitalization, singular or plural). " +
+    'The same phrase twice counts twice, but phrases that overlap or sit side by side, as in "city council meeting", count once, ' +
     "so a single passing mention does not count. " +
     (text === "cleaned"
-      ? "Matching skips text a ward repeats in most of its issues (footers, standing resource lists), so a standing block does not count as news every month. "
+      ? "Matching skips text a ward repeats across many of its issues (footers, standing resource lists), so a standing block does not count as news every month. "
       : "Matching reads the full text, including standing blocks a ward repeats in every issue. ") +
-    `Newsletters with too little extracted text cannot mention anything. Counts below are out of ${numberFormat.format(readable)} readable newsletters in the whole archive. ` +
-    "Lenses marked Strong Towns Chicago focus are narrower slices of the broader lenses.";
+    `Counts below are out of the ${numberFormat.format(readable)} newsletters analyzed across the whole archive. ` +
+    "Topics marked Strong Towns Chicago focus are narrower slices of the broader topics.";
   const list = document.createElement("dl");
   list.className = "space-y-2";
   for (const lens of state.data.lenses.lenses) {
@@ -559,8 +551,8 @@ function renderLensTrendsPanel(
   // Thin months are left out of the lines (a gap), as the calendar fades them.
   const points = cells.map((cell) => (isReachFaded(cell, threshold) ? { ...cell, share: null } : cell));
   caption.textContent = threshold
-    ? `Months with fewer than ${threshold} wards sending readable newsletters are left blank.`
-    : "Shares are out of the selected wards that sent readable newsletters each month.";
+    ? `Months with fewer than ${threshold} wards sending newsletters are left blank.`
+    : "Shares are out of the selected wards that sent newsletters each month.";
   const maxShare = Math.max(0, ...points.map((point) => point.share ?? 0));
   const single = lenses.length === 1;
   chart.classList.toggle("md:grid-cols-2", !single);
@@ -585,7 +577,7 @@ function renderLensTrendsPanel(
           );
           return figure;
         })
-      : [emptyMessage("No month in the selected window has enough wards sending readable newsletters.")]),
+      : [emptyMessage("No month in the selected window has enough wards sending newsletters.")]),
   );
   setTable(table, reachColumns(state, threshold), cells);
 }
@@ -600,8 +592,8 @@ function renderLensWardsPanel(
   if (!chart) return;
   if (!filters.lens) {
     caption.textContent = "";
-    replaceContent(chart, emptyMessage("Choose a lens in the filters above to see which wards mentioned it."));
-    replaceContent(table, emptyMessage("Choose a lens to see its table."));
+    replaceContent(chart, emptyMessage("Choose a topic in the filters above to see which wards mentioned it."));
+    replaceContent(table, emptyMessage("Choose a topic to see its table."));
     return;
   }
   const label = lensLabel(state, filters.lens);
@@ -622,8 +614,7 @@ function renderLensWardsPanel(
       { label: "Month", value: (cell) => cell.month },
       { label: "Status", value: (cell) => LENS_WARD_STATUS_LABELS[cell.status] },
       { label: "Newsletters mentioning", value: (cell) => cell.mentioning, numeric: true },
-      { label: "Readable newsletters", value: (cell) => cell.readable, numeric: true },
-      { label: "All newsletters", value: (cell) => cell.newsletters, numeric: true },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
     ],
     cells.filter((cell) => cell.status !== "no_newsletter"),
   );
@@ -668,8 +659,8 @@ function renderRisingPanel(state: DashboardState): void {
   const baselineSpan = `${formatMonth(rising.baseline_months[0])} – ${formatMonth(rising.baseline_months[rising.baseline_months.length - 1])}`;
   const latest = formatMonth(rising.latest_month);
   caption.textContent =
-    `${latest}: ${pluralize(rising.latest_active_wards, "ward")} sent readable newsletters ` +
-    `(${rising.baseline_active_wards.join(", ")} in ${baselineSpan}). Terms sharing a word with a higher-ranked term are left out.`;
+    `${latest}: ${pluralize(rising.latest_active_wards, "ward")} sent newsletters ` +
+    `(${rising.baseline_active_wards.join(", ")} in ${baselineSpan}). Terms that are part of a higher-ranked term's phrase (such as "labor" or "day weekend" after "labor day") are left out.`;
   if (!chart) return;
   replaceContent(
     chart,
