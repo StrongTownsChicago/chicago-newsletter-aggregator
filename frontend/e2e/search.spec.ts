@@ -104,7 +104,7 @@ test('loads old links with removed relevance params and drops them', async ({ pa
 test.describe('search timeline', () => {
   const timelineRoute = '**/api/search-timeline?*';
 
-  test('shows monthly counts for a search with results', async ({ page }) => {
+  test('shows monthly counts that link to each month', async ({ page }) => {
     await page.route(timelineRoute, (route) =>
       route.fulfill({
         json: {
@@ -119,13 +119,10 @@ test.describe('search timeline', () => {
     test.skip((await page.getByTestId('newsletter-card').count()) === 0, 'no results in this database');
 
     const timeline = page.getByTestId('search-timeline');
-    await page.mouse.wheel(0, 10000);
-    await expect(timeline).toBeVisible();
     await expect(timeline.getByRole('heading', { name: /zoning/ })).toBeVisible();
-
-    await timeline.getByText('Show monthly counts').click();
-    await expect(timeline.getByRole('row', { name: 'Jan 2026 3 2' })).toBeVisible();
-    await expect(timeline.getByRole('row', { name: 'Feb 2026 0 0' })).toBeVisible();
+    const january = timeline.getByRole('link', { name: 'Jan 2026: 3 newsletters, 2 wards' });
+    await expect(january).toHaveAttribute('href', '/search?q=zoning&from=2026-01-01&to=2026-01-31');
+    await expect(timeline.getByRole('link', { name: /Feb 2026/ })).toHaveCount(0);
   });
 
   test('stays hidden when the timeline is unavailable', async ({ page }) => {
@@ -133,9 +130,8 @@ test.describe('search timeline', () => {
       route.fulfill({ status: 404, json: { error: 'timeline_unavailable' } }),
     );
     await page.goto('/search?q=zoning');
-    await page.mouse.wheel(0, 10000);
 
-    await expect(page.getByTestId('search-timeline')).toBeHidden();
+    await expect(page.getByTestId('search-timeline')).toHaveCount(0);
     await expect(page.getByTestId('search-input')).toHaveValue('zoning');
   });
 });

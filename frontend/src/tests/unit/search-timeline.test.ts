@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  buildMonthSearchUrl,
+  buildSearchUrlWithoutDates,
+  clipTimelineToRange,
+  formatMonthRange,
+  monthDateRange,
+  selectedTimelineMonth,
+  timelineRangeForSearch,
+  yearLabelForBar,
+  timelineRangeForDates,
+  TIMELINE_DEFAULT_START_MONTH,
   SEARCH_TIMELINE_MAX_QUERY_LENGTH,
   SEARCH_TIMELINE_RPC,
   barHeightPercent,
@@ -280,5 +290,104 @@ describe("summarizeTimeline", () => {
 
   it("returns null for an empty timeline", () => {
     expect(summarizeTimeline([])).toBeNull();
+  });
+});
+
+describe("timelineRangeForDates", () => {
+  it("starts at the default month without a start date", () => {
+    expect(timelineRangeForDates(null, null)).toEqual({
+      startMonth: TIMELINE_DEFAULT_START_MONTH,
+      endMonth: null,
+    });
+  });
+
+  it("follows the search's date filters", () => {
+    expect(timelineRangeForDates("2025-06-15", "2026-03-02")).toEqual({
+      startMonth: "2025-06",
+      endMonth: "2026-03",
+    });
+  });
+});
+
+describe("clipTimelineToRange", () => {
+  const months = [
+    { month: "2025-11", newsletterCount: 4, wardCount: 2 },
+    { month: "2026-01", newsletterCount: 3, wardCount: 3 },
+    { month: "2026-02", newsletterCount: 0, wardCount: 0 },
+    { month: "2026-03", newsletterCount: 5, wardCount: 4 },
+  ];
+
+  it("drops months before the start and runs to the latest month", () => {
+    expect(
+      clipTimelineToRange(months, { startMonth: "2026-01", endMonth: null }).map((m) => m.month),
+    ).toEqual(["2026-01", "2026-02", "2026-03"]);
+  });
+
+  it("fills zero months when the range starts before the data", () => {
+    const clipped = clipTimelineToRange(months, { startMonth: "2025-10", endMonth: "2025-12" });
+    expect(clipped).toEqual([
+      { month: "2025-10", newsletterCount: 0, wardCount: 0 },
+      { month: "2025-11", newsletterCount: 4, wardCount: 2 },
+      { month: "2025-12", newsletterCount: 0, wardCount: 0 },
+    ]);
+  });
+
+  it("is empty when nothing matched in the range or the range is reversed", () => {
+    expect(clipTimelineToRange(months, { startMonth: "2026-02", endMonth: "2026-02" })).toEqual([]);
+    expect(clipTimelineToRange(months, { startMonth: "2026-03", endMonth: "2026-01" })).toEqual([]);
+    expect(clipTimelineToRange([], { startMonth: "2026-01", endMonth: null })).toEqual([]);
+  });
+});
+
+describe("month links", () => {
+  it("gives each month's first and last day, including February and December", () => {
+    expect(monthDateRange("2026-02")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(monthDateRange("2028-02")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+    expect(monthDateRange("2026-12")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+
+  it("narrows the search to a month and returns to page 1", () => {
+    const url = new URL("https://example.org/search?q=snow&ward=5&page=4&from=2025-01-01");
+    expect(buildMonthSearchUrl(url, "2026-03")).toBe(
+      "/search?q=snow&ward=5&from=2026-03-01&to=2026-03-31",
+    );
+    expect(buildSearchUrlWithoutDates(new URL("https://example.org/search?q=snow&from=2026-03-01&to=2026-03-31&page=2"))).toBe(
+      "/search?q=snow",
+    );
+  });
+
+  it("recognizes a search covering exactly one month", () => {
+    expect(selectedTimelineMonth("2026-03-01", "2026-03-31")).toBe("2026-03");
+    expect(selectedTimelineMonth("2026-03-01", "2026-03-30")).toBeNull();
+    expect(selectedTimelineMonth("2026-03-01", null)).toBeNull();
+  });
+
+  it("keeps the full chart when one month is selected", () => {
+    expect(timelineRangeForSearch("2026-03-01", "2026-03-31")).toEqual({
+      startMonth: TIMELINE_DEFAULT_START_MONTH,
+      endMonth: null,
+    });
+    expect(timelineRangeForSearch("2025-06-01", "2025-06-30")).toEqual({
+      startMonth: "2025-06",
+      endMonth: null,
+    });
+    expect(timelineRangeForSearch("2026-03-01", "2026-05-15")).toEqual({
+      startMonth: "2026-03",
+      endMonth: "2026-05",
+    });
+  });
+});
+
+describe("labels", () => {
+  it("formats month ranges within and across years", () => {
+    expect(formatMonthRange("2026-01", "2026-10")).toBe("Jan–Oct 2026");
+    expect(formatMonthRange("2025-11", "2026-03")).toBe("Nov 2025–Mar 2026");
+    expect(formatMonthRange("2026-04", "2026-04")).toBe("Apr 2026");
+  });
+
+  it("shows the year on the first bar and at each January", () => {
+    expect(yearLabelForBar("2025-11", 0)).toBe("2025");
+    expect(yearLabelForBar("2025-12", 1)).toBeNull();
+    expect(yearLabelForBar("2026-01", 2)).toBe("2026");
   });
 });

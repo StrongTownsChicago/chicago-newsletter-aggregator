@@ -11,51 +11,55 @@ const months = [
   { month: "2026-03", newsletterCount: 4, wardCount: 3 },
 ];
 
-const TIMELINE_MARKUP = `
-  <p data-timeline-summary></p>
-  <div data-timeline-bars></div>
-  <span data-timeline-start></span><span data-timeline-end></span>
-  <table><tbody data-timeline-rows></tbody></table>
-`;
+const TIMELINE_MARKUP = `<p data-timeline-summary></p><ol data-timeline-bars aria-busy="true"></ol>`;
+
+const context = {
+  searchUrl: new URL("https://example.org/search?q=snow&page=3"),
+  currentMonth: "2026-03",
+  selectedMonth: "2026-01",
+};
 
 describe("describeTimeline", () => {
-  it("summarizes totals and the peak month", () => {
+  it("summarizes the total, the range and the peak month", () => {
     expect(describeTimeline(months)).toBe(
-      "5 newsletters in 2 months. Most in Mar 2026: 4 newsletters from 3 wards.",
+      "5 newsletters, Jan–Mar 2026. Most in Mar 2026 (4, from 3 wards).",
     );
   });
 
   it("uses singular forms", () => {
     expect(describeTimeline([{ month: "2026-01", newsletterCount: 1, wardCount: 1 }])).toBe(
-      "1 newsletter in 1 month. Most in Jan 2026: 1 newsletter from 1 ward.",
+      "1 newsletter, Jan 2026. Most in Jan 2026 (1, from 1 ward).",
     );
   });
 });
 
 describe("renderTimeline", () => {
-  it("renders one bar and one table row per month, including zero months", () => {
+  const render = () => {
     const root = document.createElement("div");
     root.innerHTML = TIMELINE_MARKUP;
+    renderTimeline(root, months, context);
+    return root;
+  };
 
-    renderTimeline(root, months, "2026-03");
+  it("labels every month with its count and links months that have matches", () => {
+    const root = render();
+    const columns = [...root.querySelectorAll("[data-timeline-bars] > li")];
+    expect(columns.map((column) => column.textContent)).toEqual(["1Jan2026", "0Feb", "4Mar"]);
 
-    const bars = root.querySelectorAll<HTMLElement>("[data-timeline-bars] > div");
-    expect(bars).toHaveLength(3);
-    expect((bars[1].firstElementChild as HTMLElement).style.height).toBe("0%");
-    expect((bars[2].firstElementChild as HTMLElement).style.height).toBe("100%");
-
-    const rows = [...root.querySelectorAll("[data-timeline-rows] tr")].map((row) =>
-      [...row.children].map((cell) => cell.textContent),
-    );
-    expect(rows).toEqual([
-      ["Jan 2026", "1", "1"],
-      ["Feb 2026", "0", "0"],
-      ["Mar 2026 (so far)", "4", "3"],
+    const links = [...root.querySelectorAll<HTMLAnchorElement>("[data-timeline-bars] a")];
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/search?q=snow&from=2026-01-01&to=2026-01-31",
+      "/search?q=snow&from=2026-03-01&to=2026-03-31",
     ]);
-    expect(root.querySelector("[data-timeline-rows] th")?.getAttribute("scope")).toBe("row");
-    expect(root.querySelector("[data-timeline-start]")?.textContent).toBe("Jan 2026");
-    expect(root.querySelector("[data-timeline-end]")?.textContent).toBe("Mar 2026");
-    expect(root.querySelector("[data-timeline-summary]")?.textContent).toContain("5 newsletters");
+    expect(links[1].getAttribute("aria-label")).toBe("Mar 2026 so far: 4 newsletters, 3 wards");
+    expect(root.querySelector("[data-timeline-bars]")?.hasAttribute("aria-busy")).toBe(false);
+  });
+
+  it("marks the selected month", () => {
+    const root = render();
+    expect(root.querySelector("[aria-current]")?.getAttribute("aria-label")).toBe(
+      "Jan 2026: 1 newsletter, 1 ward",
+    );
   });
 });
 
