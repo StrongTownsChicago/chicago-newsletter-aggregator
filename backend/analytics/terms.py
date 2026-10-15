@@ -9,8 +9,8 @@ dominate a metric. Rising terms go one step further and count wards.
 import math
 import statistics
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass
+from collections.abc import Callable, Iterable, Mapping, Set
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
 from analytics.plurals import choose_display_forms, fold_plural
@@ -21,6 +21,8 @@ from analytics.records import (
     shift_month,
     ward_sort_key,
 )
+from analytics.seasonal import is_seasonal_term
+from analytics.stopwords import TREND_FILLER_WORDS
 from analytics.text import (
     MIN_TOKEN_LENGTH,
     WORD_PATTERN,
@@ -153,6 +155,9 @@ class DistinctiveTerm:
     ward_newsletters: int
     ward_share: float
     rest_share: float
+    # How many other terms were folded into this one because they occur in the
+    # same newsletters (see `collapse_terms_sharing_newsletters`).
+    related_terms: int = 0
 
 
 def build_name_tokens_by_ward(sources: Iterable[SourceRecord]) -> dict[str, set[str]]:
@@ -202,6 +207,114 @@ def score_distinctive_term(
     )
 
 
+def jaccard_similarity(first: Set[int], second: Set[int]) -> float:
+    """Share of the union of two sets that both contain (1.0 for identical sets)."""
+    union = len(first | second)
+    return len(first & second) / union if union else 1.0
+
+
+def build_word_specificity(
+    term_newsletters: Mapping[str, int], total_newsletters: int
+) -> Callable[[str], float]:
+    """Return a function scoring how specific a term's words are citywide.
+
+    The score is the sum of each word's inverse document frequency (plurals
+    folded), so phrases of rare words ("gunshot detection") outscore phrases
+    of everyday words ("helps identify").
+    """
+    word_newsletters = {
+        fold_plural(term): count
+        for term, count in term_newsletters.items()
+        if " " not in term
+    }
+
+    def specificity(term: str) -> float:
+        return sum(
+            math.log(
+                total_newsletters / (1 + word_newsletters.get(fold_plural(word), 0))
+            )
+            for word in term.split(" ")
+        )
+
+    return specificity
+
+
+def choose_representative_term(
+    group: list[DistinctiveTerm], specificity: Callable[[str], float]
+) -> DistinctiveTerm:
+    """Pick the entry that names a group of terms from the same newsletters.
+
+    A phrase says more than a lone word ("houseless neighbors" over
+    "houseless"), so multi-word terms come first; then the most specific
+    words (see `build_word_specificity`), the highest score, and alphabetical
+    order.
+    """
+    return min(
+        group,
+        key=lambda item: (
+            " " not in item.term,
+            -specificity(item.term),
+            -item.score,
+            item.term,
+        ),
+    )
+
+
+def collapse_terms_sharing_newsletters(
+    ranked: list[DistinctiveTerm],
+    newsletters_by_term: Mapping[str, Set[int]],
+    min_similarity: float,
+    limit: int,
+    specificity: Callable[[str], float],
+) -> list[DistinctiveTerm]:
+    """Merge terms found in (nearly) the same newsletters into one entry each.
+
+    A standing block just under the boilerplate threshold yields a dozen
+    fragments ("procurement news", "certified vendor", "website provides"),
+    all in exactly the same newsletters, which would fill a ward's list with
+    one block. Walking the ranking, a term joins the first group whose
+    highest-ranked term's newsletters have at least min_similarity Jaccard
+    similarity with its own; otherwise it starts a group, up to limit groups.
+    Each group is reported by `choose_representative_term`, with the number of
+    other terms it stands for, ranked by its representative's score.
+    """
+    groups: list[list[DistinctiveTerm]] = []
+    for item in ranked:
+        newsletters = newsletters_by_term[item.term]
+        group = next(
+            (
+                group
+                for group in groups
+                if jaccard_similarity(newsletters, newsletters_by_term[group[0].term])
+                >= min_similarity
+            ),
+            None,
+        )
+        if group is not None:
+            group.append(item)
+        elif len(groups) < limit:
+            groups.append([item])
+    representatives = [
+        replace(
+            choose_representative_term(group, specificity),
+            related_terms=len(group) - 1,
+        )
+        for group in groups
+    ]
+    return sorted(representatives, key=lambda item: (-item.score, item.term))
+
+
+def index_newsletters_by_term(
+    documents: list[NewsletterTerms], vocabulary: set[str]
+) -> dict[str, set[int]]:
+    """Map each vocabulary term to the positions of the documents that contain it."""
+    positions: dict[str, set[int]] = defaultdict(set)
+    for position, document in enumerate(documents):
+        for term in document.terms & vocabulary:
+            positions[term].add(position)
+    return positions
+
+
 def compute_distinctive_terms(
     documents: list[NewsletterTerms],
     vocabulary: set[str],
@@ -210,13 +323,17 @@ def compute_distinctive_terms(
     min_ward_newsletters: int,
     min_term_newsletters_in_ward: int,
     max_ward_share: float,
+    min_shared_newsletter_similarity: float,
 ) -> dict[str, list[dict[str, Any]]]:
     """Find the top terms each ward uses far more often than the rest of the city.
 
     Skipped as uninformative: terms below min_term_newsletters_in_ward, terms in
     more than max_ward_share of a ward's newsletters (signatures and footers),
     and terms containing the ward's own source names (alderman self-references).
-    Wards with fewer than min_ward_newsletters newsletters are omitted.
+    Terms whose ward newsletters overlap by at least
+    min_shared_newsletter_similarity are reported as one entry (see
+    `collapse_terms_sharing_newsletters`). Wards with fewer than
+    min_ward_newsletters newsletters are omitted.
     """
     documents_by_ward: dict[str, list[NewsletterTerms]] = defaultdict(list)
     for document in documents:
@@ -225,6 +342,7 @@ def compute_distinctive_terms(
 
     city_counts = count_newsletters_per_term(documents)
     city_total = len(documents)
+    specificity = build_word_specificity(city_counts, city_total)
     distinctive: dict[str, list[dict[str, Any]]] = {}
 
     for ward in sorted(documents_by_ward, key=ward_sort_key):
@@ -233,25 +351,34 @@ def compute_distinctive_terms(
         if ward_total < min_ward_newsletters:
             continue
         name_tokens = name_tokens_by_ward.get(ward, set())
+        newsletters_by_term = index_newsletters_by_term(ward_documents, vocabulary)
         scored = [
             score_distinctive_term(
                 term,
-                ward_count,
+                len(newsletters),
                 ward_total,
-                city_counts[term] - ward_count,
+                city_counts[term] - len(newsletters),
                 city_total - ward_total,
             )
-            for term, ward_count in count_newsletters_per_term(ward_documents).items()
-            if term in vocabulary
-            and ward_count >= min_term_newsletters_in_ward
-            and ward_count / ward_total <= max_ward_share
+            for term, newsletters in newsletters_by_term.items()
+            if len(newsletters) >= min_term_newsletters_in_ward
+            and len(newsletters) / ward_total <= max_ward_share
             and not term_mentions_name(term, name_tokens)
         ]
         ranked = sorted(
             (item for item in scored if item.lift > 1),
             key=lambda item: (-item.score, item.term),
         )
-        distinctive[ward] = [asdict(item) for item in ranked[:top_n]]
+        distinctive[ward] = [
+            asdict(item)
+            for item in collapse_terms_sharing_newsletters(
+                ranked,
+                newsletters_by_term,
+                min_shared_newsletter_similarity,
+                top_n,
+                specificity,
+            )
+        ]
 
     return distinctive
 
@@ -270,6 +397,9 @@ class RisingTerm:
     baseline_month_wards: list[int]
     ward_gain: float
     latest_newsletters: int
+    # A recurring calendar event (see `analytics.seasonal`), which can rise
+    # every year at the same time without being news.
+    seasonal: bool
 
 
 def group_wards_by_month(documents: Iterable[NewsletterTerms]) -> dict[str, set[str]]:
@@ -281,6 +411,19 @@ def group_wards_by_month(documents: Iterable[NewsletterTerms]) -> dict[str, set[
     return wards_by_month
 
 
+def is_rising_candidate(term: str, min_phrase_words: int) -> bool:
+    """True if a term can be a rising term: a phrase of at least
+    min_phrase_words words, none of them in TREND_FILLER_WORDS.
+
+    Single words rise for unrelated reasons each month ("fall", "moving",
+    "pro"); a phrase names a subject.
+    """
+    words = term.split(" ")
+    return len(words) >= min_phrase_words and not any(
+        fold_plural(word) in TREND_FILLER_WORDS for word in words
+    )
+
+
 def compute_rising_terms(
     documents: list[NewsletterTerms],
     vocabulary: set[str],
@@ -289,6 +432,7 @@ def compute_rising_terms(
     min_latest_wards: int,
     min_ward_gain: int,
     top_n: int,
+    min_phrase_words: int,
 ) -> dict[str, Any]:
     """Rank terms by how many more wards mentioned them in latest_month than in a
     typical recent month.
@@ -299,7 +443,8 @@ def compute_rising_terms(
     baseline months with no active ward (before the archive starts) are left
     out of the median rather than counted as zero.
     A term must reach at least min_latest_wards wards and gain at least
-    min_ward_gain wards over the baseline. Pass only newsletters whose text
+    min_ward_gain wards over the baseline, and pass `is_rising_candidate`;
+    each is tagged when it is a recurring calendar event. Pass only newsletters whose text
     could be read: the wards active each month are the denominator readers
     compare against, and a ward whose text was unavailable could not mention
     anything.
@@ -325,12 +470,15 @@ def compute_rising_terms(
     if not active_wards[latest_month] or not observed_baseline:
         return result
 
+    candidate_terms = {
+        term for term in vocabulary if is_rising_candidate(term, min_phrase_words)
+    }
     wards_by_term: dict[str, dict[str, set[str]]] = defaultdict(
         lambda: defaultdict(set)
     )
     latest_newsletters: Counter[str] = Counter()
     for document in window_documents:
-        for term in document.terms & vocabulary:
+        for term in document.terms & candidate_terms:
             wards_by_term[term][document.month].add(str(document.ward))
             if document.month == latest_month:
                 latest_newsletters[term] += 1
@@ -352,6 +500,7 @@ def compute_rising_terms(
                     baseline_month_wards=month_wards,
                     ward_gain=gain,
                     latest_newsletters=latest_newsletters[term],
+                    seasonal=is_seasonal_term(term),
                 )
             )
     ranked = sorted(
