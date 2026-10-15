@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CHICAGO_TIME_ZONE } from "./chicago-dates";
+import { SEARCH_PARAM_NAMES } from "./search-filters";
 
 /**
  * Search term timeline: how many newsletters matching a /search query were
@@ -165,6 +166,51 @@ export function fillTimelineMonths(
   });
 }
 
+/**
+ * First month shown when the search has no start date. Before 2026 only a
+ * handful of wards were in the archive, so earlier counts mostly reflect
+ * coverage, not attention.
+ */
+export const TIMELINE_DEFAULT_START_MONTH = "2026-01";
+
+export interface TimelineMonthRange {
+  startMonth: string;
+  /** Null shows through the latest month in the data. */
+  endMonth: string | null;
+}
+
+/** The months to chart for a search's date filters (`YYYY-MM-DD` Chicago days). */
+export function timelineRangeForDates(
+  fromDate: string | null,
+  toDate: string | null,
+): TimelineMonthRange {
+  return {
+    startMonth: fromDate?.slice(0, 7) ?? TIMELINE_DEFAULT_START_MONTH,
+    endMonth: toDate?.slice(0, 7) ?? null,
+  };
+}
+
+/**
+ * The continuous month series for `range`, with zero counts where nothing
+ * matched. Empty when the range has no matches.
+ */
+export function clipTimelineToRange(
+  months: TimelineMonth[],
+  range: TimelineMonthRange,
+): TimelineMonth[] {
+  if (months.length === 0) return [];
+  const countsByMonth = new Map(months.map((entry) => [entry.month, entry]));
+  const firstIndex = toMonthIndex(range.startMonth);
+  const lastIndex = toMonthIndex(range.endMonth ?? months[months.length - 1].month);
+  if (lastIndex < firstIndex) return [];
+
+  const clipped = Array.from({ length: lastIndex - firstIndex + 1 }, (_, offset) => {
+    const month = fromMonthIndex(firstIndex + offset);
+    return countsByMonth.get(month) ?? { month, newsletterCount: 0, wardCount: 0 };
+  });
+  return clipped.some((entry) => entry.newsletterCount > 0) ? clipped : [];
+}
+
 /** Whether a Supabase RPC error means the timeline function is not deployed. */
 export function isMissingFunctionError(error: { code?: string }): boolean {
   return error.code !== undefined && MISSING_FUNCTION_ERROR_CODES.has(error.code);
@@ -218,6 +264,86 @@ const monthLabelFormatter = new Intl.DateTimeFormat("en-US", {
 export function formatTimelineMonth(month: string): string {
   const [year, monthOfYear] = month.split("-").map(Number);
   return monthLabelFormatter.format(new Date(Date.UTC(year, monthOfYear - 1)));
+}
+
+const shortMonthFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "short",
+});
+
+/** Formats `YYYY-MM` as e.g. "Mar". */
+export function formatShortMonth(month: string): string {
+  const [year, monthOfYear] = month.split("-").map(Number);
+  return shortMonthFormatter.format(new Date(Date.UTC(year, monthOfYear - 1)));
+}
+
+/** "Jan–Oct 2026", or "Nov 2025–Mar 2026" across years. */
+export function formatMonthRange(firstMonth: string, lastMonth: string): string {
+  if (firstMonth === lastMonth) return formatTimelineMonth(firstMonth);
+  const end = formatTimelineMonth(lastMonth);
+  const start =
+    firstMonth.slice(0, 4) === lastMonth.slice(0, 4)
+      ? formatShortMonth(firstMonth)
+      : formatTimelineMonth(firstMonth);
+  return `${start}–${end}`;
+}
+
+/** Year label under a bar: on the first bar and at each January, else null. */
+export function yearLabelForBar(month: string, index: number): string | null {
+  return index === 0 || month.endsWith("-01") ? month.slice(0, 4) : null;
+}
+
+/** First and last day (`YYYY-MM-DD`) of a `YYYY-MM` month. */
+export function monthDateRange(month: string): { from: string; to: string } {
+  const [year, monthOfYear] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthOfYear, 0)).getUTCDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
+/** The month a search's dates cover exactly, or null for any other range. */
+export function selectedTimelineMonth(
+  fromDate: string | null,
+  toDate: string | null,
+): string | null {
+  if (!fromDate || !toDate) return null;
+  const month = fromDate.slice(0, 7);
+  const range = monthDateRange(month);
+  return range.from === fromDate && range.to === toDate ? month : null;
+}
+
+/**
+ * The months to chart for a search. A search narrowed to one month (e.g. by
+ * clicking a bar) keeps the full chart so that month shows in context.
+ */
+export function timelineRangeForSearch(
+  fromDate: string | null,
+  toDate: string | null,
+): TimelineMonthRange {
+  const selected = selectedTimelineMonth(fromDate, toDate);
+  if (!selected) return timelineRangeForDates(fromDate, toDate);
+  return {
+    startMonth: selected < TIMELINE_DEFAULT_START_MONTH ? selected : TIMELINE_DEFAULT_START_MONTH,
+    endMonth: null,
+  };
+}
+
+/** The current search URL without its date filters, back on page 1. */
+export function buildSearchUrlWithoutDates(searchUrl: URL): string {
+  const url = new URL(searchUrl);
+  for (const name of [SEARCH_PARAM_NAMES.fromDate, SEARCH_PARAM_NAMES.toDate, SEARCH_PARAM_NAMES.page]) {
+    url.searchParams.delete(name);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+/** The current search URL narrowed to one month, back on page 1. */
+export function buildMonthSearchUrl(searchUrl: URL, month: string): string {
+  const url = new URL(searchUrl);
+  const { from, to } = monthDateRange(month);
+  url.searchParams.set(SEARCH_PARAM_NAMES.fromDate, from);
+  url.searchParams.set(SEARCH_PARAM_NAMES.toDate, to);
+  url.searchParams.delete(SEARCH_PARAM_NAMES.page);
+  return `${url.pathname}${url.search}`;
 }
 
 /** Smallest bar height (percent) for a non-zero month, so it stays visible. */
