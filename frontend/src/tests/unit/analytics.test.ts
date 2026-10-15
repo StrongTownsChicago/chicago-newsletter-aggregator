@@ -10,6 +10,7 @@ import {
   countBroadlyCoveredMonths,
   countNewslettersByWardMonth,
   daysBetween,
+  describeDataAsOf,
   EMPTY_FILTERS,
   expandTermPostings,
   filterFacts,
@@ -40,6 +41,7 @@ import {
   termMentionsByMonth,
   termMentionsByWard,
   type AnalyticsFilters,
+  type AnalyticsMetadata,
   type NewsletterFact,
   type SourceCoverage,
   type TermIndex,
@@ -567,5 +569,33 @@ describe("searchScopeForFilters", () => {
       toDate: "2026-02-28",
     });
     expect(searchScopeForFilters(EMPTY_FILTERS, { includeTopic: true })).toEqual({});
+  });
+});
+
+describe("describeDataAsOf", () => {
+  const metadata: AnalyticsMetadata = {
+    generated_at: "2026-10-14T20:05:00+00:00",
+    newsletter_count: 1234,
+    source_count: 60,
+    first_date: "2024-01-02",
+    last_date: "2026-10-13",
+    term_count: 5000,
+    min_term_newsletters: 20,
+  };
+
+  it("shows the generation time in Chicago with the newsletter count and range", () => {
+    expect(describeDataAsOf(metadata)).toBe(
+      "Data as of Oct 14, 2026, 3:05 PM from 1,234 newsletters (2024-01-02 to 2026-10-13).",
+    );
+  });
+
+  it("omits the date range for an empty archive", () => {
+    expect(describeDataAsOf({ ...metadata, newsletter_count: 0, first_date: null, last_date: null })).toBe(
+      "Data as of Oct 14, 2026, 3:05 PM from 0 newsletters.",
+    );
+  });
+
+  it("does not crash on an unparseable timestamp", () => {
+    expect(describeDataAsOf({ ...metadata, generated_at: "not a date" })).toMatch(/^Data as of an unknown date /);
   });
 });

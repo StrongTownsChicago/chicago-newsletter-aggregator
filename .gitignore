@@ -15,8 +15,5 @@ frontend/coverage/
 !.claude/hooks/
 
 /docs
-# Locally generated analytics dashboard data (uv run python -m utils.compute_analytics)
-frontend/src/data/analytics/
-
 # Local snapshots of production data for offline analysis (never commit; may contain newsletter text)
 backend/data/

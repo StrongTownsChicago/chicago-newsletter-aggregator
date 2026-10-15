@@ -1,5 +1,6 @@
 // Client-side wiring for /analytics: reads the filter form, recomputes every
 // panel with the pure functions in lib/analytics.ts, and renders the charts.
+// The page script loads the core data; the term index is fetched here on demand.
 import {
   BROAD_COVERAGE_PEAK_FRACTION,
   buildCoverageGrid,
@@ -36,6 +37,7 @@ import {
   type CoverageStatus,
   type MonthWardActivity,
   type NewsletterFact,
+  type TermIndex,
 } from "../lib/analytics";
 import {
   formatOptionalShare,
@@ -51,7 +53,7 @@ import {
   sourceLabel,
   type TableColumn,
 } from "../lib/analytics-charts";
-import { loadAnalyticsDataset } from "../lib/analytics-data";
+import { createLazyLoader, fetchTermIndex } from "../lib/analytics-data";
 import { humanizeIdentifier } from "../lib/format";
 import { ALL_TOPICS } from "../lib/topics";
 
@@ -77,7 +79,13 @@ interface DashboardState {
   wardActivity: MonthWardActivity[];
   broadWindow: BroadCoverageWindow | null;
   term: string;
+  /** Null until the term explorer first needs it. */
+  terms: TermIndex | null;
+  termsError: string | null;
 }
+
+// Shared by every request so concurrent triggers fetch terms.json once.
+const loadTermIndex = createLazyLoader(() => fetchTermIndex());
 
 function requireElement<T extends Element>(selector: string, root: ParentNode = document): T {
   const element = root.querySelector<T>(selector);
@@ -337,8 +345,8 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   const wardsChart = requireElement<HTMLElement>("#term-wards", section);
   const wardsTitle = requireElement<HTMLElement>("#term-wards-title", section);
   const suggestions = requireElement<HTMLElement>("#term-suggestions", section);
-  const index = state.data.terms;
-  caption.textContent = `${numberFormat.format(Object.keys(index.terms).length)} indexed terms (each appears in at least ${index.min_newsletters} newsletters).`;
+  const { metadata } = state.data;
+  caption.textContent = `${numberFormat.format(metadata.term_count)} indexed terms (each appears in at least ${metadata.min_term_newsletters} newsletters).`;
 
   const clearResults = () => {
     timeline.replaceChildren();
@@ -348,6 +356,17 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   };
 
   const term = normalizeTermQuery(state.term);
+  const index = state.terms;
+  if (!index) {
+    suggestions.replaceChildren();
+    clearResults();
+    message.textContent = !term
+      ? "Type a term to explore."
+      : state.termsError
+        ? `Could not load the term index (${state.termsError}). Search again to retry.`
+        : "Loading the term index…";
+    return;
+  }
   const suggestionTerms = suggestTerms(index, term, TERM_SUGGESTION_LIMIT);
   suggestions.replaceChildren(
     ...suggestionTerms.map((suggestion) => {
@@ -547,10 +566,18 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   renderCadencePanel(factsIgnoringTopic);
 }
 
-function showLoadError(error: unknown): void {
-  const dashboard = requireElement<HTMLElement>("#analytics-dashboard");
-  const message = emptyMessage(`Could not load analytics data: ${error instanceof Error ? error.message : String(error)}`);
-  dashboard.prepend(message);
+/** Fetch the term index once, then redraw the term explorer with it (or with the error). */
+function requestTermIndex(state: DashboardState, readCurrentFilters: () => AnalyticsFilters): void {
+  if (state.terms) return;
+  state.termsError = null;
+  loadTermIndex()
+    .then((terms) => {
+      state.terms = terms;
+    })
+    .catch((error: unknown) => {
+      state.termsError = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => renderTermExplorer(state, readCurrentFilters()));
 }
 
 function buildDashboardState(data: AnalyticsDataset): DashboardState {
@@ -563,22 +590,12 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
     wardActivity: countActiveWardsByMonth(data.newsletters),
     broadWindow: findBroadCoverageWindow(data.newsletters),
     term: "",
+    terms: null,
+    termsError: null,
   };
 }
 
-export async function startAnalyticsDashboard(): Promise<void> {
-  let data: AnalyticsDataset | null;
-  try {
-    data = await loadAnalyticsDataset();
-  } catch (error) {
-    showLoadError(error);
-    return;
-  }
-  if (!data) {
-    showLoadError(new Error("Data files are missing. Run the compute script."));
-    return;
-  }
-
+export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const state = buildDashboardState(data);
   const form = requireElement<HTMLFormElement>("#analytics-filters");
   populateFilterOptions(form, listWards(data.newsletters), state.dataMonths, state.broadWindow?.startMonth ?? null);
@@ -620,9 +637,12 @@ export async function startAnalyticsDashboard(): Promise<void> {
 
   const termInput = requireElement<HTMLInputElement>("#term-input");
   const filtersNow = () => readFilters(form);
+  // Start downloading the term index as soon as someone reaches for the explorer.
+  termInput.addEventListener("focus", () => requestTermIndex(state, filtersNow));
   requireElement<HTMLFormElement>("#term-form").addEventListener("submit", (event) => {
     event.preventDefault();
     state.term = termInput.value;
+    requestTermIndex(state, filtersNow);
     renderTermExplorer(state, filtersNow());
   });
   requireElement<HTMLElement>("#term-suggestions").addEventListener("click", (event) => {

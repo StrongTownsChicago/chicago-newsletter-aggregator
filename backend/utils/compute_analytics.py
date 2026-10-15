@@ -1,10 +1,12 @@
 """
-Compute analytics JSON files for the local /analytics dashboard.
+Compute analytics JSON files for the unlisted /analytics dashboard.
 
 Reads newsletters and sources from a local snapshot (see
 `utils/analytics_snapshot.py`), computes metrics with the pure functions in
-`analytics/`, and writes compact JSON files that the frontend loads at
-build/dev time.
+`analytics/`, and writes compact JSON files to `frontend/public/analytics-data/`.
+That folder is committed and deployed as public static files, which the page
+fetches at runtime. To publish a refresh: run this script, commit the folder,
+and push.
 
 The production database has a small disk IO budget, so it is read gently:
 
@@ -76,7 +78,7 @@ from utils.analytics_snapshot import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "src" / "data" / "analytics"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"
 
 # Small pages with a pause between them keep reads well under the database's
 # disk IO budget; repeated full reads of every plain_text exhausted it once.
