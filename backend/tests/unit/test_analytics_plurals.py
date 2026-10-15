@@ -1,8 +1,30 @@
 """Unit tests for analytics/plurals.py plural folding."""
 
+import json
 import unittest
+from pathlib import Path
 
 from analytics.plurals import choose_display_forms, fold_plural, fold_term
+
+# Shared with the frontend's TypeScript port of the fold, which must agree.
+SHARED_CASES_PATH = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "plural_fold_cases.json"
+)
+
+
+class TestSharedFoldCases(unittest.TestCase):
+    def setUp(self):
+        self.cases = json.loads(SHARED_CASES_PATH.read_text(encoding="utf-8"))
+
+    def test_words_fold_as_the_shared_cases_expect(self):
+        for word, folded in self.cases["words"]:
+            with self.subTest(word=word):
+                self.assertEqual(fold_plural(word), folded)
+
+    def test_terms_fold_as_the_shared_cases_expect(self):
+        for term, folded in self.cases["terms"]:
+            with self.subTest(term=term):
+                self.assertEqual(fold_term(term), folded)
 
 
 class TestFoldPlural(unittest.TestCase):

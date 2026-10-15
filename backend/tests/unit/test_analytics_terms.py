@@ -123,6 +123,11 @@ class TestNameTokens(unittest.TestCase):
         self.assertTrue(term_mentions_name("alderman dowell", {"dowell"}))
         self.assertFalse(term_mentions_name("bronzeville", {"dowell"}))
 
+    def test_term_mentions_name_in_another_plural_form(self):
+        # "Burns" and "burn" fold together, so either written form names the alderman.
+        self.assertTrue(term_mentions_name("burn", {"burns"}))
+        self.assertTrue(term_mentions_name("alderman hopkins", {"hopkins"}))
+
 
 class TestDistinctiveTerms(unittest.TestCase):
     def setUp(self):

@@ -1,8 +1,10 @@
 """Unit tests for analytics/text.py tokenization."""
 
+import re
 import unittest
 
 from analytics.text import (
+    EMAIL_PATTERN,
     count_words,
     extract_terms,
     normalize_text,
@@ -27,6 +29,34 @@ class TestNormalizeText(unittest.TestCase):
         normalized = normalize_text("write(info@ward32.org) today")
         self.assertNotIn("ward32", normalized)
         self.assertIn("today", normalized)
+
+    def test_email_pattern_matches_exactly_what_the_unanchored_pattern_did(self):
+        # The lookbehind only skips retries inside a run: an unanchored match
+        # can always extend back to the start of its run, so matches are equal.
+        unanchored = re.compile(r"\S+@\S+\.\S+")
+        samples = [
+            "info@ward32.org",
+            "(info@ward32.org)",
+            "email:info@ward32.org today",
+            "Email: info@ward32.org, or call",
+            "<a@b.co> and c@d.org.",
+            "write\u00a0info@ward32.org now",
+            "a@b@c.d e@f",
+            "no email here @ all.",
+            "@ward32.org",
+            "x@y. trailing",
+            "line one\nfoo@bar.com\tbaz@qux.io",
+        ]
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertEqual(
+                    [match.span() for match in EMAIL_PATTERN.finditer(sample)],
+                    [match.span() for match in unanchored.finditer(sample)],
+                )
+
+    def test_email_after_punctuation_does_not_leak_into_terms(self):
+        terms = extract_terms("Questions? email:info@ward32.org or (help@ward32.org)")
+        self.assertFalse(any("ward32" in term or "info" in term for term in terms))
 
     def test_long_runs_without_spaces_are_handled_in_linear_time(self):
         # A per-position retry made runs like this take minutes.

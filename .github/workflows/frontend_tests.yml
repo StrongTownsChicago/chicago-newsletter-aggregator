@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "frontend/**"
+      # Plural-fold cases shared with the backend (frontend/src/tests/unit/plurals.test.ts).
+      - "backend/tests/fixtures/plural_fold_cases.json"
   pull_request:
     branches: [main]
     paths:
       - "frontend/**"
+      # Plural-fold cases shared with the backend (frontend/src/tests/unit/plurals.test.ts).
+      - "backend/tests/fixtures/plural_fold_cases.json"
 
 jobs:
   test:

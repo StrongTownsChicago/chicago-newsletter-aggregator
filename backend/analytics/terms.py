@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from analytics.plurals import choose_display_forms
+from analytics.plurals import choose_display_forms, fold_plural
 from analytics.records import (
     NewsletterRecord,
     SourceRecord,
@@ -174,8 +174,13 @@ def build_name_tokens_by_ward(sources: Iterable[SourceRecord]) -> dict[str, set[
 
 
 def term_mentions_name(term: str, name_tokens: set[str]) -> bool:
-    """True if any word of the term is one of the given name words."""
-    return any(word in name_tokens for word in term.split())
+    """True if any word of the term is one of the given name words.
+
+    Words are compared with plurals folded: a term is named by its most common
+    written form, which may be a plural or singular variant of a name word.
+    """
+    folded_names = {fold_plural(name) for name in name_tokens}
+    return any(fold_plural(word) in folded_names for word in term.split())
 
 
 def score_distinctive_term(
