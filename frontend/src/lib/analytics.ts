@@ -67,11 +67,11 @@ export interface AnalyticsMetadata {
   min_term_newsletters: number;
 }
 
+/** Everything the dashboard renders up front; the term index loads separately, on demand. */
 export interface AnalyticsDataset {
   metadata: AnalyticsMetadata;
   newsletters: NewsletterFact[];
   sources: SourceCoverage[];
-  terms: TermIndex;
   distinctiveByWard: Record<string, DistinctiveTerm[]>;
   rising: RisingTerms;
 }
@@ -127,6 +127,21 @@ const monthNameFormat = new Intl.DateTimeFormat("en-US", { month: "short", timeZ
 export function formatMonth(month: string): string {
   const [year, monthNumber] = month.split("-").map(Number);
   return `${monthNameFormat.format(new Date(Date.UTC(year, monthNumber - 1, 1)))} ${year}`;
+}
+
+const dataAsOfFormat = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/Chicago",
+});
+const countFormat = new Intl.NumberFormat("en-US");
+
+/** "Data as of Oct 14, 2026, 3:05 PM from 1,234 newsletters (2024-01-02 to 2026-10-13)." */
+export function describeDataAsOf(metadata: AnalyticsMetadata): string {
+  const generatedAt = new Date(metadata.generated_at);
+  const asOf = Number.isNaN(generatedAt.getTime()) ? "an unknown date" : dataAsOfFormat.format(generatedAt);
+  const dateRange = metadata.first_date ? ` (${metadata.first_date} to ${metadata.last_date})` : "";
+  return `Data as of ${asOf} from ${countFormat.format(metadata.newsletter_count)} newsletters${dateRange}.`;
 }
 
 /** Month names need about this many pixels each; tighter axes label years only. */

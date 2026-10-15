@@ -72,7 +72,7 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 uv run python -m utils.calculate_token_costs --list-models              # List available models
 uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
 
-# Local analytics dashboard data (writes gitignored JSON for /analytics)
+# Analytics dashboard data (writes committed JSON to frontend/public/analytics-data/ for /analytics)
 uv run python -m utils.compute_analytics                  # Fetch only new newsletters into the local snapshot, then compute
 uv run python -m utils.compute_analytics --offline        # Compute from the snapshot; no database access
 uv run python -m utils.compute_analytics --full-refresh   # Rebuild the snapshot from every newsletter (heavy; rarely)
@@ -222,7 +222,7 @@ frontend/src/
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
-│   ├── analytics.astro           # Local-only analytics dashboard (not linked, noindex)
+│   ├── analytics.astro           # Unlisted analytics dashboard (not linked, noindex)
 │   ├── api/search-timeline.ts    # Edge-cached monthly match counts for the /search timeline
 │   └── api/notifications/        # Notification management API routes
 │       ├── create-rule.ts        # Create notification rule
@@ -250,7 +250,7 @@ frontend/src/
 └── lib/
     ├── analytics.ts              # Pure dashboard aggregations (unit tested)
     ├── analytics-charts.ts       # Observable Plot chart builders
-    ├── analytics-data.ts         # Loads generated analytics JSON (tolerates missing files)
+    ├── analytics-data.ts         # Fetches the static analytics JSON (missing/failed states, lazy term index)
     ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
     ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
@@ -297,7 +297,7 @@ frontend/src/
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
 
-**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to the gitignored `frontend/src/data/analytics/`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`. The page leads with ward coverage and defaults to the broad-coverage window (`BROAD_COVERAGE_PEAK_FRACTION` in `lib/analytics.ts`); late-added LLM topics start their trends at `TOPIC_LABELING_START_MONTH`. The LLM relevance score is deliberately left out of analytics (it mostly tracks newsletter length).
+**Analytics Dashboard** (unlisted): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to `frontend/public/analytics-data/`, which is committed and served as public static files. **Refresh workflow:** run `compute_analytics`, commit that folder, push; the Cloudflare deploy publishes it. `/analytics` renders no data on the server; its browser script fetches the JSON at runtime (`lib/analytics-data.ts`; register new files in `AnalyticsDataFiles`), so no data is bundled into the server worker or the client code; `terms.json` (most of the data) loads only when the term explorer is used. Missing files show setup instructions and fetch failures show an error instead of breaking the page. The page and data stay unlisted: noindex (`X-Robots-Tag` from the page, `public/_headers` for the JSON), disallowed in `robots.txt`, excluded from the sitemap, and absent from the nav. The data files are served with `Cache-Control: no-cache` (ETag revalidation) because their names are not content-hashed. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`. The page leads with ward coverage and defaults to the broad-coverage window (`BROAD_COVERAGE_PEAK_FRACTION` in `lib/analytics.ts`); late-added LLM topics start their trends at `TOPIC_LABELING_START_MONTH`. The LLM relevance score is deliberately left out of analytics (it mostly tracks newsletter length).
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
