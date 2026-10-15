@@ -45,7 +45,6 @@ class TestBuildNewsletterTerms(unittest.TestCase):
             subject="Bike lanes",
             plain_text="Zoning hearing",
             topics=None,
-            relevance_score=None,
         )
         source = SourceRecord(id=5, name="A", ward="40", source_type="alderman")
         [document] = build_newsletter_terms([newsletter], {5: source})

@@ -25,7 +25,6 @@ def make_newsletter(
         subject="Subject",
         plain_text="three word body",
         topics=["bike_lanes"],
-        relevance_score=6,
     )
 
 
