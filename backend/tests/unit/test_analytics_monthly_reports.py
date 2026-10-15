@@ -9,18 +9,10 @@ from analytics.monthly_reports import (
     build_monthly_reports,
     pick_topic_examples,
     summarize_month_topics,
-    summarize_rising_terms,
 )
-from analytics.terms import NewsletterTerms
 from analytics.topic_reach import TopicNewsletter
 
-SETTINGS = MonthlyReportSettings(
-    examples_per_topic=2,
-    rising_baseline_months=2,
-    rising_min_latest_wards=2,
-    rising_min_ward_gain=1,
-    rising_top_n=5,
-)
+SETTINGS = MonthlyReportSettings(examples_per_topic=2)
 
 
 def item(
@@ -40,10 +32,6 @@ def item(
     )
 
 
-def doc(newsletter_id: str, ward: str, month: str, terms: set[str]) -> NewsletterTerms:
-    return NewsletterTerms(newsletter_id, 1, ward, month, frozenset(terms))
-
-
 class TestPickTopicExamples(unittest.TestCase):
     def test_prefers_most_mentions_and_one_newsletter_per_ward(self):
         items = [
@@ -57,6 +45,21 @@ class TestPickTopicExamples(unittest.TestCase):
         examples = pick_topic_examples(items, "schools", limit=3)
         # Ties on mentions go to the earlier newsletter.
         self.assertEqual([example.id for example in examples], ["b", "d", "c"])
+
+    def test_prefers_newsletters_not_shown_for_another_topic(self):
+        items = [
+            item("roundup", "1", date(2026, 9, 1), {"schools": 9}),
+            item("short", "2", date(2026, 9, 2), {"schools": 2}),
+        ]
+        examples = pick_topic_examples(
+            items, "schools", limit=1, shown_ids=frozenset({"roundup"})
+        )
+        self.assertEqual([example.id for example in examples], ["short"])
+        # A shown newsletter is still used when nothing else qualifies.
+        examples = pick_topic_examples(
+            items, "schools", limit=2, shown_ids=frozenset({"roundup"})
+        )
+        self.assertEqual([example.id for example in examples], ["short", "roundup"])
 
 
 class TestSummarizeMonthTopics(unittest.TestCase):
@@ -80,72 +83,28 @@ class TestSummarizeMonthTopics(unittest.TestCase):
         )
 
 
-class TestSummarizeRisingTerms(unittest.TestCase):
-    documents = [
-        doc("a", "1", "2026-07", {"budget"}),
-        doc("b", "1", "2026-08", {"budget"}),
-        doc("c", "1", "2026-09", {"budget", "labor day"}),
-        doc("d", "2", "2026-09", {"labor day"}),
-        doc("e", "2", "2026-08", {"park"}),
-    ]
-
-    def test_reports_terms_more_wards_used_than_in_the_baseline(self):
-        rising = summarize_rising_terms(
-            "2026-09",
-            self.documents,
-            {"budget", "labor day", "park"},
-            broad_months={"2026-07", "2026-08", "2026-09"},
-            settings=SETTINGS,
-        )
-        assert rising is not None
-        self.assertEqual(rising["baseline_months"], ["2026-07", "2026-08"])
-        self.assertEqual(
-            rising["terms"], [{"term": "labor day", "wards": 2, "baseline_wards": 0.0}]
-        )
-
-    def test_omitted_when_a_baseline_month_lacks_broad_coverage(self):
-        rising = summarize_rising_terms(
-            "2026-09",
-            self.documents,
-            {"labor day"},
-            broad_months={"2026-08", "2026-09"},
-            settings=SETTINGS,
-        )
-        self.assertIsNone(rising)
-
-
 class TestBuildMonthlyReport(unittest.TestCase):
-    def test_names_sending_and_absent_wards(self):
+    def test_counts_sending_and_readable_wards(self):
         items = [
             item("a", "1", date(2026, 9, 1), {"schools": 2}),
             item("b", "10", date(2026, 9, 2), readable=False),
             item("c", "2", date(2026, 8, 2), {"schools": 2}),
         ]
-        report = build_monthly_report(
-            "2026-09",
-            items,
-            [],
-            set(),
-            ["schools"],
-            ["1", "2", "10"],
-            broad_months={"2026-09"},
-            settings=SETTINGS,
-        )
+        report = build_monthly_report("2026-09", items, ["schools"], SETTINGS)
         self.assertEqual(report["newsletters"], 2)
         self.assertEqual(report["sending_wards"], ["1", "10"])
-        self.assertEqual(report["absent_wards"], ["2"])
+        # Absent wards are not named: missing from the archive is not silence.
+        self.assertNotIn("absent_wards", report)
         self.assertEqual(report["readable_wards"], 1)
         self.assertEqual(report["topics"][0]["wards"], 1)
-        self.assertIsNone(report["rising"])
+        self.assertNotIn("rising", report)
 
     def test_builds_newest_month_first(self):
         items = [
             item("a", "1", date(2026, 8, 1)),
             item("b", "1", date(2026, 9, 1)),
         ]
-        reports = build_monthly_reports(
-            ["2026-08", "2026-09"], items, [], set(), [], ["1"], SETTINGS
-        )
+        reports = build_monthly_reports(["2026-08", "2026-09"], items, [], SETTINGS)
         self.assertEqual(
             [report["month"] for report in reports], ["2026-09", "2026-08"]
         )

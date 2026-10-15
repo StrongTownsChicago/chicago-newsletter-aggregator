@@ -1,10 +1,11 @@
 """Per-ward "at a glance" summaries for the public ward pages.
 
 Each ward is described against its own recent history: how often its office
-sent newsletters, which topics those newsletters mentioned (as a share of its
-own readable newsletters), and terms it used more than other wards. The only
-city context is ward reach ("mentioned by 24 of 37 wards"), so the summary
-never ranks one alderman against another.
+sent newsletters and which topics they mentioned. The only city context is
+ward reach ("24 of 37 wards"), so no alderman is ranked against another.
+
+Distinctive terms stay on the unlisted dashboard: they surface personal names
+and filler words that no stoplist reliably removes.
 """
 
 from collections import Counter, defaultdict
@@ -13,11 +14,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from analytics.records import ward_sort_key
-from analytics.terms import (
-    NewsletterTerms,
-    compute_distinctive_terms,
-    drop_overlapping_terms,
-)
 from analytics.topic_reach import (
     TopicNewsletter,
     group_sending_wards_by_month,
@@ -25,40 +21,11 @@ from analytics.topic_reach import (
     list_months_ending,
 )
 
-# Words that make a term say nothing about what a ward's newsletters cover:
-# references to the office itself ("5th ward", "join ald"), letter sign-offs
-# ("warm regards"), and image file names left in extracted text ("png").
-NON_TOPICAL_TERM_WORDS = frozenset(
-    {
-        "ward",
-        "wards",
-        "ald",
-        "alderman",
-        "alderwoman",
-        "alderperson",
-        "regards",
-        "sincerely",
-        "png",
-        "jpg",
-        "jpeg",
-        "gif",
-    }
-)
-
 
 @dataclass(frozen=True)
 class WardGlanceSettings:
     window_months: int
     top_topics: int
-    top_terms: int
-    distinctive_candidates: int
-    distinctive_min_ward_newsletters: int
-    distinctive_min_term_newsletters_in_ward: int
-    distinctive_max_ward_share: float
-
-
-def is_non_topical_term(term: str) -> bool:
-    return any(word in NON_TOPICAL_TERM_WORDS for word in term.split(" "))
 
 
 def count_recent_months(
@@ -108,41 +75,9 @@ def summarize_ward_topics(
     ]
 
 
-def select_recent_terms(
-    window_documents: list[NewsletterTerms],
-    vocabulary: set[str],
-    name_tokens_by_ward: dict[str, set[str]],
-    settings: WardGlanceSettings,
-) -> dict[str, list[str]]:
-    """Terms each ward used far more than other wards during the window.
-
-    Non-topical terms (see NON_TOPICAL_TERM_WORDS) and overlapping variants of
-    one phrase ("wicker" beside "wicker park") are dropped.
-    """
-    distinctive = compute_distinctive_terms(
-        window_documents,
-        vocabulary,
-        name_tokens_by_ward=name_tokens_by_ward,
-        top_n=settings.distinctive_candidates,
-        min_ward_newsletters=settings.distinctive_min_ward_newsletters,
-        min_term_newsletters_in_ward=settings.distinctive_min_term_newsletters_in_ward,
-        max_ward_share=settings.distinctive_max_ward_share,
-    )
-    return {
-        ward: drop_overlapping_terms(
-            [item["term"] for item in ranked if not is_non_topical_term(item["term"])],
-            lambda term: term,
-        )[: settings.top_terms]
-        for ward, ranked in distinctive.items()
-    }
-
-
 def build_ward_glances(
     items: list[TopicNewsletter],
-    readable_documents: list[NewsletterTerms],
-    vocabulary: set[str],
     topic_ids: Sequence[str],
-    name_tokens_by_ward: dict[str, set[str]],
     latest_month: str,
     settings: WardGlanceSettings,
 ) -> dict[str, Any]:
@@ -163,12 +98,6 @@ def build_ward_glances(
     readable_wards_latest = group_sending_wards_by_month(
         latest_items, readable_only=True
     ).get(latest_month, set())
-    terms_by_ward = select_recent_terms(
-        [document for document in readable_documents if document.month in window_set],
-        vocabulary,
-        name_tokens_by_ward,
-        settings,
-    )
 
     def summarize(ward: str) -> dict[str, Any]:
         ward_items = items_by_ward[ward]
@@ -184,7 +113,6 @@ def build_ward_glances(
             "topics": summarize_ward_topics(
                 window_items, topic_ids, city_topic_wards, settings.top_topics
             ),
-            "terms": terms_by_ward.get(ward, []),
         }
 
     return {

@@ -93,6 +93,8 @@ export function buildWardDescription(
 /**
  * Builds the canonical URL for a page. Query strings are dropped and trailing
  * slashes removed (except for the root) so each page has exactly one canonical form.
+ * Prerendered pages see their output file (`/reports/2026-09.html`, from
+ * `build.format: "file"`) as the path; Cloudflare Pages serves them without `.html`.
  *
  * Paginated listings pass `page` so that page 2+ canonicalizes to itself
  * (`?page=N`) rather than to page 1, which would discourage crawlers from
@@ -104,7 +106,7 @@ export function buildCanonicalUrl(
   page?: number,
 ): string {
   const normalizedPath =
-    pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+    pathname.length > 1 ? pathname.replace(/(\.html|\/+)$/, "") : pathname;
   const canonicalUrl = new URL(normalizedPath || "/", site);
   if (page !== undefined && Number.isInteger(page) && page > 1) {
     canonicalUrl.searchParams.set("page", String(page));

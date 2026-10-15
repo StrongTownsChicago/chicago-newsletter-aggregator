@@ -1,6 +1,5 @@
 ---
-// Prerendered at build time from the committed src/data/monthly-reports.json:
-// static HTML with no database query and no server code.
+// Prerendered from src/data/monthly-reports.json; no database query.
 export const prerender = true;
 
 import Layout from '../../layouts/Layout.astro';
@@ -25,11 +24,7 @@ const file = reportsData as MonthlyReportsFile;
     <header class="mb-8">
       <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Monthly reports</h1>
       <p class="text-base sm:text-lg text-gray-700">
-        What Chicago aldermen's newsletters mentioned each month: the topics the most wards mentioned,
-        terms more wards used than usual, and which wards sent newsletters.
-      </p>
-      <p class="text-sm text-gray-600 mt-2">
-        Reports cover complete months in which most wards' newsletters are in the archive.
+        What Chicago aldermen's newsletters covered each month, counted by ward.
       </p>
     </header>
 
@@ -49,7 +44,7 @@ const file = reportsData as MonthlyReportsFile;
             </p>
             {report.topics.length > 0 && (
               <p class="text-sm text-gray-700 mt-2">
-                Most widely mentioned:{' '}
+                Top topics:{' '}
                 {report.topics
                   .slice(0, INDEX_TOPIC_PREVIEW_COUNT)
                   .map((topic) => `${topicLabel(file.topics, topic.id)} (${topic.wards} of ${report.readable_wards} wards)`)

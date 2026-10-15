@@ -7,6 +7,7 @@ from analytics.records import (
     month_key,
     parse_newsletter_row,
     parse_source_row,
+    select_as_of_month,
     shift_month,
     to_chicago_date,
     ward_sort_key,
@@ -33,6 +34,15 @@ class TestMonthHelpers(unittest.TestCase):
 
     def test_shift_month_forwards_across_year(self):
         self.assertEqual(shift_month("2025-12", 1), "2026-01")
+
+    def test_as_of_month_is_the_current_month_for_a_fresh_snapshot(self):
+        today = date(2026, 10, 14)
+        self.assertEqual(select_as_of_month([date(2026, 10, 13)], today), "2026-10")
+        self.assertEqual(select_as_of_month([], today), "2026-10")
+
+    def test_as_of_month_is_the_newest_newsletter_month_for_a_stale_snapshot(self):
+        dates = [date(2026, 8, 1), date(2026, 9, 15)]
+        self.assertEqual(select_as_of_month(dates, date(2026, 10, 14)), "2026-09")
 
 
 class TestParseRows(unittest.TestCase):

@@ -136,8 +136,6 @@ const description = wardNumber === null
           )}
         </header>
 
-        {page === 1 && <WardGlance wardNumber={wardNumber} />}
-
         <!-- Newsletter List -->
         <section>
           {loadFailed ? (
@@ -162,6 +160,8 @@ const description = wardNumber === null
             </>
           )}
         </section>
+
+        {page === 1 && <WardGlance wardNumber={wardNumber} />}
       </>
     )}
   </div>

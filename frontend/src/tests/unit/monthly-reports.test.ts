@@ -7,7 +7,6 @@ import {
   buildReportHeading,
   buildReportPath,
   buildReportTitle,
-  describeRisingTerm,
   describeSendingWards,
   findAdjacentReports,
   isReportMonth,
@@ -22,13 +21,11 @@ function makeReport(month: string, overrides: Partial<MonthlyReport> = {}): Mont
     month,
     newsletters: 259,
     sending_wards: ['1', '2', '3'],
-    absent_wards: ['4'],
     readable_wards: 2,
     topics: [
       { id: 'transportation', wards: 2, newsletters: 10, examples: [] },
       { id: 'parks_libraries', wards: 1, newsletters: 4, examples: [] },
     ],
-    rising: null,
     ...overrides,
   };
 }
@@ -86,9 +83,6 @@ describe('report figures', () => {
     expect(describeSendingWards(report)).toBe('3 of 50 wards');
     expect(topicReachFraction(report.topics[1], report)).toBe(0.5);
     expect(topicReachFraction(report.topics[1], { ...report, readable_wards: 0 })).toBe(0);
-    expect(describeRisingTerm({ term: 'labor day', wards: 29, baseline_wards: 3 })).toBe(
-      '29 wards; 3 in a typical recent month',
-    );
     expect(topicLabel(LABELS, 'unknown')).toBe('unknown');
   });
 });
@@ -103,13 +97,37 @@ describe('committed monthly-reports.json', () => {
     expect([...months].sort().reverse()).toEqual(months);
   });
 
-  it('accounts for every ward each month and labels every topic', () => {
+  it('counts wards within their denominators and labels every topic', () => {
     for (const report of file.reports) {
-      expect(report.sending_wards.length + report.absent_wards.length).toBe(LAST_WARD);
+      expect(new Set(report.sending_wards).size).toBe(report.sending_wards.length);
+      expect(report.sending_wards.length).toBeLessThanOrEqual(LAST_WARD);
+      expect(report.readable_wards).toBeLessThanOrEqual(report.sending_wards.length);
       for (const topic of report.topics) {
         expect(file.topics[topic.id]).toBeTruthy();
         expect(topic.wards).toBeLessThanOrEqual(report.readable_wards);
       }
+    }
+  });
+
+  it('draws topic examples from that month and from different sending wards', () => {
+    for (const report of file.reports) {
+      for (const topic of report.topics) {
+        const ids = topic.examples.map((example) => example.id);
+        const wards = topic.examples.map((example) => example.ward);
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(new Set(wards).size).toBe(wards.length);
+        for (const example of topic.examples) {
+          expect(example.date.startsWith(report.month)).toBe(true);
+          expect(report.sending_wards).toContain(example.ward);
+        }
+      }
+    }
+  });
+
+  it('publishes no rising terms or absent-ward lists', () => {
+    for (const report of file.reports) {
+      expect(report).not.toHaveProperty('rising');
+      expect(report).not.toHaveProperty('absent_wards');
     }
   });
 });

@@ -17,6 +17,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 - **LLM Processing**: Topic extraction, summarization
 - **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range) and sorting (newest, oldest)
 - **Ward Pages**: A page per ward (`/ward/N`) with the alderman's contact info and newsletters, plus a ward directory (`/wards`)
+- **Monthly Reports**: Prerendered citywide pages (`/reports`) counting how many wards' newsletters mentioned each topic
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
 - **Privacy Protection**: Automatic removal of tracking links, unsubscribe URLs, and sensitive content
@@ -90,8 +91,9 @@ uv run python -m utils.process_llm_metadata --latest 10
 # Reapply privacy sanitization to existing newsletters
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 
-# Refresh the unlisted /analytics dashboard: compute, check http://localhost:4321/analytics, then commit
-# frontend/public/analytics-data/ and push; the deploy publishes it. The JSON files are public.
+# Refresh the unlisted /analytics dashboard, ward summaries and /reports: compute, check
+# http://localhost:4321/analytics, then commit frontend/public/analytics-data/ and frontend/src/data/
+# and push; the deploy publishes them. The JSON files are public.
 # (fetches only newsletters newer than the local snapshot in backend/data/; --offline skips the database,
 #  --full-refresh rebuilds it from every newsletter: needed once on a fresh checkout; run it when the site is quiet)
 uv run python -m utils.compute_analytics

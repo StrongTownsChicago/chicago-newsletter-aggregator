@@ -3,27 +3,16 @@
 import unittest
 from datetime import date
 
-from analytics.terms import NewsletterTerms
 from analytics.topic_reach import TopicNewsletter
 from analytics.ward_glance import (
     WardGlanceSettings,
     average_per_month,
     build_ward_glances,
     count_recent_months,
-    is_non_topical_term,
-    select_recent_terms,
     summarize_ward_topics,
 )
 
-SETTINGS = WardGlanceSettings(
-    window_months=3,
-    top_topics=2,
-    top_terms=3,
-    distinctive_candidates=10,
-    distinctive_min_ward_newsletters=1,
-    distinctive_min_term_newsletters_in_ward=1,
-    distinctive_max_ward_share=1.0,
-)
+SETTINGS = WardGlanceSettings(window_months=3, top_topics=2)
 
 
 def item(
@@ -41,10 +30,6 @@ def item(
         readable=readable,
         topic_mentions=topics or {},
     )
-
-
-def doc(newsletter_id: str, ward: str, month: str, terms: set[str]) -> NewsletterTerms:
-    return NewsletterTerms(newsletter_id, 1, ward, month, frozenset(terms))
 
 
 class TestCadence(unittest.TestCase):
@@ -84,27 +69,6 @@ class TestSummarizeWardTopics(unittest.TestCase):
         )
 
 
-class TestSelectRecentTerms(unittest.TestCase):
-    def test_drops_non_topical_and_overlapping_terms(self):
-        self.assertTrue(is_non_topical_term("5th ward"))
-        self.assertTrue(is_non_topical_term("warm regards"))
-        self.assertFalse(is_non_topical_term("wicker park"))
-
-        documents = [
-            doc("a", "1", "2026-09", {"wicker park", "wicker", "1st ward", "budget"}),
-            doc("b", "2", "2026-09", {"budget"}),
-        ]
-        terms = select_recent_terms(
-            documents,
-            {"wicker park", "wicker", "1st ward", "budget"},
-            name_tokens_by_ward={},
-            settings=SETTINGS,
-        )
-        self.assertEqual(len(terms["1"]), 1)
-        self.assertIn(terms["1"][0], {"wicker park", "wicker"})
-        self.assertEqual(terms.get("2", []), [])
-
-
 class TestBuildWardGlances(unittest.TestCase):
     def test_describes_each_ward_with_newsletters_over_the_window(self):
         items = [
@@ -114,9 +78,7 @@ class TestBuildWardGlances(unittest.TestCase):
             item("c", "2", date(2026, 9, 1), {"parks": 2}),
             item("d", "3", date(2026, 9, 1), readable=False),
         ]
-        glance = build_ward_glances(
-            items, [], set(), ["schools", "parks"], {}, "2026-09", SETTINGS
-        )
+        glance = build_ward_glances(items, ["schools", "parks"], "2026-09", SETTINGS)
         self.assertEqual(glance["window_months"], ["2026-07", "2026-08", "2026-09"])
         # Ward 3's only newsletter was unreadable, so it is not in the denominator.
         self.assertEqual(glance["city_readable_wards"], 2)
@@ -133,6 +95,8 @@ class TestBuildWardGlances(unittest.TestCase):
         )
         self.assertEqual(glance["wards"]["3"]["topics"], [])
         self.assertEqual(glance["wards"]["3"]["topic_newsletters"], 0)
+        # Distinctive terms surface personal names, so they stay off public pages.
+        self.assertNotIn("terms", ward_one)
 
 
 if __name__ == "__main__":

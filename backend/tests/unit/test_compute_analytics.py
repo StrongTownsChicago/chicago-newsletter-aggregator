@@ -53,6 +53,8 @@ class TestComputeOutputs(unittest.TestCase):
         newsletters = [
             make_newsletter("a", date(2026, 8, 3), 1, "Protected bike lanes"),
             make_newsletter("b", date(2026, 9, 3), 2, "Protected bike lanes"),
+            # An October newsletter shows the snapshot holds all of September.
+            make_newsletter("c", date(2026, 10, 2), 1, "Leaf pickup"),
         ]
         outputs = compute_outputs(
             analyze_archive(sources, newsletters, 2, datetime(2026, 10, 11))
@@ -70,8 +72,8 @@ class TestComputeOutputs(unittest.TestCase):
                 "lenses",
             },
         )
-        self.assertEqual(outputs["metadata"]["newsletter_count"], 2)
-        self.assertEqual(len(outputs["newsletters"]["newsletters"]), 2)
+        self.assertEqual(outputs["metadata"]["newsletter_count"], 3)
+        self.assertEqual(len(outputs["newsletters"]["newsletters"]), 3)
         self.assertIn("bike lanes", outputs["terms"]["terms"])
         self.assertEqual(outputs["terms"]["min_newsletters"], 2)
         self.assertEqual(outputs["rising"]["latest_month"], "2026-09")
@@ -200,7 +202,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
 
         reports = outputs["monthly-reports"]["reports"]
         self.assertEqual([report["month"] for report in reports], ["2026-09"])
-        self.assertEqual(reports[0]["absent_wards"], ["3"])
+        self.assertEqual(reports[0]["sending_wards"], ["1", "2"])
         street_safety = next(
             topic for topic in reports[0]["topics"] if topic["id"] == "street_safety"
         )
@@ -214,6 +216,24 @@ class TestComputeSiteOutputs(unittest.TestCase):
         self.assertEqual(outputs["ward-glance"]["wards"], {})
         self.assertIsNone(outputs["ward-glance"]["latest_month"])
         self.assertEqual(outputs["monthly-reports"]["reports"], [])
+
+    def test_a_stale_snapshot_leaves_its_newest_month_out(self):
+        # Refreshed mid-September but computed in October: September is partial.
+        newsletters = [
+            make_newsletter("a", date(2026, 8, 3), 1, self.filler),
+            make_newsletter("b", date(2026, 8, 4), 2, self.filler),
+            make_newsletter("c", date(2026, 9, 14), 1, self.filler),
+            make_newsletter("d", date(2026, 9, 15), 2, self.filler),
+        ]
+        with patch("utils.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
+            outputs = compute_site_outputs(
+                analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
+            )
+        self.assertEqual(outputs["ward-glance"]["latest_month"], "2026-08")
+        self.assertEqual(
+            [report["month"] for report in outputs["monthly-reports"]["reports"]],
+            ["2026-08"],
+        )
 
 
 class TestWriteOutputs(unittest.TestCase):

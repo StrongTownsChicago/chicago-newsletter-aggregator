@@ -15,10 +15,7 @@ export const SOURCE_CODE_LINK_LABEL = "Source code on GitHub";
 
 export const HOME_PATH = "/";
 export const PREFERENCES_PATH = "/preferences";
-/** Index of the prerendered monthly citywide reports. */
 export const REPORTS_INDEX_PATH = "/reports";
-/** How the ward summaries and monthly reports are computed, and their limits. */
-export const ANALYTICS_METHODOLOGY_PATH = "/analytics/methodology";
 const WARD_PROFILE_PATH_PREFIX = "/ward";
 
 export interface NavItem {

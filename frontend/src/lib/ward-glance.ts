@@ -1,6 +1,5 @@
-// Pure helpers for the "at a glance" section of ward pages. The data is the
-// small src/data/ward-glance.json written by backend/utils/compute_analytics.py
-// (see backend/analytics/ward_glance.py), imported server-side by the page.
+// Helpers for the ward page summary. Data: src/data/ward-glance.json, from
+// backend/analytics/ward_glance.py.
 
 import { formatLongMonth, formatMonthRange } from "./archive-months";
 
@@ -22,7 +21,6 @@ export interface WardGlance {
   /** Readable newsletters in the window: the denominator for topic shares. */
   topic_newsletters: number;
   topics: WardGlanceTopic[];
-  terms: string[];
 }
 
 export interface WardGlanceFile {
@@ -63,13 +61,13 @@ export function listTrackedMonths(counts: WardMonthCount[]): string[] {
 
 const perMonthFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
-/** "About 4.7 newsletters a month", or null when there is nothing to average. */
+/** "4.7 newsletters a month", or null when there is nothing to average. */
 export function describeCadence(glance: WardGlance): string | null {
   if (glance.per_month === null || glance.per_month === 0) {
     return null;
   }
   const amount = perMonthFormat.format(glance.per_month);
-  return `About ${amount} newsletter${amount === "1" ? "" : "s"} a month`;
+  return `${amount} newsletter${amount === "1" ? "" : "s"} a month`;
 }
 
 /** "April to September 2026" for the window months the ward was in the archive. */
@@ -103,11 +101,11 @@ export function describeTopicShare(
   };
 }
 
-/** "25 of 37 wards mentioned it in September 2026", or null without a latest month. */
+/** "Citywide: 25 of 37 wards in September 2026", or null without a latest month. */
 export function describeCityReach(file: WardGlanceFile, topic: WardGlanceTopic): string | null {
   if (!file.latest_month || file.city_readable_wards === 0) {
     return null;
   }
   const wards = file.city_readable_wards === 1 ? "ward" : "wards";
-  return `Citywide, ${topic.city_wards} of ${file.city_readable_wards} ${wards} mentioned it in ${formatLongMonth(file.latest_month)}`;
+  return `Citywide: ${topic.city_wards} of ${file.city_readable_wards} ${wards} in ${formatLongMonth(file.latest_month)}`;
 }

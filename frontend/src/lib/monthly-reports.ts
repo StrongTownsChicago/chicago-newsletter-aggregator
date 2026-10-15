@@ -1,6 +1,5 @@
-// Pure helpers for the prerendered monthly report pages (/reports and
-// /reports/YYYY-MM). The data is src/data/monthly-reports.json, written by
-// backend/utils/compute_analytics.py (see backend/analytics/monthly_reports.py).
+// Helpers for the prerendered /reports pages. Data: src/data/monthly-reports.json,
+// from backend/analytics/monthly_reports.py.
 
 import { formatLongMonth } from "./archive-months";
 import { SITE_NAME, truncateDescription } from "./seo";
@@ -22,22 +21,13 @@ export interface ReportTopic {
   examples: ReportExample[];
 }
 
-export interface ReportRisingTerm {
-  term: string;
-  wards: number;
-  /** Median wards per month over the baseline months. */
-  baseline_wards: number;
-}
-
 export interface MonthlyReport {
   month: string;
   newsletters: number;
   sending_wards: string[];
-  absent_wards: string[];
   /** Wards with a readable newsletter that month: the topic reach denominator. */
   readable_wards: number;
   topics: ReportTopic[];
-  rising: { baseline_months: string[]; terms: ReportRisingTerm[] } | null;
 }
 
 export interface MonthlyReportsFile {
@@ -91,7 +81,7 @@ export function buildReportDescription(
 
 export const REPORTS_INDEX_TITLE = `Monthly Reports on Chicago Alderman Newsletters - ${SITE_NAME}`;
 export const REPORTS_INDEX_DESCRIPTION =
-  "Month-by-month summaries of what Chicago aldermen's newsletters mentioned: topics by how many wards mentioned them, rising terms, and which wards sent newsletters.";
+  "Month-by-month summaries of Chicago aldermen's newsletters: topics by how many wards mentioned them, with example newsletters.";
 
 export interface AdjacentReports {
   newer: MonthlyReport | null;
@@ -119,12 +109,4 @@ export function describeSendingWards(report: MonthlyReport): string {
 /** Topic reach as a fraction of the wards whose newsletters could be read. */
 export function topicReachFraction(topic: ReportTopic, report: MonthlyReport): number {
   return report.readable_wards > 0 ? topic.wards / report.readable_wards : 0;
-}
-
-const baselineFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-
-/** "29 wards; 3 in a typical recent month" */
-export function describeRisingTerm(term: ReportRisingTerm): string {
-  const typical = baselineFormat.format(term.baseline_wards);
-  return `${term.wards} wards; ${typical} in a typical recent month`;
 }

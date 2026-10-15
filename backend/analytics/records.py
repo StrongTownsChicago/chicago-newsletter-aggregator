@@ -1,5 +1,6 @@
 """Typed records parsed from Supabase rows, plus date bucketing helpers."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -39,6 +40,13 @@ def to_chicago_date(timestamp: str) -> date:
 def month_key(day: date) -> str:
     """Return the YYYY-MM bucket for a date."""
     return f"{day.year:04d}-{day.month:02d}"
+
+
+def select_as_of_month(received_dates: Iterable[date], today: date) -> str:
+    """The first month the archive may hold only in part: the current month, or
+    the newest newsletter's month when the snapshot was last refreshed earlier.
+    """
+    return month_key(min(max(received_dates, default=today), today))
 
 
 def shift_month(month: str, offset: int) -> str:

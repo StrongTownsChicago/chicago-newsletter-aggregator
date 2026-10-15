@@ -21,7 +21,6 @@ function makeGlance(overrides: Partial<WardGlance> = {}): WardGlance {
     per_month: 1.5,
     topic_newsletters: 3,
     topics: [{ id: 'schools', newsletters: 2, city_wards: 25 }],
-    terms: ['wicker park'],
     ...overrides,
   };
 }
@@ -65,8 +64,8 @@ describe('month counts', () => {
 
 describe('describeCadence', () => {
   it('rounds to one decimal and uses the singular for one', () => {
-    expect(describeCadence(makeGlance({ per_month: 4.7 }))).toBe('About 4.7 newsletters a month');
-    expect(describeCadence(makeGlance({ per_month: 1 }))).toBe('About 1 newsletter a month');
+    expect(describeCadence(makeGlance({ per_month: 4.7 }))).toBe('4.7 newsletters a month');
+    expect(describeCadence(makeGlance({ per_month: 1 }))).toBe('1 newsletter a month');
   });
 
   it('says nothing when no newsletters were sent in the window', () => {
@@ -94,7 +93,7 @@ describe('describeCityReach', () => {
   it('describes how many wards mentioned the topic in the latest month', () => {
     const file = makeFile(makeGlance());
     expect(describeCityReach(file, { id: 'schools', newsletters: 2, city_wards: 25 })).toBe(
-      'Citywide, 25 of 37 wards mentioned it in September 2026',
+      'Citywide: 25 of 37 wards in September 2026',
     );
     expect(describeCityReach({ ...file, latest_month: null }, file.wards['8'].topics[0])).toBeNull();
   });
@@ -106,6 +105,12 @@ describe('committed ward-glance.json', () => {
   it('stays small, since the server bundle includes it', () => {
     const MAX_BYTES = 60_000;
     expect(JSON.stringify(file).length).toBeLessThan(MAX_BYTES);
+  });
+
+  it('publishes no distinctive terms, which surface personal names', () => {
+    for (const glance of Object.values(file.wards)) {
+      expect(glance).not.toHaveProperty('terms');
+    }
   });
 
   it('labels every topic and aligns month counts with the window', () => {

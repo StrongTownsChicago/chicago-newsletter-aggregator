@@ -61,9 +61,9 @@ from analytics.records import (
     CHICAGO_TIMEZONE,
     NewsletterRecord,
     SourceRecord,
-    month_key,
     parse_newsletter_row,
     parse_source_row,
+    select_as_of_month,
 )
 from analytics.snapshot import (
     Snapshot,
@@ -151,24 +151,10 @@ RISING_TOP_N = 15
 # Monthly reports cover complete months in which at least this many wards
 # sent a newsletter; thinner months describe the archive's gaps, not the city.
 REPORT_MIN_SENDING_WARDS = 30
-MONTHLY_REPORT_SETTINGS = MonthlyReportSettings(
-    examples_per_topic=3,
-    rising_baseline_months=RISING_BASELINE_MONTHS,
-    rising_min_latest_wards=RISING_MIN_LATEST_WARDS,
-    rising_min_ward_gain=RISING_MIN_WARD_GAIN,
-    rising_top_n=10,
-)
+MONTHLY_REPORT_SETTINGS = MonthlyReportSettings(examples_per_topic=3)
 # Ward pages describe the last six complete months: recent enough to reflect
 # the current office, long enough for a typical ward to send 20+ newsletters.
-WARD_GLANCE_SETTINGS = WardGlanceSettings(
-    window_months=6,
-    top_topics=5,
-    top_terms=8,
-    distinctive_candidates=DISTINCTIVE_TOP_N,
-    distinctive_min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
-    distinctive_min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
-    distinctive_max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
-)
+WARD_GLANCE_SETTINGS = WardGlanceSettings(window_months=6, top_topics=5)
 # Ward pages show a topic's share of a ward's newsletters as a percentage only
 # when at least this many of them could be read; below it, counts only.
 MIN_WARD_TOPIC_SHARE_NEWSLETTERS = 20
@@ -264,6 +250,8 @@ class ArchiveAnalysis:
     sources_by_id: dict[int, SourceRecord]
     min_term_newsletters: int
     generated_at: datetime
+    # Months from this one on may be incomplete in the snapshot.
+    as_of_month: str
     # Ids of newsletters with too little extracted text to analyze.
     unavailable_ids: set[str]
     documents: list[NewsletterTerms]
@@ -312,12 +300,16 @@ def analyze_archive(
         (item for item in lens_newsletters if item.id not in unavailable_ids),
         matcher,
     )
+    as_of_month = select_as_of_month(
+        (newsletter.received_date for newsletter in newsletters), generated_at.date()
+    )
     return ArchiveAnalysis(
         sources=sources,
         newsletters=newsletters,
         sources_by_id=sources_by_id,
         min_term_newsletters=min_term_newsletters,
         generated_at=generated_at,
+        as_of_month=as_of_month,
         unavailable_ids=unavailable_ids,
         documents=documents,
         vocabulary=select_vocabulary(documents, min_term_newsletters),
@@ -330,8 +322,7 @@ def analyze_archive(
             for newsletter_id, matches in lens_matches.items()
         },
         latest_month=select_latest_complete_month(
-            (document.month for document in documents),
-            month_key(generated_at.date()),
+            (document.month for document in documents), as_of_month
         ),
     )
 
@@ -428,7 +419,6 @@ def compute_site_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
     topic_ids = list(topic_labels)
     dates = [newsletter.received_date for newsletter in analysis.newsletters]
     data_through = max(dates).isoformat() if dates else None
-    readable_documents = analysis.readable_documents
     latest_month = analysis.latest_month
 
     ward_glance: dict[str, Any] = {
@@ -436,35 +426,19 @@ def compute_site_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
         "topics": topic_labels,
         "min_share_newsletters": MIN_WARD_TOPIC_SHARE_NEWSLETTERS,
         **(
-            build_ward_glances(
-                items,
-                readable_documents,
-                analysis.vocabulary,
-                topic_ids,
-                build_name_tokens_by_ward(analysis.sources),
-                latest_month,
-                WARD_GLANCE_SETTINGS,
-            )
+            build_ward_glances(items, topic_ids, latest_month, WARD_GLANCE_SETTINGS)
             if latest_month
             else EMPTY_WARD_GLANCES
         ),
     }
     report_months = select_broad_complete_months(
-        items,
-        month_key(analysis.generated_at.date()),
-        REPORT_MIN_SENDING_WARDS,
+        items, analysis.as_of_month, REPORT_MIN_SENDING_WARDS
     )
     monthly_reports = {
         "data_through": data_through,
         "topics": topic_labels,
         "reports": build_monthly_reports(
-            report_months,
-            items,
-            readable_documents,
-            analysis.vocabulary,
-            topic_ids,
-            (source.ward for source in analysis.sources if source.ward is not None),
-            MONTHLY_REPORT_SETTINGS,
+            report_months, items, topic_ids, MONTHLY_REPORT_SETTINGS
         ),
     }
     return {"ward-glance": ward_glance, "monthly-reports": monthly_reports}

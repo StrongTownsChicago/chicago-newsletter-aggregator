@@ -1,11 +1,11 @@
 ---
-// "At a glance" summary for a ward page, from the small precomputed
-// src/data/ward-glance.json. It needs no database query, so it renders even
-// when the ward's newsletter list cannot be loaded. Wards with no newsletters
-// in the archive render nothing.
+// Ward summary from the precomputed src/data/ward-glance.json (no database
+// query). Renders nothing for wards with no archived newsletters in the
+// window: a row of zeros would read as "sent nothing", which the archive
+// cannot tell.
 import wardGlanceData from '../data/ward-glance.json';
 import { formatLongDate, formatLongMonth, formatShortMonthName, monthOfDate } from '../lib/archive-months';
-import { ANALYTICS_METHODOLOGY_PATH, REPORTS_INDEX_PATH } from '../lib/site';
+import { REPORTS_INDEX_PATH } from '../lib/site';
 import {
   describeCadence,
   describeCityReach,
@@ -27,22 +27,18 @@ const glance = findWardGlance(file, wardNumber);
 const monthCounts = glance ? listWardMonthCounts(file, glance) : [];
 const trackedPeriod = describeTrackedPeriod(listTrackedMonths(monthCounts));
 const cadence = glance ? describeCadence(glance) : null;
-const windowPeriod = file.window_months.length > 0
-  ? describeTrackedPeriod(file.window_months)
-  : null;
 const maxMonthCount = Math.max(1, ...monthCounts.map((count) => count.newsletters ?? 0));
 const topics = glance && glance.topic_newsletters > 0 ? glance.topics : [];
-const terms = glance?.terms ?? [];
 ---
 
-{glance && (
+{glance && cadence && (
   <section
-    class="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6"
     aria-labelledby="ward-glance-heading"
     data-testid="ward-glance"
   >
     <h2 id="ward-glance-heading" class="text-xl font-bold text-gray-900">
-      Ward {wardNumber} newsletters at a glance
+      Ward {wardNumber} at a glance
     </h2>
     <p class="text-sm text-gray-600 mt-1">
       In the archive since {formatLongMonth(monthOfDate(glance.first_date))}
@@ -51,16 +47,8 @@ const terms = glance?.terms ?? [];
     <div class="mt-5 grid gap-6 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
       <div data-testid="ward-glance-cadence">
         <h3 class="text-sm font-semibold text-gray-700">How often</h3>
-        {cadence ? (
-          <>
-            <p class="text-xl font-bold text-gray-900 mt-1">{cadence}</p>
-            {trackedPeriod && <p class="text-sm text-gray-600">{trackedPeriod}</p>}
-          </>
-        ) : (
-          <p class="text-sm text-gray-600 mt-1">
-            The archive has no newsletters from Ward {wardNumber} from {windowPeriod}.
-          </p>
-        )}
+        <p class="text-xl font-bold text-gray-900 mt-1">{cadence}</p>
+        {trackedPeriod && <p class="text-sm text-gray-600">{trackedPeriod}</p>}
         <ol class="mt-3 flex items-end gap-1.5 h-20" aria-label="Newsletters per month">
           {monthCounts.map(({ month, newsletters }) => (
             <li class="flex-1 flex flex-col items-center justify-end h-full min-w-0">
@@ -88,9 +76,9 @@ const terms = glance?.terms ?? [];
 
       {topics.length > 0 && (
         <div data-testid="ward-glance-topics">
-          <h3 class="text-sm font-semibold text-gray-700">Topics mentioned most</h3>
+          <h3 class="text-sm font-semibold text-gray-700">Top topics</h3>
           <p class="text-xs text-gray-500 mb-3">
-            Share of this ward's newsletters{trackedPeriod && <> from {trackedPeriod}</>} that mentioned each topic
+            Share of newsletters{trackedPeriod && <> from {trackedPeriod}</>} that mention each
           </p>
           <ul class="space-y-3">
             {topics.map((topic) => {
@@ -118,22 +106,9 @@ const terms = glance?.terms ?? [];
       )}
     </div>
 
-    {terms.length > 0 && (
-      <div class="mt-6" data-testid="ward-glance-terms">
-        <h3 class="text-sm font-semibold text-gray-700">Terms used more here than in other wards' newsletters</h3>
-        <ul class="mt-2 flex flex-wrap gap-2">
-          {terms.map((term) => (
-            <li class="px-2.5 py-1 rounded-full bg-gray-100 text-sm text-gray-800">{term}</li>
-          ))}
-        </ul>
-      </div>
-    )}
-
     <p class="mt-6 text-xs text-gray-500" data-testid="ward-glance-note">
-      {file.data_through && <>Based on newsletters in the archive through {formatLongDate(file.data_through)}. </>}
-      <a href={ANALYTICS_METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-800 hover:underline">How these figures are made</a>
-      {' · '}
-      <a href={REPORTS_INDEX_PATH} class="text-blue-600 hover:text-blue-800 hover:underline">Monthly citywide reports</a>
+      {file.data_through && <>Data through {formatLongDate(file.data_through)} · </>}
+      <a href={REPORTS_INDEX_PATH} class="text-blue-600 hover:text-blue-800 hover:underline">Monthly reports</a>
     </p>
   </section>
 )}
