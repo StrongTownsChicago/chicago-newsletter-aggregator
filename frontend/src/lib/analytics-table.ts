@@ -1,6 +1,4 @@
-// Table views for the analytics pages: every chart has an accessible table
-// twin. Kept apart from the chart builders so pages without charts (the
-// methodology page) can render tables without loading the charting library.
+// Table views for the analytics pages: every chart has an accessible table twin.
 
 export interface TableColumn<T> {
   label: string;

@@ -7,7 +7,6 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
-import { METHODOLOGY_PATH } from '../lib/analytics-methodology';
 
 // Unlisted: noindex (also disallowed in robots.txt).
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
@@ -28,11 +27,6 @@ const controlClass =
         What aldermen's newsletters cover, how often they're sent, and how wards differ.
       </p>
       <p id="analytics-data-as-of" class="text-sm text-gray-500 mt-2" hidden></p>
-      <p class="text-sm mt-2">
-        <a href={METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-700 font-medium" data-testid="methodology-link">
-          Methodology
-        </a>
-      </p>
     </header>
 
     <p id="analytics-loading" class="text-gray-600" role="status">Loading analytics data…</p>
@@ -118,7 +112,6 @@ const controlClass =
         <details class="mt-4 text-sm" id="lens-definitions">
           <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
           <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
-          <p class="mt-3"><a href={METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-700 font-medium">Methodology</a></p>
         </details>
       </AnalyticsPanel>
 

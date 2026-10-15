@@ -14,7 +14,6 @@ from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
 from analytics.facts import MIN_EXTRACTED_WORDS
 from utils.compute_analytics import (
-    BOILERPLATE_MIN_SHARE_PERCENT,
     BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
     LENS_MIN_MENTIONS,
     MATCH_LENSES_ON_CLEANED_TEXT,
@@ -74,13 +73,6 @@ class TestComputeOutputs(unittest.TestCase):
             },
         )
         self.assertEqual(outputs["metadata"]["newsletter_count"], 3)
-        self.assertEqual(
-            outputs["metadata"]["boilerplate"],
-            {
-                "min_share_percent": BOILERPLATE_MIN_SHARE_PERCENT,
-                "min_source_newsletters": BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
-            },
-        )
         self.assertEqual(len(outputs["newsletters"]["newsletters"]), 3)
         self.assertIn("bike lanes", outputs["terms"]["terms"])
         self.assertEqual(outputs["terms"]["min_newsletters"], 2)
