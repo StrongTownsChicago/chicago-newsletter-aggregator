@@ -3,8 +3,8 @@
 
 # Analytics dashboard data: unlisted like /analytics (also disallowed in
 # robots.txt). The files keep the same names on every refresh, so browsers
-# revalidate on each load (a cheap 304 via ETag when unchanged): a new deploy
-# is picked up immediately and the files never mix versions.
+# revalidate on each load (a cheap 304 via ETag when unchanged), so a new deploy
+# is picked up on the next page load rather than mixed with stale cached files.
 /analytics-data/*
   X-Robots-Tag: noindex
   Cache-Control: no-cache
