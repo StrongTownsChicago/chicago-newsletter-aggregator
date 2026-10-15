@@ -32,7 +32,9 @@ def make_newsletter(
 
 class TestBuildNewsletterFact(unittest.TestCase):
     def test_shapes_fact_without_body_text(self):
-        fact = build_newsletter_fact(make_newsletter("n1", date(2026, 1, 2)), ALDER)
+        fact = build_newsletter_fact(
+            make_newsletter("n1", date(2026, 1, 2)), ALDER, ["transportation"]
+        )
         self.assertEqual(
             fact,
             {
@@ -41,17 +43,18 @@ class TestBuildNewsletterFact(unittest.TestCase):
                 "source_id": 1,
                 "ward": "1",
                 "alder": "Ada Alder",
-                "topics": ["bike_lanes"],
+                "lenses": ["transportation"],
                 "words": 3,
                 "text_unavailable": True,
             },
         )
         self.assertNotIn("plain_text", fact)
         self.assertNotIn("relevance", fact)
+        self.assertNotIn("topics", fact)
 
     def test_missing_source_yields_null_ward_and_alder(self):
         fact = build_newsletter_fact(
-            make_newsletter("n1", date(2026, 1, 2), None), None
+            make_newsletter("n1", date(2026, 1, 2), None), None, []
         )
         self.assertIsNone(fact["ward"])
         self.assertIsNone(fact["alder"])
@@ -74,10 +77,13 @@ class TestBuildNewsletterFacts(unittest.TestCase):
                 make_newsletter("early", date(2026, 1, 1), source_id=99),
             ],
             {1: ALDER},
+            {"late": ["schools"]},
         )
         self.assertEqual([fact["id"] for fact in facts], ["early", "late"])
         self.assertIsNone(facts[0]["ward"])
         self.assertEqual(facts[1]["ward"], "1")
+        self.assertEqual(facts[0]["lenses"], [])
+        self.assertEqual(facts[1]["lenses"], ["schools"])
 
 
 class TestBuildSourceCoverage(unittest.TestCase):

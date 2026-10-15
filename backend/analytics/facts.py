@@ -1,6 +1,7 @@
 """Per-newsletter facts, per-source coverage, and dataset metadata."""
 
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Any
 
@@ -19,12 +20,15 @@ def is_text_unavailable(plain_text: str) -> bool:
 
 
 def build_newsletter_fact(
-    newsletter: NewsletterRecord, source: SourceRecord | None
+    newsletter: NewsletterRecord, source: SourceRecord | None, lens_ids: list[str]
 ) -> dict[str, Any]:
     """Shape one newsletter into a compact, body-free fact row.
 
-    The LLM relevance score is deliberately left out: it mostly tracks
-    newsletter length, so it is not a sound basis for analytics.
+    The `lenses` field holds lens_ids, the keyword lenses the newsletter
+    mentions (see `analytics.lenses`).
+    The LLM topics and relevance score are deliberately left out: the topic
+    list changed over time without relabeling and misses most of what
+    aldermen write about, and the score mostly tracks newsletter length.
     """
     return {
         "id": newsletter.id,
@@ -32,16 +36,21 @@ def build_newsletter_fact(
         "source_id": newsletter.source_id,
         "ward": source.ward if source else None,
         "alder": source.name if source else None,
-        "topics": newsletter.topics,
+        "lenses": lens_ids,
         "words": count_words(newsletter.plain_text),
         "text_unavailable": is_text_unavailable(newsletter.plain_text),
     }
 
 
 def build_newsletter_facts(
-    newsletters: list[NewsletterRecord], sources_by_id: dict[int, SourceRecord]
+    newsletters: list[NewsletterRecord],
+    sources_by_id: dict[int, SourceRecord],
+    lenses_by_newsletter: Mapping[str, list[str]],
 ) -> list[dict[str, Any]]:
-    """Shape every newsletter into a fact row, ordered by date then id."""
+    """Shape every newsletter into a fact row, ordered by date then id.
+
+    Newsletters missing from lenses_by_newsletter mention no lens.
+    """
     ordered = sorted(newsletters, key=lambda item: (item.received_date, item.id))
     return [
         build_newsletter_fact(
@@ -49,6 +58,7 @@ def build_newsletter_facts(
             sources_by_id.get(newsletter.source_id)
             if newsletter.source_id is not None
             else None,
+            lenses_by_newsletter.get(newsletter.id, []),
         )
         for newsletter in ordered
     ]

@@ -12,8 +12,11 @@ from unittest.mock import MagicMock, patch
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
+from analytics.facts import MIN_EXTRACTED_WORDS
 from utils.compute_analytics import (
     BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
+    LENS_MIN_PHRASE_OCCURRENCES,
+    MATCH_LENSES_ON_CLEANED_TEXT,
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
@@ -56,7 +59,15 @@ class TestComputeOutputs(unittest.TestCase):
 
         self.assertEqual(
             set(outputs),
-            {"metadata", "newsletters", "sources", "terms", "distinctive", "rising"},
+            {
+                "metadata",
+                "newsletters",
+                "sources",
+                "terms",
+                "distinctive",
+                "rising",
+                "lenses",
+            },
         )
         self.assertEqual(outputs["metadata"]["newsletter_count"], 2)
         self.assertEqual(len(outputs["newsletters"]["newsletters"]), 2)
@@ -83,6 +94,56 @@ class TestComputeOutputs(unittest.TestCase):
         # Facts still describe the newsletter as received.
         fact_words = outputs["newsletters"]["newsletters"][0]["words"]
         self.assertEqual(fact_words, len(newsletters[0].plain_text.split()))
+
+    def test_flags_each_newsletter_with_the_lenses_it_mentions(self):
+        sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
+        filler = "word " * MIN_EXTRACTED_WORDS
+        mention = " ".join(["New speed humps."] * LENS_MIN_PHRASE_OCCURRENCES)
+        newsletters = [
+            make_newsletter("calming", date(2026, 9, 1), 1, f"{mention} {filler}"),
+            make_newsletter("passing", date(2026, 9, 2), 1, f"A speed hump. {filler}"),
+            # Image-only issue: too little text to say what it mentions.
+            make_newsletter("image", date(2026, 9, 3), 1, mention),
+        ]
+        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+
+        lenses_by_id = {
+            fact["id"]: fact["lenses"] for fact in outputs["newsletters"]["newsletters"]
+        }
+        self.assertIn("street_safety", lenses_by_id["calming"])
+        self.assertEqual(lenses_by_id["passing"], [])
+        self.assertEqual(lenses_by_id["image"], [])
+        self.assertNotIn("topics", outputs["newsletters"]["newsletters"][0])
+
+        summary = outputs["lenses"]
+        self.assertEqual(summary["readable_newsletters"], 2)
+        self.assertEqual(summary["min_phrase_occurrences"], LENS_MIN_PHRASE_OCCURRENCES)
+        street_safety = next(
+            lens for lens in summary["lenses"] if lens["id"] == "street_safety"
+        )
+        self.assertEqual(street_safety["newsletters"], 1)
+
+    @unittest.skipUnless(MATCH_LENSES_ON_CLEANED_TEXT, "lenses match raw text")
+    def test_lenses_ignore_a_standing_block_repeated_in_every_issue(self):
+        sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
+        standing_block = (
+            "Immigration resources: know your rights workshops for immigrant "
+            "neighbors every week at the ward office on Main Street"
+        )
+        newsletters = [
+            make_newsletter(
+                str(index),
+                date(2026, 9, 1 + index),
+                1,
+                f"Item {index} " + "word " * MIN_EXTRACTED_WORDS + standing_block,
+            )
+            for index in range(BOILERPLATE_MIN_SOURCE_NEWSLETTERS)
+        ]
+        outputs = compute_outputs(sources, newsletters, 1, datetime(2026, 10, 11))
+
+        self.assertEqual(outputs["lenses"]["text"], "cleaned")
+        for fact in outputs["newsletters"]["newsletters"]:
+            self.assertNotIn("immigration", fact["lenses"])
 
     def test_handles_dataset_without_complete_month(self):
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]

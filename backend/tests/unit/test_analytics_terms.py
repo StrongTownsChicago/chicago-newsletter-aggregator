@@ -12,6 +12,7 @@ from analytics.terms import (
     compute_distinctive_terms,
     compute_rising_terms,
     count_newsletters_per_term,
+    drop_overlapping_terms,
     score_distinctive_term,
     select_latest_complete_month,
     select_vocabulary,
@@ -195,56 +196,81 @@ class TestSelectLatestCompleteMonth(unittest.TestCase):
 
 
 class TestRisingTerms(unittest.TestCase):
+    """Wards 1-6 send every month; the latest month is 2026-09."""
+
     def setUp(self):
-        baseline = [
-            doc({"budget"}, month="2026-08", source_id=i % 3) for i in range(10)
-        ]
-        latest = [
-            doc({"budget", "senior fest"}, month="2026-09", source_id=i % 3)
-            for i in range(6)
-        ]
-        latest += [doc({"solo"}, month="2026-09", source_id=9) for _ in range(6)]
-        old = [doc({"senior fest"}, month="2025-01")]
-        self.documents = baseline + latest + old
-        self.vocabulary = {"budget", "senior fest", "solo"}
+        wards = [str(ward) for ward in range(1, 7)]
+        documents = []
+        for month in ("2026-06", "2026-07", "2026-08", "2026-09"):
+            for ward in wards:
+                documents.append(doc({"budget"}, ward=ward, month=month))
+        # Six wards newly mention "senior fest"; one ward did in July.
+        documents += [doc({"senior fest"}, ward=w, month="2026-09") for w in wards]
+        documents.append(doc({"senior fest"}, ward="1", month="2026-07"))
+        # One ward sends "solo" ten times: many newsletters, but one ward.
+        documents += [doc({"solo"}, ward="1", month="2026-09") for _ in range(10)]
+        # Five wards mention "labor" and "labor day" together.
+        for ward in wards[:5]:
+            documents.append(doc({"labor day", "labor"}, ward=ward, month="2026-09"))
+        documents.append(doc({"orphan"}, ward=None, month="2026-09"))
+        self.documents = documents
+        self.vocabulary = {"budget", "senior fest", "solo", "labor day", "labor"}
 
     def compute(self, **overrides):
         params = {
             "latest_month": "2026-09",
-            "baseline_months": 2,
-            "min_latest_newsletters": 3,
-            "min_latest_sources": 2,
+            "baseline_months": 3,
+            "min_latest_wards": 3,
+            "min_ward_gain": 2,
             "top_n": 10,
         }
         params.update(overrides)
         return compute_rising_terms(self.documents, self.vocabulary, **params)
 
-    def test_ranks_new_terms_and_reports_window(self):
+    def terms(self, **overrides) -> list[str]:
+        return [item["term"] for item in self.compute(**overrides)["terms"]]
+
+    def test_ranks_by_gain_in_wards_and_reports_denominators(self):
         result = self.compute()
-        self.assertEqual(result["baseline_months"], ["2026-07", "2026-08"])
-        self.assertEqual(result["latest_newsletters"], 12)
-        self.assertEqual(result["baseline_newsletters"], 10)
+        self.assertEqual(result["baseline_months"], ["2026-06", "2026-07", "2026-08"])
+        self.assertEqual(result["latest_active_wards"], 6)
+        self.assertEqual(result["baseline_active_wards"], [6, 6, 6])
         top = result["terms"][0]
         self.assertEqual(top["term"], "senior fest")
+        self.assertEqual(top["latest_wards"], 6)
+        # Median of 0, 1, 0 wards: one ward's July mention does not set the baseline.
+        self.assertEqual(top["baseline_month_wards"], [0, 1, 0])
+        self.assertEqual(top["baseline_wards"], 0)
+        self.assertEqual(top["ward_gain"], 6)
         self.assertEqual(top["latest_newsletters"], 6)
-        self.assertEqual(top["latest_sources"], 3)
-        self.assertEqual(top["baseline_newsletters"], 0)
 
-    def test_falling_terms_are_excluded(self):
-        terms = [item["term"] for item in self.compute()["terms"]]
-        self.assertNotIn("budget", terms)
+    def test_one_prolific_ward_cannot_make_a_trend(self):
+        self.assertNotIn("solo", self.terms())
 
-    def test_single_source_terms_are_excluded(self):
-        terms = [item["term"] for item in self.compute()["terms"]]
-        self.assertNotIn("solo", terms)
+    def test_steady_terms_are_excluded(self):
+        self.assertNotIn("budget", self.terms())
 
-    def test_minimum_count_floor(self):
-        self.assertEqual(self.compute(min_latest_newsletters=7)["terms"], [])
+    def test_overlapping_terms_keep_only_the_highest_ranked(self):
+        terms = self.terms()
+        self.assertIn("labor", terms)
+        self.assertNotIn("labor day", terms)
 
-    def test_empty_when_baseline_has_no_newsletters(self):
-        result = self.compute(latest_month="2025-01")
+    def test_minimum_wards_and_gain(self):
+        self.assertEqual(self.terms(min_latest_wards=7), [])
+        self.assertEqual(self.terms(min_ward_gain=6), ["senior fest"])
+
+    def test_empty_when_baseline_has_no_wards(self):
+        result = self.compute(latest_month="2026-06")
         self.assertEqual(result["terms"], [])
-        self.assertEqual(result["baseline_newsletters"], 0)
+        self.assertEqual(result["baseline_active_wards"], [0, 0, 0])
+
+
+class TestDropOverlappingTerms(unittest.TestCase):
+    def test_drops_terms_sharing_a_word_with_a_kept_term(self):
+        kept = drop_overlapping_terms(
+            ["labor day", "labor", "day weekend", "senior fest"], lambda term: term
+        )
+        self.assertEqual(kept, ["labor day", "senior fest"])
 
 
 if __name__ == "__main__":

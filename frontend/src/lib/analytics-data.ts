@@ -7,6 +7,7 @@ import type {
   AnalyticsDataset,
   AnalyticsMetadata,
   DistinctiveTerm,
+  LensSummary,
   NewsletterFact,
   RisingTerms,
   SourceCoverage,
@@ -21,6 +22,7 @@ export interface AnalyticsDataFiles {
   metadata: AnalyticsMetadata;
   newsletters: { newsletters: NewsletterFact[] };
   sources: { sources: SourceCoverage[] };
+  lenses: LensSummary;
   terms: TermIndex;
   distinctive: { wards: Record<string, DistinctiveTerm[]> };
   rising: RisingTerms;
@@ -33,6 +35,7 @@ export const CORE_ANALYTICS_FILES = [
   "metadata",
   "newsletters",
   "sources",
+  "lenses",
   "distinctive",
   "rising",
 ] as const satisfies readonly AnalyticsDataFile[];
@@ -128,13 +131,14 @@ export async function loadCoreAnalyticsData(
 ): Promise<AnalyticsLoadResult<AnalyticsDataset>> {
   const result = await loadAnalyticsFiles(CORE_ANALYTICS_FILES, fetchFile);
   if (result.status !== "ready") return result;
-  const { metadata, newsletters, sources, distinctive, rising } = result.data;
+  const { metadata, newsletters, sources, lenses, distinctive, rising } = result.data;
   return {
     status: "ready",
     data: {
       metadata,
       newsletters: newsletters.newsletters,
       sources: sources.sources,
+      lenses,
       distinctiveByWard: distinctive.wards,
       rising,
     },

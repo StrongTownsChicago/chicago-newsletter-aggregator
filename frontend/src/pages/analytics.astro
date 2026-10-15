@@ -8,9 +8,7 @@ export const prerender = false;
 // signed-in user.
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
-import { humanizeIdentifier } from '../lib/format';
-import { ALL_TOPICS } from '../lib/topics';
-import { formatMonth, MIN_MONTH_NEWSLETTERS_FOR_SHARES, STREET_SAFETY_LABELING_START_MONTH } from '../lib/analytics';
+import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
 
 // Unlisted: keep it out of search indexes (Layout has no noindex option).
 Astro.response.headers.set('X-Robots-Tag', 'noindex');
@@ -21,7 +19,7 @@ const controlClass =
 
 <Layout
   title="Analytics - Chicago Alderman Newsletter Tracker"
-  description="Local analytics dashboard exploring topics, vocabulary, and sending patterns across alderman newsletters."
+  description="Local analytics dashboard exploring subjects, vocabulary, and sending patterns across alderman newsletters."
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <header class="mb-6">
@@ -65,10 +63,9 @@ const controlClass =
             </details>
           </div>
           <label class="col-span-2 lg:col-span-1 block">
-            <span class="block text-sm font-semibold text-gray-700 mb-2">Topic</span>
-            <select name="topic" class={controlClass}>
-              <option value="">All topics</option>
-              {ALL_TOPICS.map((topic) => <option value={topic}>{humanizeIdentifier(topic)}</option>)}
+            <span class="block text-sm font-semibold text-gray-700 mb-2">Lens</span>
+            <select name="lens" class={controlClass}>
+              <option value="">All lenses</option>
             </select>
           </label>
           <label class="block">
@@ -104,7 +101,35 @@ const controlClass =
       <AnalyticsPanel
         id="coverage"
         title="What the archive covers"
-        description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the topic filter."
+        description="Newsletters per ward per month for the selected wards and dates. Gray means not tracked yet (before the ward's first archived newsletter, or no newsletter ever); outlined means tracked but nothing received that month. Wards with no newsletters are not in the archive, which says nothing about whether their aldermen publish one. The other panels can only reflect newsletters the archive holds, so read them against this grid. Ignores the lens filter."
+      >
+        <div data-chart class="overflow-x-auto"></div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="civic-calendar"
+        title="Civic calendar"
+        description={`How many wards' newsletters mentioned each subject, month by month, out of the wards that sent newsletters with readable text that month. Subjects are keyword lenses: reviewed phrase lists you can read below. Months with fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} such wards are faded when all wards are shown. Respects the ward and date filters; the lens filter outlines its row.`}
+      >
+        <div data-chart class="overflow-x-auto"></div>
+        <details class="mt-4 text-sm" id="lens-definitions">
+          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">How lenses are matched, and their phrase lists</summary>
+          <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
+        </details>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="lens-trends"
+        title="Ward reach over time"
+        description="Share of active wards whose newsletters mentioned each lens, by month, on a shared vertical scale. Hover for the ward counts behind each point. Choose a lens in the filters to enlarge one."
+      >
+        <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="lens-wards"
+        title="Which wards mentioned it"
+        description="For the lens chosen in the filters: each ward's newsletters, month by month. Read gaps against the coverage grid; a ward that sent no newsletter, or only newsletters without readable text, could not be seen mentioning anything."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -112,7 +137,7 @@ const controlClass =
       <AnalyticsPanel
         id="term-explorer"
         title="Term explorer"
-        description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by topic). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
+        description={`Search a word or two-word phrase to see how often newsletters mention it over time and which wards use it most. Respects the ward and date filters (terms are not indexed by lens). Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank.`}
       >
         <form id="term-form" class="flex gap-2 mb-2" role="search">
           <label for="term-input" class="sr-only">Term</label>
@@ -124,14 +149,6 @@ const controlClass =
         <div id="term-timeline" class="overflow-x-auto"></div>
         <h3 id="term-wards-title" class="text-sm font-semibold text-gray-700 mt-4 mb-2 hidden">Top wards using this term</h3>
         <div id="term-wards" class="overflow-x-auto"></div>
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        id="topic-trends"
-        title="Topic trends"
-        description={`Share of LLM-processed newsletters mentioning each topic, by month, on a shared vertical scale. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are left blank, and topics added to the LLM topic list later start in the first month they were labeled (street safety: ${formatMonth(STREET_SAFETY_LABELING_START_MONTH)}).`}
-      >
-        <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
       </AnalyticsPanel>
 
       <AnalyticsPanel
@@ -149,7 +166,7 @@ const controlClass =
       <AnalyticsPanel
         id="rising-terms"
         title="Rising terms"
-        description="Terms whose share of newsletters rose most in the latest complete month versus the previous six months. Computed city-wide; requires mentions from several sources."
+        description="Words and phrases mentioned by many more wards in the latest complete month than in a typical month of the three before it (the median). Counting wards, not newsletters, keeps one prolific sender from making a trend. With less than a year of data, seasonal events (holidays, festivals) cannot be told apart from new issues. Computed city-wide."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -157,7 +174,7 @@ const controlClass =
       <AnalyticsPanel
         id="sending-cadence"
         title="Sending cadence"
-        description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the topic filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
+        description="The longest gaps between consecutive newsletters from the same source in the selected wards and dates (ignores the lens filter). Monthly counts per ward are in the coverage grid at the top of the page. Gaps in scraped archives may reflect what was archived rather than what was sent."
         hasTable={false}
       >
         <div id="cadence-gaps" class="overflow-x-auto"></div>

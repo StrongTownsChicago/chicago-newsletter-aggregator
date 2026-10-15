@@ -25,9 +25,10 @@ from analytics.text import EMAIL_PATTERN, URL_PATTERN, WORD_PATTERN
 # rarely recurs by chance, short enough to catch short standing lines such as
 # a platform footer. Results on the archive barely change between 5 and 12.
 SHINGLE_WORDS = 8
-# Removed text is replaced by a line break, a phrase boundary for tokenization,
-# so no bigram is formed from words on either side of a removed span.
-REMOVED_SPAN_REPLACEMENT = "\n"
+# Removed text is replaced by a paragraph break, a phrase boundary for both
+# term tokenization and lens matching (which lets single line breaks through),
+# so no bigram or lens phrase spans a removed block.
+REMOVED_SPAN_REPLACEMENT = "\n\n"
 PERCENT = 100
 
 

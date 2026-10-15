@@ -43,6 +43,13 @@ from analytics.facts import (
     build_metadata,
     build_newsletter_facts,
     build_source_coverage,
+    is_text_unavailable,
+)
+from analytics.lenses import (
+    LENSES,
+    LensMatcher,
+    count_newsletter_phrases,
+    summarize_lens_hits,
 )
 from analytics.records import (
     CHICAGO_TIMEZONE,
@@ -107,11 +114,31 @@ DISTINCTIVE_TOP_N = 20
 DISTINCTIVE_MIN_WARD_NEWSLETTERS = 5
 DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD = 3
 DISTINCTIVE_MAX_WARD_SHARE = 0.6
-RISING_BASELINE_MONTHS = 6
-RISING_MIN_LATEST_NEWSLETTERS = 5
-RISING_MIN_LATEST_SOURCES = 2
-RISING_TOP_N = 30
+# Keyword lenses match on boilerplate-cleaned text. Lenses feed ward reach
+# ("did this ward write about X this month"), and a standing block such as a
+# resource directory repeated in every issue would answer yes every month
+# whether or not the ward said anything new, flattening the monthly calendar
+# (on raw text, immigration reaches 14-18 wards every month of 2026; cleaned,
+# it falls from 17 in January to 10 in August). The cost: a ward whose only
+# coverage of a subject is its standing block is not counted. Set False to
+# match raw text instead.
+MATCH_LENSES_ON_CLEANED_TEXT = True
+# A newsletter mentions a lens when the lens's phrases occur at least this
+# many times in it (the same phrase twice counts). One passing mention, such
+# as early voting "at the library" or "call 311 while our office is closed",
+# does not make a newsletter about parks or city services, and counting those
+# puts nearly every ward on nearly every lens every month.
+LENS_MIN_PHRASE_OCCURRENCES = 2
+# Rising terms compare the latest complete month with the median of this
+# many months before it, counting wards rather than newsletters.
+RISING_BASELINE_MONTHS = 3
+# A rising term must be mentioned by at least this many wards in the latest
+# month and by at least this many more wards than in a typical baseline month.
+RISING_MIN_LATEST_WARDS = 5
+RISING_MIN_WARD_GAIN = 3
+RISING_TOP_N = 15
 SAMPLE_SIZE = 8
+LENS_REPORT_TOP_PHRASES = 4
 
 
 def fetch_rows(
@@ -236,31 +263,50 @@ def compute_outputs(
         min_share_percent=BOILERPLATE_MIN_SHARE_PERCENT,
         min_source_newsletters=BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
     )
+    # Too little text was extracted from these to tell what they mention.
+    unavailable_ids = {
+        newsletter.id
+        for newsletter in newsletters
+        if is_text_unavailable(newsletter.plain_text)
+    }
     documents: list[NewsletterTerms] = build_newsletter_terms(
         content_newsletters, sources_by_id
     )
     vocabulary = select_vocabulary(documents, min_term_newsletters)
+
+    lens_newsletters = (
+        content_newsletters if MATCH_LENSES_ON_CLEANED_TEXT else newsletters
+    )
+    matcher = LensMatcher(LENSES)
+    phrase_counts = count_newsletter_phrases(
+        (item for item in lens_newsletters if item.id not in unavailable_ids),
+        matcher,
+    )
+    lenses_by_newsletter = {
+        newsletter_id: matcher.lenses_mentioned(counts, LENS_MIN_PHRASE_OCCURRENCES)
+        for newsletter_id, counts in phrase_counts.items()
+    }
 
     latest_month = select_latest_complete_month(
         (document.month for document in documents), month_key(generated_at.date())
     )
     rising = (
         compute_rising_terms(
-            documents,
+            [doc for doc in documents if doc.newsletter_id not in unavailable_ids],
             vocabulary,
             latest_month=latest_month,
             baseline_months=RISING_BASELINE_MONTHS,
-            min_latest_newsletters=RISING_MIN_LATEST_NEWSLETTERS,
-            min_latest_sources=RISING_MIN_LATEST_SOURCES,
+            min_latest_wards=RISING_MIN_LATEST_WARDS,
+            min_ward_gain=RISING_MIN_WARD_GAIN,
             top_n=RISING_TOP_N,
         )
         if latest_month
         else {
             "latest_month": None,
             "baseline_months": [],
+            "latest_active_wards": 0,
+            "baseline_active_wards": [],
             "terms": [],
-            "latest_newsletters": 0,
-            "baseline_newsletters": 0,
         }
     )
 
@@ -269,7 +315,15 @@ def compute_outputs(
             newsletters, sources, len(vocabulary), min_term_newsletters, generated_at
         ),
         "newsletters": {
-            "newsletters": build_newsletter_facts(newsletters, sources_by_id)
+            "newsletters": build_newsletter_facts(
+                newsletters, sources_by_id, lenses_by_newsletter
+            )
+        },
+        "lenses": {
+            "text": "cleaned" if MATCH_LENSES_ON_CLEANED_TEXT else "raw",
+            "min_phrase_occurrences": LENS_MIN_PHRASE_OCCURRENCES,
+            "readable_newsletters": len(phrase_counts),
+            "lenses": summarize_lens_hits(matcher, phrase_counts, lenses_by_newsletter),
         },
         "sources": {"sources": build_source_coverage(sources, newsletters)},
         "terms": {
@@ -317,14 +371,32 @@ def print_report(
         f"{metadata['term_count']} indexed terms (>= {metadata['min_term_newsletters']} newsletters)"
     )
 
-    rising = outputs["rising"]
+    lenses = outputs["lenses"]
+    readable = lenses["readable_newsletters"]
     print(
-        f"\nRising terms in {rising['latest_month']} vs {', '.join(rising['baseline_months'])}:"
+        f"\nLens hit rates over {readable} newsletters with readable text "
+        f"({lenses['text']} text, phrases found at least "
+        f"{lenses['min_phrase_occurrences']} times):"
     )
+    for lens in lenses["lenses"]:
+        top_phrases = ", ".join(
+            f"{item['phrase']} ({item['newsletters']})"
+            for item in lens["phrases"][:LENS_REPORT_TOP_PHRASES]
+        )
+        share = lens["newsletters"] / readable if readable else 0
+        print(f"  {lens['label']:<34} {share:6.1%}  {top_phrases}")
+
+    rising = outputs["rising"]
+    if rising["latest_month"]:
+        print(
+            f"\nRising terms in {rising['latest_month']} "
+            f"({rising['latest_active_wards']} wards active) vs the median of "
+            f"{', '.join(rising['baseline_months'])}:"
+        )
     for item in rising["terms"][:SAMPLE_SIZE]:
         print(
-            f"  {item['term']:<30} x{item['ratio']:<6} "
-            f"({item['latest_newsletters']} newsletters, {item['latest_sources']} sources)"
+            f"  {item['term']:<30} {item['latest_wards']:>3} wards "
+            f"(baseline {item['baseline_wards']:g}, +{item['ward_gain']:g})"
         )
 
     print("\nDistinctive vocabulary (sample wards):")

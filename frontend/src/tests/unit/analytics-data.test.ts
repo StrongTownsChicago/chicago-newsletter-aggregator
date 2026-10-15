@@ -24,9 +24,10 @@ const FILE_CONTENTS: AnalyticsDataFiles = {
   },
   newsletters: { newsletters: [] },
   sources: { sources: [] },
+  lenses: { text: "cleaned", min_phrase_occurrences: 2, readable_newsletters: 0, lenses: [] },
   terms: { min_newsletters: 1, months: [], buckets: [], terms: {} },
   distinctive: { wards: { "1": [] } },
-  rising: { latest_month: null, baseline_months: [], latest_newsletters: 0, baseline_newsletters: 0, terms: [] },
+  rising: { latest_month: null, baseline_months: [], latest_active_wards: 0, baseline_active_wards: [], terms: [] },
 };
 
 type ResponseOverrides = Partial<Record<AnalyticsDataFile, () => Promise<Response>>>;
@@ -90,6 +91,7 @@ describe("loadCoreAnalyticsData", () => {
         metadata: FILE_CONTENTS.metadata,
         newsletters: [],
         sources: [],
+        lenses: FILE_CONTENTS.lenses,
         distinctiveByWard: { "1": [] },
         rising: FILE_CONTENTS.rising,
       },
