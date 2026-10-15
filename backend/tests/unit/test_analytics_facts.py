@@ -27,7 +27,6 @@ def make_newsletter(
         subject="Subject",
         plain_text="three word body",
         topics=["bike_lanes"],
-        relevance_score=6,
     )
 
 
@@ -43,12 +42,12 @@ class TestBuildNewsletterFact(unittest.TestCase):
                 "ward": "1",
                 "alder": "Ada Alder",
                 "topics": ["bike_lanes"],
-                "relevance": 6,
                 "words": 3,
                 "text_unavailable": True,
             },
         )
         self.assertNotIn("plain_text", fact)
+        self.assertNotIn("relevance", fact)
 
     def test_missing_source_yields_null_ward_and_alder(self):
         fact = build_newsletter_fact(

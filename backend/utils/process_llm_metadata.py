@@ -1,5 +1,5 @@
 """
-Process newsletters with LLM to add or update metadata (topics, summary, relevance score).
+Process newsletters with LLM to add or update metadata (topics, summary).
 
 Usage:
     # Process latest 10 newsletters
@@ -56,8 +56,8 @@ def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str,
     # Filter for missing metadata
     if args.missing_metadata:
         # Filter for newsletters where ANY metadata is missing
-        # Using OR logic: topics is null OR summary is null OR relevance_score is null
-        query = query.or_("topics.is.null,summary.is.null,relevance_score.is.null")
+        # Using OR logic: topics is null OR summary is null
+        query = query.or_("topics.is.null,summary.is.null")
 
     # Order by date for consistency
     query = query.order("received_date", desc=True)
@@ -112,7 +112,6 @@ def reprocess_newsletter(
                 {
                     "topics": llm_data["topics"],
                     "summary": llm_data["summary"],
-                    "relevance_score": llm_data["relevance_score"],
                 }
             )
             .eq("id", newsletter_id)
@@ -126,7 +125,6 @@ def reprocess_newsletter(
                 ", ".join(topics) if isinstance(topics, list) and topics else "none"
             )
             print(f"    Topics: {topics_str}")
-            print(f"    Score: {llm_data['relevance_score']}/10")
 
             # Queue notifications if enabled
             if queue_notifications_flag:
@@ -144,7 +142,6 @@ def reprocess_newsletter(
                         "ward_number": newsletter.get("sources", {}).get("ward_number")
                         if newsletter.get("sources")
                         else None,
-                        "relevance_score": llm_data.get("relevance_score"),
                     }
 
                     # Match and queue
@@ -199,7 +196,7 @@ def main() -> None:
     parser.add_argument(
         "--missing-metadata",
         action="store_true",
-        help="Only process newsletters that are missing LLM metadata (topics, summary, or relevance_score)",
+        help="Only process newsletters that are missing LLM metadata (topics or summary)",
     )
 
     parser.add_argument(

@@ -33,7 +33,6 @@ def make_newsletter(
         subject="Update",
         plain_text=plain_text,
         topics=None,
-        relevance_score=None,
     )
 
 

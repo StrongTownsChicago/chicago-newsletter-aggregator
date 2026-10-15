@@ -45,18 +45,15 @@ test('groups topics by category with readable labels', async ({ page }) => {
 test('applies new filters from the form and reflects them back', async ({ page }) => {
   await page.goto('/search');
 
-  await page.getByTestId('sort-select').selectOption('relevance');
-  await page.getByTestId('min-relevance-filter').selectOption('5');
+  await page.getByTestId('sort-select').selectOption('oldest');
   await page.getByTestId('from-date-filter').fill('2026-01-01');
   await page.getByTestId('to-date-filter').fill('2026-06-30');
   await page.getByTestId('search-button').click();
 
-  await expect(page).toHaveURL(/sort=relevance/);
-  await expect(page).toHaveURL(/min_relevance=5/);
+  await expect(page).toHaveURL(/sort=oldest/);
   await expect(page).toHaveURL(/from=2026-01-01/);
   await expect(page).toHaveURL(/to=2026-06-30/);
-  await expect(page.getByTestId('sort-select')).toHaveValue('relevance');
-  await expect(page.getByTestId('min-relevance-filter')).toHaveValue('5');
+  await expect(page.getByTestId('sort-select')).toHaveValue('oldest');
   await expect(page.getByTestId('from-date-filter')).toHaveValue('2026-01-01');
   await expect(page.getByTestId('to-date-filter')).toHaveValue('2026-06-30');
 });
@@ -75,20 +72,70 @@ test('can filter by source', async ({ page }) => {
 });
 
 test('preserves filters in pagination links', async ({ page }) => {
-  await page.goto('/search?sort=oldest&min_relevance=1');
+  await page.goto('/search?sort=oldest&from=2020-01-01');
 
   const nextLink = page.getByRole('navigation', { name: 'Pagination' }).getByRole('link', { name: 'Next' });
   if (await nextLink.count()) {
-    await expect(nextLink).toHaveAttribute('href', /min_relevance=1.*sort=oldest.*page=2/);
+    await expect(nextLink).toHaveAttribute('href', /from=2020-01-01.*sort=oldest.*page=2/);
   }
 });
 
 test('ignores invalid filter params instead of failing', async ({ page }) => {
-  const response = await page.goto('/search?page=-3&min_relevance=42&sort=bogus&topic=nope&from=2026-02-31&source=abc');
+  const response = await page.goto('/search?page=-3&sort=bogus&topic=nope&from=2026-02-31&source=abc');
 
   expect(response?.status()).toBe(200);
   await expect(page.getByTestId('sort-select')).toHaveValue('newest');
-  await expect(page.getByTestId('min-relevance-filter')).toHaveValue('');
   await expect(page.getByTestId('topic-filter')).toHaveValue('');
   await expect(page.getByTestId('from-date-filter')).toHaveValue('');
+});
+
+test('loads old links with removed relevance params and drops them', async ({ page }) => {
+  const response = await page.goto('/search?min_relevance=5&sort=relevance');
+
+  expect(response?.status()).toBe(200);
+  await expect(page.getByTestId('sort-select')).toHaveValue('newest');
+
+  const nextLink = page.getByRole('navigation', { name: 'Pagination' }).getByRole('link', { name: 'Next' });
+  if (await nextLink.count()) {
+    await expect(nextLink).toHaveAttribute('href', '/search?page=2');
+  }
+});
+
+test.describe('search timeline', () => {
+  const timelineRoute = '**/api/search-timeline?*';
+
+  test('shows monthly counts for a search with results', async ({ page }) => {
+    await page.route(timelineRoute, (route) =>
+      route.fulfill({
+        json: {
+          months: [
+            { month: '2026-01', newsletterCount: 3, wardCount: 2 },
+            { month: '2026-02', newsletterCount: 0, wardCount: 0 },
+          ],
+        },
+      }),
+    );
+    await page.goto('/search?q=zoning');
+    test.skip((await page.getByTestId('newsletter-card').count()) === 0, 'no results in this database');
+
+    const timeline = page.getByTestId('search-timeline');
+    await page.mouse.wheel(0, 10000);
+    await expect(timeline).toBeVisible();
+    await expect(timeline.getByRole('heading', { name: /zoning/ })).toBeVisible();
+
+    await timeline.getByText('Show monthly counts').click();
+    await expect(timeline.getByRole('row', { name: 'Jan 2026 3 2' })).toBeVisible();
+    await expect(timeline.getByRole('row', { name: 'Feb 2026 0 0' })).toBeVisible();
+  });
+
+  test('stays hidden when the timeline is unavailable', async ({ page }) => {
+    await page.route(timelineRoute, (route) =>
+      route.fulfill({ status: 404, json: { error: 'timeline_unavailable' } }),
+    );
+    await page.goto('/search?q=zoning');
+    await page.mouse.wheel(0, 10000);
+
+    await expect(page.getByTestId('search-timeline')).toBeHidden();
+    await expect(page.getByTestId('search-input')).toHaveValue('zoning');
+  });
 });

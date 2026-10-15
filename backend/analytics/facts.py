@@ -21,7 +21,11 @@ def is_text_unavailable(plain_text: str) -> bool:
 def build_newsletter_fact(
     newsletter: NewsletterRecord, source: SourceRecord | None
 ) -> dict[str, Any]:
-    """Shape one newsletter into a compact, body-free fact row."""
+    """Shape one newsletter into a compact, body-free fact row.
+
+    The LLM relevance score is deliberately left out: it mostly tracks
+    newsletter length, so it is not a sound basis for analytics.
+    """
     return {
         "id": newsletter.id,
         "date": newsletter.received_date.isoformat(),
@@ -29,7 +33,6 @@ def build_newsletter_fact(
         "ward": source.ward if source else None,
         "alder": source.name if source else None,
         "topics": newsletter.topics,
-        "relevance": newsletter.relevance_score,
         "words": count_words(newsletter.plain_text),
         "text_unavailable": is_text_unavailable(newsletter.plain_text),
     }

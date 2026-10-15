@@ -25,7 +25,6 @@ class NotificationRule(BaseModel):
     name: str = Field(..., min_length=1)
     topics: TopicList = Field(default_factory=list)
     search_term: str | None = None
-    min_relevance_score: int | None = Field(None, ge=0, le=10)
     source_ids: list[str] = Field(default_factory=list)
     ward_numbers: list[WardNumber] = Field(default_factory=list)
     is_active: bool = True

@@ -1,64 +1,91 @@
 // Client-side wiring for /analytics: reads the filter form, recomputes every
 // panel with the pure functions in lib/analytics.ts, and renders the charts.
+// The page script loads the core data; the term index is fetched here on demand.
 import {
-  computeRelevanceByWard,
+  BROAD_COVERAGE_PEAK_FRACTION,
+  buildCoverageGrid,
+  classifyDateWindow,
   computeTopicTrends,
-  computeWardTopicCells,
-  countNewslettersByWardMonth,
+  countActiveWardsByMonth,
+  countBroadlyCoveredMonths,
+  EMPTY_FILTERS,
   expandTermPostings,
   filterFacts,
+  findBroadCoverageWindow,
   findLongestGaps,
-  listMonths,
+  formatMonth,
+  listMonthsWithShares,
+  listSourceWards,
   listWards,
-  MIN_WARD_NEWSLETTERS_FOR_SHARES,
+  listWindowMonths,
   lookupTermPostings,
+  MIN_MONTH_NEWSLETTERS_FOR_SHARES,
   monthOf,
   normalizeTermQuery,
   searchScopeForFilters,
-  selectCoverage,
   suggestTerms,
   summarizeFacts,
+  summarizeWardCounts,
+  summarizeWardCoverage,
   termMentionsByMonth,
   termMentionsByWard,
   trimSparseEdges,
+  wardsInScope,
   type AnalyticsDataset,
   type AnalyticsFilters,
+  type BroadCoverageWindow,
+  type CoverageStatus,
+  type MonthWardActivity,
   type NewsletterFact,
+  type TermIndex,
 } from "../lib/analytics";
 import {
   formatOptionalShare,
   formatPercent,
   formatWard,
-  renderCadenceHeatmap,
-  renderCoverage,
+  renderCoverageGrid,
   renderDistinctiveTerms,
-  renderRelevanceByWard,
   renderRisingTerms,
   renderTable,
   renderTermTimeline,
   renderTermWards,
   renderTopicTrend,
-  renderWardTopicHeatmap,
   sourceLabel,
   type TableColumn,
 } from "../lib/analytics-charts";
-import { loadAnalyticsDataset } from "../lib/analytics-data";
+import { createLazyLoader, fetchTermIndex } from "../lib/analytics-data";
 import { humanizeIdentifier } from "../lib/format";
 import { ALL_TOPICS } from "../lib/topics";
 
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
 const GAP_LIMIT = 10;
+const COVERAGE_STATUS_LABELS: Record<CoverageStatus, string> = {
+  untracked: "Not tracked yet",
+  silent: "Tracked, none received",
+  received: "Received",
+};
 const RESIZE_DEBOUNCE_MS = 200;
-/** Search link scope for panels computed from fully filtered newsletters. */
-const ALL_FILTERS_SCOPE = { includeTopic: true, includeRelevance: true };
 const numberFormat = new Intl.NumberFormat("en-US");
+const percentFormat = new Intl.NumberFormat("en-US", { style: "percent" });
 
 interface DashboardState {
   data: AnalyticsDataset;
   wardBySource: Map<number, string | null>;
+  /** Every ward with a source, including wards with no newsletters archived. */
+  allWards: string[];
+  /** Every month from the first to the latest newsletter. */
+  dataMonths: string[];
+  wardActivity: MonthWardActivity[];
+  broadWindow: BroadCoverageWindow | null;
   term: string;
+  /** Null until the term explorer first needs it. */
+  terms: TermIndex | null;
+  termsError: string | null;
 }
+
+// Shared by every request so concurrent triggers fetch terms.json once.
+const loadTermIndex = createLazyLoader(() => fetchTermIndex());
 
 function requireElement<T extends Element>(selector: string, root: ParentNode = document): T {
   const element = root.querySelector<T>(selector);
@@ -95,8 +122,24 @@ function setTable<T>(container: HTMLElement | null, columns: TableColumn<T>[], r
   replaceContent(container, rows.length ? renderTable(columns, rows) : emptyMessage("No rows."));
 }
 
+function tableHeading(text: string): HTMLElement {
+  const heading = document.createElement("h3");
+  heading.className = "text-sm font-semibold text-gray-700 mt-3 mb-1";
+  heading.textContent = text;
+  return heading;
+}
+
 function pluralize(count: number, noun: string): string {
   return `${numberFormat.format(count)} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** "3 wards", or "1–32 wards" when the count varied. */
+function describeWardRange(fewest: number, most: number): string {
+  return fewest === most ? pluralize(most, "ward") : `${numberFormat.format(fewest)}–${pluralize(most, "ward")}`;
+}
+
+function describeMonthSpan(months: string[]): string {
+  return months.length ? `${formatMonth(months[0])} – ${formatMonth(months[months.length - 1])}` : "–";
 }
 
 // ---------------------------------------------------------------------------
@@ -112,11 +155,15 @@ function readFilters(form: HTMLFormElement): AnalyticsFilters {
     topic: (formData.get("topic") as string) || null,
     fromMonth: (formData.get("from") as string) || null,
     toMonth: (formData.get("to") as string) || null,
-    minRelevance: Number(formData.get("relevance") ?? 0),
   };
 }
 
-function populateFilterOptions(form: HTMLFormElement, wards: string[], months: string[]): void {
+function populateFilterOptions(
+  form: HTMLFormElement,
+  wards: string[],
+  months: string[],
+  defaultFromMonth: string | null,
+): void {
   const wardOptions = requireElement<HTMLElement>("#ward-options");
   wardOptions.replaceChildren(
     ...wards.map((ward) => {
@@ -132,8 +179,22 @@ function populateFilterOptions(form: HTMLFormElement, wards: string[], months: s
   );
   for (const name of ["from", "to"]) {
     const select = requireElement<HTMLSelectElement>(`select[name="${name}"]`, form);
-    select.append(...months.map((month) => new Option(month, month)));
+    select.append(...months.map((month) => new Option(formatMonth(month), month)));
   }
+  // Start on the broad-coverage window. defaultSelected makes "Reset filters" return to it.
+  const defaultOption = [...requireElement<HTMLSelectElement>('select[name="from"]', form).options].find(
+    (option) => option.value === defaultFromMonth,
+  );
+  if (defaultOption) {
+    defaultOption.defaultSelected = true;
+    defaultOption.selected = true;
+  }
+}
+
+/** Open-ended date window starting at fromMonth (null = the start of the archive). */
+function setDateWindow(form: HTMLFormElement, fromMonth: string | null): void {
+  requireElement<HTMLSelectElement>('select[name="from"]', form).value = fromMonth ?? "";
+  requireElement<HTMLSelectElement>('select[name="to"]', form).value = "";
 }
 
 function updateWardSummary(filters: AnalyticsFilters): void {
@@ -146,29 +207,135 @@ function updateWardSummary(filters: AnalyticsFilters): void {
         : `${filters.wards.length} wards`;
 }
 
+function describeBroadCoverageRule(broadWindow: BroadCoverageWindow): string {
+  return (
+    `months when at least ${broadWindow.minActiveWards} wards sent newsletters ` +
+    `(${percentFormat.format(BROAD_COVERAGE_PEAK_FRACTION)} of the ${broadWindow.peakActiveWards} in the busiest month)`
+  );
+}
+
+function renderDateWindowStatus(state: DashboardState, filters: AnalyticsFilters): void {
+  const status = requireElement<HTMLElement>("#date-window-status");
+  const toggle = requireElement<HTMLButtonElement>("#date-window-toggle");
+  const broadWindow = state.broadWindow;
+  const kind = classifyDateWindow(filters, broadWindow);
+  const span = describeMonthSpan(listWindowMonths(filters, state.dataMonths));
+  toggle.hidden = !broadWindow;
+  toggle.textContent = kind === "full" ? "Show broad-coverage window" : "Show full archive";
+  if (!broadWindow) {
+    status.textContent = `Showing ${span}.`;
+  } else if (kind === "broad") {
+    status.textContent = `Showing ${span}, the period of broad coverage: ${describeBroadCoverageRule(broadWindow)}.`;
+  } else if (kind === "full") {
+    status.textContent =
+      `Showing the full archive, ${span}. Before ${formatMonth(broadWindow.startMonth)} only ` +
+      `${describeWardRange(broadWindow.minActiveWardsBefore, broadWindow.maxActiveWardsBefore)} a month sent newsletters, ` +
+      "so pooled numbers mix real change with wards being added.";
+  } else {
+    status.textContent = `Showing a custom window, ${span}. Broad coverage starts ${formatMonth(broadWindow.startMonth)}.`;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Panels
 
-function renderSummary(facts: NewsletterFact[]): void {
+function renderSummary(
+  state: DashboardState,
+  filters: AnalyticsFilters,
+  facts: NewsletterFact[],
+  factsIgnoringTopic: NewsletterFact[],
+): void {
   const summary = summarizeFacts(facts);
+  const wardCounts = summarizeWardCounts(
+    wardsInScope(state.allWards, filters),
+    factsIgnoringTopic,
+    state.data.newsletters,
+  );
+  const windowMonths = listWindowMonths(filters, state.dataMonths);
+  const broadWindow = state.broadWindow;
+  const wardNoun = filters.wards.length ? "selected wards" : "wards";
+  const neverArchived = wardCounts.wardsNeverArchived;
+  const tiles: [string, string][] = [
+    [
+      numberFormat.format(summary.newsletters),
+      summary.firstDate ? `matching the filters (${summary.firstDate} to ${summary.lastDate})` : "matching the filters",
+    ],
+    [
+      `${wardCounts.wardsWithNewsletters} of ${wardCounts.scopeWards}`,
+      `${wardNoun} sent newsletters in this window.` +
+        (neverArchived.length
+          ? ` ${pluralize(neverArchived.length, "ward")} ${neverArchived.length === 1 ? "has" : "have"} none archived at all: ${neverArchived.join(", ")}.`
+          : ""),
+    ],
+    [
+      describeMonthSpan(windowMonths),
+      broadWindow
+        ? `${countBroadlyCoveredMonths(windowMonths, state.wardActivity, broadWindow.minActiveWards)} of ${pluralize(windowMonths.length, "month")} with broad coverage (${broadWindow.minActiveWards}+ wards sending)`
+        : pluralize(windowMonths.length, "month"),
+    ],
+    [state.data.metadata.last_date ?? "–", "latest newsletter in the archive"],
+  ];
   const values = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-value]");
   const details = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-detail]");
-  const tiles: [string, string][] = [
-    [numberFormat.format(summary.newsletters), "matching the filters"],
-    [numberFormat.format(summary.activeSources), "sources with newsletters"],
-    [
-      summary.firstDate ? `${summary.firstDate.slice(0, 7)} – ${summary.lastDate?.slice(0, 7)}` : "–",
-      summary.firstDate ? `${summary.firstDate} to ${summary.lastDate}` : "",
-    ],
-    [
-      summary.averageRelevance === null ? "–" : summary.averageRelevance.toFixed(1),
-      `out of 10, from ${pluralize(summary.scoredNewsletters, "scored newsletter")}`,
-    ],
-  ];
   tiles.forEach(([value, detail], index) => {
     values[index].textContent = value;
     details[index].textContent = detail;
   });
+}
+
+function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): void {
+  const { chart, caption, table } = panel("coverage");
+  const wards = wardsInScope(state.allWards, filters);
+  const months = listWindowMonths(filters, state.dataMonths);
+  const coverage = summarizeWardCoverage(state.data.sources, wards);
+  const wardsNeverArchived = coverage.filter((ward) => ward.newsletters === 0).map((ward) => ward.ward);
+  const archivedWards = wards.length - wardsNeverArchived.length;
+  caption.textContent =
+    `${archivedWards} of ${pluralize(wards.length, "ward")} ${wards.length === 1 ? "has" : "have"} newsletters in the archive` +
+    (wardsNeverArchived.length
+      ? `; ${wardsNeverArchived.length} ${wardsNeverArchived.length === 1 ? "has" : "have"} none.`
+      : ".");
+  if (!chart) return;
+  const cells = buildCoverageGrid(state.data.newsletters, wards, months);
+  replaceContent(
+    chart,
+    wards.length && months.length
+      ? renderCoverageGrid(
+          cells,
+          wards,
+          months,
+          wardsNeverArchived,
+          // Coverage ignores the topic filter, so its search links do too.
+          searchScopeForFilters(filters, { includeTopic: false }),
+          chartWidth(chart),
+        )
+      : emptyMessage("No wards or months in the selected window."),
+  );
+  const wardTable = document.createElement("div");
+  setTable(
+    wardTable,
+    [
+      { label: "Ward", value: (row) => row.ward },
+      { label: "Aldermen", value: (row) => row.aldermen.join(", ") },
+      { label: "First newsletter", value: (row) => row.firstDate ?? "None archived" },
+      { label: "Latest newsletter", value: (row) => row.lastDate ?? "" },
+      { label: "Newsletters (whole archive)", value: (row) => row.newsletters, numeric: true },
+    ],
+    coverage,
+  );
+  // The grid's per-month cells, so its counts and states are not available by color alone.
+  const monthTable = document.createElement("div");
+  setTable(
+    monthTable,
+    [
+      { label: "Ward", value: (cell) => cell.ward },
+      { label: "Month", value: (cell) => cell.month },
+      { label: "Status", value: (cell) => COVERAGE_STATUS_LABELS[cell.status] },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
+    ],
+    cells,
+  );
+  replaceContent(table, tableHeading("By ward"), wardTable, tableHeading("By ward and month"), monthTable);
 }
 
 function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): void {
@@ -178,8 +345,8 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   const wardsChart = requireElement<HTMLElement>("#term-wards", section);
   const wardsTitle = requireElement<HTMLElement>("#term-wards-title", section);
   const suggestions = requireElement<HTMLElement>("#term-suggestions", section);
-  const index = state.data.terms;
-  caption.textContent = `${numberFormat.format(Object.keys(index.terms).length)} indexed terms (each appears in at least ${index.min_newsletters} newsletters).`;
+  const { metadata } = state.data;
+  caption.textContent = `${numberFormat.format(metadata.term_count)} indexed terms (each appears in at least ${metadata.min_term_newsletters} newsletters).`;
 
   const clearResults = () => {
     timeline.replaceChildren();
@@ -189,6 +356,17 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   };
 
   const term = normalizeTermQuery(state.term);
+  const index = state.terms;
+  if (!index) {
+    suggestions.replaceChildren();
+    clearResults();
+    message.textContent = !term
+      ? "Type a term to explore."
+      : state.termsError
+        ? `Could not load the term index (${state.termsError}). Search again to retry.`
+        : "Loading the term index…";
+    return;
+  }
   const suggestionTerms = suggestTerms(index, term, TERM_SUGGESTION_LIMIT);
   suggestions.replaceChildren(
     ...suggestionTerms.map((suggestion) => {
@@ -216,11 +394,7 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     return;
   }
 
-  const scopeFacts = filterFacts(state.data.newsletters, {
-    ...filters,
-    topic: null,
-    minRelevance: 0,
-  });
+  const scopeFacts = filterFacts(state.data.newsletters, { ...filters, topic: null });
   const bucketCounts = expandTermPostings(index, postings, state.wardBySource, filters);
   const months = termMentionsByMonth(bucketCounts, scopeFacts);
   const wards = termMentionsByWard(bucketCounts, scopeFacts);
@@ -231,14 +405,21 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     clearResults();
     return;
   }
-  timeline.replaceChildren(renderTermTimeline(trimSparseEdges(months), chartWidth(timeline)));
+  const timelinePoints = trimSparseEdges(months);
+  timeline.replaceChildren(
+    timelinePoints.length
+      ? renderTermTimeline(timelinePoints, chartWidth(timeline))
+      : emptyMessage(
+          `No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} or more newsletters in the selected wards and dates, so there is no monthly share to chart. See the table for counts.`,
+        ),
+  );
   wardsTitle.classList.remove("hidden");
   wardsChart.replaceChildren(
     renderTermWards(
       wards.slice(0, TERM_WARD_LIMIT),
       term,
-      // The term index has no topic or relevance, so neither do its search links.
-      searchScopeForFilters(filters, { includeTopic: false, includeRelevance: false }),
+      // The term index has no topic, so neither do its search links.
+      searchScopeForFilters(filters, { includeTopic: false }),
       chartWidth(wardsChart),
     ),
   );
@@ -251,43 +432,6 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
       { label: "Share", value: (point) => formatOptionalShare(point.share), numeric: true },
     ],
     months,
-  );
-}
-
-function renderWardTopicPanel(
-  facts: NewsletterFact[],
-  cityFacts: NewsletterFact[],
-  filters: AnalyticsFilters,
-): void {
-  const { chart, caption, table } = panel("ward-topic-heatmap");
-  const cells = computeWardTopicCells(facts, cityFacts, ALL_TOPICS);
-  const countProcessed = (items: NewsletterFact[]) => items.filter((fact) => fact.topics !== null).length;
-  const wardCount = new Set(cells.map((cell) => cell.ward)).size;
-  caption.textContent =
-    `Based on ${pluralize(countProcessed(facts), "LLM-processed newsletter")} across ${pluralize(wardCount, "ward")}, ` +
-    `compared with ${pluralize(countProcessed(cityFacts), "newsletter")} city-wide ` +
-    `(wards with fewer than ${MIN_WARD_NEWSLETTERS_FOR_SHARES} processed newsletters are hidden).`;
-  if (!chart) return;
-  if (cells.length === 0) {
-    replaceContent(chart, emptyMessage("Not enough processed newsletters for these filters."));
-  } else {
-    replaceContent(chart, renderWardTopicHeatmap(
-        cells,
-        filters.topic,
-        searchScopeForFilters(filters, { includeTopic: false, includeRelevance: true }),
-        chartWidth(chart),
-      ));
-  }
-  setTable(
-    table,
-    [
-      { label: "Ward", value: (cell) => cell.ward },
-      { label: "Topic", value: (cell) => humanizeIdentifier(cell.topic) },
-      { label: "Ward newsletters", value: (cell) => `${cell.wardTopicNewsletters} / ${cell.wardNewsletters}`, numeric: true },
-      { label: "Ward share", value: (cell) => formatPercent(cell.wardShare), numeric: true },
-      { label: "City share", value: (cell) => formatPercent(cell.cityShare), numeric: true },
-    ],
-    cells.filter((cell) => cell.wardTopicNewsletters > 0),
   );
 }
 
@@ -304,19 +448,23 @@ function renderTopicTrendsPanel(facts: NewsletterFact[], filters: AnalyticsFilte
     return;
   }
   const maxShare = Math.max(...points.map((point) => point.share ?? 0));
+  const months = listMonthsWithShares(points);
+  const monthsShown = new Set(months);
   chart.classList.toggle("md:grid-cols-2", !filters.topic);
   const cardWidth = filters.topic ? chartWidth(chart) : Math.max(chartWidth(chart) / 2 - 12, 300);
   replaceContent(
     chart,
-    ...topics.map((topic) => {
-      const figure = document.createElement("figure");
-      const title = document.createElement("figcaption");
-      title.className = "text-sm font-semibold text-gray-700";
-      title.textContent = humanizeIdentifier(topic);
-      const topicPoints = trimSparseEdges(points.filter((point) => point.topic === topic));
-      figure.append(title, renderTopicTrend(topicPoints, maxShare, cardWidth));
-      return figure;
-    }),
+    ...(months.length
+      ? topics.map((topic) => {
+          const figure = document.createElement("figure");
+          const title = document.createElement("figcaption");
+          title.className = "text-sm font-semibold text-gray-700";
+          title.textContent = humanizeIdentifier(topic);
+          const topicPoints = points.filter((point) => point.topic === topic && monthsShown.has(point.month));
+          figure.append(title, renderTopicTrend(topicPoints, months, maxShare, cardWidth));
+          return figure;
+        })
+      : [emptyMessage(`No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} or more processed newsletters for these filters.`)]),
   );
   setTable(
     table,
@@ -384,27 +532,9 @@ function renderRisingPanel(state: DashboardState): void {
   );
 }
 
-function renderCadencePanel(facts: NewsletterFact[], filters: AnalyticsFilters): void {
-  const { section, chart, caption, table } = panel("sending-cadence");
-  const counts = countNewslettersByWardMonth(facts);
-  const factMonths = facts.map((fact) => monthOf(fact.date)).sort();
-  const months = factMonths.length ? listMonths(factMonths[0], factMonths[factMonths.length - 1]) : [];
+function renderCadencePanel(facts: NewsletterFact[]): void {
+  const { section, caption } = panel("sending-cadence");
   caption.textContent = `Based on ${pluralize(facts.length, "newsletter")}.`;
-  if (!chart) return;
-  replaceContent(
-    chart,
-    counts.length ? renderCadenceHeatmap(counts, months, searchScopeForFilters(filters, ALL_FILTERS_SCOPE), chartWidth(chart)) : emptyMessage("No newsletters for these filters."),
-  );
-  setTable(
-    table,
-    [
-      { label: "Ward", value: (count) => count.ward },
-      { label: "Month", value: (count) => count.month },
-      { label: "Newsletters", value: (count) => count.newsletters, numeric: true },
-    ],
-    counts,
-  );
-  const gaps = findLongestGaps(facts, GAP_LIMIT);
   setTable(
     requireElement<HTMLElement>("#cadence-gaps", section),
     [
@@ -413,51 +543,7 @@ function renderCadencePanel(facts: NewsletterFact[], filters: AnalyticsFilters):
       { label: "To", value: (gap) => gap.to },
       { label: "Days", value: (gap) => gap.days, numeric: true },
     ],
-    gaps,
-  );
-}
-
-function renderRelevancePanel(facts: NewsletterFact[], filters: AnalyticsFilters): void {
-  const { chart, caption, table } = panel("relevance-by-ward");
-  const rows = computeRelevanceByWard(facts);
-  const scored = rows.reduce((total, row) => total + row.scoredNewsletters, 0);
-  caption.textContent = `Based on ${pluralize(scored, "scored newsletter")}. Small counts are noisy.`;
-  if (!chart) return;
-  replaceContent(
-    chart,
-    rows.length ? renderRelevanceByWard(rows, searchScopeForFilters(filters, ALL_FILTERS_SCOPE), chartWidth(chart)) : emptyMessage("No scored newsletters for these filters."),
-  );
-  setTable(
-    table,
-    [
-      { label: "Ward", value: (row) => row.ward },
-      { label: "Average relevance", value: (row) => row.averageRelevance.toFixed(2), numeric: true },
-      { label: "Scored newsletters", value: (row) => row.scoredNewsletters, numeric: true },
-    ],
-    rows,
-  );
-}
-
-function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): void {
-  const { chart, caption, table } = panel("coverage");
-  const sources = selectCoverage(state.data.sources, filters);
-  const withoutNewsletters = state.data.sources.filter((source) => source.newsletters === 0).length;
-  caption.textContent = `${pluralize(sources.length, "source")} with newsletters` +
-    (withoutNewsletters ? `; ${pluralize(withoutNewsletters, "source")} in the database have none yet.` : ".");
-  if (!chart) return;
-  replaceContent(
-    chart,
-    sources.length ? renderCoverage(sources, chartWidth(chart)) : emptyMessage("No sources for these wards."),
-  );
-  setTable(
-    table,
-    [
-      { label: "Source", value: (source) => sourceLabel(source) },
-      { label: "First newsletter", value: (source) => source.first_date ?? "" },
-      { label: "Last newsletter", value: (source) => source.last_date ?? "" },
-      { label: "Newsletters", value: (source) => source.newsletters, numeric: true },
-    ],
-    sources,
+    findLongestGaps(facts, GAP_LIMIT),
   );
 }
 
@@ -470,49 +556,49 @@ function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
   const facts = filterFacts(state.data.newsletters, filters);
   const factsIgnoringTopic = filterFacts(state.data.newsletters, filters, { ignoreTopic: true });
 
-  renderSummary(facts);
+  renderDateWindowStatus(state, filters);
+  renderSummary(state, filters, facts, factsIgnoringTopic);
+  renderCoveragePanel(state, filters);
   renderTermExplorer(state, filters);
-  renderWardTopicPanel(
-    factsIgnoringTopic,
-    filterFacts(state.data.newsletters, { ...filters, wards: [] }, { ignoreTopic: true }),
-    filters,
-  );
   renderTopicTrendsPanel(factsIgnoringTopic, filters);
   renderDistinctivePanel(state);
   renderRisingPanel(state);
-  renderCadencePanel(facts, filters);
-  renderRelevancePanel(facts, filters);
-  renderCoveragePanel(state, filters);
+  renderCadencePanel(factsIgnoringTopic);
 }
 
-function showLoadError(error: unknown): void {
-  const dashboard = requireElement<HTMLElement>("#analytics-dashboard");
-  const message = emptyMessage(`Could not load analytics data: ${error instanceof Error ? error.message : String(error)}`);
-  dashboard.prepend(message);
+/** Fetch the term index once, then redraw the term explorer with it (or with the error). */
+function requestTermIndex(state: DashboardState, readCurrentFilters: () => AnalyticsFilters): void {
+  if (state.terms) return;
+  state.termsError = null;
+  loadTermIndex()
+    .then((terms) => {
+      state.terms = terms;
+    })
+    .catch((error: unknown) => {
+      state.termsError = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => renderTermExplorer(state, readCurrentFilters()));
 }
 
-export async function startAnalyticsDashboard(): Promise<void> {
-  let data: AnalyticsDataset | null;
-  try {
-    data = await loadAnalyticsDataset();
-  } catch (error) {
-    showLoadError(error);
-    return;
-  }
-  if (!data) {
-    showLoadError(new Error("Data files are missing. Run the compute script."));
-    return;
-  }
-
-  const allMonths = [...new Set(data.newsletters.map((fact) => monthOf(fact.date)))].sort();
-  const state: DashboardState = {
+function buildDashboardState(data: AnalyticsDataset): DashboardState {
+  const factMonths = data.newsletters.map((fact) => monthOf(fact.date)).sort();
+  return {
     data,
     wardBySource: new Map(data.sources.map((source) => [source.id, source.ward])),
+    allWards: listSourceWards(data.sources),
+    dataMonths: listWindowMonths(EMPTY_FILTERS, factMonths),
+    wardActivity: countActiveWardsByMonth(data.newsletters),
+    broadWindow: findBroadCoverageWindow(data.newsletters),
     term: "",
+    terms: null,
+    termsError: null,
   };
+}
 
+export function startAnalyticsDashboard(data: AnalyticsDataset): void {
+  const state = buildDashboardState(data);
   const form = requireElement<HTMLFormElement>("#analytics-filters");
-  populateFilterOptions(form, listWards(data.newsletters), allMonths);
+  populateFilterOptions(form, listWards(data.newsletters), state.dataMonths, state.broadWindow?.startMonth ?? null);
 
   const distinctiveSelect = requireElement<HTMLSelectElement>("#distinctive-ward");
   const distinctiveWards = Object.keys(data.distinctiveByWard);
@@ -542,13 +628,21 @@ export async function startAnalyticsDashboard(): Promise<void> {
     });
     rerender();
   });
+  requireElement<HTMLButtonElement>("#date-window-toggle").addEventListener("click", () => {
+    const showingFullArchive = classifyDateWindow(readFilters(form), state.broadWindow) === "full";
+    setDateWindow(form, showingFullArchive ? (state.broadWindow?.startMonth ?? null) : null);
+    rerender();
+  });
   distinctiveSelect.addEventListener("change", () => renderDistinctivePanel(state));
 
   const termInput = requireElement<HTMLInputElement>("#term-input");
   const filtersNow = () => readFilters(form);
+  // Start downloading the term index as soon as someone reaches for the explorer.
+  termInput.addEventListener("focus", () => requestTermIndex(state, filtersNow));
   requireElement<HTMLFormElement>("#term-form").addEventListener("submit", (event) => {
     event.preventDefault();
     state.term = termInput.value;
+    requestTermIndex(state, filtersNow);
     renderTermExplorer(state, filtersNow());
   });
   requireElement<HTMLElement>("#term-suggestions").addEventListener("click", (event) => {

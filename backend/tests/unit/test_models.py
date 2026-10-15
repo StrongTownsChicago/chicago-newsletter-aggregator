@@ -46,7 +46,6 @@ class TestNewsletterModels(unittest.TestCase):
             source_id="source-456",
             topics=["bike_lanes", "transit_funding"],
             summary="Test summary",
-            relevance_score=7,
         )
 
         self.assertEqual(newsletter.subject, "Test Newsletter")
@@ -56,7 +55,6 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(newsletter.source_id, "source-456")
         self.assertEqual(newsletter.topics, ["bike_lanes", "transit_funding"])
         self.assertEqual(newsletter.summary, "Test summary")
-        self.assertEqual(newsletter.relevance_score, 7)
 
     def test_newsletter_with_id_from_db(self):
         """Newsletter model includes ID after DB fetch."""
@@ -91,24 +89,13 @@ class TestNewsletterModels(unittest.TestCase):
         with self.assertRaises(ValidationError):
             NewsletterCreate(subject="Test")  # type: ignore
 
-    def test_newsletter_relevance_score_valid_range(self):
-        """Relevance score 0-10 accepted."""
-        # Valid scores
-        for score in [0, 5, 10]:
-            newsletter = NewsletterCreate(
-                subject="Test", plain_text="Content", relevance_score=score
-            )
-            self.assertEqual(newsletter.relevance_score, score)
+    def test_newsletter_ignores_legacy_relevance_score_column(self):
+        """Deprecated relevance_score in database rows is ignored, even if out of range."""
+        newsletter = NewsletterCreate.model_validate(
+            {"subject": "Test", "plain_text": "Content", "relevance_score": 11}
+        )
 
-    def test_newsletter_relevance_score_out_of_range(self):
-        """Relevance score >10 or <0 fails."""
-        # Score too high
-        with self.assertRaises(ValidationError):
-            NewsletterCreate(subject="Test", plain_text="Content", relevance_score=11)
-
-        # Score too low
-        with self.assertRaises(ValidationError):
-            NewsletterCreate(subject="Test", plain_text="Content", relevance_score=-1)
+        self.assertFalse(hasattr(newsletter, "relevance_score"))
 
     def test_newsletter_topics_default_empty_list(self):
         """Topics defaults to empty list, not None."""
@@ -157,7 +144,6 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(matching.plain_text, "")
         self.assertIsNone(matching.source_id)
         self.assertIsNone(matching.ward_number)
-        self.assertIsNone(matching.relevance_score)
 
     def test_newsletter_processing_minimal(self):
         """NewsletterProcessing only needs subject + plain_text."""
@@ -176,7 +162,6 @@ class TestNewsletterModels(unittest.TestCase):
             "ward_number": None,
             "topics": [],
             "summary": None,
-            "relevance_score": None,
         }
 
         newsletter = NewsletterCreate.model_validate(db_data)
@@ -297,7 +282,6 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(rule.name, "My Rule")
         self.assertEqual(rule.topics, [])  # Default
         self.assertIsNone(rule.search_term)
-        self.assertIsNone(rule.min_relevance_score)
         self.assertEqual(rule.source_ids, [])  # Default
         self.assertEqual(rule.ward_numbers, [])  # Default
         self.assertTrue(rule.is_active)  # Default
@@ -310,7 +294,6 @@ class TestNotificationModels(unittest.TestCase):
             name="Bike Lane Notifications",
             topics=["bike_lanes", "pedestrian_infrastructure"],
             search_term="cycling",
-            min_relevance_score=7,
             source_ids=["source-1", "source-2"],
             ward_numbers=[1, 2, 3],
             is_active=True,
@@ -318,7 +301,6 @@ class TestNotificationModels(unittest.TestCase):
 
         self.assertEqual(rule.topics, ["bike_lanes", "pedestrian_infrastructure"])
         self.assertEqual(rule.search_term, "cycling")
-        self.assertEqual(rule.min_relevance_score, 7)
         self.assertEqual(rule.source_ids, ["source-1", "source-2"])
         self.assertEqual(rule.ward_numbers, [1, 2, 3])
 
@@ -337,34 +319,18 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(rule.topics, [])
         self.assertIsInstance(rule.topics, list)
 
-    def test_notification_rule_relevance_score_range(self):
-        """Min relevance score 0-10."""
-        # Valid scores
-        for score in [0, 5, 10]:
-            rule = NotificationRule(
-                id=f"rule-{score}",
-                user_id="user-456",
-                name="Test",
-                min_relevance_score=score,
-            )
-            self.assertEqual(rule.min_relevance_score, score)
+    def test_notification_rule_ignores_legacy_min_relevance_score(self):
+        """Deprecated min_relevance_score in database rows is ignored."""
+        rule = NotificationRule.model_validate(
+            {
+                "id": "rule-123",
+                "user_id": "user-456",
+                "name": "Test",
+                "min_relevance_score": 11,
+            }
+        )
 
-        # Invalid scores
-        with self.assertRaises(ValidationError):
-            NotificationRule(
-                id="rule-123",
-                user_id="user-456",
-                name="Test",
-                min_relevance_score=11,
-            )
-
-        with self.assertRaises(ValidationError):
-            NotificationRule(
-                id="rule-123",
-                user_id="user-456",
-                name="Test",
-                min_relevance_score=-1,
-            )
+        self.assertFalse(hasattr(rule, "min_relevance_score"))
 
     def test_rule_match_valid(self):
         """RuleMatch with all required fields."""

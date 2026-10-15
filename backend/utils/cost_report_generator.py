@@ -49,16 +49,13 @@ def generate_text_report(
     topic_output = sum(a.topic_extraction.output_tokens for a in analyses)
     summary_input = sum(a.summary_generation.input_tokens for a in analyses)
     summary_output = sum(a.summary_generation.output_tokens for a in analyses)
-    relevance_input = sum(a.relevance_scoring.input_tokens for a in analyses)
-    relevance_output = sum(a.relevance_scoring.output_tokens for a in analyses)
 
-    total_input = topic_input + summary_input + relevance_input
-    total_output = topic_output + summary_output + relevance_output
+    total_input = topic_input + summary_input
+    total_output = topic_output + summary_output
 
     # Calculate costs
     topic_cost = calculate_cost(topic_input, topic_output, model_pricing)
     summary_cost = calculate_cost(summary_input, summary_output, model_pricing)
-    relevance_cost = calculate_cost(relevance_input, relevance_output, model_pricing)
     total_cost = calculate_cost(total_input, total_output, model_pricing)
 
     # Format report
@@ -74,7 +71,7 @@ def generate_text_report(
     )
     report.append("")
     report.append("-" * 65)
-    report.append("NEWSLETTER PROCESSING (3 calls per newsletter)")
+    report.append("NEWSLETTER PROCESSING (2 calls per newsletter)")
     report.append("-" * 65)
     report.append(
         f"{'Operation':<20} {'Input Tokens':>12} {'Output Tokens':>12} {'Cost':>10}"
@@ -85,9 +82,6 @@ def generate_text_report(
     )
     report.append(
         f"{'Summary Generation':<20} {summary_input:>12,} {summary_output:>12,} ${summary_cost['total_cost']:>9.4f}"
-    )
-    report.append(
-        f"{'Relevance Scoring':<20} {relevance_input:>12,} {relevance_output:>12,} ${relevance_cost['total_cost']:>9.4f}"
     )
     report.append("-" * 65)
     report.append(
@@ -135,16 +129,13 @@ def generate_json_report(
     topic_output = sum(a.topic_extraction.output_tokens for a in analyses)
     summary_input = sum(a.summary_generation.input_tokens for a in analyses)
     summary_output = sum(a.summary_generation.output_tokens for a in analyses)
-    relevance_input = sum(a.relevance_scoring.input_tokens for a in analyses)
-    relevance_output = sum(a.relevance_scoring.output_tokens for a in analyses)
 
-    total_input = topic_input + summary_input + relevance_input
-    total_output = topic_output + summary_output + relevance_output
+    total_input = topic_input + summary_input
+    total_output = topic_output + summary_output
 
     # Calculate costs
     topic_cost = calculate_cost(topic_input, topic_output, model_pricing)
     summary_cost = calculate_cost(summary_input, summary_output, model_pricing)
-    relevance_cost = calculate_cost(relevance_input, relevance_output, model_pricing)
     total_cost = calculate_cost(total_input, total_output, model_pricing)
 
     cost_per_newsletter = total_cost["total_cost"] / len(analyses)
@@ -174,13 +165,6 @@ def generate_json_report(
                 "input_cost": summary_cost["input_cost"],
                 "output_cost": summary_cost["output_cost"],
                 "total_cost": summary_cost["total_cost"],
-            },
-            "relevance_scoring": {
-                "total_input_tokens": relevance_input,
-                "total_output_tokens": relevance_output,
-                "input_cost": relevance_cost["input_cost"],
-                "output_cost": relevance_cost["output_cost"],
-                "total_cost": relevance_cost["total_cost"],
             },
         },
         "totals": {
@@ -224,20 +208,16 @@ def generate_csv_report(
     topic_output = sum(a.topic_extraction.output_tokens for a in analyses)
     summary_input = sum(a.summary_generation.input_tokens for a in analyses)
     summary_output = sum(a.summary_generation.output_tokens for a in analyses)
-    relevance_input = sum(a.relevance_scoring.input_tokens for a in analyses)
-    relevance_output = sum(a.relevance_scoring.output_tokens for a in analyses)
 
     # Calculate costs
     topic_cost = calculate_cost(topic_input, topic_output, model_pricing)
     summary_cost = calculate_cost(summary_input, summary_output, model_pricing)
-    relevance_cost = calculate_cost(relevance_input, relevance_output, model_pricing)
 
     # Build CSV
     lines = [
         "operation,input_tokens,output_tokens,input_cost,output_cost,total_cost",
         f"topic_extraction,{topic_input},{topic_output},{topic_cost['input_cost']:.6f},{topic_cost['output_cost']:.6f},{topic_cost['total_cost']:.6f}",
         f"summary_generation,{summary_input},{summary_output},{summary_cost['input_cost']:.6f},{summary_cost['output_cost']:.6f},{summary_cost['total_cost']:.6f}",
-        f"relevance_scoring,{relevance_input},{relevance_output},{relevance_cost['input_cost']:.6f},{relevance_cost['output_cost']:.6f},{relevance_cost['total_cost']:.6f}",
     ]
 
     return "\n".join(lines) + "\n"
@@ -338,17 +318,12 @@ def generate_combined_text_report(
     summary_output = sum(
         a.summary_generation.output_tokens for a in newsletter_analyses
     )
-    relevance_input = sum(a.relevance_scoring.input_tokens for a in newsletter_analyses)
-    relevance_output = sum(
-        a.relevance_scoring.output_tokens for a in newsletter_analyses
-    )
 
-    nl_total_input = topic_input + summary_input + relevance_input
-    nl_total_output = topic_output + summary_output + relevance_output
+    nl_total_input = topic_input + summary_input
+    nl_total_output = topic_output + summary_output
 
     topic_cost = calculate_cost(topic_input, topic_output, model_pricing)
     summary_cost = calculate_cost(summary_input, summary_output, model_pricing)
-    relevance_cost = calculate_cost(relevance_input, relevance_output, model_pricing)
     nl_total_cost = calculate_cost(nl_total_input, nl_total_output, model_pricing)
 
     # Weekly report costs (if available)
@@ -401,7 +376,7 @@ def generate_combined_text_report(
 
     # Newsletter processing section
     report.append("-" * 65)
-    report.append("NEWSLETTER PROCESSING (3 calls per newsletter)")
+    report.append("NEWSLETTER PROCESSING (2 calls per newsletter)")
     report.append("-" * 65)
     report.append(
         f"{'Operation':<20} {'Input Tokens':>12} {'Output Tokens':>12} {'Cost':>10}"
@@ -412,9 +387,6 @@ def generate_combined_text_report(
     )
     report.append(
         f"{'Summary Generation':<20} {summary_input:>12,} {summary_output:>12,} ${summary_cost['total_cost']:>9.4f}"
-    )
-    report.append(
-        f"{'Relevance Scoring':<20} {relevance_input:>12,} {relevance_output:>12,} ${relevance_cost['total_cost']:>9.4f}"
     )
     report.append("-" * 65)
     report.append(

@@ -60,7 +60,7 @@ Main table for ingested newsletters.
 | entities        | jsonb       |                            | Extracted entities (deprecated)    |
 | source_id       | integer     | NOT NULL, FK → sources(id) | Source reference                   |
 | search_vector   | tsvector    | GENERATED                  | Full-text search index             |
-| relevance_score | integer     | CHECK (0-10)               | Strong Towns Chicago relevance     |
+| relevance_score | integer     | CHECK (0-10)               | LLM relevance score (deprecated)   |
 
 **Foreign Keys**:
 
@@ -73,6 +73,8 @@ Main table for ingested newsletters.
 - `idx_newsletters_source_id` on `source_id`
 - `idx_newsletters_search` (GIN) on `search_vector`
 - `idx_newsletters_relevance` on `relevance_score`
+
+**Deprecated columns**: `entities` and `relevance_score` are no longer written or read by the app. Existing values are kept; there is no migration to drop them.
 
 ---
 
@@ -153,7 +155,7 @@ User-defined notification rules.
 | updated_at          | timestamptz | NOT NULL, DEFAULT now()                | Last update time                 |
 | topics              | text[]      | NOT NULL, DEFAULT '{}'                 | Topics to match                  |
 | search_term         | text        | CHECK (length <= 100)                  | Search word or phrase to match   |
-| min_relevance_score | integer     |                                        | Minimum relevance score          |
+| min_relevance_score | integer     |                                        | Unused (deprecated)              |
 | source_ids          | integer[]   |                                        | Specific sources to match        |
 | ward_numbers        | text[]      |                                        | Specific wards to match          |
 | delivery_frequency  | text        | DEFAULT 'daily'                        | Delivery frequency: daily/weekly |
@@ -315,6 +317,20 @@ Converts ISO week identifier to date range.
 - `week_start`: Monday of the ISO week (DATE)
 - `week_end`: Sunday of the ISO week (DATE)
 
+### `search_term_timeline(search_query TEXT)`
+
+Counts the newsletters matching a `/search` query per month. Powers the search page timeline via `/api/search-timeline`.
+
+**Matching:** `search_vector @@ websearch_to_tsquery('english', search_query)`, the same filter the search page applies, so it uses the `idx_newsletters_search` GIN index and the monthly counts sum to the search page total when no other filters are set.
+
+**Returns:** One row per America/Chicago calendar month that has at least one match, oldest first:
+
+- `month`: first day of the month (DATE)
+- `newsletter_count`: matching newsletters (INTEGER)
+- `ward_count`: distinct `sources.ward_number` values among them (INTEGER; sources without a ward are not counted)
+
+**Safety:** `STABLE`, `SECURITY INVOKER` (newsletter and source RLS applies), `search_path = ''`, `statement_timeout = 3s`. Raises `invalid_parameter_value` unless the trimmed query is 1–200 characters. Executable by `anon`, `authenticated` and `service_role` only.
+
 ---
 
 ## Migration History
@@ -327,3 +343,4 @@ Converts ISO week identifier to date range.
 | 004     | `004_polymorphic_notifications.sql`   | Polymorphic notification_queue (dedicated report_id column)     |
 | 005     | `005_weekly_rules_no_ward_filter.sql` | Constraint to prevent ward filters on weekly rules              |
 | 006     | `006_enable_rls_public_tables.sql`    | RLS on all public tables; codifies production policies          |
+| 007     | `007_search_term_timeline.sql`        | `search_term_timeline` RPC for the search page timeline         |

@@ -1,6 +1,8 @@
-// Loads the analytics JSON written by `uv run python -m utils.compute_analytics`.
-// The files are gitignored, so a clean checkout (including production builds)
-// has none of them; import.meta.glob simply matches nothing in that case.
+// Fetches the analytics JSON written by `uv run python -m utils.compute_analytics`.
+// The files are committed under frontend/public/analytics-data/ and served as
+// static assets, so neither the server bundle nor the client bundle contains
+// them. The large term index is fetched separately, only when the term
+// explorer needs it (see createLazyLoader).
 import type {
   AnalyticsDataset,
   AnalyticsMetadata,
@@ -11,57 +13,150 @@ import type {
   TermIndex,
 } from "./analytics";
 
-const DATA_DIRECTORY = "../data/analytics";
+/** URL path of the static analytics files (frontend/public/analytics-data/). */
+export const ANALYTICS_DATA_BASE_PATH = "/analytics-data";
 
-export const ANALYTICS_DATA_FILES = [
+/** Contents of each generated file, keyed by file stem. Add new files here. */
+export interface AnalyticsDataFiles {
+  metadata: AnalyticsMetadata;
+  newsletters: { newsletters: NewsletterFact[] };
+  sources: { sources: SourceCoverage[] };
+  terms: TermIndex;
+  distinctive: { wards: Record<string, DistinctiveTerm[]> };
+  rising: RisingTerms;
+}
+
+export type AnalyticsDataFile = keyof AnalyticsDataFiles;
+
+/** Files the dashboard needs before it can render anything. */
+export const CORE_ANALYTICS_FILES = [
   "metadata",
   "newsletters",
   "sources",
-  "terms",
   "distinctive",
   "rising",
-] as const;
+] as const satisfies readonly AnalyticsDataFile[];
 
-type AnalyticsDataFile = (typeof ANALYTICS_DATA_FILES)[number];
+const HTTP_NOT_FOUND = 404;
 
-const loaders = import.meta.glob<unknown>("../data/analytics/*.json", { import: "default" });
+export type AnalyticsDataErrorKind = "missing" | "failed";
 
-function loaderFor(file: AnalyticsDataFile): (() => Promise<unknown>) | undefined {
-  return loaders[`${DATA_DIRECTORY}/${file}.json`];
+/** A data file that is absent ("missing") or could not be loaded ("failed"). */
+export class AnalyticsDataError extends Error {
+  constructor(
+    readonly kind: AnalyticsDataErrorKind,
+    readonly fileName: string,
+    detail: string,
+  ) {
+    super(`${fileName}: ${detail}`);
+    this.name = "AnalyticsDataError";
+  }
 }
 
-/** Data files the dashboard needs that have not been generated yet. */
-export function findMissingAnalyticsFiles(): string[] {
-  return ANALYTICS_DATA_FILES.filter((file) => !loaderFor(file)).map((file) => `${file}.json`);
+export type FetchFunction = (url: string) => Promise<Response>;
+
+export function analyticsFileName(file: AnalyticsDataFile): string {
+  return `${file}.json`;
 }
 
-async function loadFile<T>(file: AnalyticsDataFile): Promise<T> {
-  const loader = loaderFor(file);
-  if (!loader) throw new Error(`Missing analytics data file: ${file}.json`);
-  return (await loader()) as T;
+export function analyticsFileUrl(file: AnalyticsDataFile): string {
+  return `${ANALYTICS_DATA_BASE_PATH}/${analyticsFileName(file)}`;
 }
 
-export async function loadAnalyticsMetadata(): Promise<AnalyticsMetadata | null> {
-  return loaderFor("metadata") ? loadFile<AnalyticsMetadata>("metadata") : null;
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
-/** Load every analytics file, or null when any is missing. */
-export async function loadAnalyticsDataset(): Promise<AnalyticsDataset | null> {
-  if (findMissingAnalyticsFiles().length > 0) return null;
-  const [metadata, newsletters, sources, terms, distinctive, rising] = await Promise.all([
-    loadFile<AnalyticsMetadata>("metadata"),
-    loadFile<{ newsletters: NewsletterFact[] }>("newsletters"),
-    loadFile<{ sources: SourceCoverage[] }>("sources"),
-    loadFile<TermIndex>("terms"),
-    loadFile<{ wards: Record<string, DistinctiveTerm[]> }>("distinctive"),
-    loadFile<RisingTerms>("rising"),
-  ]);
+/** Fetch and parse one generated file, classifying every failure. */
+export async function fetchAnalyticsFile<K extends AnalyticsDataFile>(
+  file: K,
+  fetchFile: FetchFunction = fetch,
+): Promise<AnalyticsDataFiles[K]> {
+  const fileName = analyticsFileName(file);
+  let response: Response;
+  try {
+    response = await fetchFile(analyticsFileUrl(file));
+  } catch (error) {
+    throw new AnalyticsDataError("failed", fileName, describeError(error));
+  }
+  if (response.status === HTTP_NOT_FOUND) {
+    throw new AnalyticsDataError("missing", fileName, "not found");
+  }
+  if (!response.ok) {
+    throw new AnalyticsDataError("failed", fileName, `HTTP ${response.status}`);
+  }
+  try {
+    return (await response.json()) as AnalyticsDataFiles[K];
+  } catch (error) {
+    throw new AnalyticsDataError("failed", fileName, `invalid JSON (${describeError(error)})`);
+  }
+}
+
+export type AnalyticsFileSet<F extends readonly AnalyticsDataFile[]> = {
+  [K in F[number]]: AnalyticsDataFiles[K];
+};
+
+export type AnalyticsLoadResult<T> =
+  | { status: "ready"; data: T }
+  | { status: "missing"; missingFiles: string[] }
+  | { status: "failed"; message: string };
+
+/**
+ * Fetch several files in parallel. Missing files are reported together so the
+ * setup instructions can list them; any other failure takes precedence.
+ */
+export async function loadAnalyticsFiles<const F extends readonly AnalyticsDataFile[]>(
+  files: F,
+  fetchFile: FetchFunction = fetch,
+): Promise<AnalyticsLoadResult<AnalyticsFileSet<F>>> {
+  const results = await Promise.allSettled(files.map((file) => fetchAnalyticsFile(file, fetchFile)));
+  const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason as unknown] : []));
+  const failure = errors.find((error) => !(error instanceof AnalyticsDataError) || error.kind === "failed");
+  if (failure) return { status: "failed", message: describeError(failure) };
+  if (errors.length > 0) {
+    return { status: "missing", missingFiles: (errors as AnalyticsDataError[]).map((error) => error.fileName) };
+  }
+  const data = Object.fromEntries(
+    files.map((file, position) => [file, (results[position] as PromiseFulfilledResult<unknown>).value]),
+  ) as AnalyticsFileSet<F>;
+  return { status: "ready", data };
+}
+
+/** Load the core files and shape them into the dataset the dashboard renders. */
+export async function loadCoreAnalyticsData(
+  fetchFile: FetchFunction = fetch,
+): Promise<AnalyticsLoadResult<AnalyticsDataset>> {
+  const result = await loadAnalyticsFiles(CORE_ANALYTICS_FILES, fetchFile);
+  if (result.status !== "ready") return result;
+  const { metadata, newsletters, sources, distinctive, rising } = result.data;
   return {
-    metadata,
-    newsletters: newsletters.newsletters,
-    sources: sources.sources,
-    terms,
-    distinctiveByWard: distinctive.wards,
-    rising,
+    status: "ready",
+    data: {
+      metadata,
+      newsletters: newsletters.newsletters,
+      sources: sources.sources,
+      distinctiveByWard: distinctive.wards,
+      rising,
+    },
+  };
+}
+
+/** Fetch the term index on its own; it is most of the data and only the term explorer uses it. */
+export function fetchTermIndex(fetchFile: FetchFunction = fetch): Promise<TermIndex> {
+  return fetchAnalyticsFile("terms", fetchFile);
+}
+
+/**
+ * Wrap a loader so it runs at most once at a time and its result is reused.
+ * A failed load is forgotten, so the next call retries.
+ */
+export function createLazyLoader<T>(load: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | null = null;
+  return () => {
+    pending ??= load().catch((error: unknown) => {
+      pending = null;
+      throw error;
+    });
+    return pending;
   };
 }

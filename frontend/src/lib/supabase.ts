@@ -27,7 +27,6 @@ export interface Newsletter {
   raw_html: string | null;
   summary: string | null;
   topics: string[] | null;
-  relevance_score: number | null;
   entities: Record<string, unknown> | null;
   sources?: Source;
 }
@@ -63,7 +62,6 @@ export interface NotificationRule {
   updated_at: string;
   topics: string[];
   search_term?: string;
-  min_relevance_score?: number;
   source_ids?: number[];
   ward_numbers?: string[]; // TEXT[] to match sources.ward_number TEXT type
   delivery_frequency: "daily" | "weekly";

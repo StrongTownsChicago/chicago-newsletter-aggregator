@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and relevance scoring, and presents them through an Astro frontend.
+Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and summarization, and presents them through an Astro frontend.
 
 ## Tech Stack
 
@@ -72,7 +72,7 @@ uv run python -m utils.test_weekly_summary --sample                     # Test w
 uv run python -m utils.calculate_token_costs --list-models              # List available models
 uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5,claude-sonnet-4.5,gemini-2.5-pro  --include-weekly
 
-# Local analytics dashboard data (writes gitignored JSON for /analytics)
+# Analytics dashboard data (writes committed JSON to frontend/public/analytics-data/ for /analytics)
 uv run python -m utils.compute_analytics                  # Fetch only new newsletters into the local snapshot, then compute
 uv run python -m utils.compute_analytics --offline        # Compute from the snapshot; no database access
 uv run python -m utils.compute_analytics --full-refresh   # Rebuild the snapshot from every newsletter (heavy; rarely)
@@ -163,7 +163,7 @@ Custom Claude Code hooks are located in `.claude/hooks/` and registered in `.cla
 1. **Ingestion**: Emails arrive via Gmail IMAP polling OR web scraping from MailChimp archives
 2. **Source Matching**: Email patterns matched against `email_source_mappings` table with wildcard support
 3. **Storage**: Raw newsletters stored in `newsletters` table (plain_text, raw_html, metadata)
-4. **LLM Processing**: Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Provider dispatched via `llm_client.py` (supports Ollama and OpenAI)
+4. **LLM Processing**: Two LLM calls per newsletter for topic extraction and summarization. Provider dispatched via `llm_client.py` (supports Ollama and OpenAI)
 5. **Weekly Synthesis**: Aggregated analysis of newsletters by topic using two-phase LLM process (extract facts → synthesize summary)
 6. **Frontend**: Astro SSR queries Supabase for search/display
 
@@ -181,7 +181,7 @@ backend/
 │       └── process_scraped_newsletters.py  # Orchestrates scraping workflow
 ├── processing/
 │   ├── llm_client.py             # Multi-provider LLM dispatch (Ollama + OpenAI adapters)
-│   └── llm_processor.py          # LLM topic/summary/scoring with Pydantic schemas
+│   └── llm_processor.py          # LLM topic extraction and summarization with Pydantic schemas
 ├── notifications/
 │   ├── rule_matcher.py           # Match newsletters to user notification rules
 │   ├── email_sender.py           # Send digest emails via Resend API
@@ -192,7 +192,7 @@ backend/
 ├── utils/
 │   ├── compute_analytics.py      # Refresh snapshot → compute → write analytics JSON for /analytics
 │   ├── analytics_snapshot.py     # Read/write the local analytics snapshot (backend/data/, gitignored)
-│   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary, relevance score)
+│   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
 │   └── download_samples.py       # Download sample newsletters for testing
@@ -222,7 +222,8 @@ frontend/src/
 │   ├── preferences.astro         # User notification preferences (protected route)
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
-│   ├── analytics.astro           # Local-only analytics dashboard (not linked, noindex)
+│   ├── analytics.astro           # Unlisted analytics dashboard (not linked, noindex)
+│   ├── api/search-timeline.ts    # Edge-cached monthly match counts for the /search timeline
 │   └── api/notifications/        # Notification management API routes
 │       ├── create-rule.ts        # Create notification rule
 │       ├── update-rule.ts        # Update existing rule
@@ -249,7 +250,7 @@ frontend/src/
 └── lib/
     ├── analytics.ts              # Pure dashboard aggregations (unit tested)
     ├── analytics-charts.ts       # Observable Plot chart builders
-    ├── analytics-data.ts         # Loads generated analytics JSON (tolerates missing files)
+    ├── analytics-data.ts         # Fetches the static analytics JSON (missing/failed states, lazy term index)
     ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
     ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
@@ -271,9 +272,11 @@ frontend/src/
 
 **Web Scraping Strategy Pattern** (`scraper_strategies.py`): Strategy pattern for different archive formats. `get_strategy_for_url()` selects between `MailChimpArchiveStrategy` (most common) and `GenericListStrategy` fallback.
 
-**LLM Processing** (`llm_processor.py` + `llm_client.py`): Three sequential LLM calls per newsletter for topic extraction, summarization, and relevance scoring using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
+**LLM Processing** (`llm_processor.py` + `llm_client.py`): Two sequential LLM calls per newsletter for topic extraction and summarization using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
 **Search Filters** (`frontend/src/lib/search-filters.ts`): The search page parses URL params into a validated `SearchFilters` object (invalid values are dropped, never thrown), then `applySearchFilters()` is applied to both the count and data queries so they always filter identically. `buildSearchBaseUrl()` serializes filters back for pagination. Date filters are inclusive Chicago calendar days (`chicago-dates.ts`). Topic options come from `lib/topics.ts`, not from the database.
+
+**Search Timeline** (`lib/search-timeline.ts`, `components/SearchTimeline.astro`): For a search with results, `/search` shows newsletters per Chicago month (with ward counts) for the query alone, ignoring other filters. Counts come from the `search_term_timeline` RPC (`backend/migrations/007_search_term_timeline.sql`), which uses the same `websearch_to_tsquery` matching as search. The browser fetches `/api/search-timeline` only when the section nears the viewport, and the route caches per normalized query with the Workers Cache API, so the extra database work stays off the results render and is shared across visitors. If the RPC is missing or fails, the section stays hidden.
 
 **Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup.
 
@@ -294,7 +297,7 @@ frontend/src/
 - **Daily Digest**: Real-time alerts when newsletters match user criteria (topics, keywords, wards). Supports ward filtering.
 - **Weekly Summary**: Citywide topic reports delivered every Monday. Always covers all wards - ward filters are not supported for weekly summaries.
 
-**Local Analytics Dashboard** (phase 1, local only): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage) and writes JSON to the gitignored `frontend/src/data/analytics/`. Term metrics first drop text each source repeats across many of its issues (`analytics/boilerplate.py`) and merge plural forms (`analytics/plurals.py`); per-newsletter facts flag bodies too short to analyze as `text_unavailable`. `/analytics` loads those files via `import.meta.glob`, so a clean checkout or production deploy shows setup instructions instead of failing. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`.
+**Analytics Dashboard** (unlisted): `utils/compute_analytics.py` reads newsletters and sources from a local snapshot in the gitignored `backend/data/analytics_snapshot/` (`utils/analytics_snapshot.py`; row format and merge rules in `analytics/snapshot.py`). By default it first fetches newsletters created since the snapshot's cursor, plus LLM metadata for older rows that were still unprocessed, in small paused batches (see the module docstring for modes). The production database has a small disk IO budget that full-table reads have exhausted before: analysis and agents should use `--offline` or the snapshot files, and `--full-refresh` is only for a fresh checkout or after reprocessing edits old rows (privacy re-sanitization, LLM re-runs) or deletions. It then computes metrics with the pure functions in `backend/analytics/` (tokenization, term index, distinctive ward vocabulary, rising terms, facts, coverage), and writes JSON to `frontend/public/analytics-data/`, which is committed and served as public static files. Term metrics first drop text each source repeats across many of its issues (`analytics/boilerplate.py`) and merge plural forms (`analytics/plurals.py`); per-newsletter facts flag bodies too short to analyze as `text_unavailable`. **Refresh workflow:** run `compute_analytics`, commit that folder, push; the Cloudflare deploy publishes it. `/analytics` renders no data on the server; its browser script fetches the JSON at runtime (`lib/analytics-data.ts`; register new files in `AnalyticsDataFiles`), so no data is bundled into the server worker or the client code; `terms.json` (most of the data) loads only when the term explorer is used. Missing files show setup instructions and fetch failures show an error instead of breaking the page. The page and data stay unlisted: noindex (`X-Robots-Tag` from the page, `public/_headers` for the JSON), disallowed in `robots.txt`, excluded from the sitemap, and absent from the nav. The data files are served with `Cache-Control: no-cache` (ETag revalidation) because their names are not content-hashed. Filtering and aggregation run client-side in `lib/analytics.ts`; charts use Observable Plot. No LLM calls and no database changes. Tuning constants live at the top of `compute_analytics.py`. The page leads with ward coverage and defaults to the broad-coverage window (`BROAD_COVERAGE_PEAK_FRACTION` in `lib/analytics.ts`); late-added LLM topics start their trends at `TOPIC_LABELING_START_MONTH`. The LLM relevance score is deliberately left out of analytics (it mostly tracks newsletter length).
 
 **Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
 
@@ -302,7 +305,7 @@ frontend/src/
 
 - **`plain_text`** - Primary format for all processing:
   - Powers full-text search via generated `search_vector` column (combined with subject)
-  - Required input for all LLM operations (topic extraction, summarization, relevance scoring via `llm_processor.py`)
+  - Required input for all LLM operations (topic extraction and summarization via `llm_processor.py`)
   - Used for notification rule keyword matching (`rule_matcher.py`)
   - Fallback display when HTML unavailable
   - Generated from email plain text body or HTML-to-text conversion (`html2text`)

@@ -26,7 +26,6 @@ def make_newsletter(newsletter_id: str, day: date, subject: str = "Update"):
         subject=subject,
         plain_text="Text",
         topics=None,
-        relevance_score=None,
     )
 
 
@@ -39,7 +38,6 @@ class TestRowRoundTrip(unittest.TestCase):
             subject="Ward news",
             plain_text="Bike lanes",
             topics=["bike_lanes"],
-            relevance_score=4,
         )
         row = newsletter_to_row(newsletter)
         self.assertEqual(row["received_date"], "2026-09-30")
@@ -80,25 +78,20 @@ class TestMergeNewsletters(unittest.TestCase):
 
 
 class TestLlmMetadata(unittest.TestCase):
-    def test_ids_missing_llm_metadata_flags_null_topics_or_score(self):
-        processed = replace(
-            make_newsletter("done", date(2026, 1, 1)), topics=[], relevance_score=0
-        )
+    def test_ids_missing_llm_metadata_flags_only_null_topics(self):
+        # An empty list means the LLM ran and found no topic; only None is pending.
+        processed = replace(make_newsletter("done", date(2026, 1, 1)), topics=[])
         no_topics = replace(processed, id="no_topics", topics=None)
-        no_score = replace(processed, id="no_score", relevance_score=None)
         self.assertEqual(
-            ids_missing_llm_metadata([processed, no_topics, no_score]),
-            ["no_topics", "no_score"],
+            ids_missing_llm_metadata([processed, no_topics]), ["no_topics"]
         )
 
     def test_apply_llm_metadata_updates_only_matching_newsletters(self):
         pending = make_newsletter("pending", date(2026, 1, 1))
         other = make_newsletter("other", date(2026, 1, 2))
-        rows = [{"id": "pending", "topics": ["transit"], "relevance_score": 6}]
+        rows = [{"id": "pending", "topics": ["transit"]}]
         updated = apply_llm_metadata([pending, other], rows)
-        self.assertEqual(
-            updated[0], replace(pending, topics=["transit"], relevance_score=6)
-        )
+        self.assertEqual(updated[0], replace(pending, topics=["transit"]))
         self.assertEqual(updated[1], other)
 
 

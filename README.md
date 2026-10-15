@@ -14,8 +14,8 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 - **Email Ingestion**: Gmail IMAP polling with automatic source matching
 - **Web Scraping**: MailChimp archive scraping for historical newsletters
-- **LLM Processing**: Topic extraction, summarization, relevance scoring
-- **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range, minimum relevance score) and sorting (newest, oldest, highest relevance)
+- **LLM Processing**: Topic extraction, summarization
+- **Full-Text Search**: Search with filters (alderman/source, ward, topic, date range) and sorting (newest, oldest)
 - **Ward Pages**: A page per ward (`/ward/N`) with the alderman's contact info and newsletters, plus a ward directory (`/wards`)
 - **User Notifications**: Daily digest emails for newsletters matching user-defined rules, or weekly topic reports
 - **One-Click Unsubscribe**: Secure, JWT-based unsubscribe links in emails (RFC 8058 compliant)
@@ -28,7 +28,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 - `sources` - Aldermen and officials (name, ward, email, archive URLs)
 - `email_source_mappings` - Pattern matching for email → source identification
-- `newsletters` - Full newsletter content with LLM-extracted metadata (topics, summary, relevance)
+- `newsletters` - Full newsletter content with LLM-extracted metadata (topics, summary)
 
 **Notification Tables:**
 
@@ -43,7 +43,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 Newsletters are stored in dual formats in the `newsletters` table:
 
-- **`plain_text`** - Primary format used for search indexing, LLM processing (topics, summaries, scoring), and notification keyword matching
+- **`plain_text`** - Primary format used for search indexing, LLM processing (topics, summaries), and notification keyword matching
 - **`raw_html`** - Preserves formatting for frontend display
 
 Both formats are independently sanitized during ingestion to remove tracking links and privacy-sensitive content.
@@ -90,7 +90,8 @@ uv run python -m utils.process_llm_metadata --latest 10
 # Reapply privacy sanitization to existing newsletters
 uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
 
-# Generate data for the local analytics dashboard, then open http://localhost:4321/analytics
+# Refresh the unlisted /analytics dashboard: compute, check http://localhost:4321/analytics, then commit
+# frontend/public/analytics-data/ and push; the deploy publishes it. The JSON files are public.
 # (fetches only newsletters newer than the local snapshot in backend/data/; --offline skips the database,
 #  --full-refresh rebuilds it from every newsletter: needed once on a fresh checkout; run it when the site is quiet)
 uv run python -m utils.compute_analytics
@@ -174,7 +175,7 @@ ollama pull gpt-oss:20b
 ```
 backend/
   ├── ingest/           # Email and web scraping ingestion
-  ├── processing/       # LLM topic extraction, summarization, scoring
+  ├── processing/       # LLM topic extraction and summarization
   ├── notifications/    # User alerts and daily digest delivery
   ├── utils/            # Maintenance scripts (reprocess, migrate, privacy reapply)
   ├── tests/            # Test suite
@@ -194,7 +195,7 @@ frontend/
 
 ## LLM Processing
 
-Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings. See `backend/processing/llm_client.py` for provider dispatch and `backend/processing/llm_processor.py` for topic definitions.
+Two LLM calls per newsletter for topic extraction and summarization. Supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings. See `backend/processing/llm_client.py` for provider dispatch and `backend/processing/llm_processor.py` for topic definitions.
 
 ## Notification System
 

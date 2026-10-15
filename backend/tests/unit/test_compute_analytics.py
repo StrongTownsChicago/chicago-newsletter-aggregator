@@ -39,7 +39,6 @@ def make_newsletter(
         subject="Update",
         plain_text=text,
         topics=["bike_lanes"],
-        relevance_score=5,
     )
 
 
@@ -168,7 +167,7 @@ def newsletter_row(
     created_at: str,
     subject: str = "News",
     topics: list[str] | None = None,
-    relevance_score: int | None = 0,
+    has_llm_metadata: bool = True,
 ):
     return {
         "id": newsletter_id,
@@ -177,8 +176,7 @@ def newsletter_row(
         "source_id": 1,
         "subject": subject,
         "plain_text": "Bike lanes",
-        "topics": [] if topics is None else topics,
-        "relevance_score": relevance_score,
+        "topics": topics if topics is not None else ([] if has_llm_metadata else None),
     }
 
 
@@ -320,7 +318,6 @@ class TestRefreshSnapshot(unittest.TestCase):
                         "pending",
                         "2026-09-02T15:00:00+00:00",
                         topics=["bike_lanes"],
-                        relevance_score=8,
                     )
                 ],
             }
@@ -330,7 +327,6 @@ class TestRefreshSnapshot(unittest.TestCase):
         self.assertEqual(counts, RefreshCounts(new_rows=0, metadata_rows=1))
         refreshed = next(item for item in updated.newsletters if item.id == "pending")
         self.assertEqual(refreshed.topics, ["bike_lanes"])
-        self.assertEqual(refreshed.relevance_score, 8)
         metadata_query = next(q for q in supabase.executed if q.ids is not None)
         self.assertEqual(metadata_query.ids, ["pending"])
         # Old text is never re-read; only the metadata columns are requested.
@@ -343,7 +339,7 @@ class TestRefreshSnapshot(unittest.TestCase):
                 "sources": SOURCE_ROWS,
                 "newsletters": [
                     newsletter_row(
-                        "fresh", "2026-10-12T15:00:00+00:00", relevance_score=None
+                        "fresh", "2026-10-12T15:00:00+00:00", has_llm_metadata=False
                     )
                 ],
             }
@@ -479,7 +475,6 @@ def newsletter_record(
         subject=subject,
         plain_text="Bike lanes",
         topics=[] if has_llm_metadata else None,
-        relevance_score=0 if has_llm_metadata else None,
     )
 
 
