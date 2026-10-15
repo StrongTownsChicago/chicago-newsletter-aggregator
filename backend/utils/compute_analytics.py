@@ -5,8 +5,11 @@ Reads newsletters and sources from a local snapshot (see
 `utils/analytics_snapshot.py`), computes metrics with the pure functions in
 `analytics/`, and writes compact JSON files to `frontend/public/analytics-data/`.
 That folder is committed and deployed as public static files, which the page
-fetches at runtime. To publish a refresh: run this script, commit the folder,
-and push.
+fetches at runtime. It also writes two small summaries to
+`frontend/src/data/` for the public pages: per-ward "at a glance" figures,
+imported by the server-rendered ward pages, and monthly citywide reports,
+prerendered at build time. To publish a refresh: run this script, commit both
+folders, and push.
 
 The production database has a small disk IO budget, so it is read gently:
 
@@ -34,6 +37,7 @@ import json
 import sys
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -48,9 +52,11 @@ from analytics.facts import (
 from analytics.lenses import (
     LENSES,
     LensMatcher,
+    TextMatches,
     match_newsletters,
     summarize_lens_hits,
 )
+from analytics.monthly_reports import MonthlyReportSettings, build_monthly_reports
 from analytics.records import (
     CHICAGO_TIMEZONE,
     NewsletterRecord,
@@ -75,6 +81,12 @@ from analytics.terms import (
     select_latest_complete_month,
     select_vocabulary,
 )
+from analytics.topic_reach import (
+    build_topic_labels,
+    build_topic_newsletters,
+    select_broad_complete_months,
+)
+from analytics.ward_glance import WardGlanceSettings, build_ward_glances
 from shared.db import get_supabase_client
 from utils.analytics_snapshot import (
     DEFAULT_SNAPSHOT_DIR,
@@ -85,6 +97,9 @@ from utils.analytics_snapshot import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"
+# Imported by page code rather than fetched, so keep these files small: the
+# ward summary is bundled into the server worker.
+DEFAULT_SITE_DATA_DIR = REPO_ROOT / "frontend" / "src" / "data"
 
 # Small pages with a pause between them keep reads well under the database's
 # disk IO budget; repeated full reads of every plain_text exhausted it once.
@@ -133,6 +148,37 @@ RISING_BASELINE_MONTHS = 3
 RISING_MIN_LATEST_WARDS = 5
 RISING_MIN_WARD_GAIN = 3
 RISING_TOP_N = 15
+# Monthly reports cover complete months in which at least this many wards
+# sent a newsletter; thinner months describe the archive's gaps, not the city.
+REPORT_MIN_SENDING_WARDS = 30
+MONTHLY_REPORT_SETTINGS = MonthlyReportSettings(
+    examples_per_topic=3,
+    rising_baseline_months=RISING_BASELINE_MONTHS,
+    rising_min_latest_wards=RISING_MIN_LATEST_WARDS,
+    rising_min_ward_gain=RISING_MIN_WARD_GAIN,
+    rising_top_n=10,
+)
+# Ward pages describe the last six complete months: recent enough to reflect
+# the current office, long enough for a typical ward to send 20+ newsletters.
+WARD_GLANCE_SETTINGS = WardGlanceSettings(
+    window_months=6,
+    top_topics=5,
+    top_terms=8,
+    distinctive_candidates=DISTINCTIVE_TOP_N,
+    distinctive_min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
+    distinctive_min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
+    distinctive_max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
+)
+# Ward pages show a topic's share of a ward's newsletters as a percentage only
+# when at least this many of them could be read; below it, counts only.
+MIN_WARD_TOPIC_SHARE_NEWSLETTERS = 20
+# The ward summary when the archive has no complete month yet.
+EMPTY_WARD_GLANCES: dict[str, Any] = {
+    "latest_month": None,
+    "window_months": [],
+    "city_readable_wards": 0,
+    "wards": {},
+}
 SAMPLE_SIZE = 8
 LENS_REPORT_TOP_PHRASES = 4
 
@@ -209,13 +255,40 @@ def build_full_snapshot(
     return Snapshot(sources, newsletters, newest_created_at(rows) or now)
 
 
-def compute_outputs(
+@dataclass(frozen=True)
+class ArchiveAnalysis:
+    """Intermediate results shared by the dashboard files and the site summaries."""
+
+    sources: list[SourceRecord]
+    newsletters: list[NewsletterRecord]
+    sources_by_id: dict[int, SourceRecord]
+    min_term_newsletters: int
+    generated_at: datetime
+    # Ids of newsletters with too little extracted text to analyze.
+    unavailable_ids: set[str]
+    documents: list[NewsletterTerms]
+    vocabulary: set[str]
+    matcher: LensMatcher
+    lens_matches: dict[str, TextMatches]
+    lenses_by_newsletter: dict[str, list[str]]
+    latest_month: str | None
+
+    @property
+    def readable_documents(self) -> list[NewsletterTerms]:
+        return [
+            document
+            for document in self.documents
+            if document.newsletter_id not in self.unavailable_ids
+        ]
+
+
+def analyze_archive(
     sources: list[SourceRecord],
     newsletters: list[NewsletterRecord],
     min_term_newsletters: int,
     generated_at: datetime,
-) -> dict[str, Any]:
-    """Compute every analytics output, keyed by output file stem."""
+) -> ArchiveAnalysis:
+    """Clean, tokenize, and match topics once for every output."""
     sources_by_id = {source.id: source for source in sources}
     content_newsletters = remove_source_boilerplate(
         newsletters,
@@ -231,8 +304,6 @@ def compute_outputs(
     documents: list[NewsletterTerms] = build_newsletter_terms(
         content_newsletters, sources_by_id
     )
-    vocabulary = select_vocabulary(documents, min_term_newsletters)
-
     lens_newsletters = (
         content_newsletters if MATCH_LENSES_ON_CLEANED_TEXT else newsletters
     )
@@ -241,19 +312,45 @@ def compute_outputs(
         (item for item in lens_newsletters if item.id not in unavailable_ids),
         matcher,
     )
-    lenses_by_newsletter = {
-        newsletter_id: matcher.lenses_mentioned(
-            matches.lens_mentions, LENS_MIN_MENTIONS
-        )
-        for newsletter_id, matches in lens_matches.items()
-    }
-
-    latest_month = select_latest_complete_month(
-        (document.month for document in documents), month_key(generated_at.date())
+    return ArchiveAnalysis(
+        sources=sources,
+        newsletters=newsletters,
+        sources_by_id=sources_by_id,
+        min_term_newsletters=min_term_newsletters,
+        generated_at=generated_at,
+        unavailable_ids=unavailable_ids,
+        documents=documents,
+        vocabulary=select_vocabulary(documents, min_term_newsletters),
+        matcher=matcher,
+        lens_matches=lens_matches,
+        lenses_by_newsletter={
+            newsletter_id: matcher.lenses_mentioned(
+                matches.lens_mentions, LENS_MIN_MENTIONS
+            )
+            for newsletter_id, matches in lens_matches.items()
+        },
+        latest_month=select_latest_complete_month(
+            (document.month for document in documents),
+            month_key(generated_at.date()),
+        ),
     )
+
+
+def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
+    """Compute every dashboard output, keyed by output file stem."""
+    sources = analysis.sources
+    newsletters = analysis.newsletters
+    documents = analysis.documents
+    vocabulary = analysis.vocabulary
+    matcher = analysis.matcher
+    lens_matches = analysis.lens_matches
+    lenses_by_newsletter = analysis.lenses_by_newsletter
+    latest_month = analysis.latest_month
+    min_term_newsletters = analysis.min_term_newsletters
+
     rising = (
         compute_rising_terms(
-            [doc for doc in documents if doc.newsletter_id not in unavailable_ids],
+            analysis.readable_documents,
             vocabulary,
             latest_month=latest_month,
             baseline_months=RISING_BASELINE_MONTHS,
@@ -273,11 +370,15 @@ def compute_outputs(
 
     return {
         "metadata": build_metadata(
-            newsletters, sources, len(vocabulary), min_term_newsletters, generated_at
+            newsletters,
+            sources,
+            len(vocabulary),
+            min_term_newsletters,
+            analysis.generated_at,
         ),
         "newsletters": {
             "newsletters": build_newsletter_facts(
-                newsletters, sources_by_id, lenses_by_newsletter
+                newsletters, analysis.sources_by_id, lenses_by_newsletter
             )
         },
         "lenses": {
@@ -310,6 +411,65 @@ def compute_outputs(
     }
 
 
+def compute_site_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
+    """Compute the small summaries the public ward and report pages import,
+    keyed by output file stem.
+
+    Without a complete month there is nothing to summarize, so both are empty.
+    """
+    items = build_topic_newsletters(
+        analysis.newsletters,
+        analysis.sources_by_id,
+        analysis.unavailable_ids,
+        {key: matches.lens_mentions for key, matches in analysis.lens_matches.items()},
+        analysis.lenses_by_newsletter,
+    )
+    topic_labels = build_topic_labels(LENSES)
+    topic_ids = list(topic_labels)
+    dates = [newsletter.received_date for newsletter in analysis.newsletters]
+    data_through = max(dates).isoformat() if dates else None
+    readable_documents = analysis.readable_documents
+    latest_month = analysis.latest_month
+
+    ward_glance: dict[str, Any] = {
+        "data_through": data_through,
+        "topics": topic_labels,
+        "min_share_newsletters": MIN_WARD_TOPIC_SHARE_NEWSLETTERS,
+        **(
+            build_ward_glances(
+                items,
+                readable_documents,
+                analysis.vocabulary,
+                topic_ids,
+                build_name_tokens_by_ward(analysis.sources),
+                latest_month,
+                WARD_GLANCE_SETTINGS,
+            )
+            if latest_month
+            else EMPTY_WARD_GLANCES
+        ),
+    }
+    report_months = select_broad_complete_months(
+        items,
+        month_key(analysis.generated_at.date()),
+        REPORT_MIN_SENDING_WARDS,
+    )
+    monthly_reports = {
+        "data_through": data_through,
+        "topics": topic_labels,
+        "reports": build_monthly_reports(
+            report_months,
+            items,
+            readable_documents,
+            analysis.vocabulary,
+            topic_ids,
+            (source.ward for source in analysis.sources if source.ward is not None),
+            MONTHLY_REPORT_SETTINGS,
+        ),
+    }
+    return {"ward-glance": ward_glance, "monthly-reports": monthly_reports}
+
+
 def write_outputs(outputs: dict[str, Any], output_dir: Path) -> dict[str, int]:
     """Write each output as compact JSON; return file sizes in bytes."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -321,13 +481,15 @@ def write_outputs(outputs: dict[str, Any], output_dir: Path) -> dict[str, int]:
     return sizes
 
 
-def print_report(
-    outputs: dict[str, Any], sizes: dict[str, int], output_dir: Path
-) -> None:
-    """Print file sizes and a few sample results for a quick sanity check."""
+def print_sizes(sizes: dict[str, int], output_dir: Path) -> None:
+    """Print where the files went and how big each one is."""
     print(f"\nWrote analytics to {output_dir}")
     for name, size in sizes.items():
         print(f"  {name:<20} {size / 1024:>9.1f} KB")
+
+
+def print_report(outputs: dict[str, Any]) -> None:
+    """Print a few sample results for a quick sanity check."""
 
     metadata = outputs["metadata"]
     print(
@@ -380,6 +542,13 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
         help=f"Directory for JSON output (default: {DEFAULT_OUTPUT_DIR})",
+    )
+    parser.add_argument(
+        "--site-data-dir",
+        type=Path,
+        default=DEFAULT_SITE_DATA_DIR,
+        help="Directory for the ward and monthly report summaries "
+        f"(default: {DEFAULT_SITE_DATA_DIR})",
     )
     parser.add_argument(
         "--min-term-newsletters",
@@ -454,11 +623,16 @@ def main() -> None:
         )
 
     print("Computing...")
-    outputs = compute_outputs(
+    analysis = analyze_archive(
         snapshot.sources, snapshot.newsletters, args.min_term_newsletters, now
     )
-    sizes = write_outputs(outputs, args.output_dir)
-    print_report(outputs, sizes, args.output_dir)
+    outputs = compute_outputs(analysis)
+    print_sizes(write_outputs(outputs, args.output_dir), args.output_dir)
+    print_sizes(
+        write_outputs(compute_site_outputs(analysis), args.site_data_dir),
+        args.site_data_dir,
+    )
+    print_report(outputs)
 
 
 if __name__ == "__main__":

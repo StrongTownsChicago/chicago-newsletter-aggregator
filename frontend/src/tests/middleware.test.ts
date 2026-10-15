@@ -65,6 +65,17 @@ describe('Middleware', () => {
     });
   });
 
+  it('does not read cookies while prerendering a page at build time', async () => {
+    const context = { ...createMockContext(), isPrerendered: true } as APIContext;
+    const next = vi.fn(() => Promise.resolve(new Response()));
+
+    await onRequest(context, next);
+
+    expect(context.cookies.get).not.toHaveBeenCalled();
+    expect(mockSupabase.auth.setSession).not.toHaveBeenCalled();
+    expect(context.locals.user).toBeNull();
+  });
+
   it('sets user and session in locals if session exists', async () => {
     const mockSession = { user: { id: 'user-123' }, access_token: 'abc' };
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession }, error: null });

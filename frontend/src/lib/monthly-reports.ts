@@ -1,0 +1,130 @@
+// Pure helpers for the prerendered monthly report pages (/reports and
+// /reports/YYYY-MM). The data is src/data/monthly-reports.json, written by
+// backend/utils/compute_analytics.py (see backend/analytics/monthly_reports.py).
+
+import { formatLongMonth } from "./archive-months";
+import { SITE_NAME, truncateDescription } from "./seo";
+import { REPORTS_INDEX_PATH } from "./site";
+import { LAST_WARD } from "./wards";
+
+export interface ReportExample {
+  id: string;
+  subject: string;
+  ward: string | null;
+  date: string;
+}
+
+export interface ReportTopic {
+  id: string;
+  /** Wards with at least one readable newsletter that month mentioning the topic. */
+  wards: number;
+  newsletters: number;
+  examples: ReportExample[];
+}
+
+export interface ReportRisingTerm {
+  term: string;
+  wards: number;
+  /** Median wards per month over the baseline months. */
+  baseline_wards: number;
+}
+
+export interface MonthlyReport {
+  month: string;
+  newsletters: number;
+  sending_wards: string[];
+  absent_wards: string[];
+  /** Wards with a readable newsletter that month: the topic reach denominator. */
+  readable_wards: number;
+  topics: ReportTopic[];
+  rising: { baseline_months: string[]; terms: ReportRisingTerm[] } | null;
+}
+
+export interface MonthlyReportsFile {
+  data_through: string | null;
+  topics: Record<string, string>;
+  /** Newest first. */
+  reports: MonthlyReport[];
+}
+
+/** Topics named in a report's description. */
+const DESCRIPTION_TOPIC_COUNT = 3;
+/** Topics previewed per report on the index page. */
+export const INDEX_TOPIC_PREVIEW_COUNT = 3;
+
+const MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function isReportMonth(month: string): boolean {
+  return MONTH_KEY_PATTERN.test(month);
+}
+
+export function buildReportPath(month: string): string {
+  return `${REPORTS_INDEX_PATH}/${month}`;
+}
+
+export function buildReportHeading(month: string): string {
+  return `What Chicago aldermen wrote about in ${formatLongMonth(month)}`;
+}
+
+export function buildReportTitle(month: string): string {
+  return `What Chicago Aldermen Wrote About in ${formatLongMonth(month)} - ${SITE_NAME}`;
+}
+
+export function topicLabel(labels: Record<string, string>, topicId: string): string {
+  return labels[topicId] ?? topicId;
+}
+
+/** Meta description naming the topics the most wards mentioned. */
+export function buildReportDescription(
+  report: MonthlyReport,
+  labels: Record<string, string>,
+): string {
+  const leading = report.topics
+    .slice(0, DESCRIPTION_TOPIC_COUNT)
+    .map((topic) => topicLabel(labels, topic.id).toLowerCase())
+    .join("; ");
+  const topics = leading ? ` Most widely mentioned: ${leading}.` : "";
+  return truncateDescription(
+    `${formatLongMonth(report.month)} in Chicago aldermen's newsletters: ${report.newsletters} newsletters from ${report.sending_wards.length} wards.${topics}`,
+  );
+}
+
+export const REPORTS_INDEX_TITLE = `Monthly Reports on Chicago Alderman Newsletters - ${SITE_NAME}`;
+export const REPORTS_INDEX_DESCRIPTION =
+  "Month-by-month summaries of what Chicago aldermen's newsletters mentioned: topics by how many wards mentioned them, rising terms, and which wards sent newsletters.";
+
+export interface AdjacentReports {
+  newer: MonthlyReport | null;
+  older: MonthlyReport | null;
+}
+
+/** The reports just before and after a month, for previous/next links. */
+export function findAdjacentReports(reports: MonthlyReport[], month: string): AdjacentReports {
+  const newestFirst = [...reports].sort((a, b) => b.month.localeCompare(a.month));
+  const index = newestFirst.findIndex((report) => report.month === month);
+  if (index === -1) {
+    return { newer: null, older: null };
+  }
+  return {
+    newer: newestFirst[index - 1] ?? null,
+    older: newestFirst[index + 1] ?? null,
+  };
+}
+
+/** "38 of 50 wards" */
+export function describeSendingWards(report: MonthlyReport): string {
+  return `${report.sending_wards.length} of ${LAST_WARD} wards`;
+}
+
+/** Topic reach as a fraction of the wards whose newsletters could be read. */
+export function topicReachFraction(topic: ReportTopic, report: MonthlyReport): number {
+  return report.readable_wards > 0 ? topic.wards / report.readable_wards : 0;
+}
+
+const baselineFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+/** "29 wards; 3 in a typical recent month" */
+export function describeRisingTerm(term: ReportRisingTerm): string {
+  const typical = baselineFormat.format(term.baseline_wards);
+  return `${term.wards} wards; ${typical} in a typical recent month`;
+}

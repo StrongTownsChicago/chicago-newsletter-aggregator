@@ -1,0 +1,66 @@
+---
+// Prerendered at build time from the committed src/data/monthly-reports.json:
+// static HTML with no database query and no server code.
+export const prerender = true;
+
+import Layout from '../../layouts/Layout.astro';
+import reportsData from '../../data/monthly-reports.json';
+import ReportFootnote from '../../components/reports/ReportFootnote.astro';
+import { formatLongMonth } from '../../lib/archive-months';
+import {
+  INDEX_TOPIC_PREVIEW_COUNT,
+  REPORTS_INDEX_DESCRIPTION,
+  REPORTS_INDEX_TITLE,
+  buildReportPath,
+  describeSendingWards,
+  topicLabel,
+  type MonthlyReportsFile,
+} from '../../lib/monthly-reports';
+
+const file = reportsData as MonthlyReportsFile;
+---
+
+<Layout title={REPORTS_INDEX_TITLE} description={REPORTS_INDEX_DESCRIPTION}>
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <header class="mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Monthly reports</h1>
+      <p class="text-base sm:text-lg text-gray-700">
+        What Chicago aldermen's newsletters mentioned each month: the topics the most wards mentioned,
+        terms more wards used than usual, and which wards sent newsletters.
+      </p>
+      <p class="text-sm text-gray-600 mt-2">
+        Reports cover complete months in which most wards' newsletters are in the archive.
+      </p>
+    </header>
+
+    {file.reports.length === 0 ? (
+      <p class="text-gray-600" data-testid="reports-empty">No monthly reports yet.</p>
+    ) : (
+      <ol class="space-y-4" data-testid="reports-list">
+        {file.reports.map((report) => (
+          <li class="bg-white rounded-lg shadow-sm border border-gray-200 p-5" data-testid="report-entry">
+            <h2 class="text-xl font-semibold">
+              <a href={buildReportPath(report.month)} class="text-gray-900 hover:text-blue-600 transition-colors">
+                {formatLongMonth(report.month)}
+              </a>
+            </h2>
+            <p class="text-sm text-gray-600 mt-1">
+              {report.newsletters} newsletters from {describeSendingWards(report)}
+            </p>
+            {report.topics.length > 0 && (
+              <p class="text-sm text-gray-700 mt-2">
+                Most widely mentioned:{' '}
+                {report.topics
+                  .slice(0, INDEX_TOPIC_PREVIEW_COUNT)
+                  .map((topic) => `${topicLabel(file.topics, topic.id)} (${topic.wards} of ${report.readable_wards} wards)`)
+                  .join('; ')}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+    )}
+
+    <ReportFootnote dataThrough={file.data_through} />
+  </div>
+</Layout>

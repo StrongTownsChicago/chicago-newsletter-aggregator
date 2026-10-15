@@ -1,0 +1,23 @@
+---
+// "Data as of" note, methodology link, and how to read the numbers, shared by
+// the monthly report pages.
+import { formatLongDate } from '../../lib/archive-months';
+import { ANALYTICS_METHODOLOGY_PATH } from '../../lib/site';
+
+interface Props {
+  dataThrough: string | null;
+}
+
+const { dataThrough } = Astro.props;
+---
+
+<footer class="mt-10 border-t border-gray-200 pt-4 text-sm text-gray-600 space-y-2" data-testid="report-footnote">
+  <p>
+    Topics are counted by ward: a ward counts once if any of its archived newsletters that month mentioned the topic.
+    A topic missing from a ward's newsletters does not mean the ward did nothing about it.
+  </p>
+  <p>
+    {dataThrough && <>Based on newsletters in the archive through {formatLongDate(dataThrough)}. </>}
+    <a href={ANALYTICS_METHODOLOGY_PATH} class="text-blue-600 hover:text-blue-800 hover:underline">How these figures are made</a>
+  </p>
+</footer>
