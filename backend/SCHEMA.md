@@ -74,7 +74,7 @@ Main table for ingested newsletters.
 - `idx_newsletters_search` (GIN) on `search_vector`
 - `idx_newsletters_relevance` on `relevance_score`
 
-**Deprecated columns**: `entities` and `relevance_score` are no longer written or read by the app. Existing values are kept as unused data; there is no migration to drop them.
+**Deprecated columns**: `entities` and `relevance_score` are no longer written by the app, and the public site no longer reads them. Existing values are kept (the local analytics dashboard still reads `relevance_score`); there is no migration to drop them.
 
 ---
 

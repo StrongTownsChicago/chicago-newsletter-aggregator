@@ -187,7 +187,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
         self.assertFalse(result)  # None not in [1]
 
     def test_legacy_min_relevance_score_ignored(self):
-        """Deprecated min_relevance_score on existing rules no longer filters"""
+        """Deprecated min_relevance_score on existing rules is ignored (it never filtered)"""
         rule = create_test_rule(topics=["bike_lanes"], min_relevance_score=10)
         newsletter_data = {"topics": ["bike_lanes"]}
 

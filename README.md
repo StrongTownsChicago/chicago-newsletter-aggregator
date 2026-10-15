@@ -43,7 +43,7 @@ Searchable archive of newsletters from Chicago aldermen. Built for [Strong Towns
 
 Newsletters are stored in dual formats in the `newsletters` table:
 
-- **`plain_text`** - Primary format used for search indexing, LLM processing (topics, summaries, scoring), and notification keyword matching
+- **`plain_text`** - Primary format used for search indexing, LLM processing (topics, summaries), and notification keyword matching
 - **`raw_html`** - Preserves formatting for frontend display
 
 Both formats are independently sanitized during ingestion to remove tracking links and privacy-sensitive content.
@@ -174,7 +174,7 @@ ollama pull gpt-oss:20b
 ```
 backend/
   ├── ingest/           # Email and web scraping ingestion
-  ├── processing/       # LLM topic extraction, summarization, scoring
+  ├── processing/       # LLM topic extraction and summarization
   ├── notifications/    # User alerts and daily digest delivery
   ├── utils/            # Maintenance scripts (reprocess, migrate, privacy reapply)
   ├── tests/            # Test suite
