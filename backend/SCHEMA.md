@@ -317,6 +317,20 @@ Converts ISO week identifier to date range.
 - `week_start`: Monday of the ISO week (DATE)
 - `week_end`: Sunday of the ISO week (DATE)
 
+### `search_term_timeline(search_query TEXT)`
+
+Counts the newsletters matching a `/search` query per month. Powers the search page timeline via `/api/search-timeline`.
+
+**Matching:** `search_vector @@ websearch_to_tsquery('english', search_query)`, the same filter the search page applies, so it uses the `idx_newsletters_search` GIN index and the monthly counts sum to the search page total when no other filters are set.
+
+**Returns:** One row per America/Chicago calendar month that has at least one match, oldest first:
+
+- `month`: first day of the month (DATE)
+- `newsletter_count`: matching newsletters (INTEGER)
+- `ward_count`: distinct `sources.ward_number` values among them (INTEGER; sources without a ward are not counted)
+
+**Safety:** `STABLE`, `SECURITY INVOKER` (newsletter and source RLS applies), `search_path = ''`, `statement_timeout = 3s`. Raises `invalid_parameter_value` unless the trimmed query is 1–200 characters. Executable by `anon`, `authenticated` and `service_role` only.
+
 ---
 
 ## Migration History
@@ -329,3 +343,4 @@ Converts ISO week identifier to date range.
 | 004     | `004_polymorphic_notifications.sql`   | Polymorphic notification_queue (dedicated report_id column)     |
 | 005     | `005_weekly_rules_no_ward_filter.sql` | Constraint to prevent ward filters on weekly rules              |
 | 006     | `006_enable_rls_public_tables.sql`    | RLS on all public tables; codifies production policies          |
+| 007     | `007_search_term_timeline.sql`        | `search_term_timeline` RPC for the search page timeline         |

@@ -223,6 +223,7 @@ frontend/src/
 │   ├── unsubscribe.astro         # One-click unsubscribe confirmation page
 │   ├── newsletter/[id].astro     # Newsletter detail view
 │   ├── analytics.astro           # Local-only analytics dashboard (not linked, noindex)
+│   ├── api/search-timeline.ts    # Edge-cached monthly match counts for the /search timeline
 │   └── api/notifications/        # Notification management API routes
 │       ├── create-rule.ts        # Create notification rule
 │       ├── update-rule.ts        # Update existing rule
@@ -274,6 +275,8 @@ frontend/src/
 **LLM Processing** (`llm_processor.py` + `llm_client.py`): Two sequential LLM calls per newsletter for topic extraction and summarization using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
 **Search Filters** (`frontend/src/lib/search-filters.ts`): The search page parses URL params into a validated `SearchFilters` object (invalid values are dropped, never thrown), then `applySearchFilters()` is applied to both the count and data queries so they always filter identically. `buildSearchBaseUrl()` serializes filters back for pagination. Date filters are inclusive Chicago calendar days (`chicago-dates.ts`). Topic options come from `lib/topics.ts`, not from the database.
+
+**Search Timeline** (`lib/search-timeline.ts`, `components/SearchTimeline.astro`): For a search with results, `/search` shows newsletters per Chicago month (with ward counts) for the query alone, ignoring other filters. Counts come from the `search_term_timeline` RPC (`backend/migrations/007_search_term_timeline.sql`), which uses the same `websearch_to_tsquery` matching as search. The browser fetches `/api/search-timeline` only when the section nears the viewport, and the route caches per normalized query with the Workers Cache API, so the extra database work stays off the results render and is shared across visitors. If the RPC is missing or fails, the section stays hidden.
 
 **Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup.
 

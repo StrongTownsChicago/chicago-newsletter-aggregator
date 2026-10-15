@@ -105,6 +105,44 @@ CREATE INDEX IF NOT EXISTS idx_newsletters_source_id ON public.newsletters(sourc
 CREATE INDEX IF NOT EXISTS idx_newsletters_search ON public.newsletters USING GIN (search_vector);
 CREATE INDEX IF NOT EXISTS idx_newsletters_relevance ON public.newsletters(relevance_score);
 
+-- Search term timeline: newsletters matching a /search query per Chicago month.
+-- Same matching as the search page; see migrations/007_search_term_timeline.sql.
+CREATE OR REPLACE FUNCTION public.search_term_timeline(search_query TEXT)
+RETURNS TABLE (month DATE, newsletter_count INTEGER, ward_count INTEGER)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+SET statement_timeout = '3s'
+AS $$
+#variable_conflict use_column
+DECLARE
+    max_query_length CONSTANT INTEGER := 200;
+    trimmed_query TEXT := btrim(search_query);
+    matching_query tsquery;
+BEGIN
+    IF trimmed_query IS NULL
+        OR trimmed_query = ''
+        OR char_length(trimmed_query) > max_query_length THEN
+        RAISE EXCEPTION 'search_query must be 1 to % characters', max_query_length
+            USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+
+    matching_query := websearch_to_tsquery('english', trimmed_query);
+
+    RETURN QUERY
+    SELECT
+        date_trunc('month', n.received_date AT TIME ZONE 'America/Chicago')::DATE,
+        count(*)::INTEGER,
+        count(DISTINCT s.ward_number)::INTEGER
+    FROM public.newsletters AS n
+    LEFT JOIN public.sources AS s ON s.id = n.source_id
+    WHERE n.search_vector @@ matching_query
+    GROUP BY 1
+    ORDER BY 1;
+END;
+$$;
+
 -- EMAIL_SOURCE_MAPPINGS: Pattern matching for incoming emails
 CREATE TABLE public.email_source_mappings (
     id SERIAL PRIMARY KEY,
@@ -321,3 +359,5 @@ GRANT EXECUTE ON FUNCTION public.get_active_weekly_topics TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_active_weekly_topics TO service_role;
 GRANT EXECUTE ON FUNCTION public.get_week_date_range TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_week_date_range TO service_role;
+REVOKE ALL ON FUNCTION public.search_term_timeline(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_term_timeline(TEXT) TO anon, authenticated, service_role;
