@@ -141,16 +141,15 @@ ollama pull gpt-oss:20b
 
 - Backend CI (`.github/workflows/backend_tests.yml`) - Runs ruff, mypy, and tests on backend changes
 - Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and unit tests on frontend changes
-- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, queues notifications
+- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
 All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
-**Local LLM Processing:**
+**LLM Processing:** Email ingestion in GitHub Actions summarizes each newsletter as it is stored, so new newsletters have their summary and topics from the start. Run `process_llm_metadata` locally only to backfill or reprocess (e.g. newsletters stored without metadata, prompt changes):
 
 ```bash
-# Process newsletters with Ollama (runs locally, not in GitHub Actions)
-uv run python -m utils.process_llm_metadata --latest 50
+uv run python -m utils.process_llm_metadata --missing-metadata --latest 50
 ```
 
 See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.

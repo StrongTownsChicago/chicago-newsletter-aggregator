@@ -1,6 +1,6 @@
 # Local LLM Processing Guide
 
-Since LLM processing runs locally with Ollama (not in GitHub Actions), follow these steps to process newsletters that were ingested via automation.
+Email ingestion in GitHub Actions already summarizes new newsletters (`ENABLE_LLM` and `LLM_MODEL` repository secrets). Use these steps to backfill or reprocess newsletters locally, such as ones stored without metadata or after changing the prompts.
 
 ## Prerequisites
 
