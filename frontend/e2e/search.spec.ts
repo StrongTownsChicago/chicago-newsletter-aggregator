@@ -100,3 +100,42 @@ test('loads old links with removed relevance params and drops them', async ({ pa
     await expect(nextLink).toHaveAttribute('href', '/search?page=2');
   }
 });
+
+test.describe('search timeline', () => {
+  const timelineRoute = '**/api/search-timeline?*';
+
+  test('shows monthly counts for a search with results', async ({ page }) => {
+    await page.route(timelineRoute, (route) =>
+      route.fulfill({
+        json: {
+          months: [
+            { month: '2026-01', newsletterCount: 3, wardCount: 2 },
+            { month: '2026-02', newsletterCount: 0, wardCount: 0 },
+          ],
+        },
+      }),
+    );
+    await page.goto('/search?q=zoning');
+    test.skip((await page.getByTestId('newsletter-card').count()) === 0, 'no results in this database');
+
+    const timeline = page.getByTestId('search-timeline');
+    await page.mouse.wheel(0, 10000);
+    await expect(timeline).toBeVisible();
+    await expect(timeline.getByRole('heading', { name: /zoning/ })).toBeVisible();
+
+    await timeline.getByText('Show monthly counts').click();
+    await expect(timeline.getByRole('row', { name: 'Jan 2026 3 2' })).toBeVisible();
+    await expect(timeline.getByRole('row', { name: 'Feb 2026 0 0' })).toBeVisible();
+  });
+
+  test('stays hidden when the timeline is unavailable', async ({ page }) => {
+    await page.route(timelineRoute, (route) =>
+      route.fulfill({ status: 404, json: { error: 'timeline_unavailable' } }),
+    );
+    await page.goto('/search?q=zoning');
+    await page.mouse.wheel(0, 10000);
+
+    await expect(page.getByTestId('search-timeline')).toBeHidden();
+    await expect(page.getByTestId('search-input')).toHaveValue('zoning');
+  });
+});

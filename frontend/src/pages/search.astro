@@ -4,6 +4,7 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
+import SearchTimeline from '../components/SearchTimeline.astro';
 import { supabase } from '../lib/supabase';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/newsletter-queries';
@@ -29,6 +30,7 @@ import {
   extractWardNumbers,
 } from '../lib/search-form-options';
 import type { SearchSourceRow } from '../lib/search-form-options';
+import { normalizeTimelineQuery } from '../lib/search-timeline';
 
 const { filters, sort, page } = parseSearchParams(Astro.url.searchParams);
 const filtersOnSource = requiresSourceJoin(filters);
@@ -66,6 +68,8 @@ const sourceTypes = extractSourceTypes(sources);
 const showSourceTypeFilter = sourceTypes.length > 1;
 
 const baseUrl = buildSearchBaseUrl(filters, sort);
+// Loaded on demand (see SearchTimeline.astro) so it never delays the results.
+const timelineQuery = (count ?? 0) > 0 ? normalizeTimelineQuery(filters.query) : null;
 
 const inputClass =
   'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -231,5 +235,8 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
 
     <!-- Pagination -->
     <Pagination currentPage={page} totalPages={totalPages} baseUrl={baseUrl} />
+
+    <!-- After pagination, so revealing it never moves the page links -->
+    {timelineQuery && <SearchTimeline query={timelineQuery} />}
   </div>
 </Layout>

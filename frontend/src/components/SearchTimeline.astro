@@ -1,0 +1,63 @@
+---
+/**
+ * "Mentions over time" for a search query: newsletters per month, with the
+ * number of wards. Rendered hidden; `scripts/search-timeline.ts` loads the
+ * counts from /api/search-timeline when this nears the viewport and reveals it.
+ * If the counts can't be loaded (e.g. the database function isn't deployed),
+ * it stays hidden.
+ */
+interface Props {
+  query: string;
+}
+
+const { query } = Astro.props;
+---
+
+<div data-search-timeline-root data-query={query}>
+  <section
+    data-timeline-section
+    data-testid="search-timeline"
+    aria-labelledby="search-timeline-heading"
+    class="bg-white rounded-lg shadow-md p-6 mt-8 border border-gray-200"
+    hidden
+  >
+    <h2 id="search-timeline-heading" class="text-lg font-semibold text-gray-900 mb-1">
+      Mentions of “{query}” over time
+    </h2>
+    <p class="text-sm text-gray-700 mb-4" data-timeline-summary></p>
+
+    <div aria-hidden="true">
+      <div class="flex items-end gap-px h-24 border-b border-gray-300" data-timeline-bars></div>
+      <div class="flex justify-between text-xs text-gray-500 mt-1">
+        <span data-timeline-start></span>
+        <span data-timeline-end></span>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-500 mt-3">
+      Newsletters from aldermen and other sources matching this search, by month received (Chicago
+      time). Other filters are not applied. Months with no matches show 0.
+    </p>
+
+    <details class="mt-3 text-sm">
+      <summary class="cursor-pointer text-blue-600 hover:text-blue-800">Show monthly counts</summary>
+      <table class="mt-2 text-gray-700">
+        <caption class="sr-only">Newsletters and wards matching “{query}” by month</caption>
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th scope="col" class="py-1 pr-4 text-left font-semibold">Month</th>
+            <th scope="col" class="py-1 pr-4 text-right font-semibold">Newsletters</th>
+            <th scope="col" class="py-1 text-right font-semibold">Wards</th>
+          </tr>
+        </thead>
+        <tbody data-timeline-rows></tbody>
+      </table>
+    </details>
+  </section>
+</div>
+
+<script>
+  import { initSearchTimeline } from '../scripts/search-timeline';
+
+  initSearchTimeline();
+</script>
