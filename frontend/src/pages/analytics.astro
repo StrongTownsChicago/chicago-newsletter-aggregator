@@ -1,15 +1,13 @@
 ---
 export const prerender = false;
 
-// Unlisted dashboard. The browser fetches the committed JSON in
+// The browser fetches the committed JSON in
 // public/analytics-data/ at runtime (lib/analytics-data.ts); server-rendered so
 // the header reflects the signed-in user.
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
 import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
 
-// Unlisted: noindex (also disallowed in robots.txt).
-Astro.response.headers.set('X-Robots-Tag', 'noindex');
 
 const controlClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -18,7 +16,6 @@ const controlClass =
 <Layout
   title="Analytics - Chicago Alderman Newsletter Tracker"
   description="What aldermen's newsletters cover, how often they're sent, and how wards differ."
-  noindex
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <header class="mb-6">

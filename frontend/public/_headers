@@ -1,10 +1,9 @@
 # Cloudflare Pages headers for static files from public/ (server-rendered
 # routes set their own headers).
 
-# Analytics dashboard data: unlisted like /analytics (also disallowed in
-# robots.txt). The files keep the same names on every refresh, so browsers
-# revalidate on each load (a cheap 304 via ETag when unchanged), so a new deploy
-# is picked up on the next page load rather than mixed with stale cached files.
+# Analytics data: crawlers may fetch it to render /analytics, but the raw files
+# stay out of search results. Names don't change between refreshes, so browsers
+# revalidate on each load (a 304 when unchanged).
 /analytics-data/*
   X-Robots-Tag: noindex
   Cache-Control: no-cache

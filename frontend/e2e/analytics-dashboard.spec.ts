@@ -51,9 +51,8 @@ test('loads the dashboard from the fixture data', async ({ page }) => {
   await expect(page.locator('#analytics-data-as-of')).toContainText('from 26 newsletters');
   await expect(page.locator('#summary-tiles [data-tile-value]').first()).toHaveText(String(DEFAULT_WINDOW_NEWSLETTERS));
   await expect(page.locator('#civic-calendar svg').first()).toBeVisible();
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
-  // Unlisted: not in the site navigation.
-  await expect(page.getByRole('navigation', { name: 'Primary' }).locator('a[href^="/analytics"]')).toHaveCount(0);
+  await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Primary' }).locator('a[href="/analytics"]')).toHaveCount(1);
 });
 
 test('filters change the panels and the URL', async ({ page }) => {

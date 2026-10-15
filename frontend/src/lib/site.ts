@@ -16,6 +16,7 @@ export const SOURCE_CODE_LINK_LABEL = "Source code on GitHub";
 export const HOME_PATH = "/";
 export const PREFERENCES_PATH = "/preferences";
 export const REPORTS_INDEX_PATH = "/reports";
+export const ANALYTICS_PATH = "/analytics";
 const WARD_PROFILE_PATH_PREFIX = "/ward";
 
 export interface NavItem {
@@ -33,6 +34,7 @@ const PUBLIC_NAV_ITEMS: readonly NavItem[] = [
     href: WARD_DIRECTORY_PATH,
     activePathPrefixes: [WARD_DIRECTORY_PATH, WARD_PROFILE_PATH_PREFIX],
   },
+  { label: "Analytics", href: ANALYTICS_PATH, activePathPrefixes: [ANALYTICS_PATH] },
 ];
 
 const PREFERENCES_NAV_ITEM: NavItem = {
