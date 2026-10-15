@@ -1,0 +1,33 @@
+{
+ "text": "cleaned",
+ "min_mentions": 2,
+ "readable_newsletters": 26,
+ "lenses": [
+  {
+   "id": "public_safety",
+   "label": "Public safety",
+   "description": "Police, crime and safety meetings.",
+   "strong_towns_focus": false,
+   "newsletters": 13,
+   "phrases": [
+    {
+     "phrase": "police",
+     "newsletters": 13
+    }
+   ]
+  },
+  {
+   "id": "budget_taxes",
+   "label": "Budget & taxes",
+   "description": "The city budget and property taxes.",
+   "strong_towns_focus": false,
+   "newsletters": 8,
+   "phrases": [
+    {
+     "phrase": "budget",
+     "newsletters": 8
+    }
+   ]
+  }
+ ]
+}

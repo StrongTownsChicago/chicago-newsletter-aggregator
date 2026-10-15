@@ -18,6 +18,8 @@ import {
   type TermMonthPoint,
   type TermWardRow,
 } from "./analytics";
+import { EXPORT_SWATCH_ATTRIBUTE, EXPORT_TEXT_ATTRIBUTE } from "./chart-export";
+import type { WardTopicMonthCell, WardTopicSummary } from "./analytics-ward-profile";
 
 export const CHART_COLORS = {
   series: "#2a78d6",
@@ -114,7 +116,11 @@ function renderKey(items: KeyItem[], shape: "dot" | "square" = "dot"): HTMLEleme
     swatch.className = `inline-block w-2.5 h-2.5 ${shape === "dot" ? "rounded-full" : "rounded-sm"}`;
     swatch.style.backgroundColor = item.color;
     if (item.outline) swatch.style.boxShadow = `inset 0 0 0 1px ${item.outline}`;
-    entry.append(swatch, item.label);
+    swatch.setAttribute(EXPORT_SWATCH_ATTRIBUTE, item.outline ?? "");
+    const label = document.createElement("span");
+    label.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
+    label.textContent = item.label;
+    entry.append(swatch, label);
     key.append(entry);
   }
   return key;
@@ -215,8 +221,7 @@ export function renderCivicCalendar(
   minActiveWards: number,
   width: number,
 ): Element {
-  // Room for the longest lens name; narrow screens scroll the grid rather than clip names.
-  const marginLeft = Math.max(...lenses.map((lens) => lens.label.length), 0) * LABEL_CHARACTER_WIDTH + AXIS_TICK_ROOM;
+  const marginLeft = longestLabelMargin(lenses.map((lens) => lens.label));
   const marginRight = 10;
   const plotWidth = Math.max(width, months.length * MIN_CALENDAR_CELL_WIDTH + marginLeft + marginRight);
   const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
@@ -289,46 +294,56 @@ const LENS_WARD_COLORS: Record<LensWardCell["status"], { fill: string; stroke?: 
 
 export const LENS_WARD_STATUS_LABELS: Record<LensWardCell["status"], string> = {
   mentioned: "Mentioned it",
-  not_mentioned: "Sent newsletters, did not mention it",
-  no_newsletter: "No newsletter archived that month",
+  not_mentioned: "Didn't mention it",
+  no_newsletter: "No newsletter",
 };
 
-/** Ward × month grid for one lens: which wards' newsletters mentioned it each month. */
-export function renderLensWardGrid(
-  cells: LensWardCell[],
-  wards: string[],
+interface MentionGridOptions<T extends Pick<LensWardCell, "month" | "status" | "mentioning" | "newsletters">> {
+  /** Field holding each cell's row key. */
+  row: keyof T & string;
+  rows: string[];
+  rowLabel: (row: string) => string;
+  /** Tooltip heading for a cell, e.g. "Ward 5 · Mar 2026". */
+  describeCell: (cell: T) => string;
+  /** What a mention is of, for the tooltip: "Public safety". */
+  subjectLabel: (cell: T) => string;
+  marginLeft: number;
+}
+
+/** Row × month grid of mention statuses: mentioned, sent newsletters without mentioning, or no newsletter. */
+function renderMentionGrid<T extends Pick<LensWardCell, "month" | "status" | "mentioning" | "newsletters">>(
+  cells: T[],
   months: string[],
-  lensLabel: string,
+  options: MentionGridOptions<T>,
   width: number,
 ): Element {
-  const marginLeft = 70;
   const marginRight = 10;
-  const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
+  const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + options.marginLeft + marginRight);
   const statuses = Object.keys(LENS_WARD_COLORS) as LensWardCell["status"][];
   const plot = Plot.plot({
     ...baseOptions(plotWidth),
-    height: wards.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
+    height: options.rows.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
-    marginLeft,
+    marginLeft: options.marginLeft,
     marginRight,
     marginBottom: AXIS_BAND,
     padding: 0.08,
-    x: { ...monthAxis(months, plotWidth, marginLeft, marginRight), axis: "both" },
-    y: { label: null, domain: wards, tickFormat: formatWard },
+    x: { ...monthAxis(months, plotWidth, options.marginLeft, marginRight), axis: "both" },
+    y: { label: null, domain: options.rows, tickFormat: options.rowLabel },
     marks: statuses.map((status) =>
       Plot.cell(
         cells.filter((cell) => cell.status === status),
         {
           x: "month",
-          y: "ward",
+          y: options.row,
           fill: LENS_WARD_COLORS[status].fill,
           stroke: LENS_WARD_COLORS[status].stroke,
           inset: LENS_WARD_COLORS[status].stroke ? 0.5 : 0,
           rx: 2,
-          title: (cell: LensWardCell) =>
-            `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${LENS_WARD_STATUS_LABELS[status]}` +
+          title: (cell: T) =>
+            `${options.describeCell(cell)}\n${LENS_WARD_STATUS_LABELS[status]}` +
             (cell.newsletters
-              ? `\n${cell.mentioning} of ${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"} mentioned ${lensLabel}`
+              ? `\n${cell.mentioning} of ${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"} mentioned ${options.subjectLabel(cell)}`
               : ""),
           tip: true,
         },
@@ -344,6 +359,194 @@ export function renderLensWardGrid(
       })),
       "square",
     ),
+    plot,
+  );
+}
+
+/** Ward × month grid for one lens: which wards' newsletters mentioned it each month. */
+export function renderLensWardGrid(
+  cells: LensWardCell[],
+  wards: string[],
+  months: string[],
+  lensLabel: string,
+  width: number,
+): Element {
+  return renderMentionGrid(
+    cells,
+    months,
+    {
+      row: "ward",
+      rows: wards,
+      rowLabel: formatWard,
+      describeCell: (cell) => `${formatWard(cell.ward)} · ${formatMonth(cell.month)}`,
+      subjectLabel: () => lensLabel,
+      marginLeft: 70,
+    },
+    width,
+  );
+}
+
+/** Lens × month grid for one ward: which topics its newsletters mentioned each month. */
+export function renderWardTopicGrid(
+  cells: WardTopicMonthCell[],
+  lenses: { id: string; label: string }[],
+  months: string[],
+  ward: string,
+  width: number,
+): Element {
+  const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
+  return renderMentionGrid(
+    cells,
+    months,
+    {
+      row: "lens",
+      rows: lenses.map((lens) => lens.id),
+      rowLabel: (id) => labelOf.get(id) ?? id,
+      describeCell: (cell) => `${formatWard(ward)} · ${formatMonth(cell.month)}`,
+      subjectLabel: (cell) => labelOf.get(cell.lens) ?? cell.lens,
+      marginLeft: longestLabelMargin(lenses.map((lens) => lens.label)),
+    },
+    width,
+  );
+}
+
+/** Room for the longest y-axis label; narrow screens scroll the chart rather than clip names. */
+function longestLabelMargin(labels: string[]): number {
+  return Math.max(...labels.map((label) => label.length), 0) * LABEL_CHARACTER_WIDTH + AXIS_TICK_ROOM;
+}
+
+const CADENCE_HEIGHT = 160;
+
+/**
+ * One ward's newsletters per month: bars where newsletters arrived, a hollow
+ * dot at zero for tracked months with none, and a gray band before the ward
+ * was tracked.
+ */
+export function renderWardCadence(cells: CoverageCell[], months: string[], width: number): Element {
+  const marginLeft = 40;
+  const marginRight = 20;
+  const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
+  const maxCount = Math.max(1, ...cells.map((cell) => cell.newsletters));
+  const label = (cell: CoverageCell) => `${formatWard(cell.ward)} · ${formatMonth(cell.month)}`;
+  const plot = Plot.plot({
+    ...baseOptions(plotWidth),
+    height: CADENCE_HEIGHT + AXIS_BAND,
+    marginLeft,
+    marginRight,
+    marginBottom: AXIS_BAND,
+    x: { ...monthAxis(months, plotWidth, marginLeft, marginRight), padding: 0.2 },
+    y: { label: "Newsletters", grid: true, domain: [0, maxCount], nice: true },
+    marks: [
+      Plot.barY(
+        cells.filter((cell) => cell.status === "untracked"),
+        {
+          x: "month",
+          y: () => maxCount,
+          fill: CHART_COLORS.untracked,
+          title: (cell: CoverageCell) => `${label(cell)}\nNot tracked yet`,
+          tip: true,
+        },
+      ),
+      Plot.barY(
+        cells.filter((cell) => cell.status === "received"),
+        {
+          x: "month",
+          y: "newsletters",
+          fill: CHART_COLORS.series,
+          rx: 2,
+          title: (cell: CoverageCell) =>
+            `${label(cell)}\n${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"}`,
+          tip: true,
+        },
+      ),
+      Plot.dot(
+        cells.filter((cell) => cell.status === "silent"),
+        {
+          x: "month",
+          y: () => 0,
+          r: 3,
+          fill: CHART_COLORS.surface,
+          stroke: CHART_COLORS.mutedInk,
+          title: (cell: CoverageCell) => `${label(cell)}\nNone received`,
+          tip: true,
+        },
+      ),
+      Plot.ruleY([0], { stroke: CHART_COLORS.baseline }),
+    ],
+  });
+  return wrap(
+    renderKey(
+      [
+        { label: "Newsletters received", color: CHART_COLORS.series },
+        { label: "None received", color: CHART_COLORS.surface, outline: CHART_COLORS.mutedInk },
+        { label: "Not tracked yet", color: CHART_COLORS.untracked },
+      ],
+      "square",
+    ),
+    plot,
+  );
+}
+
+/**
+ * For each topic: the share of the ward's months that mentioned it (dark dot)
+ * beside the average share of active wards mentioning it in those months
+ * (light dot). Topics keep their usual order, so the chart is a profile, not
+ * a ranking.
+ */
+export function renderWardTopicComparison(
+  topics: WardTopicSummary[],
+  lenses: { id: string; label: string }[],
+  ward: string,
+  width: number,
+): Element {
+  const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
+  const rows = topics.filter((topic) => topic.wardShare !== null && topic.cityShare !== null);
+  const marginLeft = longestLabelMargin(lenses.map((lens) => lens.label));
+  const describe = (topic: WardTopicSummary) =>
+    `${labelOf.get(topic.lens) ?? topic.lens}\n${formatWard(ward)}: ${topic.monthsMentioning} of ${topic.monthsChecked} months ` +
+    `(${formatPercent(topic.wardShare ?? 0)})\nAll active wards, same months: ${formatPercent(topic.cityShare ?? 0)} on average`;
+  const plot = Plot.plot({
+    ...baseOptions(width),
+    height: rows.length * BAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
+    marginTop: TOP_AXIS_MARGIN,
+    marginLeft,
+    marginRight: 30,
+    x: { label: "Share of months (%)", domain: [0, 100], percent: true, grid: true, axis: "both" },
+    y: { label: null, domain: rows.map((topic) => topic.lens), tickFormat: (id: string) => labelOf.get(id) ?? id },
+    marks: [
+      Plot.link(rows, {
+        x1: "cityShare",
+        x2: "wardShare",
+        y1: "lens",
+        y2: "lens",
+        stroke: CHART_COLORS.seriesLight,
+        strokeWidth: 2,
+      }),
+      Plot.dot(rows, {
+        x: "cityShare",
+        y: "lens",
+        r: 4,
+        fill: CHART_COLORS.seriesLight,
+        stroke: CHART_COLORS.surface,
+        strokeWidth: 2,
+      }),
+      Plot.dot(rows, {
+        x: "wardShare",
+        y: "lens",
+        r: 5,
+        fill: CHART_COLORS.seriesDark,
+        stroke: CHART_COLORS.surface,
+        strokeWidth: 2,
+        title: describe,
+        tip: true,
+      }),
+    ],
+  });
+  return wrap(
+    renderKey([
+      { label: `${formatWard(ward)}: share of months`, color: CHART_COLORS.seriesDark },
+      { label: "All active wards (average)", color: CHART_COLORS.seriesLight },
+    ]),
     plot,
   );
 }
@@ -385,30 +588,41 @@ export function renderTermWards(
   });
 }
 
-export function renderDistinctiveTerms(terms: DistinctiveTerm[], ward: string, width: number): Element {
+/**
+ * A ward's distinctive terms as the share of its newsletters using each, in
+ * distinctiveness order, labeled with the count and the rest of the city's share.
+ */
+export function renderDistinctiveTerms(
+  terms: DistinctiveTerm[],
+  ward: string,
+  wardNewsletters: number,
+  width: number,
+): Element {
+  const label = (item: DistinctiveTerm) =>
+    `${item.ward_newsletters} of ${wardNewsletters} · ${formatPercent(item.rest_share)} elsewhere`;
   return Plot.plot({
     ...baseOptions(width),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND,
     marginLeft: 170,
-    marginRight: 60,
-    x: { label: "Distinctiveness score (bar labels: times more likely than the rest of the city)", grid: true },
+    marginRight: 150,
+    x: { label: "Share of this ward's newsletters (%)", percent: true, grid: true },
     y: { label: null, domain: terms.map((item) => item.term), padding: 1 - MAX_BAR_THICKNESS },
     marks: [
       Plot.barX(terms, {
-        x: "score",
+        x: "ward_share",
         y: "term",
         fill: CHART_COLORS.series,
         rx: 4,
         href: (item: DistinctiveTerm) => buildSearchUrl({ q: item.term, ward }),
         title: (item: DistinctiveTerm) =>
-          `"${item.term}" in ${item.ward_newsletters} ${formatWard(ward)} newsletters (${formatPercent(item.ward_share)})\n` +
-          `Rest of city: ${formatPercent(item.rest_share)} · ${formatLift(item.lift)} more likely\nClick to search`,
+          `"${item.term}" in ${item.ward_newsletters} of ${wardNewsletters} ${formatWard(ward)} newsletters (${formatPercent(item.ward_share)})\n` +
+          `Rest of city: ${formatPercent(item.rest_share)} · ${formatLift(item.lift)} as likely here\nClick to search`,
         tip: true,
       }),
       Plot.text(terms, {
-        x: "score",
+        x: "ward_share",
         y: "term",
-        text: (item: DistinctiveTerm) => formatLift(item.lift),
+        text: label,
         textAnchor: "start",
         dx: 6,
         fill: CHART_COLORS.mutedInk,
@@ -430,7 +644,7 @@ export function renderRisingTerms(
   latestLabel: string,
   width: number,
 ): Element {
-  const marginLeft = Math.max(...terms.map((item) => item.term.length), 0) * LABEL_CHARACTER_WIDTH + AXIS_TICK_ROOM;
+  const marginLeft = longestLabelMargin(terms.map((item) => item.term));
   const plot = Plot.plot({
     ...baseOptions(width),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
@@ -532,7 +746,7 @@ export function renderCoverageGrid(
         inset: 0.5,
         rx: 2,
         title: (cell: CoverageCell) =>
-          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nTracked, no newsletters received`,
+          `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\nNone received`,
         tip: true,
       }),
       Plot.cell(cellsByStatus("received"), {
@@ -548,7 +762,7 @@ export function renderCoverageGrid(
       Plot.text(wardsNeverArchived, {
         x: () => months[0],
         y: (ward: string) => ward,
-        text: () => "No newsletters archived",
+        text: () => "No newsletters",
         textAnchor: "start",
         frameAnchor: "left",
         dx: 4,
@@ -559,42 +773,11 @@ export function renderCoverageGrid(
   return wrap(
     renderKey(
       [
-        { label: "Not tracked yet (before the ward's first archived newsletter)", color: CHART_COLORS.untracked },
-        { label: "Tracked, none received", color: CHART_COLORS.surface, outline: CHART_COLORS.baseline },
+        { label: "Not tracked yet", color: CHART_COLORS.untracked },
+        { label: "None received", color: CHART_COLORS.surface, outline: CHART_COLORS.baseline },
       ],
       "square",
     ),
     withColorLegend(plot),
   );
-}
-
-// ---------------------------------------------------------------------------
-// Table views: every chart has an accessible table twin.
-
-export interface TableColumn<T> {
-  label: string;
-  value: (row: T) => string | number;
-  numeric?: boolean;
-}
-
-export function renderTable<T>(columns: TableColumn<T>[], rows: T[]): HTMLTableElement {
-  const table = document.createElement("table");
-  table.className = "min-w-full text-sm text-left";
-  const headerRow = table.createTHead().insertRow();
-  for (const column of columns) {
-    const cell = document.createElement("th");
-    cell.textContent = column.label;
-    cell.className = `px-2 py-1 font-semibold text-gray-700 border-b border-gray-200 ${column.numeric ? "text-right" : ""}`;
-    headerRow.appendChild(cell);
-  }
-  const body = table.createTBody();
-  for (const row of rows) {
-    const tableRow = body.insertRow();
-    for (const column of columns) {
-      const cell = tableRow.insertCell();
-      cell.textContent = String(column.value(row));
-      cell.className = `px-2 py-1 border-b border-gray-100 text-gray-700 ${column.numeric ? "text-right tabular-nums" : ""}`;
-    }
-  }
-  return table;
 }

@@ -1,0 +1,302 @@
+{
+ "newsletters": [
+  {
+   "id": "w1-2026-01-0",
+   "date": "2026-01-10",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety",
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-01-0",
+   "date": "2026-01-10",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "public_safety",
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-01-1",
+   "date": "2026-01-17",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-01-1",
+   "date": "2026-01-17",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-01-2",
+   "date": "2026-01-24",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-02-0",
+   "date": "2026-02-10",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-02-0",
+   "date": "2026-02-10",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-02-0",
+   "date": "2026-02-10",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-02-1",
+   "date": "2026-02-17",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-02-1",
+   "date": "2026-02-17",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-02-1",
+   "date": "2026-02-17",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-02-2",
+   "date": "2026-02-24",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-03-0",
+   "date": "2026-03-10",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety",
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-03-0",
+   "date": "2026-03-10",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "public_safety",
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-03-0",
+   "date": "2026-03-10",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-03-1",
+   "date": "2026-03-17",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-03-1",
+   "date": "2026-03-17",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-03-1",
+   "date": "2026-03-17",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-03-2",
+   "date": "2026-03-24",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-04-0",
+   "date": "2026-04-10",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-04-0",
+   "date": "2026-04-10",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "budget_taxes"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-04-0",
+   "date": "2026-04-10",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-04-1",
+   "date": "2026-04-17",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w2-2026-04-1",
+   "date": "2026-04-17",
+   "source_id": 2,
+   "ward": "2",
+   "alder": "Bo Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w3-2026-04-1",
+   "date": "2026-04-17",
+   "source_id": 3,
+   "ward": "3",
+   "alder": "Cy Example",
+   "lenses": [
+    "public_safety"
+   ],
+   "words": 600,
+   "text_unavailable": false
+  },
+  {
+   "id": "w1-2026-04-2",
+   "date": "2026-04-24",
+   "source_id": 1,
+   "ward": "1",
+   "alder": "Ada Example",
+   "lenses": [],
+   "words": 600,
+   "text_unavailable": false
+  }
+ ]
+}

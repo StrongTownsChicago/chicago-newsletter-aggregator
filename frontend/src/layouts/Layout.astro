@@ -11,9 +11,11 @@ interface Props {
   type?: 'website' | 'article';
   /** Current page of a paginated listing; page 2+ is kept in the canonical URL. */
   canonicalPage?: number;
+  /** Keep the page out of search indexes (unlisted pages). */
+  noindex?: boolean;
 }
 
-const { title, description, image, type = 'website', canonicalPage } = Astro.props;
+const { title, description, image, type = 'website', canonicalPage, noindex = false } = Astro.props;
 
 const site = Astro.site ?? Astro.url.origin;
 const canonicalUrl = buildCanonicalUrl(Astro.url.pathname, site, canonicalPage);
@@ -30,6 +32,7 @@ const twitterCard = imageUrl ? 'summary_large_image' : 'summary';
     <title>{title}</title>
     <meta name="description" content={metaDescription} />
     <link rel="canonical" href={canonicalUrl} />
+    {noindex && <meta name="robots" content="noindex" />}
 
     <meta property="og:title" content={title} />
     <meta property="og:description" content={metaDescription} />

@@ -1,0 +1,25 @@
+{
+ "latest_month": "2026-03",
+ "baseline_months": [
+  "2026-01",
+  "2026-02"
+ ],
+ "latest_active_wards": 3,
+ "baseline_active_wards": [
+  2,
+  3
+ ],
+ "terms": [
+  {
+   "term": "zoning",
+   "latest_wards": 2,
+   "baseline_wards": 1.0,
+   "baseline_month_wards": [
+    1,
+    1
+   ],
+   "ward_gain": 1.0,
+   "latest_newsletters": 2
+  }
+ ]
+}
