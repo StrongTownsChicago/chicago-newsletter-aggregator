@@ -11,7 +11,6 @@ def create_test_newsletter(
     raw_html: str | None = None,
     source_id: int = 1,
     topics: list[str] | None = None,
-    relevance_score: int = 5,
     received_date: str | None = None,
     email_uid: str | None = None,
     summary: str | None = None,
@@ -28,7 +27,6 @@ def create_test_newsletter(
         raw_html: HTML content (defaults to wrapping plain_text)
         source_id: Source database ID
         topics: List of topics (defaults to empty list)
-        relevance_score: Relevance score 0-10
         received_date: ISO format date (defaults to now)
         email_uid: Email UID (defaults to random)
         summary: Newsletter summary (defaults to None)
@@ -48,7 +46,6 @@ def create_test_newsletter(
         "raw_html": raw_html or f"<html><body><p>{plain_text}</p></body></html>",
         "source_id": source_id,
         "topics": topics or [],
-        "relevance_score": relevance_score,
         "received_date": received_date or datetime.now().isoformat(),
         "email_uid": email_uid or f"test_{uuid.uuid4().hex[:8]}",
         "summary": summary,

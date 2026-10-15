@@ -41,7 +41,7 @@ Check that newsletters have LLM metadata populated:
 
 ```sql
 -- In Supabase SQL editor
-SELECT id, subject, topics, summary, relevance_score
+SELECT id, subject, topics, summary
 FROM newsletters
 WHERE topics IS NULL OR summary IS NULL
 ORDER BY received_date DESC

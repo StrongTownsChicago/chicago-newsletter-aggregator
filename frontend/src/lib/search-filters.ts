@@ -17,22 +17,13 @@ import { ALL_TOPICS } from "./topics";
 export const SEARCH_PATH = "/search";
 export const SEARCH_PAGE_SIZE = 20;
 
-export const MAX_RELEVANCE_SCORE = 10;
-
-/** Selectable minimum relevance scores (1 through the maximum score). */
-export const RELEVANCE_THRESHOLD_OPTIONS: number[] = Array.from(
-  { length: MAX_RELEVANCE_SCORE },
-  (_, index) => index + 1,
-);
-
-export const SEARCH_SORTS = ["newest", "oldest", "relevance"] as const;
+export const SEARCH_SORTS = ["newest", "oldest"] as const;
 export type SearchSort = (typeof SEARCH_SORTS)[number];
 export const DEFAULT_SEARCH_SORT: SearchSort = "newest";
 
 export const SEARCH_SORT_LABELS: Record<SearchSort, string> = {
   newest: "Newest first",
   oldest: "Oldest first",
-  relevance: "Highest relevance",
 };
 
 /** URL parameter name for each search setting. */
@@ -44,7 +35,6 @@ export const SEARCH_PARAM_NAMES = {
   topic: "topic",
   fromDate: "from",
   toDate: "to",
-  minRelevance: "min_relevance",
   sort: "sort",
   page: "page",
 } as const;
@@ -62,8 +52,6 @@ export interface SearchFilters {
   fromDate: string | null;
   /** Inclusive Chicago calendar date, `YYYY-MM-DD`. */
   toDate: string | null;
-  /** Minimum relevance score (1-10); null when not filtering. */
-  minRelevance: number | null;
 }
 
 export interface SearchState {
@@ -94,15 +82,6 @@ const parseSourceType = (value: string): string | null =>
 
 const parseTopic = (value: string): string | null =>
   ALL_TOPICS.includes(value) ? value : null;
-
-/**
- * A minimum of 0 matches every scored newsletter, so it is treated as
- * "no filter" (which also keeps not-yet-scored newsletters in results).
- */
-const parseMinRelevance = (value: string): number | null => {
-  const score = parsePositiveInteger(value);
-  return score !== null && score <= MAX_RELEVANCE_SCORE ? score : null;
-};
 
 const parseSort = (value: string): SearchSort =>
   (SEARCH_SORTS as readonly string[]).includes(value)
@@ -135,7 +114,6 @@ export function parseSearchParams(params: URLSearchParams): SearchState {
         parseIsoDate(read(SEARCH_PARAM_NAMES.fromDate)),
         parseIsoDate(read(SEARCH_PARAM_NAMES.toDate)),
       ),
-      minRelevance: parseMinRelevance(read(SEARCH_PARAM_NAMES.minRelevance)),
     },
     sort: parseSort(read(SEARCH_PARAM_NAMES.sort)),
     page: parsePage(read(SEARCH_PARAM_NAMES.page)),
@@ -159,7 +137,6 @@ export function buildSearchBaseUrl(
     [SEARCH_PARAM_NAMES.topic, filters.topic],
     [SEARCH_PARAM_NAMES.fromDate, filters.fromDate],
     [SEARCH_PARAM_NAMES.toDate, filters.toDate],
-    [SEARCH_PARAM_NAMES.minRelevance, filters.minRelevance],
     [SEARCH_PARAM_NAMES.sort, sort === DEFAULT_SEARCH_SORT ? null : sort],
   ];
 
@@ -199,35 +176,24 @@ export interface FilterableQuery {
   ): this;
   eq(column: string, value: string | number): this;
   contains(column: string, value: string[]): this;
-  gte(column: string, value: string | number): this;
+  gte(column: string, value: string): this;
   lt(column: string, value: string): this;
 }
 
 interface ColumnOrdering {
   column: string;
   ascending: boolean;
-  nullsFirst?: boolean;
 }
 
-/**
- * Column orderings for each sort, applied in sequence. Relevance sorting puts
- * unscored newsletters last and breaks ties by newest first.
- */
+/** Column orderings for each sort, applied in sequence. */
 export const SEARCH_SORT_ORDERINGS: Record<SearchSort, ColumnOrdering[]> = {
   newest: [{ column: "received_date", ascending: false }],
   oldest: [{ column: "received_date", ascending: true }],
-  relevance: [
-    { column: "relevance_score", ascending: false, nullsFirst: false },
-    { column: "received_date", ascending: false },
-  ],
 };
 
 /** The subset of the PostgREST transform builder API used for sorting. */
 export interface SortableQuery {
-  order(
-    column: string,
-    options: { ascending: boolean; nullsFirst?: boolean },
-  ): this;
+  order(column: string, options: { ascending: boolean }): this;
 }
 
 /**
@@ -270,9 +236,6 @@ export function applySearchFilters<Query extends FilterableQuery>(
       "received_date",
       startOfChicagoDayUtc(addDaysToIsoDate(filters.toDate, 1)),
     );
-  }
-  if (filters.minRelevance !== null) {
-    filtered = filtered.gte("relevance_score", filters.minRelevance);
   }
 
   return filtered;

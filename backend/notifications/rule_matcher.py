@@ -36,7 +36,7 @@ def match_newsletter_to_rules(
         response = (
             supabase.table("notification_rules")
             .select(
-                "id, user_id, name, topics, search_term, min_relevance_score, source_ids, ward_numbers, delivery_frequency"
+                "id, user_id, name, topics, search_term, source_ids, ward_numbers, delivery_frequency"
             )
             .eq("is_active", True)
             .eq("delivery_frequency", "daily")
@@ -250,7 +250,7 @@ def get_pending_notifications_by_user(
     query = (
         supabase.table("notification_queue")
         .select(
-            "*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, relevance_score, source:sources(name, ward_number)), rule:notification_rules(name)"
+            "*, newsletter:newsletters(id, subject, received_date, plain_text, summary, topics, source:sources(name, ward_number)), rule:notification_rules(name)"
         )
         .eq("status", "pending")
         .order("created_at", desc=False)

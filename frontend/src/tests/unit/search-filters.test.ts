@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_SEARCH_SORT,
-  RELEVANCE_THRESHOLD_OPTIONS,
   SEARCH_PATH,
   applySearchFilters,
   applySearchSort,
@@ -20,7 +19,6 @@ const EMPTY_FILTERS: SearchFilters = {
   topic: null,
   fromDate: null,
   toDate: null,
-  minRelevance: null,
 };
 
 const parse = (queryString: string) => parseSearchParams(new URLSearchParams(queryString));
@@ -64,7 +62,7 @@ describe('parseSearchParams', () => {
   it('parses every supported filter', () => {
     const { filters, sort, page } = parse(
       'q=bike+lanes&ward=40&source=12&source_type=alderman&topic=bike_lanes' +
-        '&from=2026-01-01&to=2026-03-31&min_relevance=7&sort=relevance&page=3',
+        '&from=2026-01-01&to=2026-03-31&sort=oldest&page=3',
     );
 
     expect(filters).toEqual({
@@ -75,9 +73,8 @@ describe('parseSearchParams', () => {
       topic: 'bike_lanes',
       fromDate: '2026-01-01',
       toDate: '2026-03-31',
-      minRelevance: 7,
     });
-    expect(sort).toBe('relevance');
+    expect(sort).toBe('oldest');
     expect(page).toBe(3);
   });
 
@@ -96,11 +93,11 @@ describe('parseSearchParams', () => {
   });
 
   describe('sort', () => {
-    it.each(['newest', 'oldest', 'relevance'])('accepts %s', (value) => {
+    it.each(['newest', 'oldest'])('accepts %s', (value) => {
       expect(parse(`sort=${value}`).sort).toBe(value);
     });
 
-    it.each(['popular', 'RELEVANCE', ''])('falls back to the default for %j', (value) => {
+    it.each(['popular', 'OLDEST', ''])('falls back to the default for %j', (value) => {
       expect(parse(`sort=${value}`).sort).toBe(DEFAULT_SEARCH_SORT);
     });
   });
@@ -111,16 +108,19 @@ describe('parseSearchParams', () => {
     });
   });
 
-  describe('min relevance', () => {
-    it.each([
-      ['1', 1],
-      ['10', 10],
-    ])('accepts %s', (value, expected) => {
-      expect(parse(`min_relevance=${value}`).filters.minRelevance).toBe(expected);
+  describe('removed relevance params from old links', () => {
+    it('ignores min_relevance and sort=relevance', () => {
+      expect(parse('min_relevance=5&sort=relevance')).toEqual({
+        filters: EMPTY_FILTERS,
+        sort: DEFAULT_SEARCH_SORT,
+        page: 1,
+      });
     });
 
-    it.each(['0', '11', '-1', '5.5', 'NaN', 'high'])('ignores %j', (value) => {
-      expect(parse(`min_relevance=${value}`).filters.minRelevance).toBeNull();
+    it('keeps the other filters from an old link', () => {
+      const { filters, sort } = parse('q=zoning&min_relevance=7&sort=relevance');
+      expect(filters).toEqual({ ...EMPTY_FILTERS, query: 'zoning' });
+      expect(sort).toBe(DEFAULT_SEARCH_SORT);
     });
   });
 
@@ -183,7 +183,7 @@ describe('buildSearchBaseUrl', () => {
   it('round-trips every filter through parseSearchParams', () => {
     const original = parse(
       'q=bike+lanes&ward=40&source=12&source_type=alderman&topic=bike_lanes' +
-        '&from=2026-01-01&to=2026-03-31&min_relevance=7&sort=relevance',
+        '&from=2026-01-01&to=2026-03-31&sort=oldest',
     );
     const baseUrl = buildSearchBaseUrl(original.filters, original.sort);
     const reparsed = parseSearchParams(new URL(baseUrl, 'http://localhost').searchParams);
@@ -192,7 +192,7 @@ describe('buildSearchBaseUrl', () => {
   });
 
   it('drops invalid params from the URL', () => {
-    const { filters, sort } = parse('topic=bogus&min_relevance=42&sort=weird&from=2026-02-31&q=transit');
+    const { filters, sort } = parse('topic=bogus&sort=weird&from=2026-02-31&q=transit');
     expect(buildSearchBaseUrl(filters, sort)).toBe('/search?q=transit');
   });
 });
@@ -250,10 +250,6 @@ describe('applySearchFilters', () => {
     ]);
   });
 
-  it('filters by minimum relevance score', () => {
-    expect(applyTo({ ...EMPTY_FILTERS, minRelevance: 6 })).toEqual([['gte', 'relevance_score', 6]]);
-  });
-
   it('converts the date range to Chicago day boundaries with an inclusive end date', () => {
     expect(applyTo({ ...EMPTY_FILTERS, fromDate: '2026-01-15', toDate: '2026-01-31' })).toEqual([
       ['gte', 'received_date', '2026-01-15T06:00:00.000Z'],
@@ -270,13 +266,13 @@ describe('applySearchFilters', () => {
 
   it('applies identical filters to separate count and data queries', () => {
     const { filters } = parse(
-      'q=zoning&ward=40&source=12&topic=bike_lanes&from=2026-01-01&to=2026-03-31&min_relevance=5',
+      'q=zoning&ward=40&source=12&topic=bike_lanes&from=2026-01-01&to=2026-03-31',
     );
     const countCalls = applySearchFilters(new RecordingQuery(), filters).calls;
     const dataCalls = applySearchFilters(new RecordingQuery(), filters).calls;
 
     expect(countCalls).toEqual(dataCalls);
-    expect(countCalls).toHaveLength(7);
+    expect(countCalls).toHaveLength(6);
   });
 });
 
@@ -290,21 +286,5 @@ describe('applySearchSort', () => {
 
   it('sorts oldest first', () => {
     expect(sortCalls('oldest')).toEqual([['order', 'received_date', { ascending: true }]]);
-  });
-
-  it('sorts by relevance with unscored newsletters last, then newest first', () => {
-    expect(sortCalls('relevance')).toEqual([
-      ['order', 'relevance_score', { ascending: false, nullsFirst: false }],
-      ['order', 'received_date', { ascending: false }],
-    ]);
-  });
-});
-
-describe('RELEVANCE_THRESHOLD_OPTIONS', () => {
-  it('offers every threshold from 1 to 10 and each one parses back', () => {
-    expect(RELEVANCE_THRESHOLD_OPTIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    for (const threshold of RELEVANCE_THRESHOLD_OPTIONS) {
-      expect(parse(`min_relevance=${threshold}`).filters.minRelevance).toBe(threshold);
-    }
   });
 });

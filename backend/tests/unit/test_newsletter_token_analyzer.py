@@ -24,24 +24,20 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
 
         analysis = analyze_newsletter_tokens(newsletter, "gpt-5")
 
-        # Should have 3 operations
+        # Should have 2 operations (topics and summary)
         self.assertEqual(analysis.topic_extraction.operation, "topic_extraction")
         self.assertEqual(analysis.summary_generation.operation, "summary_generation")
-        self.assertEqual(analysis.relevance_scoring.operation, "relevance_scoring")
 
         # All operations should have token counts
         self.assertGreater(analysis.topic_extraction.input_tokens, 0)
         self.assertGreater(analysis.topic_extraction.output_tokens, 0)
         self.assertGreater(analysis.summary_generation.input_tokens, 0)
         self.assertGreater(analysis.summary_generation.output_tokens, 0)
-        self.assertGreater(analysis.relevance_scoring.input_tokens, 0)
-        self.assertGreater(analysis.relevance_scoring.output_tokens, 0)
 
         # Total should equal sum
         expected_total = (
             analysis.topic_extraction.total_tokens
             + analysis.summary_generation.total_tokens
-            + analysis.relevance_scoring.total_tokens
         )
         self.assertEqual(analysis.total_tokens, expected_total)
 

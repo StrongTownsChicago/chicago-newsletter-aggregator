@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and relevance scoring, and presents them through an Astro frontend.
+Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Chicago aldermen, built for Strong Towns Chicago. The system ingests newsletters via Gmail IMAP and web scraping, processes them with LLM for topic extraction and summarization, and presents them through an Astro frontend.
 
 ## Tech Stack
 
@@ -163,7 +163,7 @@ Custom Claude Code hooks are located in `.claude/hooks/` and registered in `.cla
 1. **Ingestion**: Emails arrive via Gmail IMAP polling OR web scraping from MailChimp archives
 2. **Source Matching**: Email patterns matched against `email_source_mappings` table with wildcard support
 3. **Storage**: Raw newsletters stored in `newsletters` table (plain_text, raw_html, metadata)
-4. **LLM Processing**: Three LLM calls per newsletter for topic extraction, summarization, and relevance scoring. Provider dispatched via `llm_client.py` (supports Ollama and OpenAI)
+4. **LLM Processing**: Two LLM calls per newsletter for topic extraction and summarization. Provider dispatched via `llm_client.py` (supports Ollama and OpenAI)
 5. **Weekly Synthesis**: Aggregated analysis of newsletters by topic using two-phase LLM process (extract facts → synthesize summary)
 6. **Frontend**: Astro SSR queries Supabase for search/display
 
@@ -181,7 +181,7 @@ backend/
 │       └── process_scraped_newsletters.py  # Orchestrates scraping workflow
 ├── processing/
 │   ├── llm_client.py             # Multi-provider LLM dispatch (Ollama + OpenAI adapters)
-│   └── llm_processor.py          # LLM topic/summary/scoring with Pydantic schemas
+│   └── llm_processor.py          # LLM topic extraction and summarization with Pydantic schemas
 ├── notifications/
 │   ├── rule_matcher.py           # Match newsletters to user notification rules
 │   ├── email_sender.py           # Send digest emails via Resend API
@@ -192,7 +192,7 @@ backend/
 ├── utils/
 │   ├── compute_analytics.py      # Refresh snapshot → compute → write analytics JSON for /analytics
 │   ├── analytics_snapshot.py     # Read/write the local analytics snapshot (backend/data/, gitignored)
-│   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary, relevance score)
+│   ├── process_llm_metadata.py   # Add/update LLM metadata (topics, summary)
 │   ├── reprocess_newsletters_privacy.py  # Reapply privacy sanitization to existing newsletters
 │   ├── migrate_topics.py         # Topic migration utility
 │   └── download_samples.py       # Download sample newsletters for testing
@@ -271,7 +271,7 @@ frontend/src/
 
 **Web Scraping Strategy Pattern** (`scraper_strategies.py`): Strategy pattern for different archive formats. `get_strategy_for_url()` selects between `MailChimpArchiveStrategy` (most common) and `GenericListStrategy` fallback.
 
-**LLM Processing** (`llm_processor.py` + `llm_client.py`): Three sequential LLM calls per newsletter for topic extraction, summarization, and relevance scoring using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
+**LLM Processing** (`llm_processor.py` + `llm_client.py`): Two sequential LLM calls per newsletter for topic extraction and summarization using Pydantic models for structured output validation. Provider-agnostic: supports Ollama (local) and OpenAI (cloud) via provider-prefixed model strings (e.g., `openai:gpt-5`, `ollama:gpt-oss:20b`). Bare model names default to Ollama for backward compatibility. Filters extracted topics against predefined list to prevent hallucinations. See `backend/processing/llm_client.py` for provider dispatch logic.
 
 **Search Filters** (`frontend/src/lib/search-filters.ts`): The search page parses URL params into a validated `SearchFilters` object (invalid values are dropped, never thrown), then `applySearchFilters()` is applied to both the count and data queries so they always filter identically. `buildSearchBaseUrl()` serializes filters back for pagination. Date filters are inclusive Chicago calendar days (`chicago-dates.ts`). Topic options come from `lib/topics.ts`, not from the database.
 
@@ -302,7 +302,7 @@ frontend/src/
 
 - **`plain_text`** - Primary format for all processing:
   - Powers full-text search via generated `search_vector` column (combined with subject)
-  - Required input for all LLM operations (topic extraction, summarization, relevance scoring via `llm_processor.py`)
+  - Required input for all LLM operations (topic extraction and summarization via `llm_processor.py`)
   - Used for notification rule keyword matching (`rule_matcher.py`)
   - Fallback display when HTML unavailable
   - Generated from email plain text body or HTML-to-text conversion (`html2text`)

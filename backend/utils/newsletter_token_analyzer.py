@@ -15,7 +15,6 @@ from processing.llm_processor import (
     TOPICS,
     TopicsExtraction,
     Summary,
-    RelevanceScore,
     MAX_NEWSLETTER_CHARS,
 )
 from models.weekly_report import FactExtraction, WeeklySynthesis
@@ -29,7 +28,6 @@ from utils.token_counter import (
 ESTIMATED_RESPONSE_SIZES = {
     "topics": 100,  # JSON array of 0-5 topic strings
     "summary": 150,  # 2-3 sentences
-    "relevance_score": 120,  # score + reasoning
     "weekly_facts": 200,  # List of KeyDevelopments per newsletter
     "weekly_synthesis": 800,  # 2-4 paragraphs
 }
@@ -47,12 +45,11 @@ class OperationTokens:
 
 @dataclass
 class NewsletterTokenAnalysis:
-    """Complete token analysis for newsletter processing (3 LLM calls)."""
+    """Complete token analysis for newsletter processing (2 LLM calls)."""
 
     newsletter_id: str | None
     topic_extraction: OperationTokens
     summary_generation: OperationTokens
-    relevance_scoring: OperationTokens
     total_input_tokens: int
     total_output_tokens: int
     total_tokens: int
@@ -78,12 +75,11 @@ def analyze_newsletter_tokens(
     max_chars: int = MAX_NEWSLETTER_CHARS,
 ) -> NewsletterTokenAnalysis:
     """
-    Simulate all 3 LLM calls for newsletter processing and count tokens.
+    Simulate both LLM calls for newsletter processing and count tokens.
 
     Replicates exact prompt construction from llm_processor.py:
     1. extract_topics()
     2. generate_summary()
-    3. score_relevance()
 
     Args:
         newsletter: Newsletter dict with 'subject' and 'plain_text' keys
@@ -159,75 +155,6 @@ Newsletter:
         include_schema_in_prompt=include_schema,
     )
 
-    # Operation 3: Relevance Scoring (llm_processor.py:278-334)
-    # This includes context from previous operations (topics + summary)
-    extracted_topics = ["bike_lanes", "transit_funding"]  # From operation 1
-    extracted_summary = "Alderman announces new bike lanes..."  # From operation 2
-
-    context_section = (
-        "\nFor context, here is what was already extracted from this newsletter:\n"
-    )
-    if extracted_topics:
-        context_section += f"Topics identified: {', '.join(extracted_topics)}\n"
-    if extracted_summary:
-        context_section += f"Summary: {extracted_summary}\n"
-
-    relevance_prompt = f"""Rate this newsletter's relevance to Strong Towns Chicago (0-10).
-
-Strong Towns Chicago's 5 Priority Campaigns:
-1. Incremental Housing: Re-legalizing 4-flats, missing middle housing, ADUs, zoning reform
-2. Ending Parking Mandates: Eliminating parking minimums, reducing parking subsidies
-3. Safe & Productive Streets: Bike lanes, pedestrian safety, tactical urbanism, traffic calming
-4. Transit: CTA/Metra funding, bus network improvements, L maintenance, stopping Lake Shore Drive expansion
-5. Transparent Local Accounting: Budget transparency, fiscal sustainability, infrastructure ROI
-
-SCORING:
-
-9-10 = Major announcements (rare and exciting):
-• Major policy changes (eliminating parking minimums, legalizing 4-flats, upzoning)
-• Citywide or major public feedback periods on housing/transit/parking
-• NEW transit service routes or frequency expansion
-Example: "City Council passes ordinance eliminating parking minimums" or "Alderman announces support for upzoning major corridor"
-
-7-8 = Action opportunities and significant housing/transit announcements:
-• Large housing developments approved (many units) or moving to committee
-• Public feedback periods on zoning changes or development
-• Public hearings/meetings on housing, transit, budget, or street design
-• Multiple street safety improvements announced
-• Significant budget allocations for bike/transit infrastructure
-• NEW bike lanes or protected bike infrastructure announced
-Example: "Plan Commission approves 500-unit development, moves to Zoning Committee" or "Public feedback open on zoning change"
-
-5-6 = Minor relevant announcements:
-• Small housing developments (several units)
-• Single plot zoning approval or variance
-• Minor street design project (crosswalk, signage)
-• Brief transit/budget mentions
-Example: "Zoning approved for 4-unit building at 2415 W Peterson"
-
-3-4 = Vague mentions:
-• General community meetings that might touch on STC topics
-• Economic development mentioning transit
-Example: "Town hall to discuss neighborhood priorities"
-
-0-2 = Not relevant (many newsletters fall here):
-• Holidays, office hours, festivals, constituent services, CAPS meetings
-• Bridge/viaduct/road construction or maintenance
-• Police/crime updates, poll workers, volunteer opportunities
-Example: "CAPS meeting Tuesday" or "Lake St bridge work continues"
-{context_section}
-Newsletter:
-{content}
-"""
-    relevance_response = '{"score": 7, "reasoning": "Newsletter announces new protected bike lanes, which is a significant street safety improvement."}'
-    relevance_tokens = estimate_llm_call_tokens(
-        relevance_prompt,
-        relevance_response,
-        RelevanceScore.model_json_schema(),
-        model_name,
-        include_schema_in_prompt=include_schema,
-    )
-
     # Create operation summaries
     topics_op = OperationTokens(
         operation="topic_extraction",
@@ -243,26 +170,14 @@ Newsletter:
         total_tokens=summary_tokens["total_tokens"],
     )
 
-    relevance_op = OperationTokens(
-        operation="relevance_scoring",
-        input_tokens=relevance_tokens["input_tokens"],
-        output_tokens=relevance_tokens["output_tokens"],
-        total_tokens=relevance_tokens["total_tokens"],
-    )
-
     # Calculate totals
-    total_input = (
-        topics_op.input_tokens + summary_op.input_tokens + relevance_op.input_tokens
-    )
-    total_output = (
-        topics_op.output_tokens + summary_op.output_tokens + relevance_op.output_tokens
-    )
+    total_input = topics_op.input_tokens + summary_op.input_tokens
+    total_output = topics_op.output_tokens + summary_op.output_tokens
 
     return NewsletterTokenAnalysis(
         newsletter_id=newsletter.get("id"),
         topic_extraction=topics_op,
         summary_generation=summary_op,
-        relevance_scoring=relevance_op,
         total_input_tokens=total_input,
         total_output_tokens=total_output,
         total_tokens=total_input + total_output,

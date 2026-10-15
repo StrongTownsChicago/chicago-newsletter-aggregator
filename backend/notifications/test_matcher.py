@@ -29,9 +29,7 @@ def test_matching(should_queue: bool = False) -> None:
     # Fetch most recent newsletters with topics
     response = (
         supabase.table("newsletters")
-        .select(
-            "id, subject, topics, plain_text, source_id, relevance_score, sources(ward_number)"
-        )
+        .select("id, subject, topics, plain_text, source_id, sources(ward_number)")
         .not_.is_("topics", None)
         .order("created_at", desc=True)
         .limit(10)
@@ -53,7 +51,6 @@ def test_matching(should_queue: bool = False) -> None:
         print(f"Newsletter: {newsletter_subject[:60]}...")
         print(f"ID: {newsletter_id}")
         print(f"Topics: {newsletter.get('topics', [])}")
-        print(f"Relevance: {newsletter.get('relevance_score')}")
         print()
 
         # Prepare newsletter data
@@ -63,7 +60,6 @@ def test_matching(should_queue: bool = False) -> None:
             "plain_text": newsletter.get("plain_text", ""),
             "source_id": newsletter.get("source_id"),
             "ward_number": sources_data.get("ward_number") if sources_data else None,
-            "relevance_score": newsletter.get("relevance_score"),
         }
 
         # Find matching rules

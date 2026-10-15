@@ -30,7 +30,6 @@ class TestNotificationMatching(unittest.TestCase):
             "topics": ["bike_lanes"],
             "plain_text": "New bike lanes on Milwaukee Avenue",
             "source_id": "source_001",
-            "relevance_score": 0.8,
         }
 
         # Mock Supabase client
@@ -47,7 +46,6 @@ class TestNotificationMatching(unittest.TestCase):
                 "name": "Bike Lane Alerts",
                 "topics": ["bike_lanes"],
                 "search_term": None,
-                "min_relevance_score": None,
                 "source_ids": None,
                 "ward_numbers": None,
                 "delivery_frequency": "daily",
@@ -146,7 +144,6 @@ class TestNotificationMatching(unittest.TestCase):
                 "name": "Bike Lane Alerts",
                 "topics": ["bike_lanes"],
                 "search_term": None,
-                "min_relevance_score": None,
                 "source_ids": None,
                 "ward_numbers": ["10"],
                 "delivery_frequency": "daily",
@@ -193,7 +190,6 @@ class TestNotificationMatching(unittest.TestCase):
             mock_llm.return_value = {
                 "topics": ["bike_lanes"],
                 "summary": "Newsletter about bike lanes",
-                "relevance_score": 8,
             }
 
             # Test reprocessing with notification queuing

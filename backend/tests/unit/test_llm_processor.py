@@ -11,7 +11,6 @@ from unittest.mock import patch
 from processing.llm_processor import (
     extract_topics,
     generate_summary,
-    score_relevance,
     extract_newsletter_metadata,
     TOPICS,
 )
@@ -177,131 +176,16 @@ class TestGenerateSummary(unittest.TestCase):
         self.assertIn("Alfred", prompt)
 
 
-class TestScoreRelevance(unittest.TestCase):
-    """Tests for score_relevance() function"""
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_score_with_context(self, mock_print, mock_call_llm):
-        """Scoring uses topics and summary context"""
-        mock_call_llm.return_value = (
-            '{"score": 8, "reasoning": "Major zoning approval for housing development"}'
-        )
-
-        result = score_relevance(
-            "Newsletter content",
-            "test-model",
-            topics=["zoning_or_development_meeting_or_approval"],
-            summary="Large housing development approved",
-        )
-
-        self.assertEqual(result, 8)
-
-        # Check that prompt includes context
-        call_args = mock_call_llm.call_args[0]
-        prompt = call_args[1]
-        self.assertIn("zoning_or_development_meeting_or_approval", prompt)
-        self.assertIn("Large housing development approved", prompt)
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_score_without_context(self, mock_print, mock_call_llm):
-        """Scoring works without topics/summary"""
-        mock_call_llm.return_value = (
-            '{"score": 5, "reasoning": "Minor mention of transit"}'
-        )
-
-        result = score_relevance("Newsletter content", "test-model")
-
-        self.assertEqual(result, 5)
-
-        # Prompt should not include context section
-        call_args = mock_call_llm.call_args[0]
-        prompt = call_args[1]
-        self.assertNotIn("For context, here is what was already extracted", prompt)
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_score_in_valid_range(self, mock_print, mock_call_llm):
-        """Score must be 0-10"""
-        test_cases = [
-            ('{"score": 0, "reasoning": "Not relevant"}', 0),
-            ('{"score": 5, "reasoning": "Somewhat relevant"}', 5),
-            ('{"score": 10, "reasoning": "Highly relevant"}', 10),
-        ]
-
-        for response, expected_score in test_cases:
-            with self.subTest(score=expected_score):
-                mock_call_llm.return_value = response
-                result = score_relevance("Newsletter content", "test-model")
-                self.assertEqual(result, expected_score)
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_returns_none_on_failure(self, mock_print, mock_call_llm):
-        """LLM fails, returns None"""
-        mock_call_llm.side_effect = Exception("LLM service down")
-
-        result = score_relevance("Newsletter content", "test-model")
-
-        self.assertIsNone(result)
-        # Verify error message was printed
-        error_printed = any(
-            "Relevance scoring failed" in str(call)
-            for call in mock_print.call_args_list
-        )
-        self.assertTrue(error_printed)
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_pydantic_validates_score_bounds(self, mock_print, mock_call_llm):
-        """Pydantic rejects score <0 or >10, resulting in None"""
-        # Test score > 10
-        mock_call_llm.return_value = '{"score": 15, "reasoning": "Invalid high score"}'
-
-        result = score_relevance("Newsletter content", "test-model")
-        self.assertIsNone(result)
-
-        # Test score < 0
-        mock_call_llm.return_value = (
-            '{"score": -1, "reasoning": "Invalid negative score"}'
-        )
-
-        result = score_relevance("Newsletter content", "test-model")
-        self.assertIsNone(result)
-
-    @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_context_with_empty_topics(self, mock_print, mock_call_llm):
-        """Empty topics list should not include topics in context"""
-        mock_call_llm.return_value = '{"score": 3, "reasoning": "Minor relevance"}'
-
-        score_relevance(
-            "Newsletter content",
-            "test-model",
-            topics=[],
-            summary="Some summary",
-        )
-
-        call_args = mock_call_llm.call_args[0]
-        prompt = call_args[1]
-
-        # Should not include "Topics identified" line
-        self.assertNotIn("Topics identified:", prompt)
-
-
 class TestProcessWithOllama(unittest.TestCase):
     """Tests for extract_newsletter_metadata() main pipeline function"""
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
     @patch("time.sleep")
-    def test_full_pipeline(self, mock_sleep, mock_score, mock_summary, mock_topics):
-        """All three LLM steps execute successfully"""
+    def test_full_pipeline(self, mock_sleep, mock_summary, mock_topics):
+        """Both LLM steps execute successfully"""
         mock_topics.return_value = ["bike_lanes", "transit_funding"]
         mock_summary.return_value = "Newsletter about transit improvements."
-        mock_score.return_value = 7
 
         newsletter = {
             "subject": "Transit Updates",
@@ -310,14 +194,35 @@ class TestProcessWithOllama(unittest.TestCase):
 
         result = extract_newsletter_metadata(newsletter, "test-model")
 
-        self.assertEqual(result["topics"], ["bike_lanes", "transit_funding"])
-        self.assertEqual(result["summary"], "Newsletter about transit improvements.")
-        self.assertEqual(result["relevance_score"], 7)
-
-        # Verify all functions were called
+        self.assertEqual(
+            result,
+            {
+                "topics": ["bike_lanes", "transit_funding"],
+                "summary": "Newsletter about transit improvements.",
+            },
+        )
         mock_topics.assert_called_once()
         mock_summary.assert_called_once()
-        mock_score.assert_called_once()
+
+    @patch("processing.llm_processor.call_llm")
+    @patch("builtins.print")
+    def test_pipeline_makes_exactly_two_llm_calls(self, mock_print, mock_call_llm):
+        """Pipeline calls the LLM once for topics and once for the summary"""
+        mock_call_llm.side_effect = [
+            '{"topics": ["bike_lanes"]}',
+            '{"summary": "Bike lanes are coming."}',
+        ]
+
+        newsletter = {"subject": "Streets", "plain_text": "New bike lanes."}
+
+        result = extract_newsletter_metadata(newsletter, "openai:gpt-5")
+
+        self.assertEqual(mock_call_llm.call_count, 2)
+        for call in mock_call_llm.call_args_list:
+            self.assertEqual(call[0][0], "openai:gpt-5")
+        self.assertEqual(
+            result, {"topics": ["bike_lanes"], "summary": "Bike lanes are coming."}
+        )
 
     @patch("processing.llm_processor.extract_topics")
     @patch("builtins.print")
@@ -349,15 +254,11 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
     @patch("time.sleep")
-    def test_includes_todays_date(
-        self, mock_sleep, mock_score, mock_summary, mock_topics
-    ):
+    def test_includes_todays_date(self, mock_sleep, mock_summary, mock_topics):
         """Prompt includes today's date"""
         mock_topics.return_value = []
         mock_summary.return_value = ""
-        mock_score.return_value = None
 
         newsletter = {
             "subject": "Test Newsletter",
@@ -376,18 +277,16 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
     @patch("builtins.print")
     @patch("time.sleep")
     def test_partial_failure_handling(
-        self, mock_sleep, mock_print, mock_score, mock_summary, mock_topics
+        self, mock_sleep, mock_print, mock_summary, mock_topics
     ):
-        """One step fails, others continue"""
-        # extract_topics, generate_summary, and score_relevance all catch their own
-        # exceptions and return default values, so we simulate that behavior
+        """One step fails, the other continues"""
+        # extract_topics and generate_summary catch their own exceptions and
+        # return default values, so we simulate that behavior
         mock_topics.return_value = ["bike_lanes"]
         mock_summary.return_value = ""  # Returns empty string on error
-        mock_score.return_value = 5
 
         newsletter = {
             "subject": "Test",
@@ -396,24 +295,21 @@ class TestProcessWithOllama(unittest.TestCase):
 
         result = extract_newsletter_metadata(newsletter, "test-model")
 
-        # Topics and score succeed, summary returns empty (as it does on error)
+        # Topics succeed, summary returns empty (as it does on error)
         self.assertEqual(result["topics"], ["bike_lanes"])
         self.assertEqual(result["summary"], "")
-        self.assertEqual(result["relevance_score"], 5)
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
     @patch("builtins.print")
     @patch("time.sleep")
     def test_returns_empty_on_complete_failure(
-        self, mock_sleep, mock_print, mock_score, mock_summary, mock_topics
+        self, mock_sleep, mock_print, mock_summary, mock_topics
     ):
         """All steps fail gracefully"""
         # The individual functions catch their own exceptions, so they return defaults
         mock_topics.return_value = []  # Returns [] on error
         mock_summary.return_value = ""  # Returns "" on error
-        mock_score.return_value = None  # Returns None on error
 
         newsletter = {
             "subject": "Test",
@@ -423,21 +319,15 @@ class TestProcessWithOllama(unittest.TestCase):
         result = extract_newsletter_metadata(newsletter, "test-model")
 
         # All should return their error defaults
-        self.assertEqual(result["topics"], [])
-        self.assertEqual(result["summary"], "")
-        self.assertIsNone(result["relevance_score"])
+        self.assertEqual(result, {"topics": [], "summary": ""})
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
     @patch("time.sleep")
-    def test_content_includes_subject(
-        self, mock_sleep, mock_score, mock_summary, mock_topics
-    ):
+    def test_content_includes_subject(self, mock_sleep, mock_summary, mock_topics):
         """Content passed to LLM includes subject"""
         mock_topics.return_value = []
         mock_summary.return_value = ""
-        mock_score.return_value = 0
 
         newsletter = {
             "subject": "Important Announcement",
@@ -450,35 +340,6 @@ class TestProcessWithOllama(unittest.TestCase):
         call_args = mock_topics.call_args[0]
         content = call_args[0]
         self.assertIn("Subject: Important Announcement", content)
-
-    @patch("processing.llm_processor.extract_topics")
-    @patch("processing.llm_processor.generate_summary")
-    @patch("processing.llm_processor.score_relevance")
-    @patch("time.sleep")
-    def test_score_receives_topics_and_summary_context(
-        self, mock_sleep, mock_score, mock_summary, mock_topics
-    ):
-        """Relevance scoring receives topics and summary as context"""
-        mock_topics.return_value = ["bike_lanes"]
-        mock_summary.return_value = "Summary text"
-        mock_score.return_value = 7
-
-        newsletter = {
-            "subject": "Test",
-            "plain_text": "Content",
-        }
-
-        extract_newsletter_metadata(newsletter, "test-model")
-
-        # Verify score_relevance was called with topics and summary
-        self.assertEqual(mock_score.call_count, 1)
-        # score_relevance signature: score_relevance(content, model, topics=None, summary=None)
-        # So it's called with 4 positional args: content, model, topics, summary
-        call_args = mock_score.call_args
-        # All are passed as positional arguments
-        self.assertEqual(len(call_args[0]), 4)  # content, model, topics, summary
-        self.assertEqual(call_args[0][2], ["bike_lanes"])  # topics is 3rd arg
-        self.assertEqual(call_args[0][3], "Summary text")  # summary is 4th arg
 
 
 if __name__ == "__main__":
