@@ -42,7 +42,6 @@ export const SOURCE_WARD_PROFILE_COLUMNS = [
   "name",
   "ward_number",
   "website",
-  "signup_url",
   "phone",
   "email_address",
 ] as const satisfies readonly (keyof Source)[];

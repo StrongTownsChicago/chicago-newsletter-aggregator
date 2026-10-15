@@ -100,7 +100,7 @@ const splitColumns = (select: string) => select.split(',').map((column) => colum
 describe('SOURCE_WARD_PROFILE_SELECT', () => {
   it('selects exactly the public fields the ward page header renders', () => {
     expect(splitColumns(SOURCE_WARD_PROFILE_SELECT).sort()).toEqual(
-      ['email_address', 'id', 'name', 'phone', 'signup_url', 'ward_number', 'website'],
+      ['email_address', 'id', 'name', 'phone', 'ward_number', 'website'],
     );
   });
 });

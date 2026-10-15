@@ -97,7 +97,6 @@ describe('buildWardDirectory', () => {
 describe('buildWardContactLinks', () => {
   const fullSource: WardContactSource = {
     website: 'https://www.the1stward.com/',
-    signup_url: 'https://www.the1stward.com/newsletter',
     phone: '872-206-2685',
     email_address: 'info@the1stward.com',
   };
@@ -105,12 +104,6 @@ describe('buildWardContactLinks', () => {
   it('returns every available link in display order', () => {
     expect(buildWardContactLinks(fullSource)).toEqual([
       { kind: 'website', label: 'Website', href: 'https://www.the1stward.com/', isExternal: true },
-      {
-        kind: 'signup',
-        label: 'Newsletter signup',
-        href: 'https://www.the1stward.com/newsletter',
-        isExternal: true,
-      },
       { kind: 'phone', label: '872-206-2685', href: 'tel:8722062685', isExternal: false },
       {
         kind: 'email',
@@ -123,7 +116,7 @@ describe('buildWardContactLinks', () => {
 
   it('omits missing and blank fields', () => {
     expect(
-      buildWardContactLinks({ website: null, signup_url: '  ', phone: null, email_address: null }),
+      buildWardContactLinks({ website: '  ', phone: null, email_address: null }),
     ).toEqual([]);
   });
 
@@ -131,7 +124,6 @@ describe('buildWardContactLinks', () => {
     const links = buildWardContactLinks({
       ...fullSource,
       website: 'javascript:alert(1)',
-      signup_url: 'www.example.com/signup',
     });
     expect(links.map((link) => link.kind)).toEqual(['phone', 'email']);
   });

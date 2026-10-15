@@ -87,7 +87,7 @@ export function buildWardDirectory<
   }));
 }
 
-export type WardContactKind = "website" | "signup" | "phone" | "email";
+export type WardContactKind = "website" | "phone" | "email";
 
 export interface WardContactLink {
   kind: WardContactKind;
@@ -99,7 +99,6 @@ export interface WardContactLink {
 
 export interface WardContactSource {
   website: string | null;
-  signup_url: string | null;
   phone: string | null;
   email_address: string | null;
 }
@@ -134,7 +133,6 @@ export function buildWardContactLinks(
   source: WardContactSource,
 ): WardContactLink[] {
   const website = toSafeWebUrl(source.website);
-  const signupUrl = toSafeWebUrl(source.signup_url);
   const phone = source.phone?.trim();
   const telHref = toTelHref(source.phone);
   const email = source.email_address?.trim();
@@ -142,14 +140,6 @@ export function buildWardContactLinks(
   const links: (WardContactLink | null)[] = [
     website
       ? { kind: "website", label: "Website", href: website, isExternal: true }
-      : null,
-    signupUrl
-      ? {
-          kind: "signup",
-          label: "Newsletter signup",
-          href: signupUrl,
-          isExternal: true,
-        }
       : null,
     phone && telHref
       ? { kind: "phone", label: phone, href: telHref, isExternal: false }
