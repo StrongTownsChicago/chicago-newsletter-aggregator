@@ -233,9 +233,10 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
       ))}
     </div>
 
-    {timelineQuery && <SearchTimeline query={timelineQuery} />}
-
     <!-- Pagination -->
     <Pagination currentPage={page} totalPages={totalPages} baseUrl={baseUrl} />
+
+    <!-- After pagination, so revealing it never moves the page links -->
+    {timelineQuery && <SearchTimeline query={timelineQuery} />}
   </div>
 </Layout>

@@ -115,14 +115,32 @@ describe("respondWithSearchTimeline", () => {
     const { cache } = createMemoryCache();
     mockRpc.mockResolvedValue({
       data: null,
-      error: { code: "57014", message: "canceling statement due to statement timeout" },
+      error: { code: "08006", message: "connection failure" },
     });
 
     const response = await respond(requestUrl("snow"), cache);
 
     expect(response.status).toBe(503);
     expect(response.headers.get("Cache-Control")).toBe(SEARCH_TIMELINE_CACHE_CONTROL.noStore);
+    expect(await response.json()).toEqual({ error: SEARCH_TIMELINE_ERRORS.failed });
     expect(cache.put).not.toHaveBeenCalled();
+  });
+
+  it("caches a statement timeout briefly so repeats don't re-run the query", async () => {
+    const { cache } = createMemoryCache();
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { code: "57014", message: "canceling statement due to statement timeout" },
+    });
+
+    const first = await respond(requestUrl("snow"), cache);
+    const second = await respond(requestUrl("snow"), cache);
+
+    expect(first.status).toBe(503);
+    expect(first.headers.get("Cache-Control")).toBe(SEARCH_TIMELINE_CACHE_CONTROL.timedOut);
+    expect(await first.json()).toEqual({ error: SEARCH_TIMELINE_ERRORS.timedOut });
+    expect(second.status).toBe(503);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
   });
 
   it("returns 503 when the client throws", async () => {

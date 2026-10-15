@@ -26,6 +26,10 @@ describe("normalizeTimelineQuery", () => {
     expect(normalizeTimelineQuery("  snow \t  removal\n")).toBe("snow removal");
   });
 
+  it("keeps non-ASCII spaces inside the query, which Postgres may not split on", () => {
+    expect(normalizeTimelineQuery(" snow -removal ")).toBe("snow -removal");
+  });
+
   it("keeps websearch syntax and case intact", () => {
     expect(normalizeTimelineQuery('"Speed Hump" or -parking')).toBe(
       '"Speed Hump" or -parking',
@@ -206,13 +210,23 @@ describe("fetchSearchTimeline", () => {
     });
   });
 
-  it("throws on other database errors", async () => {
+  it("reports timedOut when the query hits the statement timeout", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
       error: { code: "57014", message: "canceling statement due to statement timeout" },
     });
+    expect(await fetchSearchTimeline({ rpc } as never, "snow", now)).toEqual({
+      status: "timedOut",
+    });
+  });
+
+  it("throws on other database errors", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "search_query must be 1 to 200 characters" },
+    });
     await expect(fetchSearchTimeline({ rpc } as never, "snow", now)).rejects.toThrow(
-      "statement timeout",
+      "search_query must be",
     );
   });
 });

@@ -12,8 +12,9 @@ import {
  * Request handling for `GET /api/search-timeline?q=...`, kept separate from
  * the route file so it can be tested with an injected client and cache.
  *
- * Responses are shared by everyone (anon client, no cookies), so successful
- * and "not deployed" responses are cached at the edge per normalized query.
+ * Responses are shared by everyone (anon client, no cookies), so successful,
+ * "not deployed" and timed-out responses are cached at the edge per normalized
+ * query.
  * That keeps database load to one call per distinct query per cache lifetime.
  */
 
@@ -28,16 +29,24 @@ const TIMELINE_EDGE_MAX_AGE_SECONDS = 60 * SECONDS_PER_MINUTE;
  * appears soon after the migration is applied.
  */
 const UNAVAILABLE_MAX_AGE_SECONDS = 5 * SECONDS_PER_MINUTE;
+/**
+ * Cache lifetime for a query that hit the database statement timeout. Retrying
+ * it right away would most likely time out again and add load while the
+ * database is already slow, so the failure is shared briefly.
+ */
+const TIMED_OUT_MAX_AGE_SECONDS = 5 * SECONDS_PER_MINUTE;
 
 export const SEARCH_TIMELINE_CACHE_CONTROL = {
   ok: `public, max-age=${TIMELINE_BROWSER_MAX_AGE_SECONDS}, s-maxage=${TIMELINE_EDGE_MAX_AGE_SECONDS}`,
   unavailable: `public, max-age=${UNAVAILABLE_MAX_AGE_SECONDS}, s-maxage=${UNAVAILABLE_MAX_AGE_SECONDS}`,
+  timedOut: `public, max-age=${TIMED_OUT_MAX_AGE_SECONDS}, s-maxage=${TIMED_OUT_MAX_AGE_SECONDS}`,
   noStore: "no-store",
 } as const;
 
 export const SEARCH_TIMELINE_ERRORS = {
   invalidQuery: "invalid_query",
   unavailable: "timeline_unavailable",
+  timedOut: "timeline_timed_out",
   failed: "timeline_failed",
 } as const;
 
@@ -78,23 +87,33 @@ async function buildTimelineResponse(
   { supabase, now }: SearchTimelineRequestDependencies,
 ): Promise<Response> {
   const result = await fetchSearchTimeline(supabase, query, now);
-  return result.status === "ok"
-    ? jsonResponse(
+  switch (result.status) {
+    case "ok":
+      return jsonResponse(
         { months: result.months },
         HTTP_STATUS.ok,
         SEARCH_TIMELINE_CACHE_CONTROL.ok,
-      )
-    : jsonResponse(
+      );
+    case "unavailable":
+      return jsonResponse(
         { error: SEARCH_TIMELINE_ERRORS.unavailable },
         HTTP_STATUS.notFound,
         SEARCH_TIMELINE_CACHE_CONTROL.unavailable,
       );
+    case "timedOut":
+      return jsonResponse(
+        { error: SEARCH_TIMELINE_ERRORS.timedOut },
+        HTTP_STATUS.serviceUnavailable,
+        SEARCH_TIMELINE_CACHE_CONTROL.timedOut,
+      );
+  }
 }
 
 /**
  * Responds to a timeline request: validates the query, serves from the edge
  * cache when possible, and otherwise queries the database and caches the
- * result. Database errors return 503 and are never cached.
+ * result. A statement timeout returns a briefly cached 503; any other database
+ * error returns an uncached 503.
  */
 export async function respondWithSearchTimeline(
   requestUrl: URL,

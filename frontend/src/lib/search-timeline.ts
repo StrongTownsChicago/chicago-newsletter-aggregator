@@ -24,6 +24,16 @@ export const SEARCH_TIMELINE_MAX_QUERY_LENGTH = 200;
  */
 const MISSING_FUNCTION_ERROR_CODES = new Set(["PGRST202", "42883"]);
 
+/** Postgres `query_canceled`, raised when the statement timeout is hit. */
+const STATEMENT_TIMEOUT_ERROR_CODE = "57014";
+
+/**
+ * Whitespace that `websearch_to_tsquery` treats as a separator. Only these
+ * runs are collapsed: other Unicode spaces (e.g. U+00A0) can change how the
+ * query is parsed, so they are passed through exactly as search passes them.
+ */
+const QUERY_WHITESPACE_RUN = /[ \t\n\r\f\v]+/g;
+
 const RPC_MONTH_PATTERN = /^(\d{4})-(\d{2})-01$/;
 const TIMELINE_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const MONTHS_PER_YEAR = 12;
@@ -42,18 +52,20 @@ export interface SearchTimelineResponseBody {
 
 export type SearchTimelineResult =
   | { status: "ok"; months: TimelineMonth[] }
-  | { status: "unavailable" };
+  | { status: "unavailable" }
+  | { status: "timedOut" };
 
 /**
- * Validates a search query for the timeline. Trims and collapses whitespace
- * (which does not change `websearch_to_tsquery` matching, and lets equivalent
- * queries share a cache entry). Returns null when empty or too long; length is
- * counted in characters, as Postgres `char_length` does.
+ * Validates a search query for the timeline. Trims it like the search page
+ * does and collapses ASCII whitespace runs (which does not change
+ * `websearch_to_tsquery` matching, and lets equivalent queries share a cache
+ * entry). Returns null when empty or too long; length is counted in
+ * characters, as Postgres `char_length` does.
  */
 export function normalizeTimelineQuery(
   rawQuery: string | null | undefined,
 ): string | null {
-  const query = (rawQuery ?? "").replace(/\s+/g, " ").trim();
+  const query = (rawQuery ?? "").trim().replace(QUERY_WHITESPACE_RUN, " ");
   if (!query) return null;
   return [...query].length <= SEARCH_TIMELINE_MAX_QUERY_LENGTH ? query : null;
 }
@@ -158,10 +170,16 @@ export function isMissingFunctionError(error: { code?: string }): boolean {
   return error.code !== undefined && MISSING_FUNCTION_ERROR_CODES.has(error.code);
 }
 
+/** Whether a Supabase RPC error is the statement timeout cancelling the query. */
+export function isStatementTimeoutError(error: { code?: string }): boolean {
+  return error.code === STATEMENT_TIMEOUT_ERROR_CODE;
+}
+
 /**
  * Fetches the timeline for a normalized query, filled through the current
- * Chicago month. Resolves `unavailable` when the database function is missing;
- * throws on any other database error.
+ * Chicago month. Resolves `unavailable` when the database function is missing
+ * and `timedOut` when the query hit its statement timeout; throws on any other
+ * database error.
  */
 export async function fetchSearchTimeline(
   supabase: Pick<SupabaseClient, "rpc">,
@@ -174,6 +192,7 @@ export async function fetchSearchTimeline(
 
   if (error) {
     if (isMissingFunctionError(error)) return { status: "unavailable" };
+    if (isStatementTimeoutError(error)) return { status: "timedOut" };
     throw new Error(`Failed to fetch search timeline: ${error.message}`);
   }
 

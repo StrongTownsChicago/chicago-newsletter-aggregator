@@ -27,9 +27,10 @@
 -- * search_path is pinned to '' and every relation is schema-qualified;
 --   built-ins resolve through pg_catalog, which is always searched.
 -- * statement_timeout in the definition: PostgREST 12+ (Supabase RPC) applies a
---   function's statement_timeout setting to the request transaction, on top of
---   the anon/authenticated role timeouts. Called from plain SQL, the session's
---   own timeout governs instead.
+--   function's settings to the request transaction before calling it, so this
+--   3s replaces the calling role's timeout (anon 3s, authenticated 8s) for the
+--   call. Postgres itself does not re-arm the timer for a SET clause, so called
+--   from plain SQL (e.g. the SQL editor) the session's own timeout governs.
 -- * Input is limited to 1-200 characters after trimming (matches
 --   SEARCH_TIMELINE_MAX_QUERY_LENGTH in frontend/src/lib/search-timeline.ts).
 --   Anything else raises invalid_parameter_value (SQLSTATE 22023).
