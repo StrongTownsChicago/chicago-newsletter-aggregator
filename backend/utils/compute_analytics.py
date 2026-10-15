@@ -38,6 +38,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from analytics.boilerplate import remove_source_boilerplate
 from analytics.facts import (
     build_metadata,
     build_newsletter_facts,
@@ -93,6 +94,12 @@ NEWSLETTER_COLUMNS = (
 LLM_METADATA_COLUMNS = "id, topics"
 SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
+# Text repeated in at least this share of one source's newsletters is template
+# (footers, office hours, resource lists) and is left out of every term metric.
+BOILERPLATE_MIN_SHARE_PERCENT = 30
+# Sources with fewer newsletters keep all their text: a few consecutive issues
+# repeating one event announcement would otherwise look like a template.
+BOILERPLATE_MIN_SOURCE_NEWSLETTERS = 10
 # Terms in fewer newsletters are mostly one-off names and typos; 20 keeps the
 # term index around a few MB for the full archive.
 DEFAULT_MIN_TERM_NEWSLETTERS = 20
@@ -224,8 +231,13 @@ def compute_outputs(
 ) -> dict[str, Any]:
     """Compute every analytics output, keyed by output file stem."""
     sources_by_id = {source.id: source for source in sources}
+    content_newsletters = remove_source_boilerplate(
+        newsletters,
+        min_share_percent=BOILERPLATE_MIN_SHARE_PERCENT,
+        min_source_newsletters=BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
+    )
     documents: list[NewsletterTerms] = build_newsletter_terms(
-        newsletters, sources_by_id
+        content_newsletters, sources_by_id
     )
     vocabulary = select_vocabulary(documents, min_term_newsletters)
 

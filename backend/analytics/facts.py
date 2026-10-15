@@ -7,6 +7,16 @@ from typing import Any
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.text import count_words
 
+# Bodies shorter than this are mostly image-only issues or "view in browser"
+# stubs whose content was not extracted, so a term missing from them says
+# little about what the alderman wrote.
+MIN_EXTRACTED_WORDS = 80
+
+
+def is_text_unavailable(plain_text: str) -> bool:
+    """True when too little text was extracted to analyze the newsletter's content."""
+    return count_words(plain_text) < MIN_EXTRACTED_WORDS
+
 
 def build_newsletter_fact(
     newsletter: NewsletterRecord, source: SourceRecord | None
@@ -24,6 +34,7 @@ def build_newsletter_fact(
         "alder": source.name if source else None,
         "topics": newsletter.topics,
         "words": count_words(newsletter.plain_text),
+        "text_unavailable": is_text_unavailable(newsletter.plain_text),
     }
 
 

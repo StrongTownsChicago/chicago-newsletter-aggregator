@@ -55,6 +55,25 @@ class TestBuildNewsletterTerms(unittest.TestCase):
         # Subject and body are separate phrases.
         self.assertNotIn("lanes zoning", document.terms)
 
+    def test_merges_plurals_under_the_most_common_written_form(self):
+        texts = ["New speed humps", "More speed humps", "One speed hump"]
+        newsletters = [
+            NewsletterRecord(
+                id=f"n{index}",
+                received_date=date(2026, 3, 4),
+                source_id=None,
+                subject="",
+                plain_text=text,
+                topics=None,
+            )
+            for index, text in enumerate(texts)
+        ]
+        documents = build_newsletter_terms(newsletters, {})
+        self.assertTrue(all("speed humps" in document.terms for document in documents))
+        self.assertTrue(
+            all("speed hump" not in document.terms for document in documents)
+        )
+
 
 class TestVocabulary(unittest.TestCase):
     def test_counts_newsletters_not_occurrences(self):
@@ -103,6 +122,11 @@ class TestNameTokens(unittest.TestCase):
     def test_term_mentions_name(self):
         self.assertTrue(term_mentions_name("alderman dowell", {"dowell"}))
         self.assertFalse(term_mentions_name("bronzeville", {"dowell"}))
+
+    def test_term_mentions_name_in_another_plural_form(self):
+        # "Burns" and "burn" fold together, so either written form names the alderman.
+        self.assertTrue(term_mentions_name("burn", {"burns"}))
+        self.assertTrue(term_mentions_name("alderman hopkins", {"hopkins"}))
 
 
 class TestDistinctiveTerms(unittest.TestCase):

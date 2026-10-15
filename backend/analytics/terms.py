@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from analytics.plurals import choose_display_forms, fold_plural
 from analytics.records import (
     NewsletterRecord,
     SourceRecord,
@@ -39,11 +40,23 @@ class NewsletterTerms:
 def build_newsletter_terms(
     newsletters: list[NewsletterRecord], sources_by_id: dict[int, SourceRecord]
 ) -> list[NewsletterTerms]:
-    """Tokenize every newsletter's subject and body once."""
+    """Tokenize every newsletter's subject and body once.
+
+    Singular and plural forms of a term are merged and named by their most
+    common written form across these newsletters (see `analytics.plurals`).
+    """
 
     def ward_for(source_id: int | None) -> str | None:
         source = sources_by_id.get(source_id) if source_id is not None else None
         return source.ward if source else None
+
+    written_terms = [
+        extract_terms(f"{newsletter.subject}\n{newsletter.plain_text}")
+        for newsletter in newsletters
+    ]
+    display_forms = choose_display_forms(
+        Counter(term for terms in written_terms for term in terms)
+    )
 
     return [
         NewsletterTerms(
@@ -51,11 +64,9 @@ def build_newsletter_terms(
             source_id=newsletter.source_id,
             ward=ward_for(newsletter.source_id),
             month=month_key(newsletter.received_date),
-            terms=frozenset(
-                extract_terms(f"{newsletter.subject}\n{newsletter.plain_text}")
-            ),
+            terms=frozenset(display_forms[term] for term in terms),
         )
-        for newsletter in newsletters
+        for newsletter, terms in zip(newsletters, written_terms, strict=True)
     ]
 
 
@@ -163,8 +174,13 @@ def build_name_tokens_by_ward(sources: Iterable[SourceRecord]) -> dict[str, set[
 
 
 def term_mentions_name(term: str, name_tokens: set[str]) -> bool:
-    """True if any word of the term is one of the given name words."""
-    return any(word in name_tokens for word in term.split())
+    """True if any word of the term is one of the given name words.
+
+    Words are compared with plurals folded: a term is named by its most common
+    written form, which may be a plural or singular variant of a name word.
+    """
+    folded_names = {fold_plural(name) for name in name_tokens}
+    return any(fold_plural(word) in folded_names for word in term.split())
 
 
 def score_distinctive_term(

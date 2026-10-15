@@ -4,10 +4,12 @@ import unittest
 from datetime import date, datetime
 
 from analytics.facts import (
+    MIN_EXTRACTED_WORDS,
     build_metadata,
     build_newsletter_fact,
     build_newsletter_facts,
     build_source_coverage,
+    is_text_unavailable,
 )
 from analytics.records import NewsletterRecord, SourceRecord
 
@@ -41,6 +43,7 @@ class TestBuildNewsletterFact(unittest.TestCase):
                 "alder": "Ada Alder",
                 "topics": ["bike_lanes"],
                 "words": 3,
+                "text_unavailable": True,
             },
         )
         self.assertNotIn("plain_text", fact)
@@ -52,6 +55,15 @@ class TestBuildNewsletterFact(unittest.TestCase):
         )
         self.assertIsNone(fact["ward"])
         self.assertIsNone(fact["alder"])
+
+
+class TestIsTextUnavailable(unittest.TestCase):
+    def test_flags_bodies_shorter_than_the_minimum(self):
+        self.assertTrue(is_text_unavailable(""))
+        self.assertTrue(is_text_unavailable("word " * (MIN_EXTRACTED_WORDS - 1)))
+
+    def test_bodies_at_the_minimum_are_available(self):
+        self.assertFalse(is_text_unavailable("word " * MIN_EXTRACTED_WORDS))
 
 
 class TestBuildNewsletterFacts(unittest.TestCase):

@@ -1,8 +1,10 @@
 """Unit tests for analytics/text.py tokenization."""
 
+import re
 import unittest
 
 from analytics.text import (
+    EMAIL_PATTERN,
     count_words,
     extract_terms,
     normalize_text,
@@ -22,6 +24,44 @@ class TestNormalizeText(unittest.TestCase):
         self.assertNotIn("example", normalized)
         self.assertNotIn("ward32", normalized)
         self.assertIn(" . ", normalized)
+
+    def test_replaces_email_inside_a_longer_token(self):
+        normalized = normalize_text("write(info@ward32.org) today")
+        self.assertNotIn("ward32", normalized)
+        self.assertIn("today", normalized)
+
+    def test_email_pattern_matches_exactly_what_the_unanchored_pattern_did(self):
+        # The lookbehind only skips retries inside a run: an unanchored match
+        # can always extend back to the start of its run, so matches are equal.
+        unanchored = re.compile(r"\S+@\S+\.\S+")
+        samples = [
+            "info@ward32.org",
+            "(info@ward32.org)",
+            "email:info@ward32.org today",
+            "Email: info@ward32.org, or call",
+            "<a@b.co> and c@d.org.",
+            "write\u00a0info@ward32.org now",
+            "a@b@c.d e@f",
+            "no email here @ all.",
+            "@ward32.org",
+            "x@y. trailing",
+            "line one\nfoo@bar.com\tbaz@qux.io",
+        ]
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertEqual(
+                    [match.span() for match in EMAIL_PATTERN.finditer(sample)],
+                    [match.span() for match in unanchored.finditer(sample)],
+                )
+
+    def test_email_after_punctuation_does_not_leak_into_terms(self):
+        terms = extract_terms("Questions? email:info@ward32.org or (help@ward32.org)")
+        self.assertFalse(any("ward32" in term or "info" in term for term in terms))
+
+    def test_long_runs_without_spaces_are_handled_in_linear_time(self):
+        # A per-position retry made runs like this take minutes.
+        normalized = normalize_text("x" * 200_000 + " ward")
+        self.assertTrue(normalized.endswith("ward"))
 
     def test_replaces_www_urls(self):
         self.assertNotIn(
@@ -44,6 +84,11 @@ class TestNormalizeToken(unittest.TestCase):
         self.assertIsNone(normalize_token("60614"))
         self.assertIsNone(normalize_token("218af5f0b5"))
         self.assertIsNone(normalize_token("x"))
+
+    def test_keeps_allowlisted_service_numbers(self):
+        for token in ("311", "chi311", "911", "988", "211"):
+            with self.subTest(token=token):
+                self.assertEqual(normalize_token(token), token)
 
     def test_keeps_ordinals_used_in_street_names(self):
         self.assertEqual(normalize_token("75th"), "75th")
@@ -90,6 +135,9 @@ class TestExtractTerms(unittest.TestCase):
 
     def test_hyphenated_words_form_bigrams(self):
         self.assertIn("single stair", extract_terms("single-stair reform"))
+
+    def test_keeps_311_in_terms(self):
+        self.assertIn("call 311", extract_terms("Call 311 to report potholes"))
 
     def test_empty_text_has_no_terms(self):
         self.assertEqual(extract_terms(""), set())

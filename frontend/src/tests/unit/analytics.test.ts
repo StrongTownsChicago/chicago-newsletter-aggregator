@@ -24,11 +24,11 @@ import {
   listTopics,
   listWards,
   listWindowMonths,
-  lookupTermPostings,
   MIN_MONTH_LABEL_WIDTH,
   monthDateRange,
   monthTickLabeler,
   normalizeTermQuery,
+  resolveIndexedTerm,
   searchScopeForFilters,
   shareOrNull,
   STREET_SAFETY_LABELING_START_MONTH,
@@ -353,20 +353,37 @@ describe("term explorer", () => {
     expect(normalizeTermQuery("Ward’s")).toBe("ward's");
   });
 
-  it("looks up postings and reports misses as null", () => {
-    expect(lookupTermPostings(index, "Bike Lanes")).toEqual([0, 2, 2, 1]);
-    expect(lookupTermPostings(index, "streetcar")).toBeNull();
+  it("resolves queries to indexed terms and reports misses as null", () => {
+    expect(resolveIndexedTerm(index, "Bike Lanes")).toBe("bike lanes");
+    expect(resolveIndexedTerm(index, "streetcar")).toBeNull();
+    expect(resolveIndexedTerm(index, "  ")).toBeNull();
+  });
+
+  it("finds a term under its indexed written form whichever plural form is typed", () => {
+    // The backend merges "bike lane" and "bike lanes" and names the group by its commoner form.
+    expect(resolveIndexedTerm(index, "bike lane")).toBe("bike lanes");
+    expect(resolveIndexedTerm(index, "Bikes")).toBe("bike");
+    expect(resolveIndexedTerm(index, "bike shares")).toBe("bike share");
+  });
+
+  it("does not fold words the backend keeps whole", () => {
+    const newsIndex: TermIndex = { ...index, terms: { new: [0, 1] } };
+    expect(resolveIndexedTerm(newsIndex, "news")).toBeNull();
   });
 
   it("ignores inherited object keys instead of returning prototype members", () => {
     for (const query of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
-      expect(lookupTermPostings(index, query)).toBeNull();
+      expect(resolveIndexedTerm(index, query)).toBeNull();
     }
   });
 
   it("suggests longer indexed terms by prefix, shortest first", () => {
     expect(suggestTerms(index, "bike", 5)).toEqual(["bike lanes", "bike share"]);
     expect(suggestTerms(index, "", 5)).toEqual([]);
+  });
+
+  it("leaves the queried term out of suggestions even when typed in another form", () => {
+    expect(suggestTerms(index, "bike lane", 5)).toEqual([]);
   });
 
   it("expands postings and applies ward and date filters", () => {

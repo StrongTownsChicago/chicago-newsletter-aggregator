@@ -18,10 +18,10 @@ import {
   listSourceWards,
   listWards,
   listWindowMonths,
-  lookupTermPostings,
   MIN_MONTH_NEWSLETTERS_FOR_SHARES,
   monthOf,
   normalizeTermQuery,
+  resolveIndexedTerm,
   searchScopeForFilters,
   suggestTerms,
   summarizeFacts,
@@ -384,8 +384,8 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
     clearResults();
     return;
   }
-  const postings = lookupTermPostings(index, term);
-  if (!postings) {
+  const indexedTerm = resolveIndexedTerm(index, term);
+  if (indexedTerm === null) {
     message.textContent =
       `"${term}" is not in the term index. It may be too rare (fewer than ${index.min_newsletters} newsletters), ` +
       "a common stopword, or a phrase longer than two words." +
@@ -395,11 +395,13 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   }
 
   const scopeFacts = filterFacts(state.data.newsletters, { ...filters, topic: null });
+  const postings = index.terms[indexedTerm];
   const bucketCounts = expandTermPostings(index, postings, state.wardBySource, filters);
   const months = termMentionsByMonth(bucketCounts, scopeFacts);
   const wards = termMentionsByWard(bucketCounts, scopeFacts);
   const totalMentions = months.reduce((total, point) => total + point.mentions, 0);
-  message.textContent = `"${term}" appears in ${pluralize(totalMentions, "newsletter")} out of ${numberFormat.format(scopeFacts.length)} in the selected wards and dates.`;
+  // A query can match another written form of the term ("bike lane" finds "bike lanes").
+  message.textContent = `"${indexedTerm}" appears in ${pluralize(totalMentions, "newsletter")} out of ${numberFormat.format(scopeFacts.length)} in the selected wards and dates.`;
 
   if (totalMentions === 0) {
     clearResults();
@@ -417,7 +419,7 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   wardsChart.replaceChildren(
     renderTermWards(
       wards.slice(0, TERM_WARD_LIMIT),
-      term,
+      indexedTerm,
       // The term index has no topic, so neither do its search links.
       searchScopeForFilters(filters, { includeTopic: false }),
       chartWidth(wardsChart),

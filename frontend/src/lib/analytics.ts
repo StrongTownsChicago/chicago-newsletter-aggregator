@@ -1,6 +1,8 @@
 // Pure aggregation logic for the local /analytics dashboard.
 // Data shapes mirror the JSON written by backend/utils/compute_analytics.py.
 
+import { foldTerm } from "./plurals";
+
 export interface NewsletterFact {
   id: string;
   date: string; // YYYY-MM-DD, Chicago time
@@ -9,6 +11,8 @@ export interface NewsletterFact {
   alder: string | null;
   topics: string[] | null; // null = not yet processed by the LLM
   words: number;
+  /** Too little text was extracted to analyze (image-only or "view in browser" issues). */
+  text_unavailable?: boolean;
 }
 
 export interface SourceCoverage {
@@ -418,18 +422,37 @@ export function normalizeTermQuery(query: string): string {
   return query.toLowerCase().replace(/[‘’]/g, "'").trim().replace(/\s+/g, " ");
 }
 
-export function lookupTermPostings(index: TermIndex, query: string): number[] | null {
-  const term = normalizeTermQuery(query);
-  // Own keys only: "constructor" or "__proto__" must not resolve to Object.prototype members.
-  return Object.hasOwn(index.terms, term) ? index.terms[term] : null;
+const indexedTermsByFold = new WeakMap<TermIndex, Map<string, string>>();
+
+/** Map each folded term to the written form the index stores it under, built once per index. */
+function indexedTermsByFoldedForm(index: TermIndex): Map<string, string> {
+  let byFold = indexedTermsByFold.get(index);
+  if (!byFold) {
+    byFold = new Map(Object.keys(index.terms).map((term) => [foldTerm(term), term]));
+    indexedTermsByFold.set(index, byFold);
+  }
+  return byFold;
 }
 
-/** Up to `limit` indexed terms that start with the query, most specific first. */
+/**
+ * The index key for a query, or null. The backend merges singular and plural
+ * forms under the most common written one, so "bike lane" finds "bike lanes".
+ */
+export function resolveIndexedTerm(index: TermIndex, query: string): string | null {
+  const term = normalizeTermQuery(query);
+  if (!term) return null;
+  // Own keys only: "constructor" or "__proto__" must not resolve to Object.prototype members.
+  if (Object.hasOwn(index.terms, term)) return term;
+  return indexedTermsByFoldedForm(index).get(foldTerm(term)) ?? null;
+}
+
+/** Up to `limit` indexed terms that start with the query, most specific first; the query's own term is left out. */
 export function suggestTerms(index: TermIndex, query: string, limit: number): string[] {
   const normalized = normalizeTermQuery(query);
   if (!normalized) return [];
+  const queriedTerm = resolveIndexedTerm(index, normalized);
   return Object.keys(index.terms)
-    .filter((term) => term.startsWith(normalized) && term !== normalized)
+    .filter((term) => term.startsWith(normalized) && term !== queriedTerm)
     .sort((a, b) => a.length - b.length || a.localeCompare(b))
     .slice(0, limit);
 }
