@@ -3,6 +3,11 @@ import eslintPluginAstro from "eslint-plugin-astro";
 import noUnsanitized from "eslint-plugin-no-unsanitized";
 import tseslint from "typescript-eslint";
 
+/** Code lines per file: blank lines and comments don't count. */
+const maxLines = (max) => ({
+  "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
+});
+
 export default defineConfig(
   { ignores: ["dist/**", ".astro/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**"] },
   ...tseslint.configs.recommended,
@@ -48,6 +53,15 @@ export default defineConfig(
       }],
     },
   },
+  // New files stay under the cap; one that outgrows it is split.
+  { files: ["src/**/*.{ts,astro}", "e2e/**/*.ts"], rules: maxLines(400) },
+  // Ceilings for files already over: lower freely, never raise. Split the file instead.
+  // src/tests/unit/lint-budgets.test.ts repeats them and checks each equals today's size.
+  { files: ["src/scripts/analytics-dashboard.ts"], rules: maxLines(1170) },
+  { files: ["src/lib/analytics-charts.ts"], rules: maxLines(851) },
+  { files: ["src/pages/preferences.astro"], rules: maxLines(785) },
+  { files: ["src/lib/analytics.ts"], rules: maxLines(635) },
+  { files: ["src/tests/unit/analytics.test.ts"], rules: maxLines(488) },
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,
   // and `expect(obj.method)` assertions on mocked methods.
   {
