@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ANALYTICS_DATA_BASE_PATH, analyticsFileUrl, CORE_ANALYTICS_FILES } from "../../lib/analytics-data";
+import { disallowRulesFor, isPathDisallowed } from "../robots-rules";
 
 const PUBLIC_DIRECTORY = path.resolve(__dirname, "../../../public");
 
@@ -38,12 +39,8 @@ describe("published analytics data", () => {
   });
 
   it("lets crawlers fetch the dashboard and its data", () => {
-    const disallowed = readPublicFile("robots.txt")
-      .split(/\r?\n/)
-      .filter((line) => line.startsWith("Disallow:"))
-      .map((line) => line.slice("Disallow:".length).trim());
-    const blocks = (path: string) => disallowed.some((rule) => rule !== "" && path.startsWith(rule));
-    expect(blocks("/analytics")).toBe(false);
-    expect(blocks(`${ANALYTICS_DATA_BASE_PATH}/terms.json`)).toBe(false);
+    const disallowed = disallowRulesFor(readPublicFile("robots.txt"), "Googlebot");
+    expect(isPathDisallowed(disallowed, "/analytics")).toBe(false);
+    expect(isPathDisallowed(disallowed, `${ANALYTICS_DATA_BASE_PATH}/terms.json`)).toBe(false);
   });
 });
