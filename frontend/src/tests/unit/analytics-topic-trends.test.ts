@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { LensReachCell } from "../../lib/analytics-reach";
 import {
   describeSparkline,
+  describeTopicReach,
   findAsOfMonth,
   findLargestChangeTopic,
   findPeakPoint,
   findWidestReachTopic,
+  formatLatestReach,
   formatPointChange,
   formatPoints,
   isPartialMonth,
+  latestReachCell,
   listFullMonths,
   MIN_TREND_SPAN,
   orderBySwing,
@@ -192,5 +195,31 @@ describe("findPeakPoint", () => {
 
   it("has no peak when no ward mentioned the topic", () => {
     expect(findPeakPoint(trendOf([0, 0, null]))).toBeNull();
+  });
+});
+
+describe("latest reach", () => {
+  const trendWith = (latest: LensReachCell | null) => ({
+    lens: "x",
+    points: [],
+    averageShare: null,
+    swing: 0,
+    latest,
+    latestChange: null,
+  });
+
+  it("states the last full month's wards with their denominator", () => {
+    const trend = trendWith(cell("x", "2026-03", 28, 37));
+    expect(latestReachCell(trend)?.month).toBe("2026-03");
+    expect(formatLatestReach(trend)).toBe("28 of 37");
+    expect(describeTopicReach(trend)).toBe("28 of 37 wards");
+  });
+
+  it("shows nothing when no ward sent newsletters that month", () => {
+    for (const trend of [trendWith(null), trendWith(cell("x", "2026-03", 0, 0))]) {
+      expect(latestReachCell(trend)).toBeNull();
+      expect(formatLatestReach(trend)).toBe("–");
+      expect(describeTopicReach(trend)).toBe("");
+    }
   });
 });

@@ -160,3 +160,19 @@ export function formatPointChange(change: number): string {
   const sign = points > 0 ? "+" : points < 0 ? "−" : "";
   return `${sign}${formatPoints(change)}`;
 }
+
+/** The last full month's reach cell, or null when no ward sent newsletters then. */
+export function latestReachCell(trend: TopicTrend): LensReachCell | null {
+  return trend.latest && trend.latest.activeWards > 0 ? trend.latest : null;
+}
+
+/** "28 of 37": wards mentioning a topic in the last full month, of wards sending. */
+export function formatLatestReach(trend: TopicTrend): string {
+  const latest = latestReachCell(trend);
+  return latest ? `${latest.wardsMentioning} of ${latest.activeWards}` : "–";
+}
+
+/** "28 of 37 wards". */
+export function describeTopicReach(trend: TopicTrend): string {
+  return latestReachCell(trend) ? `${formatLatestReach(trend)} wards` : "";
+}

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  COVERAGE_STATUS_LABELS,
   describeWardReach,
+  formatCount,
   formatLift,
+  formatMedian,
   formatOptionalShare,
   formatPercent,
   formatWard,
@@ -42,5 +45,18 @@ describe("analytics formats", () => {
 
   it("labels every lens ward status", () => {
     expect(Object.keys(LENS_WARD_STATUS_LABELS).sort()).toEqual(["mentioned", "no_newsletter", "not_mentioned"]);
+  });
+});
+
+describe("dashboard number formats", () => {
+  it("groups counts and rounds medians to one decimal", () => {
+    expect(formatCount(1234)).toBe("1,234");
+    expect(formatMedian(2.25)).toBe("2.3");
+    expect(formatMedian(4)).toBe("4");
+    expect(formatMedian(null)).toBe("–");
+  });
+
+  it("labels every coverage status", () => {
+    expect(Object.keys(COVERAGE_STATUS_LABELS).sort()).toEqual(["received", "silent", "untracked"]);
   });
 });

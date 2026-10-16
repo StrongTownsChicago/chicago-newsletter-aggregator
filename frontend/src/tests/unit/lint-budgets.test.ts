@@ -10,7 +10,6 @@ const DEFAULT_MAX_LINES = 400;
 // Same numbers as the max-lines ceilings in eslint.config.js. Raising one is a
 // two-place change on purpose; lower both when a file shrinks.
 const ADOPTED_CEILINGS: Record<string, number> = {
-  "src/scripts/analytics-dashboard.ts": 1170,
   "src/pages/preferences.astro": 785,
 };
 
