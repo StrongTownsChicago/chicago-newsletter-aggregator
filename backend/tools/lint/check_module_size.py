@@ -25,7 +25,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from tools.lint.source_trees import python_files
+from tools.lint.source_trees import physical_lines, python_files
 
 #: ``backend/``: this file sits two directories below it.
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,7 +108,7 @@ def _docstring_lines(tree: ast.Module) -> set[int]:
 
 def _comment_lines(source: str) -> set[int]:
     """Whole-line comments only; a trailing comment sits on a line of code."""
-    lines = source.splitlines()
+    lines = physical_lines(source)
     found: set[int] = set()
     try:
         for token in tokenize.generate_tokens(io.StringIO(source).readline):
@@ -190,7 +190,7 @@ def measure(source: str, rel: str, baseline: Baseline) -> Metrics:
         return Metrics(rel, 0, 0, allowed, error=f"{type(error).__name__}: {error}")
 
     skip = _docstring_lines(tree) | _comment_lines(source)
-    numbered = enumerate(source.splitlines(), 1)
+    numbered = enumerate(physical_lines(source), 1)
     return Metrics(
         path=rel,
         lines=sum(
@@ -268,7 +268,8 @@ def grew(recorded: Baseline, entries: Baseline) -> list[str]:
     """Every way the new measurement is larger than the recorded one.
 
     The per-file check is keyed on the path, so a rename carrying growth with it
-    would walk past. The total cannot be renamed around. An absent baseline is
+    would walk past, and a new entry has nothing to compare against. Each
+    field's total covers both. An absent baseline is
     the one case with nothing to compare, so it records whatever it finds.
     """
     if not recorded:
@@ -279,10 +280,11 @@ def grew(recorded: Baseline, entries: Baseline) -> list[str]:
         for field, was in entry.items()
         if entries.get(path, {}).get(field, 0) > was
     ]
-    before = sum(entry.get("lines", 0) for entry in recorded.values())
-    after = sum(entry.get("lines", 0) for entry in entries.values())
-    if after > before:
-        growth.append(f"total baselined lines {after}, was {before}")
+    for _, field, _cap in RULES.values():
+        before = sum(entry.get(field, 0) for entry in recorded.values())
+        after = sum(entry.get(field, 0) for entry in entries.values())
+        if after > before:
+            growth.append(f"total baselined {field} {after}, was {before}")
     return growth
 
 

@@ -67,6 +67,14 @@ class TestCaps(unittest.TestCase):
         half = "".join(f"# note {n}\n" for n in range(checker.COMMENT_BLOCK_MAX))
         self.assertNotIn("DS003", rules_hit(f"{half}\n{half}x = 1\n"))
 
+    def test_a_line_separator_inside_a_string_does_not_shift_lines(self) -> None:
+        for separator in ("\x0c", " "):
+            with self.subTest(separator=repr(separator)):
+                source = f'a = "x{separator}y"\n' + comment_block(
+                    checker.COMMENT_BLOCK_MAX + 1
+                )
+                self.assertIn("DS003", rules_hit(source))
+
     def test_trailing_comments_do_not_form_a_block(self) -> None:
         source = "".join(f"x{n} = 1  # note {n}\n" for n in range(9))
         self.assertNotIn("DS003", rules_hit(source))
@@ -96,6 +104,17 @@ class TestNoqa(unittest.TestCase):
             checker.MODULE_DOC_MAX + 5
         )
         self.assertNotIn("DS001", rules_hit(source))
+
+    def test_noqa_on_a_comment_line_inside_a_block_suppresses_that_line(self) -> None:
+        citation = "feature_planning" + "/x.md"
+        source = (
+            "# one\n"
+            f"# see {citation}  # noqa: DS101  kept for history\n"
+            f"# see {citation}\n"
+            "x = 1\n"
+        )
+        violations = checker.check_source(source, "a.py")
+        self.assertEqual([(v.rule, v.line) for v in violations], [("DS101", 3)])
 
     def test_noqa_on_a_comment_block_suppresses_ds003(self) -> None:
         source = "# noqa: DS003  a table\n" + comment_block(checker.COMMENT_BLOCK_MAX)

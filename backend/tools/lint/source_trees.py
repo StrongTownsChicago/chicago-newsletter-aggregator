@@ -1,4 +1,4 @@
-"""The backend trees the lint tools scan, shared so every tool agrees on scope."""
+"""What the lint tools scan and how they split it into lines, so every tool agrees."""
 
 from pathlib import Path
 
@@ -35,3 +35,12 @@ def python_files(root: Path, trees: tuple[str, ...] = TREES) -> list[Path]:
             if not SKIPPED_DIRECTORIES.intersection(path.relative_to(root).parts)
         )
     return files
+
+
+def physical_lines(source: str) -> list[str]:
+    """Source lines as ``ast`` and ``tokenize`` number them.
+
+    ``str.splitlines`` also breaks at form feeds and Unicode line separators,
+    which may sit inside a string literal and would shift every later line.
+    """
+    return source.split("\n")

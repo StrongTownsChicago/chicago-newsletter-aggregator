@@ -49,6 +49,12 @@ class TestMeasure(unittest.TestCase):
         )
         self.assertEqual(measure(source).lines, 1)
 
+    def test_a_line_separator_inside_a_string_does_not_shift_lines(self) -> None:
+        for separator in ("\x0c", " "):
+            with self.subTest(separator=repr(separator)):
+                source = f'a = "x{separator}y"\n# note\n# more\nb = 2\n'
+                self.assertEqual(measure(source).lines, 2)
+
     def test_a_string_that_is_not_a_docstring_is_code(self) -> None:
         self.assertEqual(measure('a = 1\n"""not a docstring"""\n').lines, 2)
 
@@ -127,6 +133,11 @@ class TestGrew(unittest.TestCase):
     def test_a_rename_carrying_growth_is_refused_by_the_total(self) -> None:
         growth = checker.grew({"a.py": {"lines": 410}}, {"b.py": {"lines": 600}})
         self.assertEqual(growth, ["total baselined lines 600, was 410"])
+
+    def test_a_new_public_names_entry_is_refused_by_the_total(self) -> None:
+        recorded = {"a.py": {"lines": 500}}
+        growth = checker.grew(recorded, {**recorded, "b.py": {"public": 45}})
+        self.assertEqual(growth, ["total baselined public 45, was 0"])
 
     def test_shrinking_or_dropping_entries_is_accepted(self) -> None:
         recorded = {"a.py": {"lines": 500}, "b.py": {"lines": 450}}

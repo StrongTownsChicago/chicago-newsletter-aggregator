@@ -7,8 +7,9 @@ today's count, which may only go down.
     uv run python -m tools.lint.check_docstrings            # gate
     uv run python -m tools.lint.check_docstrings --report   # list every site
 
-Suppress one site with ``# noqa: DS002`` on the ``def``/``class`` line, or on a
-comment line above a module docstring, with a reason. ``pyproject.toml``
+Suppress one site with ``# noqa: DS002`` on the ``def``/``class`` line, on a
+comment line above a module docstring, or on the first line of a comment block
+(or the flagged comment line itself), with a reason. ``pyproject.toml``
 declares ``DS`` in ``lint.external`` so ruff accepts the code.
 """
 
@@ -24,7 +25,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from tools.lint.source_trees import python_files
+from tools.lint.source_trees import physical_lines, python_files
 
 #: ``backend/``: this file sits two directories below it.
 ROOT = Path(__file__).resolve().parents[2]
@@ -114,7 +115,7 @@ def _noqa_codes(lines: list[str], start: int, end: int) -> set[str]:
 
 
 def _prose_violations(path: str, text: str, lineno: int) -> Iterator[Violation]:
-    for offset, line in enumerate(text.splitlines()):
+    for offset, line in enumerate(physical_lines(text)):
         for rule, pattern in _PROSE_RULES:
             found = pattern.search(line)
             if found is not None:
@@ -144,7 +145,7 @@ def _docstring_nodes(tree: ast.Module) -> Iterator[tuple[str, ast.Constant, int,
 
 def _comment_blocks(source: str) -> Iterator[tuple[int, list[str]]]:
     """Yield ``(first line, comment texts)`` for each run of whole-line comments."""
-    lines = source.splitlines()
+    lines = physical_lines(source)
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     except (tokenize.TokenError, SyntaxError):
@@ -172,7 +173,7 @@ def _comment_blocks(source: str) -> Iterator[tuple[int, list[str]]]:
 
 def check_source(source: str, rel: str) -> list[Violation]:
     """Return every violation in one file's source, ``rel`` being its path from ``backend/``."""
-    lines = source.splitlines()
+    lines = physical_lines(source)
     try:
         tree = ast.parse(source)
     except SyntaxError as error:
@@ -198,10 +199,12 @@ def check_source(source: str, rel: str) -> list[Violation]:
         if len(block) > COMMENT_BLOCK_MAX and "DS003" not in suppressed:
             found.append(Violation(rel, start, "DS003", f"{len(block)} lines"))
         for offset, comment in enumerate(block):
+            lineno = start + offset
+            line_suppressed = suppressed | _noqa_codes(lines, lineno, lineno)
             found.extend(
                 v
-                for v in _prose_violations(rel, comment, start + offset)
-                if v.rule not in suppressed
+                for v in _prose_violations(rel, comment, lineno)
+                if v.rule not in line_suppressed
             )
     return found
 
