@@ -39,6 +39,10 @@ export default defineConfig(
       "prefer-const": "error",
       // newsletter raw_html is rendered with set:html; every use needs a written reason
       "astro/no-set-html-directive": "error",
+      "no-restricted-syntax": ["error", {
+        selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
+        message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
+      }],
     },
   },
   {
