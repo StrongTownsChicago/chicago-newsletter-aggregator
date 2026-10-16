@@ -67,7 +67,7 @@ test('summary tiles name the widest-reaching topic of the last full month', asyn
   await openDashboard(page, '?wards=1,2,3');
   const tiles = page.locator('#summary-tiles > div');
   await expect(tiles.nth(1)).toContainText('3 of 3');
-  // April is partial (data through Apr 24), so March is the last full month.
+  // The data was generated in April, so March is the last full month.
   await expect(tiles.nth(2)).toContainText('Most mentioned topic, Mar 2026');
   await expect(tiles.nth(2)).toContainText('Public safety');
   await expect(tiles.nth(2)).toContainText('3 of 3 wards');
@@ -83,6 +83,26 @@ test('choosing a topic in the overview opens its detail', async ({ page }) => {
   await expect(page.locator('#topic-detail-trend svg')).toBeVisible();
   await expect(page.locator('#topic-detail-wards svg')).toBeVisible();
   await expect(page.locator('#topic-detail [data-caption]')).toContainText('Mar 2026: 2 of 3 wards');
+});
+
+test('calendar row labels are keyboard buttons that open the topic detail', async ({ page }) => {
+  await openDashboard(page);
+  const label = page.getByRole('button', { name: 'Show Budget & taxes detail' });
+  await label.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/[?&]topic=budget_taxes/);
+  await expect(page.locator('#topic-detail')).toBeVisible();
+  await expect(page.locator('#topic-detail-heading')).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Show Budget & taxes detail' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('the topic table fits a phone screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openDashboard(page);
+  const table = page.locator('#topic-trends');
+  await expect(table.locator('svg[role="img"]').first()).toHaveAttribute('aria-label', /Public safety|Budget & taxes/);
+  const overflow = await table.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test('filters change the panels and the URL', async ({ page }) => {
@@ -116,6 +136,8 @@ test('restores a shared view from the URL and supports back and forward', async 
   await page.reload();
   await expect(page.locator('select[name="lens"]')).toHaveValue('budget_taxes');
   await expect(page.locator('#profile-heading')).toHaveText('Ward 1 · Ada Example');
+  // A distinctive term standing for others from the same newsletters says so.
+  await expect(page.locator('#profile-distinctive svg text', { hasText: '+3 related' })).toHaveCount(1);
 
   await page.locator('select[name="lens"]').selectOption('public_safety');
   await expect(page).toHaveURL(/topic=public_safety/);
@@ -167,6 +189,9 @@ test('opens a ward profile from the filter bar', async ({ page }) => {
   await expect(page.locator('#profile-heading')).toHaveText('Ward 3 · Cy Example');
   await expect(page.locator('#profile-topics svg').first()).toBeVisible();
   await expect(page).toHaveURL(/[?&]ward=3(&|$)/);
+  await page.getByRole('button', { name: 'Reset filters' }).click();
+  await expect(page.locator('#ward-profile')).toBeHidden();
+  await expect(page).toHaveURL(/\/analytics$/);
 });
 
 test('names wards without newsletters and draws coverage on demand', async ({ page }) => {

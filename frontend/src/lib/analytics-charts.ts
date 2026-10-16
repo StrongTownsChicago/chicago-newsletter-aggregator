@@ -64,6 +64,8 @@ const COVERAGE_FONT_SIZE = "10px";
 const SPARKLINE_WIDTH = 120;
 const SPARKLINE_HEIGHT = 28;
 const TREND_HEIGHT = 200;
+/** Right margin of the distinctive terms chart when labels end in "+N related". */
+const DISTINCTIVE_RELATED_MARGIN = 220;
 /** Right margin of the rising terms chart when a "seasonal" tag may sit past the last dot. */
 const SEASONAL_TAG_MARGIN = 64;
 
@@ -243,7 +245,7 @@ export function renderReachTrend(
 /** A tiny line of monthly ward reach on its own tight scale, ending in a dot. */
 export function renderSparkline(points: TopicTrendPoint[], domain: [number, number], ariaLabel: string): Element {
   const shown = points.filter((point) => point.share !== null);
-  return Plot.plot({
+  const sparkline = Plot.plot({
     width: SPARKLINE_WIDTH,
     height: SPARKLINE_HEIGHT,
     margin: 4,
@@ -256,6 +258,9 @@ export function renderSparkline(points: TopicTrendPoint[], domain: [number, numb
       Plot.dot(shown.slice(-1), { x: "month", y: "share", r: 2.5, fill: CHART_COLORS.series }),
     ],
   });
+  // Read as one image with its label, not as a tree of unnamed marks.
+  sparkline.setAttribute("role", "img");
+  return sparkline;
 }
 
 export interface CivicCalendarOptions {
@@ -754,12 +759,14 @@ export function renderDistinctiveTerms(
   width: number,
 ): Element {
   const label = (item: DistinctiveTerm) =>
-    `${item.ward_newsletters} of ${wardNewsletters} · ${formatPercent(item.rest_share)} elsewhere`;
+    `${item.ward_newsletters} of ${wardNewsletters} · ${formatPercent(item.rest_share)} elsewhere` +
+    (item.related_terms ? ` · +${item.related_terms} related` : "");
+  const hasRelated = terms.some((item) => item.related_terms);
   return Plot.plot({
     ...baseOptions(width),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND,
     marginLeft: 170,
-    marginRight: 150,
+    marginRight: hasRelated ? DISTINCTIVE_RELATED_MARGIN : 150,
     x: { label: "Share of this ward's newsletters (%)", percent: true, grid: true },
     y: { label: null, domain: terms.map((item) => item.term), padding: 1 - MAX_BAR_THICKNESS },
     marks: [
@@ -771,7 +778,11 @@ export function renderDistinctiveTerms(
         href: (item: DistinctiveTerm) => buildSearchUrl({ q: item.term, ward }),
         title: (item: DistinctiveTerm) =>
           `"${item.term}" in ${item.ward_newsletters} of ${wardNewsletters} ${formatWard(ward)} newsletters (${formatPercent(item.ward_share)})\n` +
-          `Rest of city: ${formatPercent(item.rest_share)} · ${formatLift(item.lift)} as likely here\nClick to search`,
+          `Rest of city: ${formatPercent(item.rest_share)} · ${formatLift(item.lift)} as likely here` +
+          (item.related_terms
+            ? `\n+${item.related_terms} related term${item.related_terms === 1 ? "" : "s"} from the same newsletters`
+            : "") +
+          "\nClick to search",
         tip: true,
       }),
       Plot.text(terms, {

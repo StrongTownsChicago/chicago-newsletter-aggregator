@@ -111,6 +111,18 @@ describe("summarizeTopicTrends", () => {
     expect(findWidestReachTopic(thinLatest)).toBeNull();
     expect(findLargestChangeTopic([])).toBeNull();
   });
+
+  it("breaks ties by topic order", () => {
+    const tied = summarizeTopicTrends(
+      [cell("parks", "2026-03", 6), cell("budget", "2026-03", 6), cell("parks", "2026-02", 4), cell("budget", "2026-02", 4)],
+      ["parks", "budget"],
+      ["2026-02", "2026-03"],
+      0,
+    );
+    expect(findWidestReachTopic(tied)?.lens).toBe("parks");
+    expect(findLargestChangeTopic(tied)?.lens).toBe("parks");
+    expect(findWidestReachTopic([...tied].reverse())?.lens).toBe("budget");
+  });
 });
 
 describe("reachDeviation", () => {

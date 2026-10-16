@@ -523,13 +523,15 @@ function reachColumns(state: DashboardState, minActiveWards: number): TableColum
   ];
 }
 
-function textCell(tag: "td" | "th", text: string, className: string): HTMLTableCellElement {
-  const cell = document.createElement(tag);
-  cell.className = className;
-  cell.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
-  cell.textContent = text;
-  return cell;
+/** An element whose text the PNG export draws. */
+function exportText<K extends "td" | "th" | "span">(tag: K, text: string, className: string): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
+  element.textContent = text;
+  return element;
 }
+
 
 /** One row per topic: a button that selects it, a sparkline, the last full month and its change. */
 function buildTopicTrendTable(
@@ -543,10 +545,10 @@ function buildTopicTrendTable(
   const head = tableElement.createTHead().insertRow();
   const headClass = "text-left text-xs font-semibold text-gray-600 pb-1 pr-4";
   head.append(
-    textCell("th", "Topic", headClass),
-    textCell("th", "Trend", headClass),
-    textCell("th", latestMonth ? formatMonth(latestMonth) : "Latest", `${headClass} text-right`),
-    textCell("th", "vs average", `${headClass} text-right`),
+    exportText("th", "Topic", headClass),
+    exportText("th", "Trend", headClass),
+    exportText("th", latestMonth ? formatMonth(latestMonth) : "Latest", `${headClass} text-right`),
+    exportText("th", "vs average", `${headClass} text-right hidden sm:table-cell`),
   );
   const body = tableElement.createTBody();
   for (const trend of trends) {
@@ -560,21 +562,27 @@ function buildTopicTrendTable(
     button.dataset.topic = trend.lens;
     button.setAttribute("aria-pressed", String(trend.lens === selectedLens));
     button.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
-    button.className = "text-left text-blue-700 hover:underline whitespace-nowrap";
+    button.className =
+      "text-left text-blue-700 hover:underline sm:whitespace-nowrap rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600";
     button.textContent = label;
     topicCell.append(button);
     const sparkCell = row.insertCell();
-    sparkCell.className = "pr-4 py-0.5";
+    sparkCell.className = "pr-2 sm:pr-4 py-0.5";
     const shares = trend.points.flatMap((point) => (point.share === null ? [] : [point.share]));
     sparkCell.append(renderSparkline(trend.points, tightShareDomain(shares), describeSparkline(label, trend.points)));
-    row.append(
-      textCell("td", formatLatestReach(trend), "pr-4 text-right tabular-nums whitespace-nowrap"),
-      textCell(
-        "td",
-        trend.latestChange === null ? "–" : formatPointChange(trend.latestChange),
-        "text-right tabular-nums whitespace-nowrap",
+    const change = trend.latestChange === null ? "–" : formatPointChange(trend.latestChange);
+    // Narrow screens fold the change under the month's count instead of a fourth column.
+    const latestCell = row.insertCell();
+    latestCell.className = "sm:pr-4 text-right tabular-nums whitespace-nowrap";
+    latestCell.append(
+      exportText("span", formatLatestReach(trend), "block"),
+      exportText(
+        "span",
+        trend.latestChange === null ? change : `${change} vs avg.`,
+        "block text-xs text-gray-500 sm:hidden",
       ),
     );
+    row.append(exportText("td", change, "text-right tabular-nums whitespace-nowrap hidden sm:table-cell"));
   }
   return tableElement;
 }
@@ -622,6 +630,7 @@ function renderCivicCalendarPanel(
         )
       : emptyMessage("Nothing in these dates."),
   );
+  requireElement<HTMLElement>("#civic-calendar-scroll-hint", section).hidden = chart.scrollWidth <= chart.clientWidth;
   replaceContent(
     requireElement<HTMLElement>("#topic-trends", section),
     fullMonths.length ? buildTopicTrendTable(state, trends, fullMonths.at(-1), filters.lens) : emptyMessage("No full month in these dates."),
@@ -892,6 +901,7 @@ function renderWardProfilePanel(state: DashboardState, ward: string, months: str
       { label: "Ward newsletters", value: (item) => item.ward_newsletters, numeric: true },
       { label: "Ward share", value: (item) => formatPercent(item.ward_share), numeric: true },
       { label: "Rest of city share", value: (item) => formatPercent(item.rest_share), numeric: true },
+      { label: "Related terms", value: (item) => item.related_terms ?? 0, numeric: true },
     ],
     terms,
   );
