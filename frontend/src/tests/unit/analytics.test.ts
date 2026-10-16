@@ -1,80 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
   BROAD_COVERAGE_PEAK_FRACTION,
-  buildCoverageGrid,
-  buildLensWardGrid,
-  buildSearchUrl,
   classifyDateWindow,
   compareWards,
-  computeLensWardReach,
   countActiveWardsByMonth,
-  countNewslettersByWardMonth,
   daysBetween,
   describeDataAsOf,
   EMPTY_FILTERS,
-  expandTermPostings,
   filterFacts,
   findBroadCoverageWindow,
-  findLongestGaps,
   formatDay,
   formatMonth,
-  isReachFaded,
   listMonths,
   listSourceWards,
   listWards,
   listWindowMonths,
   MIN_MONTH_LABEL_WIDTH,
-  monthDateRange,
   monthTickLabeler,
-  normalizeTermQuery,
-  resolveIndexedTerm,
-  searchScopeForFilters,
   shareOrNull,
   summarizeWardCounts,
-  summarizeWardCoverage,
   wardsInScope,
   trimSparseEdges,
-  suggestTerms,
-  termMentionsByMonth,
-  termMentionsByWard,
-  type AnalyticsFilters,
   type AnalyticsMetadata,
-  type NewsletterFact,
-  type SourceCoverage,
-  type TermIndex,
 } from "../../lib/analytics";
-
-let nextId = 0;
-function fact(overrides: Partial<NewsletterFact> = {}): NewsletterFact {
-  nextId += 1;
-  return {
-    id: `n${nextId}`,
-    date: "2026-01-15",
-    source_id: 1,
-    ward: "1",
-    alder: "Ada Alder",
-    lenses: [],
-    words: 100,
-    ...overrides,
-  };
-}
-
-function filters(overrides: Partial<AnalyticsFilters> = {}): AnalyticsFilters {
-  return { ...EMPTY_FILTERS, ...overrides };
-}
-
-function source(overrides: Partial<SourceCoverage> = {}): SourceCoverage {
-  return {
-    id: 1,
-    name: "A",
-    ward: "1",
-    source_type: "alderman",
-    first_date: "2024-01-01",
-    last_date: "2026-01-01",
-    newsletters: 10,
-    ...overrides,
-  };
-}
+import { fact, filters, source } from "../analytics-fixtures";
 
 describe("dates and wards", () => {
   it("lists months inclusively across a year boundary", () => {
@@ -267,264 +216,6 @@ describe("date windows", () => {
     expect(classifyDateWindow(EMPTY_FILTERS, window)).toBe("full");
     expect(classifyDateWindow(filters({ fromMonth: "2026-02", toMonth: "2026-02" }), window)).toBe("custom");
     expect(classifyDateWindow(filters({ fromMonth: "2026-01" }), null)).toBe("custom");
-  });
-});
-
-describe("term explorer", () => {
-  const index: TermIndex = {
-    min_newsletters: 2,
-    months: ["2026-01", "2026-02"],
-    buckets: [
-      [1, 0],
-      [2, 0],
-      [2, 1],
-    ],
-    terms: { "bike lanes": [0, 2, 2, 1], bike: [0, 3], "bike share": [1, 1] },
-  };
-  const wardBySource = new Map<number, string | null>([
-    [1, "1"],
-    [2, "2"],
-  ]);
-  const scopeFacts = [
-    fact({ ward: "1", date: "2026-01-05" }),
-    fact({ ward: "1", date: "2026-01-06" }),
-    fact({ ward: "1", date: "2026-01-07" }),
-    fact({ ward: "1", date: "2026-01-08" }),
-    fact({ ward: "2", date: "2026-02-05", source_id: 2 }),
-    fact({ ward: "2", date: "2026-02-06", source_id: 2 }),
-  ];
-
-  it("normalizes queries like the backend tokenizer", () => {
-    expect(normalizeTermQuery("  Bike   LANES ")).toBe("bike lanes");
-    expect(normalizeTermQuery("Ward’s")).toBe("ward's");
-  });
-
-  it("resolves queries to indexed terms and reports misses as null", () => {
-    expect(resolveIndexedTerm(index, "Bike Lanes")).toBe("bike lanes");
-    expect(resolveIndexedTerm(index, "streetcar")).toBeNull();
-    expect(resolveIndexedTerm(index, "  ")).toBeNull();
-  });
-
-  it("finds a term under its indexed written form whichever plural form is typed", () => {
-    // The backend merges "bike lane" and "bike lanes" and names the group by its commoner form.
-    expect(resolveIndexedTerm(index, "bike lane")).toBe("bike lanes");
-    expect(resolveIndexedTerm(index, "Bikes")).toBe("bike");
-    expect(resolveIndexedTerm(index, "bike shares")).toBe("bike share");
-  });
-
-  it("does not fold words the backend keeps whole", () => {
-    const newsIndex: TermIndex = { ...index, terms: { new: [0, 1] } };
-    expect(resolveIndexedTerm(newsIndex, "news")).toBeNull();
-  });
-
-  it("ignores inherited object keys instead of returning prototype members", () => {
-    for (const query of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
-      expect(resolveIndexedTerm(index, query)).toBeNull();
-    }
-  });
-
-  it("suggests longer indexed terms by prefix, shortest first", () => {
-    expect(suggestTerms(index, "bike", 5)).toEqual(["bike lanes", "bike share"]);
-    expect(suggestTerms(index, "", 5)).toEqual([]);
-  });
-
-  it("leaves the queried term out of suggestions even when typed in another form", () => {
-    expect(suggestTerms(index, "bike lane", 5)).toEqual([]);
-  });
-
-  it("expands postings and applies ward and date filters", () => {
-    const postings = index.terms["bike lanes"];
-    expect(expandTermPostings(index, postings, wardBySource, EMPTY_FILTERS)).toEqual([
-      { sourceId: 1, ward: "1", month: "2026-01", newsletters: 2 },
-      { sourceId: 2, ward: "2", month: "2026-02", newsletters: 1 },
-    ]);
-    expect(expandTermPostings(index, postings, wardBySource, filters({ wards: ["2"] }))).toHaveLength(1);
-    expect(
-      expandTermPostings(index, postings, wardBySource, filters({ fromMonth: "2026-02" })),
-    ).toEqual([{ sourceId: 2, ward: "2", month: "2026-02", newsletters: 1 }]);
-  });
-
-  it("computes monthly mention shares against all newsletters that month", () => {
-    const buckets = expandTermPostings(index, index.terms["bike lanes"], wardBySource, EMPTY_FILTERS);
-    expect(termMentionsByMonth(buckets, scopeFacts, 1)).toEqual([
-      { month: "2026-01", mentions: 2, newsletters: 4, share: 0.5 },
-      { month: "2026-02", mentions: 1, newsletters: 2, share: 0.5 },
-    ]);
-  });
-
-  it("leaves shares of sparse months empty", () => {
-    const buckets = expandTermPostings(index, index.terms["bike lanes"], wardBySource, EMPTY_FILTERS);
-    expect(termMentionsByMonth(buckets, scopeFacts, 3).map((point) => point.share)).toEqual([0.5, null]);
-  });
-
-  it("zero-fills months without newsletters", () => {
-    const points = termMentionsByMonth([], [fact({ date: "2026-01-01" }), fact({ date: "2026-03-01" })]);
-    expect(points.map((point) => [point.month, point.newsletters])).toEqual([
-      ["2026-01", 1],
-      ["2026-02", 0],
-      ["2026-03", 1],
-    ]);
-  });
-
-  it("ranks wards by mentions with each ward's share", () => {
-    const buckets = expandTermPostings(index, index.terms["bike lanes"], wardBySource, EMPTY_FILTERS);
-    expect(termMentionsByWard(buckets, scopeFacts)).toEqual([
-      { ward: "1", mentions: 2, newsletters: 4, share: 0.5 },
-      { ward: "2", mentions: 1, newsletters: 2, share: 0.5 },
-    ]);
-  });
-});
-
-describe("lens ward reach", () => {
-  const facts = [
-    fact({ ward: "1", date: "2026-01-05", lenses: ["schools"] }),
-    fact({ ward: "1", date: "2026-01-20", lenses: ["schools", "events"] }),
-    fact({ ward: "2", date: "2026-01-07", lenses: [] }),
-    // Image-only: cannot mention anything, so ward 3 is left out of January's denominator.
-    fact({ ward: "3", date: "2026-01-09", lenses: [], text_unavailable: true }),
-    fact({ ward: "2", date: "2026-02-03", lenses: ["schools"] }),
-    fact({ ward: null, date: "2026-02-03", lenses: ["schools"] }),
-  ];
-
-  it("counts wards mentioning each lens out of wards with readable newsletters", () => {
-    const cells = computeLensWardReach(facts, ["schools", "events"], ["2026-01", "2026-02", "2026-03"]);
-    expect(cells).toEqual([
-      { lens: "schools", month: "2026-01", wardsMentioning: 1, activeWards: 2, share: 0.5 },
-      { lens: "schools", month: "2026-02", wardsMentioning: 1, activeWards: 1, share: 1 },
-      { lens: "schools", month: "2026-03", wardsMentioning: 0, activeWards: 0, share: null },
-      { lens: "events", month: "2026-01", wardsMentioning: 1, activeWards: 2, share: 0.5 },
-      { lens: "events", month: "2026-02", wardsMentioning: 0, activeWards: 1, share: 0 },
-      { lens: "events", month: "2026-03", wardsMentioning: 0, activeWards: 0, share: null },
-    ]);
-  });
-
-  it("counts a ward once however many of its newsletters mention the lens", () => {
-    const [january] = computeLensWardReach(facts, ["schools"], ["2026-01"]);
-    expect(january.wardsMentioning).toBe(1);
-  });
-
-  it("fades cells resting on too few wards, never when the threshold is 0", () => {
-    expect(isReachFaded({ activeWards: 19 }, 20)).toBe(true);
-    expect(isReachFaded({ activeWards: 20 }, 20)).toBe(false);
-    expect(isReachFaded({ activeWards: 1 }, 0)).toBe(false);
-  });
-
-  it("grids one lens by ward and month, showing a month of only image-only newsletters as not mentioned", () => {
-    const cells = buildLensWardGrid(facts, "schools", ["1", "2", "3"], ["2026-01"]);
-    expect(cells).toEqual([
-      { ward: "1", month: "2026-01", status: "mentioned", mentioning: 2, newsletters: 2 },
-      { ward: "2", month: "2026-01", status: "not_mentioned", mentioning: 0, newsletters: 1 },
-      { ward: "3", month: "2026-01", status: "not_mentioned", mentioning: 0, newsletters: 1 },
-    ]);
-    expect(buildLensWardGrid(facts, "schools", ["4"], ["2026-01"])[0].status).toBe("no_newsletter");
-  });
-});
-
-describe("cadence", () => {
-  it("counts newsletters per ward per month", () => {
-    const counts = countNewslettersByWardMonth([
-      fact({ ward: "10", date: "2026-01-01" }),
-      fact({ ward: "2", date: "2026-01-05" }),
-      fact({ ward: "2", date: "2026-01-20" }),
-      fact({ ward: null }),
-    ]);
-    expect(counts).toEqual([
-      { ward: "2", month: "2026-01", newsletters: 2 },
-      { ward: "10", month: "2026-01", newsletters: 1 },
-    ]);
-  });
-
-  it("finds the longest gaps between consecutive newsletters per source", () => {
-    const gaps = findLongestGaps(
-      [
-        fact({ source_id: 1, date: "2026-01-01" }),
-        fact({ source_id: 1, date: "2026-03-01" }),
-        fact({ source_id: 1, date: "2026-03-05" }),
-        fact({ source_id: 2, date: "2026-01-01", ward: "2", alder: "Bo" }),
-        fact({ source_id: 2, date: "2026-01-11", ward: "2", alder: "Bo" }),
-      ],
-      2,
-    );
-    expect(gaps).toEqual([
-      { sourceId: 1, alder: "Ada Alder", ward: "1", from: "2026-01-01", to: "2026-03-01", days: 59 },
-      { sourceId: 2, alder: "Bo", ward: "2", from: "2026-01-01", to: "2026-01-11", days: 10 },
-    ]);
-  });
-});
-
-describe("coverage", () => {
-  it("marks months before a ward's first newsletter untracked and later empty months silent", () => {
-    const archive = [
-      fact({ ward: "1", date: "2026-02-10" }),
-      fact({ ward: "1", date: "2026-02-20" }),
-      fact({ ward: "1", date: "2026-04-01" }),
-    ];
-    const cells = buildCoverageGrid(archive, ["1", "4"], ["2026-01", "2026-02", "2026-03", "2026-04"]);
-    expect(cells.map((cell) => [cell.ward, cell.month, cell.status, cell.newsletters])).toEqual([
-      ["1", "2026-01", "untracked", 0],
-      ["1", "2026-02", "received", 2],
-      ["1", "2026-03", "silent", 0],
-      ["1", "2026-04", "received", 1],
-      ["4", "2026-01", "untracked", 0],
-      ["4", "2026-02", "untracked", 0],
-      ["4", "2026-03", "untracked", 0],
-      ["4", "2026-04", "untracked", 0],
-    ]);
-  });
-
-  it("keeps a ward tracked in a window that starts after its first newsletter", () => {
-    const archive = [fact({ ward: "1", date: "2025-06-01" })];
-    expect(buildCoverageGrid(archive, ["1"], ["2026-01"])[0].status).toBe("silent");
-  });
-
-  it("summarizes archive coverage per ward, merging sources and keeping wards with none", () => {
-    const sources = [
-      source({ id: 1, name: "Former", ward: "1", first_date: "2025-01-01", last_date: "2025-06-01", newsletters: 4 }),
-      source({ id: 2, name: "Current", ward: "1", first_date: "2025-07-01", last_date: "2026-01-01", newsletters: 6 }),
-      source({ id: 3, name: "Quiet", ward: "4", first_date: null, last_date: null, newsletters: 0 }),
-    ];
-    expect(summarizeWardCoverage(sources, ["1", "4", "7"])).toEqual([
-      { ward: "1", aldermen: ["Former", "Current"], firstDate: "2025-01-01", lastDate: "2026-01-01", newsletters: 10 },
-      { ward: "4", aldermen: ["Quiet"], firstDate: null, lastDate: null, newsletters: 0 },
-      { ward: "7", aldermen: [], firstDate: null, lastDate: null, newsletters: 0 },
-    ]);
-  });
-});
-
-describe("buildSearchUrl", () => {
-  it("builds search links and quotes phrases", () => {
-    expect(buildSearchUrl({ ward: "3" })).toBe("/search?ward=3");
-    expect(buildSearchUrl({ q: "bike lanes" })).toBe("/search?q=%22bike+lanes%22");
-    expect(buildSearchUrl({ q: "zoning", ward: "1" })).toBe("/search?q=zoning&ward=1");
-    expect(buildSearchUrl({})).toBe("/search");
-  });
-});
-
-describe("monthDateRange", () => {
-  it("returns the first and last day of the month, including leap years", () => {
-    expect(monthDateRange("2026-01")).toEqual({ fromDate: "2026-01-01", toDate: "2026-01-31" });
-    expect(monthDateRange("2024-02")).toEqual({ fromDate: "2024-02-01", toDate: "2024-02-29" });
-    expect(monthDateRange("2026-02")).toEqual({ fromDate: "2026-02-01", toDate: "2026-02-28" });
-    expect(monthDateRange("2026-12")).toEqual({ fromDate: "2026-12-01", toDate: "2026-12-31" });
-  });
-});
-
-describe("searchScopeForFilters", () => {
-  const filters: AnalyticsFilters = {
-    wards: ["3"],
-    lens: "transportation",
-    fromMonth: "2025-11",
-    toMonth: "2026-02",
-  };
-
-  it("carries the date range into search links, never the lens (search cannot filter by it)", () => {
-    const scope = searchScopeForFilters(filters);
-    expect(scope).toEqual({ fromDate: "2025-11-01", toDate: "2026-02-28" });
-    expect(buildSearchUrl({ ...scope, ward: "3" })).toBe("/search?ward=3&from=2025-11-01&to=2026-02-28");
-  });
-
-  it("omits unset filters", () => {
-    expect(searchScopeForFilters(EMPTY_FILTERS)).toEqual({});
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LensReachCell } from "../../lib/analytics";
+import type { LensReachCell } from "../../lib/analytics-reach";
 import {
   describeSparkline,
   findAsOfMonth,

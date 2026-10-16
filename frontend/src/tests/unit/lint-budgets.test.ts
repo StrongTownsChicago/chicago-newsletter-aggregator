@@ -13,8 +13,6 @@ const ADOPTED_CEILINGS: Record<string, number> = {
   "src/scripts/analytics-dashboard.ts": 1170,
   "src/lib/analytics-charts.ts": 851,
   "src/pages/preferences.astro": 785,
-  "src/lib/analytics.ts": 635,
-  "src/tests/unit/analytics.test.ts": 488,
 };
 
 interface MaxLinesBlock {

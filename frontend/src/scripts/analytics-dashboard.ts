@@ -1,46 +1,52 @@
 // Client wiring for /analytics: reads the filters, recomputes each panel with
 // the pure functions in lib/, renders the charts, and mirrors the view in the URL.
 import {
-  buildCoverageGrid,
   describeDataAsOf,
-  buildLensWardGrid,
   classifyDateWindow,
-  computeLensWardReach,
   EMPTY_FILTERS,
-  expandTermPostings,
   filterFacts,
   findBroadCoverageWindow,
   daysBetween,
-  findLongestGaps,
   formatDay,
   formatMonth,
-  isReachFaded,
   listSourceWards,
   listWards,
   listWindowMonths,
-  MIN_ACTIVE_WARDS_FOR_REACH,
   MIN_MONTH_NEWSLETTERS_FOR_SHARES,
   monthOf,
-  normalizeTermQuery,
-  resolveIndexedTerm,
-  searchScopeForFilters,
-  suggestTerms,
   summarizeWardCounts,
-  summarizeWardCoverage,
-  termMentionsByMonth,
-  termMentionsByWard,
   trimSparseEdges,
   wardsInScope,
   type AnalyticsDataset,
   type AnalyticsFilters,
   type BroadCoverageWindow,
-  type CoverageStatus,
   type LensDefinition,
-  type LensReachCell,
   type NewsletterFact,
   type RisingTerm,
   type TermIndex,
 } from "../lib/analytics";
+import {
+  buildCoverageGrid,
+  findLongestGaps,
+  summarizeWardCoverage,
+  type CoverageStatus,
+} from "../lib/analytics-coverage";
+import {
+  buildLensWardGrid,
+  computeLensWardReach,
+  isReachFaded,
+  MIN_ACTIVE_WARDS_FOR_REACH,
+  type LensReachCell,
+} from "../lib/analytics-reach";
+import {
+  expandTermPostings,
+  normalizeTermQuery,
+  resolveIndexedTerm,
+  suggestTerms,
+  termMentionsByMonth,
+  termMentionsByWard,
+} from "../lib/analytics-terms";
+import { searchScopeForFilters } from "../lib/analytics-search-links";
 import {
   formatOptionalShare,
   formatPercent,

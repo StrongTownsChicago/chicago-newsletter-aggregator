@@ -1,7 +1,8 @@
 // Pure logic for the /analytics topic overview: each topic's ward reach
 // against its own average, the civic calendar's row order, and the headline
 // topics for the summary tiles.
-import { formatMonth, isReachFaded, type LensReachCell } from "./analytics";
+import { formatMonth } from "./analytics";
+import { isReachFaded, type LensReachCell } from "./analytics-reach";
 
 /**
  * Sparklines and the topic trend use a y scale spanning at least this share

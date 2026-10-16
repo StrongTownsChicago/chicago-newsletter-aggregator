@@ -3,20 +3,16 @@
 // blue/red around a gray midpoint for above/below average, gray for context.
 import * as Plot from "@observablehq/plot";
 import {
-  buildSearchUrl,
   formatMonth,
-  monthDateRange,
   monthTickLabeler,
-  type CoverageCell,
   type DistinctiveTerm,
-  type LensReachCell,
-  type LensWardCell,
   type RisingTerm,
-  type SearchLinkParams,
   type SourceCoverage,
-  type TermMonthPoint,
-  type TermWardRow,
 } from "./analytics";
+import { buildSearchUrl, monthDateRange, type SearchLinkParams } from "./analytics-search-links";
+import type { CoverageCell } from "./analytics-coverage";
+import type { LensReachCell, LensWardCell } from "./analytics-reach";
+import type { TermMonthPoint, TermWardRow } from "./analytics-terms";
 import { EXPORT_SWATCH_ATTRIBUTE, EXPORT_TEXT_ATTRIBUTE } from "./chart-export";
 import { formatPointChange, reachDeviation, type TopicTrendPoint } from "./analytics-topic-trends";
 import type { WardTopicMonthCell, WardTopicSummary } from "./analytics-ward-profile";

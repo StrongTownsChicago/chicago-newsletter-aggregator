@@ -64,8 +64,6 @@ export default defineConfig(
   { files: ["src/scripts/analytics-dashboard.ts"], rules: maxLines(1170) },
   { files: ["src/lib/analytics-charts.ts"], rules: maxLines(851) },
   { files: ["src/pages/preferences.astro"], rules: maxLines(785) },
-  { files: ["src/lib/analytics.ts"], rules: maxLines(635) },
-  { files: ["src/tests/unit/analytics.test.ts"], rules: maxLines(488) },
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,
   // and `expect(obj.method)` assertions on mocked methods.
   {
