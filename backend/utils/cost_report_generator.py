@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from shared.utils import CHICAGO_TIMEZONE
 from utils.cost_calculator import ModelPricing, calculate_cost
 from utils.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
@@ -63,7 +64,9 @@ def generate_text_report(
     report.append("=" * 65)
     report.append("LLM TOKEN COST ANALYSIS")
     report.append("=" * 65)
-    report.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append(
+        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     report.append(f"Newsletters Analyzed: {len(analyses)}")
     report.append(f"Model: {model_pricing.model} ({model_pricing.provider})")
     report.append(
@@ -142,7 +145,7 @@ def generate_json_report(
 
     return {
         "metadata": {
-            "analysis_date": datetime.now().isoformat(),
+            "analysis_date": datetime.now(CHICAGO_TIMEZONE).isoformat(),
             "newsletter_count": len(analyses),
             "model": model_pricing.model,
             "provider": model_pricing.provider,
@@ -365,7 +368,9 @@ def generate_combined_text_report(
     report.append("=" * 65)
     report.append("LLM TOKEN COST ANALYSIS (NEWSLETTER + WEEKLY REPORTS)")
     report.append("=" * 65)
-    report.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append(
+        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     report.append(f"Newsletters Analyzed: {len(newsletter_analyses)}")
     report.append(f"Weekly Reports Generated: {weekly_report_count}")
     report.append(f"Model: {model_pricing.model} ({model_pricing.provider})")

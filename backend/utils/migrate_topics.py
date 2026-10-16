@@ -217,7 +217,7 @@ def migrate_topics(dry_run: bool = False) -> None:
                         print(
                             f"  Updated {updated_count}/{stats['modified']} newsletters..."
                         )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
                     print(f"  ✗ Failed to update newsletter {newsletter['id']}: {e}")
                     failed_count += 1
 

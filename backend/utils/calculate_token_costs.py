@@ -233,7 +233,7 @@ Examples:
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  CLI: report any load error and exit
         print(f"Error loading pricing data: {e}")
         sys.exit(1)
 

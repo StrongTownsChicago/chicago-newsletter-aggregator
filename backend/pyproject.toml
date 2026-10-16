@@ -48,6 +48,9 @@ select = [
     "ARG",              # unused arguments
     "PTH",              # pathlib
     "PIE", "N", "ERA",  # misc, naming, commented-out code
+    "T20",              # no stray prints outside CLI surfaces
+    "DTZ",              # naive datetimes (the app reasons in Chicago calendar days)
+    "BLE",              # blind except
     "FURB", "PERF",
 ]
 ignore = [
@@ -59,8 +62,25 @@ ignore = [
 allowed-confusables = ["–", "‘", "’", "ℹ"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests: mock signatures.
-"tests/*" = ["ARG001", "ARG002"]
+# Tests: mock signatures, fixture datetimes.
+"tests/*" = ["ARG001", "ARG002", "DTZ001", "DTZ005", "T20"]
+# CLI surfaces: printing is the job.
+"utils/*" = ["T20"]
+"tools/*" = ["T20"]
+"ingest/email/process_emails.py" = ["T20"]
+"ingest/scraper/process_scraped_newsletters.py" = ["T20"]
+"notifications/process_notification_queue.py" = ["T20"]
+"notifications/weekly_notification_queue.py" = ["T20"]
+"notifications/test_matcher.py" = ["T20"]
+# Library modules that use print as logging. This list only shrinks: moving one to `logging` removes its line.
+"ingest/email/email_parser.py" = ["T20"]
+"ingest/scraper/newsletter_scraper.py" = ["T20"]
+"notifications/email_sender.py" = ["T20"]
+"notifications/rule_matcher.py" = ["T20"]
+"processing/llm_client.py" = ["T20"]
+"processing/llm_processor.py" = ["T20"]
+"processing/weekly_report_generator.py" = ["T20"]
+"shared/utils.py" = ["T20"]
 # Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
 # which Pydantic turns into a named schema reference instead of the plain type.
 "models/types.py" = ["UP040"]

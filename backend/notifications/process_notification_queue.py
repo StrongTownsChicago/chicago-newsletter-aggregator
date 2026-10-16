@@ -88,7 +88,7 @@ def _fetch_weekly_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]
 
         return notifications_by_user
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no notifications
         print(f"Error fetching weekly notifications: {e}")
         return {}
 

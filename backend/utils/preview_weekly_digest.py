@@ -59,7 +59,7 @@ def fetch_weekly_report(topic: str, week_id: str) -> dict[str, Any] | None:
 
         return dict(response.data)  # type: ignore
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  CLI: report a fetch error and stop
         print(f"✗ Error fetching report: {e}")
         return None
 

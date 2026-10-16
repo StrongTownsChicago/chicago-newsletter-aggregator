@@ -63,7 +63,7 @@ def sanitize_content(
 
             result = str(soup)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
             print(f"  ⚠️  HTML Sanitization failed: {e}")
             result = content
 

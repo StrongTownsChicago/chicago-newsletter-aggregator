@@ -31,7 +31,7 @@ class NewsletterScraper:
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()
                 return cast(str, response.text)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
                     print(f"  ⚠ Archive fetch failed (attempt {attempt + 1}): {e}")
                     time.sleep(2**attempt)
@@ -83,7 +83,7 @@ class NewsletterScraper:
                     "archive_date_str": date_str,
                 }
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
                     print(f"  ⚠ Newsletter fetch failed (attempt {attempt + 1}): {e}")
                     time.sleep(2**attempt)

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from shared.db import get_supabase_client
+from shared.utils import CHICAGO_TIMEZONE
 
 MAX_SAMPLES_PER_SOURCE = 1
 OUTPUT_DIR = Path(__file__).parent / "../samples"
@@ -15,7 +16,9 @@ def download_samples() -> None:
     # ensure output directory exists
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"[{datetime.now()}] Starting sample download to {OUTPUT_DIR}...")
+    print(
+        f"[{datetime.now(CHICAGO_TIMEZONE)}] Starting sample download to {OUTPUT_DIR}..."
+    )
 
     # Get all sources
     result = supabase.table("sources").select("id, name").execute()
@@ -74,7 +77,7 @@ def download_samples() -> None:
                 print(f"  ✓ {source_name}: Saved sample ({subject_preview}...)")
                 count += 1
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-source boundary: log and continue
             print(f"  ✗ {source_name}: Error fetching samples: {e}")
 
     print(f"\nDownload complete. Saved {count} samples from {len(sources)} sources.")

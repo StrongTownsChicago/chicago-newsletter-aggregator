@@ -97,7 +97,9 @@ def find_unprocessed_emails(
     unprocessed = [email for email in mailbox_emails if email.uid not in stored_uids]
     return sorted(
         unprocessed,
-        key=lambda email: (email.sender.lower(), email.date or datetime.min),
+        # imap_tools dates are aware, or a naive 1900-01-01 when unparsed,
+        # so no sentinel of either kind is safe for every mailbox.
+        key=lambda email: (email.sender.lower(), email.date or datetime.min),  # noqa: DTZ901
     )
 
 

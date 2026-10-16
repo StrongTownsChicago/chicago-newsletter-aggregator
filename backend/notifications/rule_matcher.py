@@ -86,7 +86,7 @@ def match_newsletter_to_rules(
 
         return matched_rules
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  matching must not fail ingestion: log to file
         error_file = log_notification_error(
             error_type="matching",
             error_message=str(e),
@@ -188,7 +188,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
             try:
                 supabase.table("notification_queue").insert(notification).execute()
                 queued_count += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  per-notification boundary: duplicates are expected
                 # Track failures that aren't just duplicates
                 error_str = str(e)
                 if (
@@ -215,7 +215,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
 
         return queued_count
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  queuing must not fail ingestion: log to file
         error_file = log_notification_error(
             error_type="queuing",
             error_message=str(e),

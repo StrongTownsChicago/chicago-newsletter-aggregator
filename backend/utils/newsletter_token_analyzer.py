@@ -18,6 +18,7 @@ from processing.llm_processor import (
     Summary,
     TopicsExtraction,
 )
+from shared.utils import CHICAGO_TIMEZONE
 from utils.token_counter import (
     estimate_llm_call_tokens,
 )
@@ -94,7 +95,7 @@ def analyze_newsletter_tokens(
         plain_text = plain_text[:max_chars]
 
     # Replicate content construction from llm_processor.py:372-374
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(CHICAGO_TIMEZONE).strftime("%Y-%m-%d")
     content = (
         f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
     )

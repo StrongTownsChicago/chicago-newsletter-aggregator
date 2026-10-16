@@ -36,7 +36,7 @@ from imap_tools import AND, MailBox, MailMessageFlags  # type: ignore[attr-defin
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import parse_newsletter
 from shared.db import get_supabase_client
-from shared.utils import print_summary
+from shared.utils import CHICAGO_TIMEZONE, print_summary
 
 load_dotenv()
 
@@ -62,11 +62,11 @@ def save_unmapped_report(unmapped_emails: list[dict[str, str]]) -> None:
     if not unmapped_emails:
         return
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(CHICAGO_TIMEZONE).strftime("%Y%m%d_%H%M%S")
     filename = f"unmapped_emails_{timestamp}.txt"
 
     with Path(filename).open("w", encoding="utf-8") as f:
-        f.write(f"Unmapped Emails Report - {datetime.now()}\n")
+        f.write(f"Unmapped Emails Report - {datetime.now(CHICAGO_TIMEZONE)}\n")
         f.write("=" * 60 + "\n\n")
 
         for i, email in enumerate(unmapped_emails, 1):
@@ -109,7 +109,7 @@ def process_new_newsletters() -> None:
         - Continues processing even if individual emails fail
     """
 
-    print(f"[{datetime.now()}] Starting newsletter ingestion...")
+    print(f"[{datetime.now(CHICAGO_TIMEZONE)}] Starting newsletter ingestion...")
 
     # Validate credentials
     if not GMAIL_ADDRESS or not GMAIL_PASSWORD:
@@ -167,7 +167,7 @@ def process_new_newsletters() -> None:
                         print("  LLM processing complete")
                     except ImportError:
                         print("  Warning: LLM enabled but llm_processor not found")
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
                         print(f"  Warning: LLM processing failed: {e}")
 
                 # Extract ward_number for notifications, but remove from dict for DB insertion
@@ -208,7 +208,7 @@ def process_new_newsletters() -> None:
                         if matched:
                             queued = queue_notifications(newsletter_id, matched)
                             print(f"  ✓ Queued {queued} notification(s)")
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001  notification queuing must not fail ingestion
                         # Don't fail newsletter ingestion if notification queuing fails
                         print(f"  ⚠️  Notification queuing failed: {e}")
 
@@ -218,7 +218,7 @@ def process_new_newsletters() -> None:
                 processed_count += 1
                 print("  ✓ Stored in database")
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  per-email boundary: log and continue
                 print(f"✗ Error processing {msg.uid}: {e}")
                 continue
 

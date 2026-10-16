@@ -220,7 +220,7 @@ def send_digest(
 
         return {"success": True, "email_id": response.get("id")}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  send boundary: report failure to the caller
         return {"success": False, "error": str(e)}
 
 
@@ -804,7 +804,7 @@ def _fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]
 
         return newsletters
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no newsletters
         print(f"Warning: Failed to fetch newsletter details: {e}")
         return []
 
@@ -908,9 +908,9 @@ def _format_week_range(week_id: str) -> str:
         week = int(week_str)
 
         # Calculate week start (Monday)
-        from datetime import datetime, timedelta
+        from datetime import date, timedelta
 
-        jan_4 = datetime(year, 1, 4)  # Always in week 1
+        jan_4 = date(year, 1, 4)  # Always in week 1
         week_1_monday = jan_4 - timedelta(days=jan_4.weekday())
         week_start = week_1_monday + timedelta(weeks=week - 1)
         week_end = week_start + timedelta(days=6)

@@ -114,7 +114,7 @@ def fetch_report_facts(
 
         return (facts, topic_display)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  CLI: report a fetch error and stop
         print(f"✗ Error fetching report: {e}")
         return None
 
@@ -156,7 +156,7 @@ def synthesize_summary(
         response = call_llm(model, prompt, WeeklySynthesis.model_json_schema())
         data = WeeklySynthesis.model_validate_json(response)
         return data.summary
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  prompt test harness: show the error as the output
         return f"ERROR: {e}"
 
 

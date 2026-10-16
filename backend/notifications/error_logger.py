@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from shared.utils import CHICAGO_TIMEZONE
+
 
 def log_notification_error(
     error_type: str, error_message: str, context: dict[str, Any] | None = None
@@ -28,12 +30,12 @@ def log_notification_error(
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate timestamped filename
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(CHICAGO_TIMEZONE).strftime("%Y%m%d_%H%M%S")
     log_path = log_dir / f"notification_error_{timestamp}.txt"
 
     # Write error to file
     with log_path.open("w", encoding="utf-8") as f:
-        f.write(f"Notification Error Report - {datetime.now()}\n")
+        f.write(f"Notification Error Report - {datetime.now(CHICAGO_TIMEZONE)}\n")
         f.write("=" * 60 + "\n\n")
         f.write(f"Error Type: {error_type}\n")
         f.write(f"Error Message: {error_message}\n\n")

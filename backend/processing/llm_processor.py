@@ -18,6 +18,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from processing.llm_client import call_llm
+from shared.utils import CHICAGO_TIMEZONE
 
 __all__ = ["call_llm"]
 
@@ -96,7 +97,7 @@ Newsletter:
             f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}"
         )
         return valid_topics
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no topics
         print(f"  ✗ Topic extraction failed: {e}")
         return []
 
@@ -141,7 +142,7 @@ Newsletter:
         data = Summary.model_validate_json(response)
         print(f"  ✓ Summary: {data.summary}")
         return data.summary
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no summary
         print(f"  ✗ Summary generation failed: {e}")
         return ""
 
@@ -171,7 +172,7 @@ def extract_newsletter_metadata(
         plain_text = plain_text[:max_chars]
         print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(CHICAGO_TIMEZONE).strftime("%Y-%m-%d")
     content = (
         f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
     )

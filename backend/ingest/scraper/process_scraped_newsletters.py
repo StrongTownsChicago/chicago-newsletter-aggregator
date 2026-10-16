@@ -5,14 +5,14 @@ Scrape newsletters from alderman websites and save to database.
 import os
 import random
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from dotenv import load_dotenv
 
 from ingest.scraper.newsletter_scraper import NewsletterScraper
 from shared.db import get_supabase_client
-from shared.utils import parse_date_string, print_summary
+from shared.utils import CHICAGO_TIMEZONE, parse_date_string, print_summary
 
 load_dotenv()
 
@@ -66,7 +66,9 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
     source_name, archive_url = get_source_archive_url(source_id)
 
     print(f"\n{'=' * 60}")
-    print(f"[{datetime.now()}] Scraping newsletters for source ID: {source_id}")
+    print(
+        f"[{datetime.now(CHICAGO_TIMEZONE)}] Scraping newsletters for source ID: {source_id}"
+    )
     print(f"Source: {source_name}")
     print(f"Archive URL: {archive_url}")
     print(f"{'=' * 60}\n")
@@ -113,7 +115,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
             received_date = parse_date_string(content.get("archive_date_str", ""))
             newsletter_data: dict[str, Any] = {
                 "source_id": source_id,
-                "received_date": received_date or datetime.now().isoformat(),
+                "received_date": received_date or datetime.now(UTC).isoformat(),
                 "subject": content["subject"],
                 "from_email": None,
                 "to_email": None,
@@ -136,7 +138,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
 
                 except ImportError:
                     print("  ⚠ LLM enabled but llm_processor not found")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
                     print(f"  ⚠ LLM processing failed: {e}")
             else:
                 # Add delay when LLM disabled to avoid bot-like behavior
@@ -148,7 +150,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
             processed_count += 1
             print("  ✓ Stored in database")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
             print(f"  ✗ Error: {e}")
             failed_count += 1
             continue
@@ -180,7 +182,7 @@ def scrape_all_sources() -> None:
             process_scraped_newsletters(
                 source_id=cast(int, source_dict["id"]), limit=None
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-source boundary: log and continue
             print(f"✗ Error processing source {source_dict['name']}: {e}")
             continue
 
