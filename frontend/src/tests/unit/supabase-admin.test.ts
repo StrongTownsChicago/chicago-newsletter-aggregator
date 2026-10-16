@@ -7,7 +7,7 @@ describe("getSupabaseAdmin", () => {
   });
 
   it("throws error if not in SSR mode", async () => {
-    vi.stubEnv("SSR", ""); // Simulate non-SSR
+    vi.stubEnv("SSR", false);
 
     try {
       await import("../../lib/supabase-admin");
@@ -22,7 +22,7 @@ describe("getSupabaseAdmin", () => {
   });
 
   it("throws error if missing environment variables", async () => {
-    vi.stubEnv("SSR", "true");
+    vi.stubEnv("SSR", true);
     vi.stubEnv("PUBLIC_SUPABASE_URL", "");
     vi.stubEnv("SUPABASE_SERVICE_KEY", "");
 
@@ -40,7 +40,7 @@ describe("getSupabaseAdmin", () => {
   });
 
   it("initializes successfully with correct environment", async () => {
-    vi.stubEnv("SSR", "true");
+    vi.stubEnv("SSR", true);
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_KEY", "service-role-key");
 

@@ -9,10 +9,8 @@ settings.local.json
 frontend/coverage/
 .wrangler
 
-# Claude Code - Ignore local settings, keep shared configuration
+# Claude Code local settings
 .claude/settings.local.json
-!.claude/settings.json
-!.claude/hooks/
 
 /docs
 # Local snapshots of production data for offline analysis (never commit; may contain newsletter text)

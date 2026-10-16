@@ -36,6 +36,7 @@ describe("describeTimeline", () => {
 describe("renderTimeline", () => {
   const render = () => {
     const root = document.createElement("div");
+    // eslint-disable-next-line no-unsanitized/property -- static test fixture markup
     root.innerHTML = TIMELINE_MARKUP;
     renderTimeline(root, months, context);
     return root;

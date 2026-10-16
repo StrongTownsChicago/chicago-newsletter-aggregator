@@ -110,3 +110,7 @@ export const buildNewsletterCountSelect = ({
 
 /** Select string for the newsletter detail page, which needs the full body. */
 export const NEWSLETTER_DETAIL_SELECT = `*, sources(${SOURCE_DETAIL_COLUMNS.join(", ")})`;
+
+export type NewsletterDetailRow = Omit<Newsletter, "sources"> & {
+  sources: Pick<Source, (typeof SOURCE_DETAIL_COLUMNS)[number]> | null;
+};

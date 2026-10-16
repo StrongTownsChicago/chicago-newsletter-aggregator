@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import { supabase } from '../../lib/supabase';
-import { NEWSLETTER_DETAIL_SELECT } from '../../lib/newsletter-queries';
+import { NEWSLETTER_DETAIL_SELECT, type NewsletterDetailRow } from '../../lib/newsletter-queries';
 import { buildNewsletterDescription } from '../../lib/seo';
 import { buildWardPath, parseWardParam } from '../../lib/wards';
 
@@ -13,7 +13,7 @@ const { data: newsletter, error } = await supabase
   .from('newsletters')
   .select(NEWSLETTER_DETAIL_SELECT)
   .eq('id', id)
-  .single();
+  .single<NewsletterDetailRow>();
 
 if (error || !newsletter) {
   return Astro.redirect('/404');
@@ -98,11 +98,13 @@ const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
           </header>
     
           <div class="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900" data-testid="newsletter-detail-content">
+            {/* eslint-disable astro/no-set-html-directive -- raw_html is sanitized at ingestion (backend email_parser.sanitize_content) */}
             {newsletter.raw_html ? (
               <div set:html={newsletter.raw_html} />
             ) : (
               <div class="whitespace-pre-wrap font-sans">{newsletter.plain_text}</div>
             )}
+            {/* eslint-enable astro/no-set-html-directive */}
           </div>
         </article>  </div>
 </Layout>
