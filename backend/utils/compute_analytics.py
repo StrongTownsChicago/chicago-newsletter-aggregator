@@ -1,5 +1,4 @@
-"""
-Compute analytics JSON files for the unlisted /analytics dashboard.
+"""Compute analytics JSON files for the unlisted /analytics dashboard.
 
 Reads newsletters and sources from a local snapshot (see
 `utils/analytics_snapshot.py`), computes metrics with the pure functions in
@@ -27,8 +26,6 @@ Usage:
     uv run python -m utils.compute_analytics
     uv run python -m utils.compute_analytics --offline
     uv run python -m utils.compute_analytics --full-refresh
-    uv run python -m utils.compute_analytics --output-dir /tmp/analytics
-    uv run python -m utils.compute_analytics --min-term-newsletters 30
 """
 
 import argparse
@@ -130,22 +127,19 @@ DISTINCTIVE_MAX_WARD_SHARE = 0.6
 # at least this. Looser matching of unrelated terms merged whole digests: ward
 # 46 runs several standing sections in nearly the same issues.
 DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY = 0.8
-# Keyword lenses match on boilerplate-cleaned text. Lenses feed ward reach
-# ("did this ward write about X this month"), and a standing block such as a
-# resource directory repeated in every issue would answer yes every month
-# whether or not the ward said anything new, flattening the monthly calendar
-# (on raw text, immigration reaches 14-18 wards every month of 2026; cleaned,
-# it falls from 17 in January to 10 in August). The cost: a ward whose only
-# coverage of a subject is its standing block is not counted. Set False to
-# match raw text instead.
+# Lenses match boilerplate-cleaned text. They feed ward reach ("did this ward write
+# about X this month"), and a standing block repeated in every issue, such as a
+# resource directory, would answer yes every month whether or not the ward said
+# anything new, flattening the monthly calendar (raw text: immigration reaches 14-18
+# wards every month of 2026; cleaned, 17 in January to 10 in August). Cost: a ward
+# covering a subject only in its standing block is uncounted. Set False for raw text.
 MATCH_LENSES_ON_CLEANED_TEXT = True
-# A newsletter mentions a lens when the lens's phrases occur at least this
-# many separate times in it (the same phrase twice counts; phrases that
-# overlap or touch, like "city council meeting", count once). One passing
-# mention, such
-# as early voting "at the library" or "call 311 while our office is closed",
-# does not make a newsletter about parks or city services, and counting those
-# puts nearly every ward on nearly every lens every month.
+# A newsletter mentions a lens when the lens's phrases occur at least this many
+# separate times in it (the same phrase twice counts; phrases that overlap or touch,
+# like "city council meeting", count once). One passing mention, such as early
+# voting "at the library" or "call 311 while our office is closed", does not make a
+# newsletter about parks or city services, and counting those puts nearly every
+# ward on nearly every lens every month.
 LENS_MIN_MENTIONS = 2
 # Rising terms compare the latest complete month with the median of this
 # many months before it, counting wards rather than newsletters.
