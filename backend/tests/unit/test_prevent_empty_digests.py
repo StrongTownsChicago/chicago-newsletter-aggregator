@@ -8,14 +8,15 @@ preparation, and that process_digests handles this error by skipping.
 import unittest
 from unittest.mock import MagicMock, patch
 
-from notifications.email_sender import DigestType, send_digest
+from notifications.digest_config import DigestType
+from notifications.email_sender import send_digest
 from notifications.process_notification_queue import process_digests
 
 
 class TestPreventEmptyDigests(unittest.TestCase):
     """Tests for empty digest prevention logic."""
 
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender._build_unsubscribe_url")
     def test_send_digest_empty_daily(
         self, mock_unsub: MagicMock, mock_prepare: MagicMock
@@ -39,7 +40,7 @@ class TestPreventEmptyDigests(unittest.TestCase):
         self.assertEqual(result["error"], "Empty digest content")
         mock_prepare.assert_called_once()
 
-    @patch("notifications.email_sender._prepare_weekly_report_data")
+    @patch("notifications.email_sender.prepare_weekly_report_data")
     @patch("notifications.email_sender._build_unsubscribe_url")
     def test_send_digest_empty_weekly(
         self, mock_unsub: MagicMock, mock_prepare: MagicMock

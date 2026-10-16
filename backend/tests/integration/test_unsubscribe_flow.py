@@ -9,12 +9,13 @@ from unittest.mock import MagicMock, patch
 
 import jwt
 
-from notifications.email_sender import send_daily_digest
+from notifications.digest_config import DigestType
+from notifications.email_sender import send_digest
 from notifications.unsubscribe_tokens import (
     ALGORITHM,
     generate_unsubscribe_token,
-    validate_unsubscribe_token,
 )
+from tests.fixtures.unsubscribe_token_validation import validate_unsubscribe_token
 
 
 class TestUnsubscribeFlow(unittest.TestCase):
@@ -76,7 +77,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         ]
 
         # Send email
-        result = send_daily_digest(user_id, user_email, notifications)
+        result = send_digest(user_id, user_email, notifications, DigestType.DAILY)
         self.assertTrue(result["success"])
 
         # Extract sent email data
@@ -186,13 +187,17 @@ class TestUnsubscribeFlow(unittest.TestCase):
         ]
 
         # Send to first user
-        result1 = send_daily_digest(user1_id, "user1@example.com", notifications)
+        result1 = send_digest(
+            user1_id, "user1@example.com", notifications, DigestType.DAILY
+        )
         self.assertTrue(result1["success"])
         call1_args = mock_resend.Emails.send.call_args_list[0][0][0]
         token1_url = call1_args["headers"]["List-Unsubscribe"]
 
         # Send to second user
-        result2 = send_daily_digest(user2_id, "user2@example.com", notifications)
+        result2 = send_digest(
+            user2_id, "user2@example.com", notifications, DigestType.DAILY
+        )
         self.assertTrue(result2["success"])
         call2_args = mock_resend.Emails.send.call_args_list[1][0][0]
         token2_url = call2_args["headers"]["List-Unsubscribe"]

@@ -9,12 +9,10 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-from notifications.email_sender import (
-    DigestType,
-    _build_digest_html,
-    _build_digest_text,
-    send_digest,
-)
+from notifications.digest_config import DigestType
+from notifications.digest_html import build_digest_html
+from notifications.digest_text import build_digest_text
+from notifications.email_sender import send_digest
 from notifications.process_notification_queue import (
     _calculate_daily_batch_id,
     _calculate_weekly_batch_id,
@@ -40,7 +38,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared, DigestType.DAILY, "http://prefs.com", "http://unsub.com"
         )
 
@@ -61,7 +59,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared, DigestType.WEEKLY, "http://prefs.com", "http://unsub.com"
         )
 
@@ -95,10 +93,10 @@ class TestDigestEmailTemplates(unittest.TestCase):
             }
         ]
 
-        daily_text = _build_digest_text(
+        daily_text = build_digest_text(
             daily_data, DigestType.DAILY, "http://p.com", "http://u.com"
         )
-        weekly_text = _build_digest_text(
+        weekly_text = build_digest_text(
             weekly_data, DigestType.WEEKLY, "http://p.com", "http://u.com"
         )
 
@@ -107,7 +105,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
 
     def test_topic_limit_business_rule(self) -> None:
         """Only first 5 topics shown (business rule enforcement)."""
-        from notifications.email_sender import _render_daily_content_html
+        from notifications.digest_html import _render_daily_content_html
 
         prepared = [
             {
@@ -133,7 +131,7 @@ class TestDigestSending(unittest.TestCase):
     """Tests for unified send_digest() function."""
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_sends_correct_digest_type(
         self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
@@ -168,7 +166,7 @@ class TestDigestSending(unittest.TestCase):
         self.assertIn("Daily", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_handles_sending_errors_gracefully(
         self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock

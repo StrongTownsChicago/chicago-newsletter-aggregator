@@ -19,14 +19,14 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from notifications.email_sender import (
-    DigestType,
-    _build_digest_html,
-    _build_digest_text,
-    _fetch_newsletter_details,
-    _format_topic_name,
-    _format_week_range,
+from notifications.digest_config import DigestType
+from notifications.digest_data import (
+    fetch_newsletter_details,
+    format_topic_name,
+    format_week_range,
 )
+from notifications.digest_html import build_digest_html
+from notifications.digest_text import build_digest_text
 from shared.db import get_supabase_client
 
 
@@ -127,11 +127,11 @@ def prepare_report_for_preview(
     if use_sample_newsletters:
         referenced_newsletters = get_sample_newsletters()
     else:
-        referenced_newsletters = _fetch_newsletter_details(newsletter_ids)
+        referenced_newsletters = fetch_newsletter_details(newsletter_ids)
 
     # Format data
-    topic_display = _format_topic_name(topic)
-    week_range = _format_week_range(week_id)
+    topic_display = format_topic_name(topic)
+    week_range = format_week_range(week_id)
     newsletter_count = len(newsletter_ids)
 
     return [
@@ -163,10 +163,10 @@ def preview_digest(
     unsubscribe_url = "https://example.com/unsubscribe?token=xxx"
 
     # Generate HTML and text
-    html_output = _build_digest_html(
+    html_output = build_digest_html(
         prepared_reports, DigestType.WEEKLY, preferences_url, unsubscribe_url
     )
-    text_output = _build_digest_text(
+    text_output = build_digest_text(
         prepared_reports, DigestType.WEEKLY, preferences_url, unsubscribe_url
     )
 

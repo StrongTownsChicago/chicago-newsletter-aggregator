@@ -11,8 +11,8 @@ import jwt
 from notifications.unsubscribe_tokens import (
     ALGORITHM,
     generate_unsubscribe_token,
-    validate_unsubscribe_token,
 )
+from tests.fixtures.unsubscribe_token_validation import validate_unsubscribe_token
 
 
 class TestUnsubscribeTokens(unittest.TestCase):

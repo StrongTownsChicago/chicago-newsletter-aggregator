@@ -30,12 +30,9 @@ Usage:
 
 import argparse
 import io
-import json
 import sys
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,27 +43,19 @@ from analytics.facts import (
     build_source_coverage,
     is_text_unavailable,
 )
-from analytics.lenses import (
-    LENSES,
+from analytics.lens_matching import (
     LensMatcher,
     TextMatches,
     match_newsletters,
     summarize_lens_hits,
 )
+from analytics.lenses import LENSES
 from analytics.monthly_reports import MonthlyReportSettings, build_monthly_reports
 from analytics.records import (
     CHICAGO_TIMEZONE,
     NewsletterRecord,
     SourceRecord,
-    parse_newsletter_row,
-    parse_source_row,
     select_as_of_month,
-)
-from analytics.snapshot import (
-    Snapshot,
-    advance_cursor,
-    merge_newsletters,
-    newest_created_at,
 )
 from analytics.terms import (
     NewsletterTerms,
@@ -84,28 +73,15 @@ from analytics.topic_reach import (
     select_broad_complete_months,
 )
 from analytics.ward_glance import WardGlanceSettings, build_ward_glances
-from shared.db import get_supabase_client
-from utils.analytics_snapshot import (
-    DEFAULT_SNAPSHOT_DIR,
-    SnapshotError,
-    load_snapshot,
-    save_snapshot,
-)
+from utils.analytics_output import print_report, print_sizes, write_outputs
+from utils.analytics_snapshot import DEFAULT_SNAPSHOT_DIR, SnapshotError
+from utils.analytics_snapshot_refresh import load_or_refresh_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"
 # Imported by page code rather than fetched, so keep these files small: the
 # ward summary is bundled into the server worker.
 DEFAULT_SITE_DATA_DIR = REPO_ROOT / "frontend" / "src" / "data"
-
-# Small pages with a pause between them keep reads well under the database's
-# disk IO budget; repeated full reads of every plain_text exhausted it once.
-FETCH_PAGE_SIZE = 100
-FETCH_PAUSE_SECONDS = 1.0
-# Re-fetch this far behind the cursor so rows committed late are not missed.
-INCREMENTAL_OVERLAP = timedelta(days=1)
-NEWSLETTER_COLUMNS = "id, created_at, received_date, source_id, subject, plain_text"
-SOURCE_COLUMNS = "id, name, ward_number, source_type"
 
 # Text repeated in at least this share of one source's newsletters is template
 # (footers, office hours, resource lists) and is left out of every term metric.
@@ -170,80 +146,6 @@ EMPTY_WARD_GLANCES: dict[str, Any] = {
     "city_readable_wards": 0,
     "wards": {},
 }
-SAMPLE_SIZE = 8
-LENS_REPORT_TOP_PHRASES = 4
-
-
-def fetch_rows(
-    supabase: Any,
-    table: str,
-    columns: str,
-    created_since: datetime | None = None,
-    sleep: Callable[[float], None] = time.sleep,
-) -> list[dict[str, Any]]:
-    """Fetch rows one small page at a time, pausing between pages.
-
-    Pages are ordered by the unique `id`, so offsets stay stable. Errors are
-    not retried: a struggling database should be left alone, not hammered.
-    """
-    rows: list[dict[str, Any]] = []
-    while True:
-        query = supabase.table(table).select(columns)
-        if created_since is not None:
-            query = query.gte("created_at", created_since.isoformat())
-        page = (
-            query.order("id")
-            .range(len(rows), len(rows) + FETCH_PAGE_SIZE - 1)
-            .execute()
-            .data
-        )
-        rows.extend(page)
-        if len(page) < FETCH_PAGE_SIZE:
-            return rows
-        sleep(FETCH_PAUSE_SECONDS)
-
-
-def fetch_sources(
-    supabase: Any, sleep: Callable[[float], None] = time.sleep
-) -> list[SourceRecord]:
-    """Fetch every source (a small table, so always read in full)."""
-    return [
-        parse_source_row(row)
-        for row in fetch_rows(supabase, "sources", SOURCE_COLUMNS, sleep=sleep)
-    ]
-
-
-def refresh_snapshot(
-    supabase: Any, snapshot: Snapshot, sleep: Callable[[float], None] = time.sleep
-) -> tuple[Snapshot, int]:
-    """Bring the snapshot up to date without re-reading old newsletters.
-
-    Fetches newsletters created since the snapshot's cursor (minus an
-    overlap) and returns the updated snapshot with the number of rows fetched.
-    """
-    created_since = snapshot.fetched_through - INCREMENTAL_OVERLAP
-    sources = fetch_sources(supabase, sleep)
-    rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, created_since, sleep)
-    newsletters = merge_newsletters(
-        snapshot.newsletters, (parse_newsletter_row(row) for row in rows)
-    )
-    updated = Snapshot(
-        sources=sources,
-        newsletters=newsletters,
-        fetched_through=advance_cursor(snapshot.fetched_through, rows),
-    )
-    return updated, len(rows)
-
-
-def build_full_snapshot(
-    supabase: Any, now: datetime, sleep: Callable[[float], None] = time.sleep
-) -> Snapshot:
-    """Read every newsletter to build a snapshot from scratch."""
-    sources = fetch_sources(supabase, sleep)
-    rows = fetch_rows(supabase, "newsletters", NEWSLETTER_COLUMNS, sleep=sleep)
-    newsletters = merge_newsletters([], (parse_newsletter_row(row) for row in rows))
-    # An empty table has nothing to resume from, so the cursor starts now.
-    return Snapshot(sources, newsletters, newest_created_at(rows) or now)
 
 
 @dataclass(frozen=True)
@@ -451,70 +353,6 @@ def compute_site_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
     return {"ward-glance": ward_glance, "monthly-reports": monthly_reports}
 
 
-def write_outputs(outputs: dict[str, Any], output_dir: Path) -> dict[str, int]:
-    """Write each output as compact JSON; return file sizes in bytes."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    sizes: dict[str, int] = {}
-    for stem, payload in outputs.items():
-        path = output_dir / f"{stem}.json"
-        path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
-        sizes[path.name] = path.stat().st_size
-    return sizes
-
-
-def print_sizes(sizes: dict[str, int], output_dir: Path) -> None:
-    """Print where the files went and how big each one is."""
-    print(f"\nWrote analytics to {output_dir}")
-    for name, size in sizes.items():
-        print(f"  {name:<20} {size / 1024:>9.1f} KB")
-
-
-def print_report(outputs: dict[str, Any]) -> None:
-    """Print a few sample results for a quick sanity check."""
-
-    metadata = outputs["metadata"]
-    print(
-        f"\n{metadata['newsletter_count']} newsletters from {metadata['source_count']} sources, "
-        f"{metadata['first_date']} to {metadata['last_date']}; "
-        f"{metadata['term_count']} indexed terms (>= {metadata['min_term_newsletters']} newsletters)"
-    )
-
-    lenses = outputs["lenses"]
-    readable = lenses["readable_newsletters"]
-    print(
-        f"\nLens hit rates over {readable} newsletters with readable text "
-        f"({lenses['text']} text, mentioned at least "
-        f"{lenses['min_mentions']} separate times):"
-    )
-    for lens in lenses["lenses"]:
-        top_phrases = ", ".join(
-            f"{item['phrase']} ({item['newsletters']})"
-            for item in lens["phrases"][:LENS_REPORT_TOP_PHRASES]
-        )
-        share = lens["newsletters"] / readable if readable else 0
-        print(f"  {lens['label']:<34} {share:6.1%}  {top_phrases}")
-
-    rising = outputs["rising"]
-    if rising["latest_month"]:
-        print(
-            f"\nRising terms in {rising['latest_month']} "
-            f"({rising['latest_active_wards']} wards active) vs the median of "
-            f"{', '.join(rising['baseline_months'])}:"
-        )
-    for item in rising["terms"][:SAMPLE_SIZE]:
-        print(
-            f"  {item['term']:<30} {item['latest_wards']:>3} wards "
-            f"(baseline {item['baseline_wards']:g}, +{item['ward_gain']:g})"
-            f"{' seasonal' if item['seasonal'] else ''}"
-        )
-
-    print("\nDistinctive vocabulary (sample wards):")
-    for ward, terms in list(outputs["distinctive"]["wards"].items())[:SAMPLE_SIZE]:
-        print(
-            f"  Ward {ward}: {', '.join(item['term'] for item in terms[:SAMPLE_SIZE])}"
-        )
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Compute analytics JSON for the local dashboard."
@@ -557,36 +395,6 @@ def parse_args() -> argparse.Namespace:
         help="Rebuild the snapshot by reading every newsletter (heavy; use rarely)",
     )
     return parser.parse_args()
-
-
-def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapshot:
-    """Produce the snapshot to compute from, according to the chosen mode."""
-    if args.full_refresh:
-        print(
-            "Full refresh: reading every newsletter from Supabase in pages of "
-            f"{FETCH_PAGE_SIZE}, pausing {FETCH_PAUSE_SECONDS}s between pages..."
-        )
-        snapshot = build_full_snapshot(get_supabase_client(), now)
-        save_snapshot(args.snapshot_dir, snapshot, now)
-        print(f"Saved a snapshot of {len(snapshot.newsletters)} newsletters.")
-        return snapshot
-
-    snapshot = load_snapshot(args.snapshot_dir)
-    print(
-        f"Loaded a snapshot of {len(snapshot.newsletters)} newsletters "
-        f"(fetched through {snapshot.fetched_through.isoformat()})."
-    )
-    if args.offline:
-        return snapshot
-
-    print("Fetching sources and newsletters created since the snapshot...")
-    snapshot, fetched = refresh_snapshot(get_supabase_client(), snapshot)
-    save_snapshot(args.snapshot_dir, snapshot, now)
-    print(
-        f"Fetched {fetched} recent newsletter rows; the snapshot now has "
-        f"{len(snapshot.newsletters)} newsletters."
-    )
-    return snapshot
 
 
 def main() -> None:

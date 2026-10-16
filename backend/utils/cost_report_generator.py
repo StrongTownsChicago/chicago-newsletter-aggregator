@@ -4,7 +4,6 @@ Cost report generation and formatting.
 Generates reports in multiple formats (text, JSON, CSV) for LLM cost analysis.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -14,18 +13,6 @@ from utils.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
     WeeklyReportTokenAnalysis,
 )
-
-
-@dataclass
-class CostAnalysisReport:
-    """Complete cost analysis for a set of newsletters."""
-
-    metadata: dict[str, Any]
-    pricing: dict[str, float]
-    operations: dict[str, dict[str, float]]
-    totals: dict[str, Any]
-    per_newsletter: dict[str, float]
-    projections: dict[str, float]
 
 
 def generate_text_report(
