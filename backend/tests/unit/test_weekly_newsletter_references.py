@@ -17,7 +17,7 @@ class TestFetchNewsletterDetails(unittest.TestCase):
     """Tests for _fetch_newsletter_details() function."""
 
     @patch("notifications.email_sender.get_supabase_client")
-    def test_fetches_and_sorts_by_ward(self, mock_get_client):
+    def test_fetches_and_sorts_by_ward(self, mock_get_client: MagicMock) -> None:
         """Fetches newsletter details and sorts by ward number."""
         # Arrange
         mock_supabase = MagicMock()
@@ -58,7 +58,7 @@ class TestFetchNewsletterDetails(unittest.TestCase):
         self.assertEqual(result[2]["ward_number"], 48)
 
     @patch("notifications.email_sender.get_supabase_client")
-    def test_handles_empty_list(self, mock_get_client):
+    def test_handles_empty_list(self, mock_get_client: MagicMock) -> None:
         """Returns empty list for empty input."""
         result = _fetch_newsletter_details([])
         self.assertEqual(result, [])
@@ -68,7 +68,7 @@ class TestPrepareWeeklyReportData(unittest.TestCase):
     """Tests for _prepare_weekly_report_data() with newsletter references."""
 
     @patch("notifications.email_sender._fetch_newsletter_details")
-    def test_includes_referenced_newsletters(self, mock_fetch):
+    def test_includes_referenced_newsletters(self, mock_fetch: MagicMock) -> None:
         """Prepared data includes referenced newsletters."""
         # Arrange
         mock_fetch.return_value = [
@@ -105,7 +105,7 @@ class TestPrepareWeeklyReportData(unittest.TestCase):
 class TestRenderWeeklyContentWithReferences(unittest.TestCase):
     """Tests for weekly content rendering with newsletter references."""
 
-    def test_html_includes_referenced_section(self):
+    def test_html_includes_referenced_section(self) -> None:
         """HTML output includes referenced newsletters section."""
         # Arrange
         prepared = [
@@ -137,7 +137,7 @@ class TestRenderWeeklyContentWithReferences(unittest.TestCase):
         self.assertIn("Ward 40 Updates", html)
         self.assertIn("/newsletter/nl-1", html)
 
-    def test_text_includes_referenced_section(self):
+    def test_text_includes_referenced_section(self) -> None:
         """Plain text output includes referenced newsletters section."""
         # Arrange
         prepared = [

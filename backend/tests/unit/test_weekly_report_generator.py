@@ -7,8 +7,9 @@ Tests aggregation, error handling, and resilience.
 import io
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from models.types import NewsletterID
 from models.weekly_report import KeyDevelopment
 from processing.weekly_report_generator import (
     extract_facts_from_newsletters,
@@ -20,24 +21,30 @@ from processing.weekly_report_generator import (
 class TestExtractFactsFromNewsletters(unittest.TestCase):
     """Tests for extract_facts_from_newsletters() aggregation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output."""
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
     @patch("processing.weekly_report_generator.extract_facts_from_single_newsletter")
-    def test_aggregates_facts_from_multiple_newsletters(self, mock_extract):
+    def test_aggregates_facts_from_multiple_newsletters(
+        self, mock_extract: MagicMock
+    ) -> None:
         """Facts from multiple newsletters aggregated into single list."""
         # Arrange
         dev1 = KeyDevelopment(
-            description="Dev from NL1", newsletter_ids=["nl-1"], wards=["10"]
+            description="Dev from NL1",
+            newsletter_ids=[NewsletterID("nl-1")],
+            wards=["10"],
         )
         dev2 = KeyDevelopment(
-            description="Dev from NL2", newsletter_ids=["nl-2"], wards=["20"]
+            description="Dev from NL2",
+            newsletter_ids=[NewsletterID("nl-2")],
+            wards=["20"],
         )
         mock_extract.side_effect = [[dev1], [dev2]]
 
@@ -55,10 +62,12 @@ class TestExtractFactsFromNewsletters(unittest.TestCase):
         self.assertEqual(result[1].description, "Dev from NL2")
 
     @patch("processing.weekly_report_generator.extract_facts_from_single_newsletter")
-    def test_continues_on_individual_failure(self, mock_extract):
+    def test_continues_on_individual_failure(self, mock_extract: MagicMock) -> None:
         """Processing continues if one newsletter fails (resilience)."""
         # Arrange
-        dev1 = KeyDevelopment(description="Success", newsletter_ids=["nl-1"], wards=[])
+        dev1 = KeyDevelopment(
+            description="Success", newsletter_ids=[NewsletterID("nl-1")], wards=[]
+        )
         mock_extract.side_effect = [[], [dev1], []]  # Only middle succeeds
 
         newsletters = [
@@ -80,17 +89,19 @@ class TestExtractFactsFromNewsletters(unittest.TestCase):
 class TestExtractFactsFromSingleNewsletter(unittest.TestCase):
     """Tests for extract_facts_from_single_newsletter() LLM extraction + mapping."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output."""
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
     @patch("processing.weekly_report_generator.call_llm")
-    def test_attaches_newsletter_id_and_ward_deterministically(self, mock_llm):
+    def test_attaches_newsletter_id_and_ward_deterministically(
+        self, mock_llm: MagicMock
+    ) -> None:
         """The LLM returns only a description; id and ward come from the source."""
         # The LLM response provides only description — newsletter_ids and wards
         # are known deterministically from the source newsletter.
@@ -115,7 +126,7 @@ class TestExtractFactsFromSingleNewsletter(unittest.TestCase):
         self.assertEqual(dev.newsletter_ids, ["nl-42"])
 
     @patch("processing.weekly_report_generator.call_llm")
-    def test_citywide_source_yields_no_wards(self, mock_llm):
+    def test_citywide_source_yields_no_wards(self, mock_llm: MagicMock) -> None:
         """A source without a ward number (citywide official) yields empty wards."""
         mock_llm.return_value = '{"developments": ["Citywide budget announcement"]}'
         newsletter = {
@@ -132,7 +143,7 @@ class TestExtractFactsFromSingleNewsletter(unittest.TestCase):
         self.assertEqual(result[0].wards, [])
 
     @patch("processing.weekly_report_generator.call_llm")
-    def test_returns_empty_list_on_llm_failure(self, mock_llm):
+    def test_returns_empty_list_on_llm_failure(self, mock_llm: MagicMock) -> None:
         """A failed LLM call yields an empty list rather than raising."""
         mock_llm.side_effect = Exception("LLM timeout")
         newsletter = {
@@ -150,17 +161,17 @@ class TestExtractFactsFromSingleNewsletter(unittest.TestCase):
 class TestSynthesizeWeeklySummary(unittest.TestCase):
     """Tests for synthesize_weekly_summary() function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output."""
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
     @patch("processing.weekly_report_generator.call_llm")
-    def test_synthesizes_facts_into_summary(self, mock_llm):
+    def test_synthesizes_facts_into_summary(self, mock_llm: MagicMock) -> None:
         """Multiple facts synthesized into narrative using LLM."""
         # Arrange
         mock_llm.return_value = (
@@ -170,12 +181,12 @@ class TestSynthesizeWeeklySummary(unittest.TestCase):
         facts = [
             KeyDevelopment(
                 description="Ward 10 approved bike lanes",
-                newsletter_ids=["nl-1"],
+                newsletter_ids=[NewsletterID("nl-1")],
                 wards=["10"],
             ),
             KeyDevelopment(
                 description="Ward 20 announced bike lane study",
-                newsletter_ids=["nl-2"],
+                newsletter_ids=[NewsletterID("nl-2")],
                 wards=["20"],
             ),
         ]
@@ -188,13 +199,15 @@ class TestSynthesizeWeeklySummary(unittest.TestCase):
         mock_llm.assert_called_once()
 
     @patch("processing.weekly_report_generator.call_llm")
-    def test_handles_synthesis_failure_gracefully(self, mock_llm):
+    def test_handles_synthesis_failure_gracefully(self, mock_llm: MagicMock) -> None:
         """Returns empty string on LLM failure instead of crashing."""
         # Arrange
         mock_llm.side_effect = Exception("LLM timeout")
 
         facts = [
-            KeyDevelopment(description="Test", newsletter_ids=["nl-1"], wards=["10"])
+            KeyDevelopment(
+                description="Test", newsletter_ids=[NewsletterID("nl-1")], wards=["10"]
+            )
         ]
 
         # Act

@@ -5,7 +5,7 @@ Tests filtering logic, notification queuing, and dry-run behavior.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from utils.process_llm_metadata import fetch_newsletters, reprocess_newsletter
 
@@ -13,13 +13,13 @@ from utils.process_llm_metadata import fetch_newsletters, reprocess_newsletter
 class TestFetchNewsletters(unittest.TestCase):
     """Test newsletter fetching with various filters."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.mock_supabase = Mock()
         self.mock_table = Mock()
         self.mock_supabase.table.return_value = self.mock_table
 
-    def test_missing_metadata_filter_applied(self):
+    def test_missing_metadata_filter_applied(self) -> None:
         """Test --missing-metadata flag adds OR filter for null metadata."""
         # Arrange
         args = Mock(
@@ -44,7 +44,7 @@ class TestFetchNewsletters(unittest.TestCase):
         # Assert
         self.mock_table.or_.assert_called_once_with("topics.is.null,summary.is.null")
 
-    def test_missing_metadata_not_applied_when_flag_false(self):
+    def test_missing_metadata_not_applied_when_flag_false(self) -> None:
         """Test no filter added when --missing-metadata not set."""
         # Arrange
         args = Mock(
@@ -68,7 +68,7 @@ class TestFetchNewsletters(unittest.TestCase):
         # Assert
         self.mock_table.or_.assert_not_called()
 
-    def test_combines_missing_metadata_with_source_filter(self):
+    def test_combines_missing_metadata_with_source_filter(self) -> None:
         """Test --missing-metadata works with --source-id."""
         # Arrange
         args = Mock(
@@ -102,8 +102,8 @@ class TestNotificationQueuing(unittest.TestCase):
     @patch("notifications.rule_matcher.match_newsletter_to_rules")
     @patch("notifications.rule_matcher.queue_notifications")
     def test_queues_notifications_when_flag_enabled(
-        self, mock_queue, mock_match, mock_llm
-    ):
+        self, mock_queue: MagicMock, mock_match: MagicMock, mock_llm: MagicMock
+    ) -> None:
         """Test notifications queued when --queue-notifications set."""
         # Arrange
         mock_supabase = Mock()
@@ -155,7 +155,7 @@ class TestNotificationQueuing(unittest.TestCase):
         mock_queue.assert_called_once()
 
     @patch("utils.process_llm_metadata.extract_newsletter_metadata")
-    def test_skips_notifications_when_flag_disabled(self, mock_llm):
+    def test_skips_notifications_when_flag_disabled(self, mock_llm: MagicMock) -> None:
         """Test notifications not queued when --queue-notifications not set."""
         # Arrange
         mock_supabase = Mock()

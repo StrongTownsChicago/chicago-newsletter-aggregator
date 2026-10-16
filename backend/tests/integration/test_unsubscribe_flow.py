@@ -5,7 +5,7 @@ Integration tests for complete unsubscribe workflow.
 import os
 import unittest
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import jwt
 
@@ -20,7 +20,7 @@ from notifications.unsubscribe_tokens import (
 class TestUnsubscribeFlow(unittest.TestCase):
     """Test end-to-end unsubscribe workflow."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test environment."""
         self.original_secret = os.environ.get("UNSUBSCRIBE_SECRET_KEY")
         self.test_secret = "test-secret-key-for-testing-must-be-at-least-32-chars-long"
@@ -28,7 +28,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.original_base_url = os.environ.get("FRONTEND_BASE_URL")
         os.environ["FRONTEND_BASE_URL"] = "https://test.example.com"
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore original environment."""
         if self.original_secret:
             os.environ["UNSUBSCRIBE_SECRET_KEY"] = self.original_secret
@@ -40,7 +40,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         else:
             os.environ.pop("FRONTEND_BASE_URL", None)
 
-    def test_token_generation_and_validation_roundtrip(self):
+    def test_token_generation_and_validation_roundtrip(self) -> None:
         """Test that generated token can be validated to get original user_id."""
         user_id = "test-user-integration-123"
 
@@ -54,7 +54,9 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.assertEqual(validated_user_id, user_id)
 
     @patch("notifications.email_sender.resend")
-    def test_email_contains_valid_unsubscribe_token(self, mock_resend):
+    def test_email_contains_valid_unsubscribe_token(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that email digest includes valid unsubscribe token in headers and body."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -108,7 +110,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.assertIn("/unsubscribe?token=", text_body)
         self.assertIn(token, text_body)
 
-    def test_expired_token_cannot_be_validated(self):
+    def test_expired_token_cannot_be_validated(self) -> None:
         """Test that tokens respect expiration."""
         user_id = "test-user-expiry-check"
 
@@ -124,7 +126,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         result = validate_unsubscribe_token(token)
         self.assertIsNone(result)
 
-    def test_tampered_token_fails_validation(self):
+    def test_tampered_token_fails_validation(self) -> None:
         """Test that modifying token makes it invalid."""
         user_id = "test-user-tamper-check"
 
@@ -144,7 +146,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         result = validate_unsubscribe_token(tampered_token)
         self.assertIsNone(result)
 
-    def test_different_secret_key_fails_validation(self):
+    def test_different_secret_key_fails_validation(self) -> None:
         """Test that tokens generated with different secret keys don't validate."""
         user_id = "test-user-secret-mismatch"
 
@@ -163,7 +165,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch("notifications.email_sender.resend")
-    def test_multiple_users_get_unique_tokens(self, mock_resend):
+    def test_multiple_users_get_unique_tokens(self, mock_resend: MagicMock) -> None:
         """Test that different users get different unsubscribe tokens."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -208,7 +210,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         self.assertEqual(validated1, user1_id)
         self.assertEqual(validated2, user2_id)
 
-    def test_token_with_special_characters_in_user_id(self):
+    def test_token_with_special_characters_in_user_id(self) -> None:
         """Test that UUIDs and special characters work correctly."""
         # Test with typical UUID format
         uuid_user_id = "550e8400-e29b-41d4-a716-446655440000"

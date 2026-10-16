@@ -10,7 +10,7 @@ class TestUserCases(unittest.TestCase):
     Verifies that privacy sanitization robustly handles complex HTML structures found in actual newsletters.
     """
 
-    def test_case_1_daniel_la_spata(self):
+    def test_case_1_daniel_la_spata(self) -> None:
         """
         Verify removal of mailchimp-specific preference/unsubscribe links
         embedded in complex footer structures (1st Ward example).
@@ -34,7 +34,7 @@ class TestUserCases(unittest.TestCase):
         )
         self.assertNotIn("the1stward.us4.list-manage.com/unsubscribe", sanitized)
 
-    def test_case_2_compliance_links(self):
+    def test_case_2_compliance_links(self) -> None:
         """
         Verify removal of Constant Contact 'complianceLinks' table which contains
         unsubscribe and profile update links.
@@ -61,7 +61,7 @@ class TestUserCases(unittest.TestCase):
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("Update Profile", sanitized)
 
-    def test_case_3_constant_contact_footer(self):
+    def test_case_3_constant_contact_footer(self) -> None:
         """
         Test handling of generic Constant Contact footer images/logos.
         Currently, these benign logos are expected to match if they contain tracked links,
@@ -82,7 +82,7 @@ class TestUserCases(unittest.TestCase):
         # No specific removal assertion required for generic logos unless they become a privacy issue.
         self.assertIsNotNone(sanitized)
 
-    def test_case_4_view_in_browser(self):
+    def test_case_4_view_in_browser(self) -> None:
         """
         Verify removal of 'View in browser' links, a common pattern in newsletters.
         """
@@ -97,7 +97,7 @@ class TestUserCases(unittest.TestCase):
         self.assertNotIn("mailchi.mp", sanitized)
         self.assertNotIn("<a href=", sanitized)
 
-    def test_case_5_artifacts(self):
+    def test_case_5_artifacts(self) -> None:
         """
         Verify robustness against artifacting.
         With the safer sanitization approach, we assert that SENSITIVE URLs are removed,

@@ -7,7 +7,7 @@ import unittest
 from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import ClassVar
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 from analytics.facts import MIN_EXTRACTED_WORDS
@@ -46,7 +46,7 @@ def make_newsletter(
 
 
 class TestComputeOutputs(unittest.TestCase):
-    def test_produces_every_output_file(self):
+    def test_produces_every_output_file(self) -> None:
         sources = [
             SourceRecord(1, "Ada Alder", "1", "alderman"),
             SourceRecord(2, "Bo Alder", "2", "alderman"),
@@ -79,7 +79,7 @@ class TestComputeOutputs(unittest.TestCase):
         self.assertEqual(outputs["terms"]["min_newsletters"], 2)
         self.assertEqual(outputs["rising"]["latest_month"], "2026-09")
 
-    def test_term_metrics_exclude_text_a_source_repeats_in_every_issue(self):
+    def test_term_metrics_exclude_text_a_source_repeats_in_every_issue(self) -> None:
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         footer = "Ada Alder | 1 Main St | Unsubscribe | Update Profile | Constant Contact Data Notice"
         newsletters = [
@@ -101,7 +101,7 @@ class TestComputeOutputs(unittest.TestCase):
         fact_words = outputs["newsletters"]["newsletters"][0]["words"]
         self.assertEqual(fact_words, len(newsletters[0].plain_text.split()))
 
-    def test_flags_each_newsletter_with_the_lenses_it_mentions(self):
+    def test_flags_each_newsletter_with_the_lenses_it_mentions(self) -> None:
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         filler = "word " * MIN_EXTRACTED_WORDS
         mention = " ".join(["New speed humps."] * LENS_MIN_MENTIONS)
@@ -132,7 +132,7 @@ class TestComputeOutputs(unittest.TestCase):
         self.assertEqual(street_safety["newsletters"], 1)
 
     @unittest.skipUnless(MATCH_LENSES_ON_CLEANED_TEXT, "lenses match raw text")
-    def test_lenses_ignore_a_standing_block_repeated_in_every_issue(self):
+    def test_lenses_ignore_a_standing_block_repeated_in_every_issue(self) -> None:
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         standing_block = (
             "Immigration resources: know your rights workshops for immigrant "
@@ -155,7 +155,7 @@ class TestComputeOutputs(unittest.TestCase):
         for fact in outputs["newsletters"]["newsletters"]:
             self.assertNotIn("immigration", fact["lenses"])
 
-    def test_handles_dataset_without_complete_month(self):
+    def test_handles_dataset_without_complete_month(self) -> None:
         sources = [SourceRecord(1, "Ada Alder", "1", "alderman")]
         newsletters = [make_newsletter("a", date(2026, 10, 3), 1, "Bike lanes")]
         outputs = compute_outputs(
@@ -175,7 +175,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
     filler = "word " * MIN_EXTRACTED_WORDS
     mention = " ".join(["New speed humps."] * LENS_MIN_MENTIONS)
 
-    def test_summarizes_wards_and_broad_complete_months(self):
+    def test_summarizes_wards_and_broad_complete_months(self) -> None:
         newsletters = [
             make_newsletter("a", date(2026, 8, 3), 1, self.filler),
             make_newsletter("b", date(2026, 9, 3), 1, f"{self.mention} {self.filler}"),
@@ -209,7 +209,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
         )
         self.assertEqual(street_safety["wards"], 2)
 
-    def test_without_a_complete_month_both_summaries_are_empty(self):
+    def test_without_a_complete_month_both_summaries_are_empty(self) -> None:
         newsletters = [make_newsletter("a", date(2026, 10, 3), 1, self.filler)]
         outputs = compute_site_outputs(
             analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
@@ -218,7 +218,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
         self.assertIsNone(outputs["ward-glance"]["latest_month"])
         self.assertEqual(outputs["monthly-reports"]["reports"], [])
 
-    def test_a_stale_snapshot_leaves_its_newest_month_out(self):
+    def test_a_stale_snapshot_leaves_its_newest_month_out(self) -> None:
         # Refreshed mid-September but computed in October: September is partial.
         newsletters = [
             make_newsletter("a", date(2026, 8, 3), 1, self.filler),
@@ -238,7 +238,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
 
 
 class TestWriteOutputs(unittest.TestCase):
-    def test_writes_compact_json_and_reports_sizes(self):
+    def test_writes_compact_json_and_reports_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory) / "nested"
             sizes = write_outputs({"metadata": {"a": 1}}, output_dir)
@@ -251,7 +251,7 @@ class TestWriteOutputs(unittest.TestCase):
 class FakeQuery:
     """Minimal stand-in for a PostgREST select query over in-memory rows."""
 
-    def __init__(self, database: "FakeSupabase", table: str):
+    def __init__(self, database: "FakeSupabase", table: str) -> None:
         self.database = database
         self.table = table
         self.created_since: str | None = None
@@ -290,7 +290,7 @@ class FakeQuery:
 
 
 class FakeSupabase:
-    def __init__(self, tables: dict[str, list[dict]]):
+    def __init__(self, tables: dict[str, list[dict[str, Any]]]) -> None:
         self.tables = tables
         self.executed: list[FakeQuery] = []
 
@@ -302,7 +302,7 @@ def newsletter_row(
     newsletter_id: str,
     created_at: str,
     subject: str = "News",
-):
+) -> dict[str, Any]:
     return {
         "id": newsletter_id,
         "created_at": created_at,
@@ -319,7 +319,7 @@ SOURCE_ROWS = [
 
 
 class TestFetchRows(unittest.TestCase):
-    def test_paginates_with_a_pause_between_full_pages(self):
+    def test_paginates_with_a_pause_between_full_pages(self) -> None:
         rows = [{"id": f"{index:05d}"} for index in range(FETCH_PAGE_SIZE + 1)]
         supabase = FakeSupabase({"newsletters": rows})
         sleep = MagicMock()
@@ -332,7 +332,7 @@ class TestFetchRows(unittest.TestCase):
         self.assertTrue(all(q.order_column == "id" for q in supabase.executed))
         sleep.assert_called_once_with(FETCH_PAUSE_SECONDS)
 
-    def test_single_short_page_does_not_pause(self):
+    def test_single_short_page_does_not_pause(self) -> None:
         supabase = FakeSupabase({"sources": SOURCE_ROWS})
         sleep = MagicMock()
         self.assertEqual(
@@ -340,7 +340,7 @@ class TestFetchRows(unittest.TestCase):
         )
         sleep.assert_not_called()
 
-    def test_filters_on_created_at_when_given(self):
+    def test_filters_on_created_at_when_given(self) -> None:
         supabase = FakeSupabase(
             {
                 "newsletters": [
@@ -354,7 +354,7 @@ class TestFetchRows(unittest.TestCase):
         self.assertEqual([row["id"] for row in fetched], ["new"])
         self.assertEqual(supabase.executed[0].created_since, since.isoformat())
 
-    def test_errors_are_not_retried(self):
+    def test_errors_are_not_retried(self) -> None:
         supabase = MagicMock()
         supabase.table.return_value.select.return_value.order.return_value.range.return_value.execute.side_effect = RuntimeError(
             "522"
@@ -365,7 +365,7 @@ class TestFetchRows(unittest.TestCase):
 
 
 class TestRefreshSnapshot(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.cursor = datetime(2026, 10, 11, 20, 0, tzinfo=UTC)
         self.snapshot = Snapshot(
             sources=[],
@@ -376,7 +376,7 @@ class TestRefreshSnapshot(unittest.TestCase):
             fetched_through=self.cursor,
         )
 
-    def test_fetches_only_rows_since_cursor_minus_overlap_and_merges(self):
+    def test_fetches_only_rows_since_cursor_minus_overlap_and_merges(self) -> None:
         supabase = FakeSupabase(
             {
                 "sources": SOURCE_ROWS,
@@ -410,7 +410,7 @@ class TestRefreshSnapshot(unittest.TestCase):
         )
         self.assertEqual([source.name for source in updated.sources], ["Ada Alder"])
 
-    def test_no_new_rows_keeps_snapshot_and_cursor(self):
+    def test_no_new_rows_keeps_snapshot_and_cursor(self) -> None:
         supabase = FakeSupabase({"sources": SOURCE_ROWS, "newsletters": []})
         updated, fetched = refresh_snapshot(supabase, self.snapshot, MagicMock())
         self.assertEqual(fetched, 0)
@@ -419,7 +419,7 @@ class TestRefreshSnapshot(unittest.TestCase):
 
 
 class TestBuildFullSnapshot(unittest.TestCase):
-    def test_reads_every_newsletter_and_sets_cursor_to_newest(self):
+    def test_reads_every_newsletter_and_sets_cursor_to_newest(self) -> None:
         supabase = FakeSupabase(
             {
                 "sources": SOURCE_ROWS,
@@ -435,7 +435,7 @@ class TestBuildFullSnapshot(unittest.TestCase):
         self.assertEqual(snapshot.fetched_through, datetime(2026, 10, 12, tzinfo=UTC))
         self.assertTrue(all(q.created_since is None for q in supabase.executed))
 
-    def test_empty_table_starts_the_cursor_now(self):
+    def test_empty_table_starts_the_cursor_now(self) -> None:
         supabase = FakeSupabase({"sources": SOURCE_ROWS, "newsletters": []})
         now = datetime(2026, 10, 13, tzinfo=UTC)
         self.assertEqual(
@@ -446,13 +446,13 @@ class TestBuildFullSnapshot(unittest.TestCase):
 class TestLoadOrRefreshSnapshot(unittest.TestCase):
     NOW = datetime(2026, 10, 13, tzinfo=UTC)
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Progress messages are for the CLI; keep test output clean.
         silence = patch("builtins.print")
         silence.start()
         self.addCleanup(silence.stop)
 
-    def make_args(self, directory: Path, **flags) -> argparse.Namespace:
+    def make_args(self, directory: Path, **flags: Any) -> argparse.Namespace:
         return argparse.Namespace(
             snapshot_dir=directory,
             offline=flags.get("offline", False),
@@ -468,7 +468,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
         save_snapshot(directory, seed, self.NOW)
         return seed
 
-    def test_offline_never_creates_a_database_client(self):
+    def test_offline_never_creates_a_database_client(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             seed = self.save_seed(path)
@@ -479,7 +479,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             client.assert_not_called()
             self.assertEqual(snapshot, seed)
 
-    def test_default_mode_refreshes_and_saves_the_snapshot(self):
+    def test_default_mode_refreshes_and_saves_the_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             self.save_seed(path)
@@ -503,7 +503,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             )
             self.assertEqual(load_snapshot(path), snapshot)
 
-    def test_default_mode_without_snapshot_does_not_touch_the_database(self):
+    def test_default_mode_without_snapshot_does_not_touch_the_database(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with (
                 patch("utils.compute_analytics.get_supabase_client") as client,
@@ -514,7 +514,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
                 )
             client.assert_not_called()
 
-    def test_full_refresh_builds_and_saves_a_new_snapshot(self):
+    def test_full_refresh_builds_and_saves_a_new_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "fresh"
             supabase = FakeSupabase(

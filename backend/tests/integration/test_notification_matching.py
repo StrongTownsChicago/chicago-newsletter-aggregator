@@ -9,13 +9,14 @@ test_user_cases.py.
 """
 
 import unittest
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 
 class TestNotificationMatching(unittest.TestCase):
     """Tests for notification rule matching and queuing."""
 
-    def test_newsletter_matches_topic_rule(self):
+    def test_newsletter_matches_topic_rule(self) -> None:
         """Verify newsletter with matching topic triggers notification rule."""
         from notifications.rule_matcher import (
             match_newsletter_to_rules,
@@ -89,7 +90,7 @@ class TestNotificationMatching(unittest.TestCase):
             "notification_queue": mock_queue_table,
         }
 
-        def table_router(table_name):
+        def table_router(table_name: str) -> Any:
             return tables.get(table_name) or MagicMock()
 
         mock_supabase.table.side_effect = table_router
@@ -109,7 +110,7 @@ class TestNotificationMatching(unittest.TestCase):
             count = queue_notifications(newsletter_id, matched_rules)
             self.assertEqual(count, 1)
 
-    def test_reprocessing_triggers_notifications(self):
+    def test_reprocessing_triggers_notifications(self) -> None:
         """Verify that reprocessing flow correctly triggers notification matching."""
         from utils.process_llm_metadata import reprocess_newsletter
 
@@ -161,7 +162,7 @@ class TestNotificationMatching(unittest.TestCase):
         mock_queue_response.data = [{"id": "queue_001"}]
 
         # Route table() calls
-        def table_router(table_name):
+        def table_router(table_name: str) -> Any:
             if table_name == "newsletters":
                 return mock_update_table
             if table_name == "notification_rules":

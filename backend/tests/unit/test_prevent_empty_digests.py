@@ -17,7 +17,9 @@ class TestPreventEmptyDigests(unittest.TestCase):
 
     @patch("notifications.email_sender._prepare_newsletter_data")
     @patch("notifications.email_sender._build_unsubscribe_url")
-    def test_send_digest_empty_daily(self, mock_unsub, mock_prepare):
+    def test_send_digest_empty_daily(
+        self, mock_unsub: MagicMock, mock_prepare: MagicMock
+    ) -> None:
         """send_digest returns error when daily preparation results in no content."""
         # Arrange
         mock_prepare.return_value = []
@@ -39,7 +41,9 @@ class TestPreventEmptyDigests(unittest.TestCase):
 
     @patch("notifications.email_sender._prepare_weekly_report_data")
     @patch("notifications.email_sender._build_unsubscribe_url")
-    def test_send_digest_empty_weekly(self, mock_unsub, mock_prepare):
+    def test_send_digest_empty_weekly(
+        self, mock_unsub: MagicMock, mock_prepare: MagicMock
+    ) -> None:
         """send_digest returns error when weekly preparation results in no content."""
         # Arrange
         mock_prepare.return_value = []
@@ -63,8 +67,8 @@ class TestPreventEmptyDigests(unittest.TestCase):
     @patch("notifications.process_notification_queue.get_supabase_client")
     @patch("notifications.process_notification_queue.send_digest")
     def test_process_digests_handles_empty_result(
-        self, mock_send, mock_supabase, mock_print
-    ):
+        self, mock_send: MagicMock, mock_supabase: MagicMock, mock_print: MagicMock
+    ) -> None:
         """process_digests increments skipped stat and updates DB for empty content."""
         # Arrange
         mock_sb = MagicMock()
