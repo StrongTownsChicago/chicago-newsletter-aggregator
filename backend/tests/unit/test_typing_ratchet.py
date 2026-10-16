@@ -21,8 +21,8 @@ BACKEND = Path(__file__).resolve().parents[2]
 MYPY_INI = BACKEND / "mypy.ini"
 
 # The counts at adoption. Lower them as entries go; never raise either.
-ADOPTED_MODULES = 6
-ADOPTED_CODES = 10
+ADOPTED_MODULES = 5
+ADOPTED_CODES = 9
 
 TEST_SECTION_PREFIX = "mypy-tests."
 # Any other setting (above all ignore_errors) would switch a module off
