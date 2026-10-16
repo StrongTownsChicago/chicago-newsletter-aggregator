@@ -5,10 +5,12 @@ Handles sending digest emails (daily and weekly) to users with matched content.
 """
 
 import os
+from datetime import datetime
 from enum import Enum
 from typing import Any
-from datetime import datetime
+
 import resend
+
 from notifications.unsubscribe_tokens import generate_unsubscribe_token
 from shared.db import get_supabase_client
 
@@ -112,7 +114,7 @@ def _prepare_newsletter_data(
         received_date = newsletter.get("received_date", "")
         if received_date:
             try:
-                date_obj = datetime.fromisoformat(received_date.replace("Z", "+00:00"))
+                date_obj = datetime.fromisoformat(received_date)
                 date_formatted = date_obj.strftime("%B %d, %Y")
             except (ValueError, TypeError):
                 date_formatted = received_date[:10]
@@ -218,7 +220,7 @@ def send_digest(
 
         return {"success": True, "email_id": response.get("id")}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  send boundary: report failure to the caller
         return {"success": False, "error": str(e)}
 
 
@@ -327,9 +329,7 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
             for nl in report["referenced_newsletters"]:
                 # Format date
                 try:
-                    date_obj = datetime.fromisoformat(
-                        nl["received_date"].replace("Z", "+00:00")
-                    )
+                    date_obj = datetime.fromisoformat(nl["received_date"])
                     date_str = date_obj.strftime("%B %d, %Y")
                 except (ValueError, TypeError):
                     date_str = nl["received_date"][:10]
@@ -649,9 +649,7 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
             for nl in report["referenced_newsletters"]:
                 # Format date
                 try:
-                    date_obj = datetime.fromisoformat(
-                        nl["received_date"].replace("Z", "+00:00")
-                    )
+                    date_obj = datetime.fromisoformat(nl["received_date"])
                     date_str = date_obj.strftime("%B %d, %Y")
                 except (ValueError, TypeError):
                     date_str = nl["received_date"][:10]
@@ -806,7 +804,7 @@ def _fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]
 
         return newsletters
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no newsletters
         print(f"Warning: Failed to fetch newsletter details: {e}")
         return []
 
@@ -910,14 +908,14 @@ def _format_week_range(week_id: str) -> str:
         week = int(week_str)
 
         # Calculate week start (Monday)
-        from datetime import datetime, timedelta
+        from datetime import date, timedelta
 
-        jan_4 = datetime(year, 1, 4)  # Always in week 1
+        jan_4 = date(year, 1, 4)  # Always in week 1
         week_1_monday = jan_4 - timedelta(days=jan_4.weekday())
         week_start = week_1_monday + timedelta(weeks=week - 1)
         week_end = week_start + timedelta(days=6)
 
-        # Format: "January 26 - February 1, 2026"
+        # Formats as "January 26 - February 1, 2026"
         if week_start.month == week_end.month:
             return f"{week_start.strftime('%B %d')} - {week_end.strftime('%d, %Y')}"
         else:

@@ -1,5 +1,6 @@
 """Tokenization of newsletter text into unigram and bigram terms."""
 
+import itertools
 import re
 
 from analytics.stopwords import EXCLUDED_TERMS
@@ -76,7 +77,7 @@ def extract_terms(text: str) -> set[str]:
         terms.update(token for token in phrase if token is not None)
         terms.update(
             f"{first} {second}"
-            for first, second in zip(phrase, phrase[1:])
+            for first, second in itertools.pairwise(phrase)
             if first is not None and second is not None
         )
     return terms

@@ -15,14 +15,14 @@ from models.notification import (
 from models.source import EmailSourceMapping, Source
 
 __all__ = [
+    "EmailSourceMapping",
     "Newsletter",
     "NewsletterCreate",
-    "NewsletterProcessing",
     "NewsletterMatching",
-    "Source",
-    "EmailSourceMapping",
+    "NewsletterProcessing",
+    "NotificationQueueEntry",
     "NotificationRule",
     "RuleMatch",
-    "NotificationQueueEntry",
+    "Source",
     "UserProfile",
 ]

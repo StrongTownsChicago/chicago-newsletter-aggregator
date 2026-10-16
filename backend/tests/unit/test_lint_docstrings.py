@@ -68,7 +68,7 @@ class TestCaps(unittest.TestCase):
         self.assertNotIn("DS003", rules_hit(f"{half}\n{half}x = 1\n"))
 
     def test_a_line_separator_inside_a_string_does_not_shift_lines(self) -> None:
-        for separator in ("\x0c", " "):
+        for separator in ("\x0c", "\u2028"):
             with self.subTest(separator=repr(separator)):
                 source = f'a = "x{separator}y"\n' + comment_block(
                     checker.COMMENT_BLOCK_MAX + 1

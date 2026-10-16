@@ -50,7 +50,7 @@ class TestMeasure(unittest.TestCase):
         self.assertEqual(measure(source).lines, 1)
 
     def test_a_line_separator_inside_a_string_does_not_shift_lines(self) -> None:
-        for separator in ("\x0c", " "):
+        for separator in ("\x0c", "\u2028"):
             with self.subTest(separator=repr(separator)):
                 source = f'a = "x{separator}y"\n# note\n# more\nb = 2\n'
                 self.assertEqual(measure(source).lines, 2)

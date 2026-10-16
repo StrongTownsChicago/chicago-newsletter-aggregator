@@ -9,13 +9,14 @@ test_user_cases.py.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 
 class TestNotificationMatching(unittest.TestCase):
     """Tests for notification rule matching and queuing."""
 
-    def test_newsletter_matches_topic_rule(self):
+    def test_newsletter_matches_topic_rule(self) -> None:
         """Verify newsletter with matching topic triggers notification rule."""
         from notifications.rule_matcher import (
             match_newsletter_to_rules,
@@ -83,14 +84,14 @@ class TestNotificationMatching(unittest.TestCase):
         mock_queue_table.insert.return_value = mock_queue_insert
 
         # Route table() calls
-        def table_router(table_name):
-            if table_name == "notification_rules":
-                return mock_rules_table
-            elif table_name == "user_profiles":
-                return mock_users_table
-            elif table_name == "notification_queue":
-                return mock_queue_table
-            return MagicMock()
+        tables = {
+            "notification_rules": mock_rules_table,
+            "user_profiles": mock_users_table,
+            "notification_queue": mock_queue_table,
+        }
+
+        def table_router(table_name: str) -> Any:
+            return tables.get(table_name) or MagicMock()
 
         mock_supabase.table.side_effect = table_router
 
@@ -109,7 +110,7 @@ class TestNotificationMatching(unittest.TestCase):
             count = queue_notifications(newsletter_id, matched_rules)
             self.assertEqual(count, 1)
 
-    def test_reprocessing_triggers_notifications(self):
+    def test_reprocessing_triggers_notifications(self) -> None:
         """Verify that reprocessing flow correctly triggers notification matching."""
         from utils.process_llm_metadata import reprocess_newsletter
 
@@ -161,12 +162,12 @@ class TestNotificationMatching(unittest.TestCase):
         mock_queue_response.data = [{"id": "queue_001"}]
 
         # Route table() calls
-        def table_router(table_name):
+        def table_router(table_name: str) -> Any:
             if table_name == "newsletters":
                 return mock_update_table
             if table_name == "notification_rules":
                 mock_rules_table = MagicMock()
-                # Handle .select().eq().eq().execute()
+                # Handles the select, eq, eq, execute chain
                 mock_rules_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_rules_response
                 return mock_rules_table
             elif table_name == "user_profiles":

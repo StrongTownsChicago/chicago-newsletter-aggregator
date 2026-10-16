@@ -1,8 +1,8 @@
-import unittest
 import os
+import unittest
 
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
 
 
 class TestSanitizationComprehensive(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
     Uses parameterized cases to verify all configured patterns and potential edge cases.
     """
 
-    def test_url_domain_patterns(self):
+    def test_url_domain_patterns(self) -> None:
         """Verify removal of specific known newsletter service domains in hrefs."""
         cases = [
             (
@@ -131,7 +131,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
                         f"Anchor tag for {url} should have been preserved",
                     )
 
-    def test_link_text_keyword_matches(self):
+    def test_link_text_keyword_matches(self) -> None:
         """Verify removal of links based on their text content, catching obscured tracking URLs."""
         cases = [
             ("Unsubscribe text", "Unsubscribe", True),
@@ -176,7 +176,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
                         f"Anchor tag for '{text}' should have been preserved",
                     )
 
-    def test_css_selectors(self):
+    def test_css_selectors(self) -> None:
         """Verify removal of entire containers via CSS selectors."""
         cases = [
             (
@@ -202,15 +202,14 @@ class TestSanitizationComprehensive(unittest.TestCase):
             with self.subTest(name=name):
                 html = f"<body><div>Content</div>{snippet}</body>"
                 sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
-                if should_remove:
-                    # We look for a fragment of the snippet that shouldn't be there
-                    # (Simple check: find a unique attribute or the text)
-                    if "class=" in snippet:
-                        attr = snippet.split('class="')[1].split('"')[0]
-                        self.assertNotIn(attr, sanitized)
+                # We look for a fragment of the snippet that shouldn't be there
+                # (Simple check: find a unique attribute or the text)
+                if should_remove and "class=" in snippet:
+                    attr = snippet.split('class="')[1].split('"')[0]
+                    self.assertNotIn(attr, sanitized)
                 self.assertIn("Content", sanitized)
 
-    def test_keyword_safety_in_regular_text(self):
+    def test_keyword_safety_in_regular_text(self) -> None:
         """Verify that keywords like 'unsubscribe' are NOT removed when part of normal sentence text."""
         # In HTML, only <a> tags should be checked for these keywords
         html = """
@@ -233,7 +232,7 @@ class TestSanitizationComprehensive(unittest.TestCase):
             "tracked.com", sanitized, "The link itself should still be removed"
         )
 
-    def test_plain_text_sanitization(self):
+    def test_plain_text_sanitization(self) -> None:
         """Verify basic line-stripping and keyword removal in plain text content."""
         text = """
 Keep this line.
@@ -251,7 +250,7 @@ Keep this sentence: I will not unsubscribe from your great news.
         # heuristic 'unsubscribe|update profile|manage preferences' exactly as a line.
         self.assertNotIn("\nManage Preferences\n", sanitized)
 
-    def test_sensitive_phrase_redaction(self):
+    def test_sensitive_phrase_redaction(self) -> None:
         """Verify that specific phrases (names/emails) from env var are redacted."""
         from unittest.mock import patch
 
@@ -276,7 +275,7 @@ Keep this sentence: I will not unsubscribe from your great news.
             self.assertIn("[REDACTED]", sanitized_text)
             self.assertEqual(sanitized_text.count("[REDACTED]"), 2)
 
-    def test_tracking_link_unwrap_with_image(self):
+    def test_tracking_link_unwrap_with_image(self) -> None:
         """Verify that tracking links wrapping images are unwrapped (tag removed, image kept)."""
         html = '<a href="https://zsabxyiab.cc.rs6.net/tn.jsp?f=123"><img src="news_image.jpg"></a>'
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
@@ -284,14 +283,14 @@ Keep this sentence: I will not unsubscribe from your great news.
         self.assertNotIn("<a", sanitized)
         self.assertIn('<img src="news_image.jpg"', sanitized)
 
-    def test_unsubscribe_link_decomposition(self):
+    def test_unsubscribe_link_decomposition(self) -> None:
         """Verify that purely functional privacy links are still completely removed (not unwrapped)."""
         html = '<a href="http://tracked.com">Unsubscribe</a>'
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("<a", sanitized)
 
-    def test_tracking_link_unwrap_with_text(self):
+    def test_tracking_link_unwrap_with_text(self) -> None:
         """Verify that tracking links with text content preserve the text while removing the link."""
         cases = [
             (
@@ -368,7 +367,7 @@ Keep this sentence: I will not unsubscribe from your great news.
                         "Tracking link anchor tag should be removed",
                     )
 
-    def test_privacy_link_double_match_decomposition(self):
+    def test_privacy_link_double_match_decomposition(self) -> None:
         """Verify that links matching both URL and text patterns are completely removed."""
         cases = [
             (
@@ -426,7 +425,7 @@ Keep this sentence: I will not unsubscribe from your great news.
                         f"Privacy link should be completely removed, but text '{removed_text}' still present"
                     )
 
-    def test_mixed_content_scenarios(self):
+    def test_mixed_content_scenarios(self) -> None:
         """Verify complex scenarios with legitimate links, tracking links, and privacy links."""
         html = """
         <div>

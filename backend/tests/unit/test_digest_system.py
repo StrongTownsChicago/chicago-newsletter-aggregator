@@ -5,15 +5,15 @@ Tests template selection, business rules, error handling.
 """
 
 import unittest
-from unittest.mock import patch
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 from notifications.email_sender import (
     DigestType,
-    send_digest,
     _build_digest_html,
     _build_digest_text,
+    send_digest,
 )
 from notifications.process_notification_queue import (
     _calculate_daily_batch_id,
@@ -25,7 +25,7 @@ from notifications.process_notification_queue import (
 class TestDigestEmailTemplates(unittest.TestCase):
     """Tests for template-based digest generation."""
 
-    def test_daily_uses_newsletter_template(self):
+    def test_daily_uses_newsletter_template(self) -> None:
         """Daily digest uses newsletter card template."""
         prepared = [
             {
@@ -47,7 +47,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
         self.assertIn("Daily Chicago Aldermen Newsletter Digest", html)
         self.assertIn('class="newsletter"', html)
 
-    def test_weekly_uses_topic_report_template(self):
+    def test_weekly_uses_topic_report_template(self) -> None:
         """Weekly digest uses topic report template."""
         prepared = [
             {
@@ -68,7 +68,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
         self.assertIn("Weekly Topic Digest", html)
         self.assertIn('class="topic-report"', html)
 
-    def test_daily_text_format_differs_from_weekly(self):
+    def test_daily_text_format_differs_from_weekly(self) -> None:
         """Daily and weekly text formats are distinct."""
         daily_data = [
             {
@@ -105,7 +105,7 @@ class TestDigestEmailTemplates(unittest.TestCase):
         self.assertIn("DAILY NEWSLETTER DIGEST", daily_text)
         self.assertIn("WEEKLY TOPIC DIGEST", weekly_text)
 
-    def test_topic_limit_business_rule(self):
+    def test_topic_limit_business_rule(self) -> None:
         """Only first 5 topics shown (business rule enforcement)."""
         from notifications.email_sender import _render_daily_content_html
 
@@ -135,7 +135,9 @@ class TestDigestSending(unittest.TestCase):
     @patch("notifications.email_sender.resend.Emails.send")
     @patch("notifications.email_sender._prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
-    def test_sends_correct_digest_type(self, mock_token, mock_prepare, mock_resend):
+    def test_sends_correct_digest_type(
+        self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
+    ) -> None:
         """Correct digest type reflected in subject and routing."""
         mock_token.return_value = "test-token"
         mock_prepare.return_value = [
@@ -169,8 +171,8 @@ class TestDigestSending(unittest.TestCase):
     @patch("notifications.email_sender._prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_handles_sending_errors_gracefully(
-        self, mock_token, mock_prepare, mock_resend
-    ):
+        self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
+    ) -> None:
         """Email sending errors don't crash, return error dict."""
         mock_token.return_value = "test-token"
         mock_prepare.return_value = [
@@ -204,7 +206,7 @@ class TestBatchIdCalculation(unittest.TestCase):
     """Tests for batch ID calculation functions."""
 
     @patch("notifications.process_notification_queue.datetime")
-    def test_calculates_yesterday_chicago_time(self, mock_datetime):
+    def test_calculates_yesterday_chicago_time(self, mock_datetime: MagicMock) -> None:
         """Daily batch ID is yesterday in Chicago timezone."""
         chicago_tz = ZoneInfo("America/Chicago")
         mock_now = datetime(2026, 1, 26, 10, 0, 0, tzinfo=chicago_tz)
@@ -215,7 +217,7 @@ class TestBatchIdCalculation(unittest.TestCase):
         self.assertEqual(result, "2026-01-25")
 
     @patch("notifications.process_notification_queue.datetime")
-    def test_calculates_previous_iso_week(self, mock_datetime):
+    def test_calculates_previous_iso_week(self, mock_datetime: MagicMock) -> None:
         """Weekly batch ID is previous week in ISO format."""
         chicago_tz = ZoneInfo("America/Chicago")
         mock_now = datetime(2026, 1, 26, 10, 0, 0, tzinfo=chicago_tz)  # Monday of W05
@@ -229,32 +231,32 @@ class TestBatchIdCalculation(unittest.TestCase):
 class TestDigestProcessing(unittest.TestCase):
     """Tests for process_digests() workflow."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output."""
-        import sys
         import io
+        import sys
 
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         import sys
 
         sys.stdout = sys.__stdout__
 
     @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
-    def test_dry_run_counts_but_doesnt_send(self, mock_get_notifs):
+    def test_dry_run_counts_but_doesnt_send(self, mock_get_notifs: MagicMock) -> None:
         """Dry run mode processes notifications without sending emails."""
         mock_get_notifs.return_value = {
             "user-1": [{"id": "notif-1", "newsletter_id": "nl-1", "rule_id": "rule-1"}]
         }
 
-        with patch("notifications.process_notification_queue.get_supabase_client"):
-            with patch(
-                "notifications.process_notification_queue.send_digest"
-            ) as mock_send:
-                result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
+        with (
+            patch("notifications.process_notification_queue.get_supabase_client"),
+            patch("notifications.process_notification_queue.send_digest") as mock_send,
+        ):
+            result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
 
         # Assert - counted but not sent
         self.assertEqual(result["sent"], 1)

@@ -19,3 +19,7 @@ backend/data/
 
 # Agent worktrees created by Claude Code
 .claude/worktrees/
+
+# Coverage output
+.coverage
+htmlcov/

@@ -3,12 +3,13 @@ Scraping strategies for different alderman newsletter archive formats.
 Each strategy knows how to extract newsletter links from a specific site structure.
 """
 
+import re
 from abc import ABC, abstractmethod
+from typing import cast
+from urllib.parse import urljoin
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from urllib.parse import urljoin
-from typing import cast
-import re
 
 
 class NewsletterArchiveStrategy(ABC):
@@ -22,13 +23,12 @@ class NewsletterArchiveStrategy(ABC):
         Returns:
             List of dicts with keys: title, url, date_str (optional)
         """
-        pass
 
 
 class MailChimpArchiveStrategy(NewsletterArchiveStrategy):
     """Strategy for MailChimp-based archives (Ward 1, 2, etc.)"""
 
-    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:
+    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:  # noqa: ARG002  strategy interface: MailChimp archive links are used as given
         soup = BeautifulSoup(html, "html.parser")
         newsletters: list[dict[str, str]] = []
 

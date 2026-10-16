@@ -2,6 +2,7 @@
 
 import unittest
 from datetime import datetime
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -22,7 +23,7 @@ from models import (
 class TestNewsletterModels(unittest.TestCase):
     """Tests for Newsletter Pydantic models."""
 
-    def test_newsletter_create_minimal_valid(self):
+    def test_newsletter_create_minimal_valid(self) -> None:
         """Newsletter with only required fields."""
         newsletter = NewsletterCreate(
             subject="Test Newsletter", plain_text="Test content"
@@ -33,7 +34,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertIsNone(newsletter.raw_html)
         self.assertEqual(newsletter.topics, [])  # Default value
 
-    def test_newsletter_create_full_valid(self):
+    def test_newsletter_create_full_valid(self) -> None:
         """Newsletter with all optional fields."""
         newsletter = NewsletterCreate(
             subject="Test Newsletter",
@@ -56,7 +57,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(newsletter.topics, ["bike_lanes", "transit_funding"])
         self.assertEqual(newsletter.summary, "Test summary")
 
-    def test_newsletter_with_id_from_db(self):
+    def test_newsletter_with_id_from_db(self) -> None:
         """Newsletter model includes ID after DB fetch."""
         newsletter = Newsletter(
             id="uuid-123",
@@ -68,7 +69,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(newsletter.id, "uuid-123")
         self.assertIsInstance(newsletter.created_at, datetime)
 
-    def test_newsletter_strips_whitespace(self):
+    def test_newsletter_strips_whitespace(self) -> None:
         """Subject whitespace automatically stripped."""
         newsletter = NewsletterCreate(
             subject="  Test Newsletter  ", plain_text="Content"
@@ -76,7 +77,7 @@ class TestNewsletterModels(unittest.TestCase):
 
         self.assertEqual(newsletter.subject, "Test Newsletter")
 
-    def test_newsletter_empty_subject_fails(self):
+    def test_newsletter_empty_subject_fails(self) -> None:
         """Empty subject raises ValidationError."""
         with self.assertRaises(ValidationError) as ctx:
             NewsletterCreate(subject="", plain_text="Content")
@@ -84,12 +85,12 @@ class TestNewsletterModels(unittest.TestCase):
         error = ctx.exception
         self.assertIn("subject", str(error))
 
-    def test_newsletter_missing_plain_text_fails(self):
+    def test_newsletter_missing_plain_text_fails(self) -> None:
         """Missing required field raises error."""
         with self.assertRaises(ValidationError):
-            NewsletterCreate(subject="Test")  # type: ignore
+            NewsletterCreate(subject="Test")  # deliberately missing fields
 
-    def test_newsletter_ignores_legacy_relevance_score_column(self):
+    def test_newsletter_ignores_legacy_relevance_score_column(self) -> None:
         """Deprecated relevance_score in database rows is ignored, even if out of range."""
         newsletter = NewsletterCreate.model_validate(
             {"subject": "Test", "plain_text": "Content", "relevance_score": 11}
@@ -97,14 +98,14 @@ class TestNewsletterModels(unittest.TestCase):
 
         self.assertFalse(hasattr(newsletter, "relevance_score"))
 
-    def test_newsletter_topics_default_empty_list(self):
+    def test_newsletter_topics_default_empty_list(self) -> None:
         """Topics defaults to empty list, not None."""
         newsletter = NewsletterCreate(subject="Test", plain_text="Content")
 
         self.assertEqual(newsletter.topics, [])
         self.assertIsInstance(newsletter.topics, list)
 
-    def test_newsletter_model_dump(self):
+    def test_newsletter_model_dump(self) -> None:
         """model_dump() returns dict for DB insertion."""
         newsletter = NewsletterCreate(
             subject="Test",
@@ -121,7 +122,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(data["email_uid"], "test-123")
         self.assertEqual(data["topics"], ["bike_lanes"])
 
-    def test_newsletter_model_validate(self):
+    def test_newsletter_model_validate(self) -> None:
         """model_validate() creates model from dict."""
         data = {
             "subject": "Test",
@@ -136,7 +137,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertEqual(newsletter.subject, "Test")
         self.assertEqual(newsletter.topics, ["bike_lanes"])
 
-    def test_newsletter_matching_defaults(self):
+    def test_newsletter_matching_defaults(self) -> None:
         """NewsletterMatching has sensible defaults."""
         matching = NewsletterMatching()
 
@@ -145,16 +146,16 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertIsNone(matching.source_id)
         self.assertIsNone(matching.ward_number)
 
-    def test_newsletter_processing_minimal(self):
+    def test_newsletter_processing_minimal(self) -> None:
         """NewsletterProcessing only needs subject + plain_text."""
         processing = NewsletterProcessing(subject="Test", plain_text="Content")
 
         self.assertEqual(processing.subject, "Test")
         self.assertEqual(processing.plain_text, "Content")
 
-    def test_newsletter_with_null_values(self):
+    def test_newsletter_with_null_values(self) -> None:
         """NULL database values handled correctly."""
-        db_data = {
+        db_data: dict[str, Any] = {
             "subject": "Test",
             "plain_text": "Content",
             "raw_html": None,
@@ -170,7 +171,7 @@ class TestNewsletterModels(unittest.TestCase):
         self.assertIsNone(newsletter.source_id)
         self.assertEqual(newsletter.topics, [])
 
-    def test_empty_string_vs_none(self):
+    def test_empty_string_vs_none(self) -> None:
         """Empty string vs None handled differently."""
         # None is allowed for optional fields
         newsletter1 = NewsletterCreate(
@@ -188,7 +189,7 @@ class TestNewsletterModels(unittest.TestCase):
 class TestSourceModels(unittest.TestCase):
     """Tests for Source Pydantic models."""
 
-    def test_source_valid_alderman(self):
+    def test_source_valid_alderman(self) -> None:
         """Alderman source with ward number."""
         source = Source(
             id="source-123",
@@ -202,7 +203,7 @@ class TestSourceModels(unittest.TestCase):
         self.assertEqual(source.ward_number, 1)
         self.assertEqual(source.source_type, "alderman")
 
-    def test_source_valid_other(self):
+    def test_source_valid_other(self) -> None:
         """Non-alderman source without ward."""
         source = Source(
             id="source-456",
@@ -215,7 +216,7 @@ class TestSourceModels(unittest.TestCase):
         self.assertIsNone(source.ward_number)
         self.assertTrue(source.is_active)  # Default value
 
-    def test_source_empty_name_fails(self):
+    def test_source_empty_name_fails(self) -> None:
         """Empty name raises error."""
         with self.assertRaises(ValidationError) as ctx:
             Source(id="test", name="", source_type="alderman")
@@ -223,7 +224,7 @@ class TestSourceModels(unittest.TestCase):
         error = ctx.exception
         self.assertIn("name", str(error))
 
-    def test_source_ward_in_range(self):
+    def test_source_ward_in_range(self) -> None:
         """Ward 1-50 accepted."""
         # Valid boundaries
         Source(id="1", name="Ward 1", ward_number=1, source_type="alderman")
@@ -232,7 +233,7 @@ class TestSourceModels(unittest.TestCase):
         # Valid middle
         Source(id="25", name="Ward 25", ward_number=25, source_type="alderman")
 
-    def test_source_ward_out_of_range(self):
+    def test_source_ward_out_of_range(self) -> None:
         """Ward 0, 51+ rejected."""
         # Ward 0
         with self.assertRaises(ValidationError):
@@ -251,7 +252,7 @@ class TestSourceModels(unittest.TestCase):
                 source_type="alderman",
             )
 
-    def test_email_mapping_valid(self):
+    def test_email_mapping_valid(self) -> None:
         """Email mapping with pattern and source_id."""
         mapping = EmailSourceMapping(
             id=1, email_pattern="%@example.com", source_id="source-123"
@@ -261,7 +262,7 @@ class TestSourceModels(unittest.TestCase):
         self.assertEqual(mapping.email_pattern, "%@example.com")
         self.assertEqual(mapping.source_id, "source-123")
 
-    def test_email_mapping_empty_pattern_fails(self):
+    def test_email_mapping_empty_pattern_fails(self) -> None:
         """Empty email pattern rejected."""
         with self.assertRaises(ValidationError) as ctx:
             EmailSourceMapping(id=1, email_pattern="", source_id="source-123")
@@ -273,7 +274,7 @@ class TestSourceModels(unittest.TestCase):
 class TestNotificationModels(unittest.TestCase):
     """Tests for Notification Pydantic models."""
 
-    def test_notification_rule_minimal(self):
+    def test_notification_rule_minimal(self) -> None:
         """Rule with just required fields."""
         rule = NotificationRule(id="rule-123", user_id="user-456", name="My Rule")
 
@@ -286,7 +287,7 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(rule.ward_numbers, [])  # Default
         self.assertTrue(rule.is_active)  # Default
 
-    def test_notification_rule_full(self):
+    def test_notification_rule_full(self) -> None:
         """Rule with all filters."""
         rule = NotificationRule(
             id="rule-123",
@@ -304,7 +305,7 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(rule.source_ids, ["source-1", "source-2"])
         self.assertEqual(rule.ward_numbers, [1, 2, 3])
 
-    def test_notification_rule_empty_name_fails(self):
+    def test_notification_rule_empty_name_fails(self) -> None:
         """Empty rule name rejected."""
         with self.assertRaises(ValidationError) as ctx:
             NotificationRule(id="rule-123", user_id="user-456", name="")
@@ -312,14 +313,14 @@ class TestNotificationModels(unittest.TestCase):
         error = ctx.exception
         self.assertIn("name", str(error))
 
-    def test_notification_rule_topics_default_empty(self):
+    def test_notification_rule_topics_default_empty(self) -> None:
         """Topics default to empty list."""
         rule = NotificationRule(id="rule-123", user_id="user-456", name="Test")
 
         self.assertEqual(rule.topics, [])
         self.assertIsInstance(rule.topics, list)
 
-    def test_notification_rule_ignores_legacy_min_relevance_score(self):
+    def test_notification_rule_ignores_legacy_min_relevance_score(self) -> None:
         """Deprecated min_relevance_score in database rows is ignored."""
         rule = NotificationRule.model_validate(
             {
@@ -332,7 +333,7 @@ class TestNotificationModels(unittest.TestCase):
 
         self.assertFalse(hasattr(rule, "min_relevance_score"))
 
-    def test_rule_match_valid(self):
+    def test_rule_match_valid(self) -> None:
         """RuleMatch with all required fields."""
         match = RuleMatch(user_id="user-123", rule_id="rule-456", rule_name="Test Rule")
 
@@ -340,7 +341,7 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(match.rule_id, "rule-456")
         self.assertEqual(match.rule_name, "Test Rule")
 
-    def test_notification_queue_entry_valid(self):
+    def test_notification_queue_entry_valid(self) -> None:
         """Queue entry with all fields."""
         entry = NotificationQueueEntry(
             id="notif-123",
@@ -358,7 +359,7 @@ class TestNotificationModels(unittest.TestCase):
         self.assertEqual(entry.status, "pending")
         self.assertEqual(entry.digest_batch_id, "2026-01-30")
 
-    def test_notification_queue_entry_status_valid(self):
+    def test_notification_queue_entry_status_valid(self) -> None:
         """Status must be pending/sent/failed."""
         for status in ["pending", "sent", "failed"]:
             entry = NotificationQueueEntry(
@@ -372,7 +373,7 @@ class TestNotificationModels(unittest.TestCase):
             )
             self.assertEqual(entry.status, status)
 
-    def test_notification_queue_entry_status_invalid(self):
+    def test_notification_queue_entry_status_invalid(self) -> None:
         """Invalid status rejected."""
         with self.assertRaises(ValidationError) as ctx:
             NotificationQueueEntry(
@@ -388,14 +389,14 @@ class TestNotificationModels(unittest.TestCase):
         error = ctx.exception
         self.assertIn("status", str(error))
 
-    def test_user_profile_valid_email(self):
+    def test_user_profile_valid_email(self) -> None:
         """User with valid email."""
         profile = UserProfile(id="user-123", email="test@example.com")
 
         self.assertEqual(profile.id, "user-123")
         self.assertEqual(profile.email, "test@example.com")
 
-    def test_user_profile_invalid_email(self):
+    def test_user_profile_invalid_email(self) -> None:
         """Invalid email rejected."""
         invalid_emails = ["not-an-email", "@example.com", "test@", "test"]
 
@@ -403,7 +404,7 @@ class TestNotificationModels(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 UserProfile(id="user-123", email=invalid_email)
 
-    def test_user_profile_preferences_default(self):
+    def test_user_profile_preferences_default(self) -> None:
         """Notification preferences default to enabled and daily."""
         profile = UserProfile(id="user-123", email="test@example.com")
 
@@ -416,11 +417,11 @@ class TestNotificationModels(unittest.TestCase):
 class TestEdgeCases(unittest.TestCase):
     """Edge case validation tests."""
 
-    def test_newsletter_with_invalid_type(self):
+    def test_newsletter_with_invalid_type(self) -> None:
         """Invalid type raises clear error."""
         with self.assertRaises(ValidationError) as ctx:
             NewsletterCreate(
-                subject=123,  # type: ignore - Should be string
+                subject=123,  # deliberately wrong type
                 plain_text="Content",
             )
 
@@ -429,7 +430,7 @@ class TestEdgeCases(unittest.TestCase):
         self.assertIn("subject", error_str)
         self.assertIn("string", error_str.lower())
 
-    def test_source_ward_boundary_values(self):
+    def test_source_ward_boundary_values(self) -> None:
         """Ward number boundary validation."""
         # Valid boundaries
         Source(id="1", name="Ward 1", ward_number=1, source_type="alderman")
@@ -442,7 +443,7 @@ class TestEdgeCases(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Source(id="51", name="Ward 51", ward_number=51, source_type="alderman")
 
-    def test_date_parsing(self):
+    def test_date_parsing(self) -> None:
         """Dates parsed from ISO strings."""
         db_data = {
             "id": "test",

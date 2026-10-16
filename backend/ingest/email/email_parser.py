@@ -1,8 +1,9 @@
-import re
 import os
+import re
+from typing import Any, cast
+
 from bs4 import BeautifulSoup
 from html2text import html2text
-from typing import Any, cast
 
 
 def sanitize_content(
@@ -62,7 +63,7 @@ def sanitize_content(
 
             result = str(soup)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
             print(f"  ⚠️  HTML Sanitization failed: {e}")
             result = content
 

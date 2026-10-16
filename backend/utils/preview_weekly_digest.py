@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+from pathlib import Path
 from typing import Any
 
 from notifications.email_sender import (
@@ -58,7 +59,7 @@ def fetch_weekly_report(topic: str, week_id: str) -> dict[str, Any] | None:
 
         return dict(response.data)  # type: ignore
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  CLI: report a fetch error and stop
         print(f"✗ Error fetching report: {e}")
         return None
 
@@ -174,10 +175,10 @@ def preview_digest(
         html_file = "weekly_digest_preview.html"
         text_file = "weekly_digest_preview.txt"
 
-        with open(html_file, "w", encoding="utf-8") as f:
+        with Path(html_file).open("w", encoding="utf-8") as f:
             f.write(html_output)
 
-        with open(text_file, "w", encoding="utf-8") as f:
+        with Path(text_file).open("w", encoding="utf-8") as f:
             f.write(text_output)
 
         print(f"\nSaved HTML preview to: {html_file}")

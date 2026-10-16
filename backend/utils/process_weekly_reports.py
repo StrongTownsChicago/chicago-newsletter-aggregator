@@ -22,6 +22,7 @@ import argparse
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
 
 from models.weekly_report import WeeklyTopicReport
@@ -88,9 +89,9 @@ def get_active_weekly_topics() -> list[str]:
             if isinstance(topics_list, list):
                 all_topics.update(topics_list)
 
-        return sorted(list(all_topics))
+        return sorted(all_topics)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no topics
         print(f"⚠ Error querying active topics: {e}")
         return []
 
@@ -120,7 +121,7 @@ def report_exists(topic: str, week_id: str) -> bool:
 
         return len(response.data) > 0
 
-    except Exception:
+    except Exception:  # noqa: BLE001  database boundary: treat a failed lookup as absent
         return False
 
 
@@ -164,7 +165,7 @@ def store_weekly_report(report: WeeklyTopicReport) -> bool:
 
         return len(response.data) > 0
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and report failure
         print(f"  ✗ Failed to store report: {e}")
         return False
 
@@ -268,7 +269,7 @@ def process_weekly_reports(
                     print("  ✗ Failed to store report")
                     stats["failed"] += 1
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-topic boundary: log and continue
             print(f"  ✗ Error generating report: {e}")
             error_file = log_notification_error(
                 error_type="weekly_report_generation",

@@ -5,17 +5,19 @@ Tests the ability of notification_queue to handle both newsletters (daily)
 and weekly topic reports (weekly) using dedicated newsletter_id and report_id columns.
 """
 
-import sys
 import io
+import sys
 import unittest
-from unittest.mock import patch, Mock
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
+
 from notifications.process_notification_queue import _extract_content_ids
 
 
 class TestExtractContentIds(unittest.TestCase):
     """Tests for _extract_content_ids() helper function."""
 
-    def test_extracts_newsletter_ids_from_daily_notifications(self):
+    def test_extracts_newsletter_ids_from_daily_notifications(self) -> None:
         """Extracts newsletter_id from daily notifications."""
         # Arrange
         notifications = [
@@ -31,7 +33,7 @@ class TestExtractContentIds(unittest.TestCase):
         self.assertIn("nl-1", result)
         self.assertIn("nl-2", result)
 
-    def test_extracts_report_ids_from_weekly_notifications(self):
+    def test_extracts_report_ids_from_weekly_notifications(self) -> None:
         """Extracts report_id from weekly notifications."""
         # Arrange
         notifications = [
@@ -47,7 +49,7 @@ class TestExtractContentIds(unittest.TestCase):
         self.assertIn("report-1", result)
         self.assertIn("report-2", result)
 
-    def test_handles_mixed_notifications_with_none_values(self):
+    def test_handles_mixed_notifications_with_none_values(self) -> None:
         """Handles notifications with None values for unused ID field."""
         # Arrange - Weekly notification has newsletter_id=None
         notifications = [
@@ -73,7 +75,7 @@ class TestExtractContentIds(unittest.TestCase):
         self.assertIn("nl-1", result)
         self.assertIn("report-1", result)
 
-    def test_deduplicates_identical_ids(self):
+    def test_deduplicates_identical_ids(self) -> None:
         """Returns unique IDs when multiple notifications reference same content."""
         # Arrange
         notifications = [
@@ -90,7 +92,7 @@ class TestExtractContentIds(unittest.TestCase):
         self.assertIn("nl-1", result)
         self.assertIn("nl-2", result)
 
-    def test_handles_empty_list(self):
+    def test_handles_empty_list(self) -> None:
         """Returns empty list when given empty notifications."""
         # Act
         result = _extract_content_ids([])
@@ -98,7 +100,7 @@ class TestExtractContentIds(unittest.TestCase):
         # Assert
         self.assertEqual(result, [])
 
-    def test_skips_notifications_missing_both_ids(self):
+    def test_skips_notifications_missing_both_ids(self) -> None:
         """Gracefully handles malformed notifications missing both IDs."""
         # Arrange - Edge case that shouldn't happen due to DB constraint
         notifications = [
@@ -117,17 +119,17 @@ class TestExtractContentIds(unittest.TestCase):
 class TestWeeklyNotificationQueuing(unittest.TestCase):
     """Tests for weekly notification queuing with report_id."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output during tests."""
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
     @patch("notifications.weekly_notification_queue.get_supabase_client")
-    def test_queues_with_report_id_column(self, mock_get_client):
+    def test_queues_with_report_id_column(self, mock_get_client: MagicMock) -> None:
         """Weekly notifications use report_id column, not newsletter_id."""
         from notifications.weekly_notification_queue import queue_weekly_notifications
 
@@ -157,10 +159,10 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
         ]
 
         # Track insert calls
-        insert_calls = []
+        insert_calls: list[Any] = []
 
         # Setup mock chain for multiple queries
-        def table_side_effect(table_name):
+        def table_side_effect(table_name: str) -> Any:
             if table_name == "notification_rules":
                 return Mock(
                     select=Mock(
@@ -205,7 +207,7 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
                 )
             elif table_name == "notification_queue":
                 # Mock insert and track calls
-                def track_insert(data):
+                def track_insert(data: Any) -> Mock:
                     insert_calls.append(data)
                     return Mock(execute=Mock(return_value=Mock()))
 
@@ -231,7 +233,7 @@ class TestWeeklyNotificationFetching(unittest.TestCase):
     """Tests for fetching weekly notifications with proper joins."""
 
     @patch("notifications.process_notification_queue.get_supabase_client")
-    def test_fetches_with_report_join(self, mock_get_client):
+    def test_fetches_with_report_join(self, mock_get_client: MagicMock) -> None:
         """Weekly notification fetching joins to weekly_topic_reports via report_id."""
         from notifications.process_notification_queue import _fetch_weekly_notifications
 

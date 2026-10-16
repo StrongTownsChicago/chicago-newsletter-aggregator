@@ -1,12 +1,12 @@
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
 from shared.db import get_supabase_client
+from shared.utils import CHICAGO_TIMEZONE
 
 MAX_SAMPLES_PER_SOURCE = 1
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "../samples")
+OUTPUT_DIR = Path(__file__).parent / "../samples"
 
 
 def download_samples() -> None:
@@ -14,9 +14,11 @@ def download_samples() -> None:
     supabase = get_supabase_client()
 
     # ensure output directory exists
-    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"[{datetime.now()}] Starting sample download to {OUTPUT_DIR}...")
+    print(
+        f"[{datetime.now(CHICAGO_TIMEZONE)}] Starting sample download to {OUTPUT_DIR}..."
+    )
 
     # Get all sources
     result = supabase.table("sources").select("id, name").execute()
@@ -57,20 +59,16 @@ def download_samples() -> None:
                 # Save HTML
                 raw_html = cast(str | None, nl.get("raw_html"))
                 if raw_html:
-                    with open(
-                        os.path.join(OUTPUT_DIR, f"{base_filename}.html"),
-                        "w",
-                        encoding="utf-8",
+                    with (OUTPUT_DIR / f"{base_filename}.html").open(
+                        "w", encoding="utf-8"
                     ) as f:
                         f.write(raw_html)
 
                 # Save Plain Text
                 plain_text = cast(str | None, nl.get("plain_text"))
                 if plain_text:
-                    with open(
-                        os.path.join(OUTPUT_DIR, f"{base_filename}.txt"),
-                        "w",
-                        encoding="utf-8",
+                    with (OUTPUT_DIR / f"{base_filename}.txt").open(
+                        "w", encoding="utf-8"
                     ) as f:
                         f.write(plain_text)
 
@@ -79,7 +77,7 @@ def download_samples() -> None:
                 print(f"  ✓ {source_name}: Saved sample ({subject_preview}...)")
                 count += 1
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-source boundary: log and continue
             print(f"  ✗ {source_name}: Error fetching samples: {e}")
 
     print(f"\nDownload complete. Saved {count} samples from {len(sources)} sources.")

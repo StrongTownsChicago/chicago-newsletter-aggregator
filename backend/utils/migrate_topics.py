@@ -17,11 +17,11 @@ Usage:
 """
 
 import argparse
-from typing import Any, cast
 from collections import defaultdict
-from shared.db import get_supabase_client
-from processing.llm_processor import TOPICS as VALID_TOPICS
+from typing import Any, cast
 
+from processing.llm_processor import TOPICS as VALID_TOPICS
+from shared.db import get_supabase_client
 
 # Mapping from old topics to new topics
 # Topics not in this mapping will be REMOVED
@@ -70,7 +70,7 @@ def remap_topics(old_topics: list[str]) -> list[str]:
         if candidate_topic in VALID_TOPICS:
             new_topics.add(candidate_topic)
 
-    return sorted(list(new_topics))
+    return sorted(new_topics)
 
 
 def migrate_topics(dry_run: bool = False) -> None:
@@ -217,7 +217,7 @@ def migrate_topics(dry_run: bool = False) -> None:
                         print(
                             f"  Updated {updated_count}/{stats['modified']} newsletters..."
                         )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
                     print(f"  ✗ Failed to update newsletter {newsletter['id']}: {e}")
                     failed_count += 1
 

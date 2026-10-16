@@ -61,7 +61,7 @@ PRICING = ModelPricing(
 class TestCostReportGenerator(unittest.TestCase):
     """Reports include only topic extraction and summary generation."""
 
-    def test_json_report_has_two_operations_and_matching_totals(self):
+    def test_json_report_has_two_operations_and_matching_totals(self) -> None:
         report = generate_json_report([build_analysis()], PRICING)
 
         self.assertEqual(
@@ -76,13 +76,13 @@ class TestCostReportGenerator(unittest.TestCase):
             TOPIC_OUTPUT_TOKENS + SUMMARY_OUTPUT_TOKENS,
         )
 
-    def test_csv_report_has_one_row_per_operation(self):
+    def test_csv_report_has_one_row_per_operation(self) -> None:
         rows = generate_csv_report([build_analysis()], PRICING).strip().split("\n")
 
         operations = [row.split(",")[0] for row in rows[1:]]
         self.assertEqual(operations, ["topic_extraction", "summary_generation"])
 
-    def test_text_report_describes_two_calls(self):
+    def test_text_report_describes_two_calls(self) -> None:
         report = generate_text_report([build_analysis()], PRICING)
 
         self.assertIn("2 calls per newsletter", report)

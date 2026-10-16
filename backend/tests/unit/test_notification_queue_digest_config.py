@@ -4,26 +4,26 @@ Unit tests for digest configuration system in process_notification_queue.py
 Tests DigestConfig, DIGEST_CONFIGS, and unified process_digests function.
 """
 
-import unittest
-import sys
 import io
-from unittest.mock import patch, Mock
+import sys
+import unittest
 from datetime import datetime
+from unittest.mock import MagicMock, Mock, patch
 from zoneinfo import ZoneInfo
 
+from notifications.email_sender import DigestType
 from notifications.process_notification_queue import (
     DIGEST_CONFIGS,
     _calculate_daily_batch_id,
     _calculate_weekly_batch_id,
     process_digests,
 )
-from notifications.email_sender import DigestType
 
 
 class TestDigestConfig(unittest.TestCase):
     """Tests for DigestConfig dataclass."""
 
-    def test_has_all_required_fields(self):
+    def test_has_all_required_fields(self) -> None:
         """DigestConfig contains all necessary configuration fields."""
         # Arrange
         config = DIGEST_CONFIGS[DigestType.DAILY]
@@ -39,12 +39,12 @@ class TestDigestConfig(unittest.TestCase):
 class TestDigestConfigs(unittest.TestCase):
     """Tests for DIGEST_CONFIGS dictionary."""
 
-    def test_contains_daily_and_weekly_configs(self):
+    def test_contains_daily_and_weekly_configs(self) -> None:
         """Config exists for both digest types."""
         self.assertIn(DigestType.DAILY, DIGEST_CONFIGS)
         self.assertIn(DigestType.WEEKLY, DIGEST_CONFIGS)
 
-    def test_daily_config_values(self):
+    def test_daily_config_values(self) -> None:
         """Daily config has correct values."""
         config = DIGEST_CONFIGS[DigestType.DAILY]
 
@@ -52,7 +52,7 @@ class TestDigestConfigs(unittest.TestCase):
         self.assertEqual(config.notification_type, "daily")
         self.assertEqual(config.delivery_type, "daily_digest")
 
-    def test_weekly_config_values(self):
+    def test_weekly_config_values(self) -> None:
         """Weekly config has correct values."""
         config = DIGEST_CONFIGS[DigestType.WEEKLY]
 
@@ -65,7 +65,7 @@ class TestCalculateDailyBatchId(unittest.TestCase):
     """Tests for _calculate_daily_batch_id() function."""
 
     @patch("notifications.process_notification_queue.datetime")
-    def test_returns_yesterday_in_chicago_time(self, mock_datetime):
+    def test_returns_yesterday_in_chicago_time(self, mock_datetime: MagicMock) -> None:
         """Returns yesterday's date in YYYY-MM-DD format (Chicago time)."""
         # Arrange - Mock "today" as 2026-01-26 in Chicago
         chicago_tz = ZoneInfo("America/Chicago")
@@ -84,7 +84,9 @@ class TestCalculateWeeklyBatchId(unittest.TestCase):
     """Tests for _calculate_weekly_batch_id() function."""
 
     @patch("notifications.process_notification_queue.datetime")
-    def test_returns_previous_week_in_iso_format(self, mock_datetime):
+    def test_returns_previous_week_in_iso_format(
+        self, mock_datetime: MagicMock
+    ) -> None:
         """Returns previous week ID in YYYY-WXX format."""
         # Arrange - Mock "today" as 2026-01-26 (Monday of W05)
         # Previous week is W04
@@ -102,19 +104,21 @@ class TestCalculateWeeklyBatchId(unittest.TestCase):
 class TestProcessDigests(unittest.TestCase):
     """Tests for unified process_digests() function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Suppress print output during tests."""
         self.held_output = io.StringIO()
         sys.stdout = self.held_output
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
     @patch("notifications.process_notification_queue.send_digest")
     @patch("notifications.process_notification_queue.get_supabase_client")
     @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
-    def test_processes_daily_digest(self, mock_get_notifs, mock_supabase, mock_send):
+    def test_processes_daily_digest(
+        self, mock_get_notifs: MagicMock, mock_supabase: MagicMock, mock_send: MagicMock
+    ) -> None:
         """Daily digest processed with correct configuration."""
         # Arrange
         mock_get_notifs.return_value = {
@@ -149,7 +153,7 @@ class TestProcessDigests(unittest.TestCase):
         call_args = mock_send.call_args
         self.assertEqual(call_args[0][3], DigestType.DAILY)
 
-    def test_weekly_config_exists(self):
+    def test_weekly_config_exists(self) -> None:
         """Weekly digest configuration exists and has correct values."""
         # Just verify configuration exists and is correct
         # Integration tests handle actual processing
@@ -160,7 +164,9 @@ class TestProcessDigests(unittest.TestCase):
         self.assertEqual(config.delivery_type, "weekly_digest")
 
     @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
-    def test_uses_default_batch_id_when_not_provided(self, mock_get_notifs):
+    def test_uses_default_batch_id_when_not_provided(
+        self, mock_get_notifs: MagicMock
+    ) -> None:
         """Calculates batch ID when not provided."""
         # Arrange
         mock_get_notifs.return_value = {}
@@ -182,7 +188,9 @@ class TestProcessDigests(unittest.TestCase):
         mock_get_notifs.assert_called()
 
     @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
-    def test_dry_run_mode_does_not_send_emails(self, mock_get_notifs):
+    def test_dry_run_mode_does_not_send_emails(
+        self, mock_get_notifs: MagicMock
+    ) -> None:
         """Dry run mode counts but doesn't send."""
         # Arrange
         mock_get_notifs.return_value = {
@@ -190,17 +198,17 @@ class TestProcessDigests(unittest.TestCase):
         }
 
         # Act
-        with patch("notifications.process_notification_queue.get_supabase_client"):
-            with patch(
-                "notifications.process_notification_queue.send_digest"
-            ) as mock_send:
-                result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
+        with (
+            patch("notifications.process_notification_queue.get_supabase_client"),
+            patch("notifications.process_notification_queue.send_digest") as mock_send,
+        ):
+            result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
 
         # Assert
         self.assertEqual(result["sent"], 1)  # Counted
         mock_send.assert_not_called()  # But not sent
 
-    def test_delivery_types_differ_by_config(self):
+    def test_delivery_types_differ_by_config(self) -> None:
         """Each digest type has unique delivery_type value."""
         # Verify that daily and weekly have different delivery types
         daily_config = DIGEST_CONFIGS[DigestType.DAILY]

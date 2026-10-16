@@ -33,7 +33,7 @@ def item(
 
 
 class TestCadence(unittest.TestCase):
-    def test_months_before_the_first_newsletter_are_unknown_not_zero(self):
+    def test_months_before_the_first_newsletter_are_unknown_not_zero(self) -> None:
         ward_items = [
             item("a", "1", date(2026, 8, 20)),
             item("b", "1", date(2026, 8, 21)),
@@ -42,12 +42,12 @@ class TestCadence(unittest.TestCase):
         self.assertEqual(recent, [None, 2, 0])
         self.assertEqual(average_per_month(recent), 1.0)
 
-    def test_average_is_none_without_tracked_months(self):
+    def test_average_is_none_without_tracked_months(self) -> None:
         self.assertIsNone(average_per_month([None, None]))
 
 
 class TestSummarizeWardTopics(unittest.TestCase):
-    def test_counts_readable_newsletters_and_adds_city_reach(self):
+    def test_counts_readable_newsletters_and_adds_city_reach(self) -> None:
         window_items = [
             item("a", "1", date(2026, 9, 1), {"schools": 2, "parks": 2}),
             item("b", "1", date(2026, 9, 2), {"schools": 2}),
@@ -70,7 +70,7 @@ class TestSummarizeWardTopics(unittest.TestCase):
 
 
 class TestBuildWardGlances(unittest.TestCase):
-    def test_describes_each_ward_with_newsletters_over_the_window(self):
+    def test_describes_each_ward_with_newsletters_over_the_window(self) -> None:
         items = [
             item("old", "1", date(2026, 3, 1), {"schools": 2}),
             item("a", "1", date(2026, 8, 1), {"schools": 2}),

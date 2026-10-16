@@ -1,7 +1,7 @@
 import unittest
 
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
 
 
 class TestSanitization(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestSanitization(unittest.TestCase):
     using both CSS selectors and URL regex patterns.
     """
 
-    def test_sanitize_html_unsubscribe_link(self):
+    def test_sanitize_html_unsubscribe_link(self) -> None:
         """Test removal of unsubscribe links identified by recognized list-management domains."""
         html = """
         <html>
@@ -26,7 +26,7 @@ class TestSanitization(unittest.TestCase):
         self.assertNotIn("list-manage.com/unsubscribe", sanitized)
         self.assertIn("Here is some content", sanitized)
 
-    def test_sanitize_html_manage_preferences(self):
+    def test_sanitize_html_manage_preferences(self) -> None:
         """Test removal of 'Manage Preferences' links for Mailchimp sites."""
         html = """
         <div>
@@ -36,7 +36,7 @@ class TestSanitization(unittest.TestCase):
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("mailchimpsites.com/manage/preferences", sanitized)
 
-    def test_sanitize_html_manage_profile(self):
+    def test_sanitize_html_manage_profile(self) -> None:
         """Test removal of 'Update Profile' links for generic list management."""
         html = """
         <div>
@@ -46,14 +46,14 @@ class TestSanitization(unittest.TestCase):
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("list-manage.com/profile", sanitized)
 
-    def test_sanitize_text_regex(self):
+    def test_sanitize_text_regex(self) -> None:
         """Test removal of standalone unsubscribe lines in plain text content."""
         text = "Some content.\nUnsubscribe\nMore content."
         sanitized = sanitize_content(text, "text", PRIVACY_PATTERNS_DICT)
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertIn("Some content", sanitized)
 
-    def test_sanitize_footer_class(self):
+    def test_sanitize_footer_class(self) -> None:
         """Test removal of entire containers identified by specific CSS classes (e.g. .footer-links)."""
         html = """
         <div class="footer-links">
@@ -64,7 +64,7 @@ class TestSanitization(unittest.TestCase):
         self.assertNotIn("footer-links", sanitized)  # Div should be removed
         self.assertNotIn("Some link", sanitized)
 
-    def test_sanitize_constant_contact(self):
+    def test_sanitize_constant_contact(self) -> None:
         """Test specific selectors for Constant Contact compliance blocks."""
         html = """
         <table class="complianceLinks">
@@ -81,7 +81,7 @@ class TestSanitization(unittest.TestCase):
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("Update Profile", sanitized)
 
-    def test_sanitize_mailchimp(self):
+    def test_sanitize_mailchimp(self) -> None:
         """Test specific removal of Mailchimp list management links."""
         html = """
         <p>

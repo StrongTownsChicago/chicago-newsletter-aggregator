@@ -59,7 +59,7 @@ class TestResolveSenderSources(unittest.TestCase):
     """Test that each distinct sender is resolved exactly once."""
 
     @patch("utils.replay_unprocessed_emails.lookup_source_by_email")
-    def test_looks_up_each_sender_once(self, mock_lookup):
+    def test_looks_up_each_sender_once(self, mock_lookup: MagicMock) -> None:
         mock_lookup.side_effect = lambda sender, _: (
             WARD_28 if sender.endswith("aldermanervin.com") else None
         )
@@ -80,7 +80,7 @@ class TestResolveSenderSources(unittest.TestCase):
 class TestSelectReplayCandidates(unittest.TestCase):
     """Test selection of unprocessed emails from mapped senders."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.unprocessed = [
             make_email("1", "jason@aldermanervin.com", date=datetime(2026, 8, 15)),
             make_email("2", "info@ronniemosley.com", date=datetime(2026, 9, 10)),
@@ -92,17 +92,17 @@ class TestSelectReplayCandidates(unittest.TestCase):
         candidates = select_replay_candidates(self.unprocessed, SENDER_SOURCES, filters)
         return [candidate.email.uid for candidate in candidates]
 
-    def test_excludes_unmapped_senders(self):
+    def test_excludes_unmapped_senders(self) -> None:
         self.assertEqual(self.select_uids(ReplayFilters()), ["1", "2", "4"])
 
-    def test_sender_missing_from_lookup_is_excluded(self):
+    def test_sender_missing_from_lookup_is_excluded(self) -> None:
         candidates = select_replay_candidates(
             [make_email("9", "new@example.org")], SENDER_SOURCES, ReplayFilters()
         )
 
         self.assertEqual(candidates, [])
 
-    def test_attaches_source_id_and_name(self):
+    def test_attaches_source_id_and_name(self) -> None:
         candidates = select_replay_candidates(
             self.unprocessed[:1], SENDER_SOURCES, ReplayFilters()
         )
@@ -110,21 +110,21 @@ class TestSelectReplayCandidates(unittest.TestCase):
         self.assertEqual(candidates[0].source_id, 28)
         self.assertEqual(candidates[0].source_name, "Jason Ervin")
 
-    def test_filters_by_source_id(self):
+    def test_filters_by_source_id(self) -> None:
         self.assertEqual(self.select_uids(ReplayFilters(source_id=21)), ["2"])
 
-    def test_filters_by_uids(self):
+    def test_filters_by_uids(self) -> None:
         filters = ReplayFilters(uids=frozenset({"1", "3"}))
 
         # UID 3 is requested but unmapped, so it is still excluded
         self.assertEqual(self.select_uids(filters), ["1"])
 
-    def test_since_is_inclusive_and_excludes_undated(self):
+    def test_since_is_inclusive_and_excludes_undated(self) -> None:
         filters = ReplayFilters(since=date(2026, 9, 10))
 
         self.assertEqual(self.select_uids(filters), ["2"])
 
-    def test_filters_combine_with_and(self):
+    def test_filters_combine_with_and(self) -> None:
         filters = ReplayFilters(
             uids=frozenset({"1", "2"}), source_id=28, since=date(2026, 8, 1)
         )
@@ -135,7 +135,7 @@ class TestSelectReplayCandidates(unittest.TestCase):
 class TestGroupingAndFormatting(unittest.TestCase):
     """Test grouping by source and report rendering."""
 
-    def test_groups_largest_first(self):
+    def test_groups_largest_first(self) -> None:
         candidates = [
             make_candidate("1", WARD_21),
             make_candidate("2", WARD_28),
@@ -147,7 +147,7 @@ class TestGroupingAndFormatting(unittest.TestCase):
         self.assertEqual(list(groups), [(28, "Jason Ervin"), (21, "Ronnie Mosley")])
         self.assertEqual(len(groups[(28, "Jason Ervin")]), 2)
 
-    def test_report_has_header_with_count_and_email_lines(self):
+    def test_report_has_header_with_count_and_email_lines(self) -> None:
         report = format_replay_report([make_candidate("7"), make_candidate("8")])
 
         lines = report.splitlines()
@@ -155,7 +155,7 @@ class TestGroupingAndFormatting(unittest.TestCase):
         self.assertIn("uid=7", lines[1])
         self.assertIn("2026-09-01", lines[1])
 
-    def test_summary_counts_unmapped_and_selected(self):
+    def test_summary_counts_unmapped_and_selected(self) -> None:
         unprocessed = [
             make_email("1"),
             make_email("2", "unknown@example.org"),
@@ -170,47 +170,47 @@ class TestGroupingAndFormatting(unittest.TestCase):
         self.assertIn("1 are from still-unmapped senders", summary)
         self.assertIn("Selected 1 email(s) from 1 source(s)", summary)
 
-    def test_summary_reports_nothing_to_replay(self):
+    def test_summary_reports_nothing_to_replay(self) -> None:
         summary = format_selection_summary(0, [], {}, [], ReplayFilters())
 
         self.assertIn("Nothing to replay.", summary)
 
-    def test_unmatched_requested_uids_sorted_numerically(self):
+    def test_unmatched_requested_uids_sorted_numerically(self) -> None:
         unmatched = find_unmatched_requested_uids(
             frozenset({"100", "9", "5"}), [make_candidate("5")]
         )
 
         self.assertEqual(unmatched, ["9", "100"])
 
-    def test_no_requested_uids_means_no_unmatched(self):
+    def test_no_requested_uids_means_no_unmatched(self) -> None:
         self.assertEqual(find_unmatched_requested_uids(None, []), [])
 
-    def test_follow_up_includes_ingestion_and_llm_backfill(self):
+    def test_follow_up_includes_ingestion_and_llm_backfill(self) -> None:
         commands = format_follow_up_commands()
 
         self.assertIn("uv run python -m ingest.email.process_emails", commands)
         self.assertIn("process_llm_metadata --missing-metadata\n", commands)
 
-    def test_follow_up_backfill_has_no_latest_limit(self):
+    def test_follow_up_backfill_has_no_latest_limit(self) -> None:
         # Replayed emails are older than newer metadata-less newsletters, so a
         # --latest N limit would select the newer ones and skip the replayed ones
         self.assertNotIn("--latest", format_follow_up_commands())
 
-    def test_follow_up_warns_about_notifications(self):
+    def test_follow_up_warns_about_notifications(self) -> None:
         self.assertIn("ENABLE_NOTIFICATIONS=true", format_follow_up_commands())
 
 
 class TestMarkCandidatesUnread(unittest.TestCase):
     """Test the single mailbox mutation."""
 
-    def test_clears_seen_for_candidate_uids(self):
+    def test_clears_seen_for_candidate_uids(self) -> None:
         mailbox = Mock()
 
         mark_candidates_unread(mailbox, [make_candidate("1"), make_candidate("2")])
 
         mailbox.flag.assert_called_once_with(["1", "2"], MailMessageFlags.SEEN, False)
 
-    def test_no_candidates_makes_no_call(self):
+    def test_no_candidates_makes_no_call(self) -> None:
         mailbox = Mock()
 
         mark_candidates_unread(mailbox, [])
@@ -221,7 +221,7 @@ class TestMarkCandidatesUnread(unittest.TestCase):
 class TestMain(unittest.TestCase):
     """Test end-to-end wiring: dry run never mutates, --apply flags only selected."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.mailbox = MagicMock()
         self.mailbox.fetch.return_value = [
             Mock(
@@ -254,7 +254,7 @@ class TestMain(unittest.TestCase):
             self.mailbox
         )
 
-        patchers = [
+        patchers: list[Any] = [
             patch("utils.replay_unprocessed_emails.MailBox", mailbox_factory),
             patch("utils.replay_unprocessed_emails.load_dotenv"),
             patch("utils.replay_unprocessed_emails.get_supabase_client"),
@@ -284,7 +284,7 @@ class TestMain(unittest.TestCase):
             main()
         return output.getvalue()
 
-    def test_dry_run_makes_no_mailbox_mutation(self):
+    def test_dry_run_makes_no_mailbox_mutation(self) -> None:
         output = self.run_main()
 
         self.mailbox.flag.assert_not_called()
@@ -293,14 +293,14 @@ class TestMain(unittest.TestCase):
         self.assertIn("DRY RUN", output)
         self.assertIn("Selected 2 email(s) from 2 source(s)", output)
 
-    def test_fetch_is_read_only(self):
+    def test_fetch_is_read_only(self) -> None:
         self.run_main()
 
         self.mailbox.fetch.assert_called_once_with(
             headers_only=True, mark_seen=False, bulk=True
         )
 
-    def test_apply_clears_seen_only_for_selected_uids(self):
+    def test_apply_clears_seen_only_for_selected_uids(self) -> None:
         output = self.run_main("--apply")
 
         self.mailbox.flag.assert_called_once()
@@ -313,12 +313,12 @@ class TestMain(unittest.TestCase):
         self.assertIn("Marked 2 email(s) unread.", output)
         self.assertIn("process_llm_metadata --missing-metadata", output)
 
-    def test_apply_respects_source_filter(self):
+    def test_apply_respects_source_filter(self) -> None:
         self.run_main("--apply", "--source-id", "21")
 
         self.mailbox.flag.assert_called_once_with(["3"], MailMessageFlags.SEEN, False)
 
-    def test_apply_with_no_candidates_makes_no_call(self):
+    def test_apply_with_no_candidates_makes_no_call(self) -> None:
         output = self.run_main("--apply", "--uids", "2", "4")
 
         self.mailbox.flag.assert_not_called()

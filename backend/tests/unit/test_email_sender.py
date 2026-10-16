@@ -6,14 +6,15 @@ and Resend API integration.
 """
 
 import unittest
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 from notifications.email_sender import (
-    _prepare_newsletter_data,
-    send_daily_digest,
+    DigestType,
     _build_digest_html,
     _build_digest_text,
-    DigestType,
+    _prepare_newsletter_data,
+    send_daily_digest,
 )
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 
@@ -21,7 +22,7 @@ from tests.fixtures.newsletter_factory import create_test_newsletter, create_tes
 class TestPrepareNewsletterData(unittest.TestCase):
     """Tests for _prepare_newsletter_data() function."""
 
-    def test_groups_by_newsletter(self):
+    def test_groups_by_newsletter(self) -> None:
         """Multiple rules matching same newsletter are grouped."""
         newsletter = create_test_newsletter(id="nl_123", subject="Test Newsletter")
 
@@ -43,7 +44,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertIn("Rule 1", result[0]["matched_rules"])
         self.assertIn("Rule 2", result[0]["matched_rules"])
 
-    def test_extracts_source_info(self):
+    def test_extracts_source_info(self) -> None:
         """Source name and ward number extracted correctly."""
         source = create_test_source(source_id=1, name="Test Alderman", ward_number=25)
         newsletter = create_test_newsletter(source_id=1)
@@ -56,7 +57,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertEqual(result[0]["source_name"], "Test Alderman")
         self.assertEqual(result[0]["ward_text"], " (Ward 25)")
 
-    def test_formats_date(self):
+    def test_formats_date(self) -> None:
         """ISO format date converted to readable format."""
         newsletter = create_test_newsletter(received_date="2026-01-24T12:30:00+00:00")
 
@@ -66,7 +67,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         self.assertEqual(result[0]["date_formatted"], "January 24, 2026")
 
-    def test_handles_missing_date(self):
+    def test_handles_missing_date(self) -> None:
         """Missing date defaults to 'Unknown date'."""
         # Use overrides to bypass the factory's default logic
         newsletter = create_test_newsletter()
@@ -78,7 +79,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         self.assertEqual(result[0]["date_formatted"], "Unknown date")
 
-    def test_handles_missing_source(self):
+    def test_handles_missing_source(self) -> None:
         """Missing source defaults to 'Unknown Source'."""
         newsletter = create_test_newsletter(source_id=None)
         newsletter["source"] = None
@@ -90,7 +91,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertEqual(result[0]["source_name"], "Unknown Source")
         self.assertEqual(result[0]["ward_text"], "")
 
-    def test_builds_newsletter_url(self):
+    def test_builds_newsletter_url(self) -> None:
         """Newsletter URL constructed with FRONTEND_BASE_URL."""
         newsletter = create_test_newsletter(id="nl_abc123")
 
@@ -100,7 +101,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         self.assertIn("nl_abc123", result[0]["newsletter_url"])
 
-    def test_sorts_by_received_date(self):
+    def test_sorts_by_received_date(self) -> None:
         """Newsletters sorted by received date, most recent first."""
         newsletter1 = create_test_newsletter(
             id="nl_1", received_date="2026-01-24T10:00:00"
@@ -120,7 +121,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertIn("nl_2", result[0]["newsletter_url"])
         self.assertIn("nl_1", result[1]["newsletter_url"])
 
-    def test_collects_matched_rules(self):
+    def test_collects_matched_rules(self) -> None:
         """Rule names collected for each newsletter."""
         newsletter = create_test_newsletter()
 
@@ -134,15 +135,15 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertIn("Zoning Updates", result[0]["matched_rules"])
         self.assertIn("Bike Lanes", result[0]["matched_rules"])
 
-    def test_empty_notifications_returns_empty(self):
+    def test_empty_notifications_returns_empty(self) -> None:
         """Empty notifications list returns empty result."""
         result = _prepare_newsletter_data([])
 
         self.assertEqual(result, [])
 
-    def test_handles_malformed_notifications(self):
+    def test_handles_malformed_notifications(self) -> None:
         """Malformed notifications are skipped without error."""
-        notifications = [
+        notifications: list[dict[str, Any]] = [
             {"newsletter": None},  # Missing newsletter
             {"newsletter": {"id": None}},  # Missing ID
             {"something": "else"},  # Totally wrong structure
@@ -150,7 +151,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         result = _prepare_newsletter_data(notifications)
         self.assertEqual(result, [])
 
-    def test_handles_invalid_date_format(self):
+    def test_handles_invalid_date_format(self) -> None:
         """Invalid date format falls back to substring."""
         newsletter = create_test_newsletter(received_date="2026-01-24-INVALID")
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
@@ -163,7 +164,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 class TestSendDailyDigest(unittest.TestCase):
     """Tests for send_daily_digest() function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test environment with secret key."""
         import os
 
@@ -172,7 +173,7 @@ class TestSendDailyDigest(unittest.TestCase):
             "test-secret-key-for-testing-must-be-at-least-32-chars-long"
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore original environment."""
         import os
 
@@ -182,7 +183,7 @@ class TestSendDailyDigest(unittest.TestCase):
             os.environ.pop("UNSUBSCRIBE_SECRET_KEY", None)
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_send_success(self, mock_send):
+    def test_send_success(self, mock_send: MagicMock) -> None:
         """Email sent successfully via Resend API."""
         mock_send.return_value = {"id": "email_123"}
 
@@ -196,7 +197,7 @@ class TestSendDailyDigest(unittest.TestCase):
         mock_send.assert_called_once()
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_send_failure(self, mock_send):
+    def test_send_failure(self, mock_send: MagicMock) -> None:
         """Resend API error handled gracefully."""
         mock_send.side_effect = Exception("API Error")
 
@@ -208,7 +209,7 @@ class TestSendDailyDigest(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertIn("API Error", result["error"])
 
-    def test_empty_notifications_returns_error(self):
+    def test_empty_notifications_returns_error(self) -> None:
         """Empty notifications list returns error."""
         result = send_daily_digest("user-123", "user@example.com", [])
 
@@ -216,7 +217,7 @@ class TestSendDailyDigest(unittest.TestCase):
         self.assertIn("No notifications", result["error"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_uses_default_preferences_url(self, mock_send):
+    def test_uses_default_preferences_url(self, mock_send: MagicMock) -> None:
         """Default preferences URL used when not provided."""
         mock_send.return_value = {"id": "email_123"}
 
@@ -230,7 +231,7 @@ class TestSendDailyDigest(unittest.TestCase):
         self.assertIn("/preferences", call_args["html"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_uses_custom_preferences_url(self, mock_send):
+    def test_uses_custom_preferences_url(self, mock_send: MagicMock) -> None:
         """Custom preferences URL used when provided."""
         mock_send.return_value = {"id": "email_123"}
 
@@ -248,7 +249,7 @@ class TestSendDailyDigest(unittest.TestCase):
         self.assertIn("https://custom.com/prefs", call_args["html"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_subject_includes_count(self, mock_send):
+    def test_subject_includes_count(self, mock_send: MagicMock) -> None:
         """Subject line includes newsletter count."""
         mock_send.return_value = {"id": "email_123"}
 
@@ -265,7 +266,7 @@ class TestSendDailyDigest(unittest.TestCase):
         self.assertIn("2 newsletters", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    def test_calls_resend_api(self, mock_send):
+    def test_calls_resend_api(self, mock_send: MagicMock) -> None:
         """Resend API called with correct parameters."""
         mock_send.return_value = {"id": "email_123"}
 
@@ -286,7 +287,7 @@ class TestSendDailyDigest(unittest.TestCase):
 class TestBuildDigestHtml(unittest.TestCase):
     """Tests for _build_digest_html() template generation."""
 
-    def test_includes_all_newsletters(self):
+    def test_includes_all_newsletters(self) -> None:
         """All newsletters included in HTML."""
         prepared = [
             {
@@ -321,7 +322,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("Newsletter 1", html)
         self.assertIn("Newsletter 2", html)
 
-    def test_includes_matched_rules(self):
+    def test_includes_matched_rules(self) -> None:
         """Matched rule names shown in HTML."""
         prepared = [
             {
@@ -346,7 +347,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("Zoning Updates", html)
         self.assertIn("Bike Lanes", html)
 
-    def test_includes_topics(self):
+    def test_includes_topics(self) -> None:
         """Topics displayed in HTML."""
         prepared = [
             {
@@ -372,7 +373,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("transit", html)
         self.assertIn("bike_lanes", html)
 
-    def test_limits_topics_to_five(self):
+    def test_limits_topics_to_five(self) -> None:
         """Only first 5 topics shown."""
         prepared = [
             {
@@ -397,7 +398,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("topic5", html)
         self.assertNotIn("topic6", html)
 
-    def test_includes_preferences_link(self):
+    def test_includes_preferences_link(self) -> None:
         """Preferences link present in footer."""
         prepared = [
             {
@@ -425,7 +426,7 @@ class TestBuildDigestHtml(unittest.TestCase):
 class TestBuildDigestText(unittest.TestCase):
     """Tests for _build_digest_text() plain text template."""
 
-    def test_plain_text_structure(self):
+    def test_plain_text_structure(self) -> None:
         """Plain text has header, numbered list, footer."""
         prepared = [
             {
@@ -451,7 +452,7 @@ class TestBuildDigestText(unittest.TestCase):
         self.assertIn("1.", text)
         self.assertIn("---", text)
 
-    def test_includes_all_newsletters(self):
+    def test_includes_all_newsletters(self) -> None:
         """All newsletters included in numbered list."""
         prepared = [
             {
@@ -486,7 +487,7 @@ class TestBuildDigestText(unittest.TestCase):
         self.assertIn("1. Newsletter 1", text)
         self.assertIn("2. Newsletter 2", text)
 
-    def test_includes_matched_rules(self):
+    def test_includes_matched_rules(self) -> None:
         """Rule names shown in plain text."""
         prepared = [
             {
@@ -510,7 +511,7 @@ class TestBuildDigestText(unittest.TestCase):
 
         self.assertIn("Zoning Updates", text)
 
-    def test_includes_topics(self):
+    def test_includes_topics(self) -> None:
         """Topics listed in plain text."""
         prepared = [
             {
@@ -535,7 +536,7 @@ class TestBuildDigestText(unittest.TestCase):
         self.assertIn("zoning", text)
         self.assertIn("transit", text)
 
-    def test_includes_preferences_link(self):
+    def test_includes_preferences_link(self) -> None:
         """Preferences link present in footer."""
         prepared = [
             {

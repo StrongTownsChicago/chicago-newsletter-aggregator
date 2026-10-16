@@ -6,8 +6,9 @@ Tokens are stateless (no database storage needed).
 """
 
 import os
+from datetime import UTC, datetime, timedelta
+
 import jwt
-from datetime import datetime, timedelta, timezone
 
 ALGORITHM = "HS256"
 
@@ -43,7 +44,7 @@ def generate_unsubscribe_token(user_id: str, max_age_days: int = 90) -> str:
         ValueError: If UNSUBSCRIBE_SECRET_KEY not configured
     """
     secret_key = _get_secret_key()
-    expiration = datetime.now(timezone.utc) + timedelta(days=max_age_days)
+    expiration = datetime.now(UTC) + timedelta(days=max_age_days)
 
     payload = {"sub": user_id, "exp": expiration, "type": "unsubscribe"}
 

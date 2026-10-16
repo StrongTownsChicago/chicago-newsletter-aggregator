@@ -23,12 +23,14 @@ Usage:
     uv run python -m utils.process_llm_metadata --latest 10 --dry-run
 """
 
-import os
 import argparse
+import os
 from typing import Any, cast
+
 from dotenv import load_dotenv
-from shared.db import get_supabase_client
+
 from processing.llm_processor import extract_newsletter_metadata
+from shared.db import get_supabase_client
 
 load_dotenv()
 
@@ -124,6 +126,8 @@ def reprocess_newsletter(
                 try:
                     from notifications.rule_matcher import (
                         match_newsletter_to_rules,
+                    )
+                    from notifications.rule_matcher import (
                         queue_notifications as queue_notifs,
                     )
 
@@ -145,7 +149,7 @@ def reprocess_newsletter(
                     else:
                         print("    - No matching notification rules")
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001  notification queuing must not fail LLM processing
                     # Don't fail LLM processing if notification queuing fails
                     print(f"    ⚠️  Notification queuing failed: {e}")
 
@@ -154,7 +158,7 @@ def reprocess_newsletter(
             print("  ✗ Update failed")
             return False
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
         print(f"  ✗ Processing failed: {e}")
         return False
 
@@ -289,7 +293,7 @@ def main() -> None:
         except KeyboardInterrupt:
             print("\n\nInterrupted by user")
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
             print(f"  ✗ Unexpected error: {e}")
             fail_count += 1
 

@@ -6,13 +6,13 @@ topic filtering, and the full processing pipeline.
 """
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from processing.llm_processor import (
+    TOPICS,
+    extract_newsletter_metadata,
     extract_topics,
     generate_summary,
-    extract_newsletter_metadata,
-    TOPICS,
 )
 
 
@@ -21,7 +21,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_extract_valid_topics(self, mock_print, mock_call_llm):
+    def test_extract_valid_topics(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM returns valid topics, filtered correctly"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "zoning_or_development_meeting_or_approval"]}'
@@ -36,7 +38,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_filters_invalid_topics(self, mock_print, mock_call_llm):
+    def test_filters_invalid_topics(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM returns invalid topics, filtered out"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "invalid_topic", "not_in_list"]}'
@@ -49,7 +53,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_returns_empty_on_no_topics(self, mock_print, mock_call_llm):
+    def test_returns_empty_on_no_topics(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM returns no topics"""
         mock_call_llm.return_value = '{"topics": []}'
 
@@ -59,7 +65,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_handles_llm_failure(self, mock_print, mock_call_llm):
+    def test_handles_llm_failure(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM call fails, returns empty list"""
         mock_call_llm.side_effect = Exception("LLM service down")
 
@@ -74,7 +82,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_topic_name_exact_match_required(self, mock_print, mock_call_llm):
+    def test_topic_name_exact_match_required(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """Topic names must match TOPICS list exactly"""
         # Return topics with wrong case
         mock_call_llm.return_value = '{"topics": ["Bike_Lanes", "TRANSIT_FUNDING"]}'
@@ -86,7 +96,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_duplicate_topics_deduplicated(self, mock_print, mock_call_llm):
+    def test_duplicate_topics_deduplicated(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM returns duplicates, should be handled"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "bike_lanes", "transit_funding"]}'
@@ -101,7 +113,9 @@ class TestExtractTopics(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_prompt_includes_all_valid_topics(self, mock_print, mock_call_llm):
+    def test_prompt_includes_all_valid_topics(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """Prompt includes all topics from TOPICS constant"""
         mock_call_llm.return_value = '{"topics": []}'
 
@@ -121,7 +135,9 @@ class TestGenerateSummary(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_generate_valid_summary(self, mock_print, mock_call_llm):
+    def test_generate_valid_summary(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM returns valid summary"""
         summary_text = "Ward 1 announces new bike lane on Main St. Public meeting scheduled for next week."
         mock_call_llm.return_value = f'{{"summary": "{summary_text}"}}'
@@ -133,7 +149,9 @@ class TestGenerateSummary(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_max_length_enforced(self, mock_print, mock_call_llm):
+    def test_max_length_enforced(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """Pydantic validates ≤2000 chars"""
         # Create a summary >2000 chars
         long_summary = "x" * 2001
@@ -147,7 +165,9 @@ class TestGenerateSummary(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_returns_empty_on_failure(self, mock_print, mock_call_llm):
+    def test_returns_empty_on_failure(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """LLM fails, returns empty string"""
         mock_call_llm.side_effect = Exception("LLM service down")
 
@@ -163,7 +183,9 @@ class TestGenerateSummary(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_prompt_warns_against_alfred_hallucination(self, mock_print, mock_call_llm):
+    def test_prompt_warns_against_alfred_hallucination(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """Prompt includes warning about not assuming Alfred as first name"""
         mock_call_llm.return_value = '{"summary": "Test summary."}'
 
@@ -182,7 +204,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("time.sleep")
-    def test_full_pipeline(self, mock_sleep, mock_summary, mock_topics):
+    def test_full_pipeline(
+        self, mock_sleep: MagicMock, mock_summary: MagicMock, mock_topics: MagicMock
+    ) -> None:
         """Both LLM steps execute successfully"""
         mock_topics.return_value = ["bike_lanes", "transit_funding"]
         mock_summary.return_value = "Newsletter about transit improvements."
@@ -206,7 +230,9 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.call_llm")
     @patch("builtins.print")
-    def test_pipeline_makes_exactly_two_llm_calls(self, mock_print, mock_call_llm):
+    def test_pipeline_makes_exactly_two_llm_calls(
+        self, mock_print: MagicMock, mock_call_llm: MagicMock
+    ) -> None:
         """Pipeline calls the LLM once for topics and once for the summary"""
         mock_call_llm.side_effect = [
             '{"topics": ["bike_lanes"]}',
@@ -227,7 +253,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("builtins.print")
     @patch("time.sleep")
-    def test_truncation_applied(self, mock_sleep, mock_print, mock_topics):
+    def test_truncation_applied(
+        self, mock_sleep: MagicMock, mock_print: MagicMock, mock_topics: MagicMock
+    ) -> None:
         """Content >100k chars truncated"""
         mock_topics.return_value = []
 
@@ -255,7 +283,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("time.sleep")
-    def test_includes_todays_date(self, mock_sleep, mock_summary, mock_topics):
+    def test_includes_todays_date(
+        self, mock_sleep: MagicMock, mock_summary: MagicMock, mock_topics: MagicMock
+    ) -> None:
         """Prompt includes today's date"""
         mock_topics.return_value = []
         mock_summary.return_value = ""
@@ -280,8 +310,12 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     def test_partial_failure_handling(
-        self, mock_sleep, mock_print, mock_summary, mock_topics
-    ):
+        self,
+        mock_sleep: MagicMock,
+        mock_print: MagicMock,
+        mock_summary: MagicMock,
+        mock_topics: MagicMock,
+    ) -> None:
         """One step fails, the other continues"""
         # extract_topics and generate_summary catch their own exceptions and
         # return default values, so we simulate that behavior
@@ -304,8 +338,12 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     def test_returns_empty_on_complete_failure(
-        self, mock_sleep, mock_print, mock_summary, mock_topics
-    ):
+        self,
+        mock_sleep: MagicMock,
+        mock_print: MagicMock,
+        mock_summary: MagicMock,
+        mock_topics: MagicMock,
+    ) -> None:
         """All steps fail gracefully"""
         # The individual functions catch their own exceptions, so they return defaults
         mock_topics.return_value = []  # Returns [] on error
@@ -324,7 +362,9 @@ class TestProcessWithOllama(unittest.TestCase):
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
     @patch("time.sleep")
-    def test_content_includes_subject(self, mock_sleep, mock_summary, mock_topics):
+    def test_content_includes_subject(
+        self, mock_sleep: MagicMock, mock_summary: MagicMock, mock_topics: MagicMock
+    ) -> None:
         """Content passed to LLM includes subject"""
         mock_topics.return_value = []
         mock_summary.return_value = ""

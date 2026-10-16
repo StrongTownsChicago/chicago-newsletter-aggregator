@@ -1,7 +1,7 @@
 import unittest
 
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
 
 
 class TestUserCases(unittest.TestCase):
@@ -10,7 +10,7 @@ class TestUserCases(unittest.TestCase):
     Verifies that privacy sanitization robustly handles complex HTML structures found in actual newsletters.
     """
 
-    def test_case_1_daniel_la_spata(self):
+    def test_case_1_daniel_la_spata(self) -> None:
         """
         Verify removal of mailchimp-specific preference/unsubscribe links
         embedded in complex footer structures (1st Ward example).
@@ -34,24 +34,24 @@ class TestUserCases(unittest.TestCase):
         )
         self.assertNotIn("the1stward.us4.list-manage.com/unsubscribe", sanitized)
 
-    def test_case_2_compliance_links(self):
+    def test_case_2_compliance_links(self) -> None:
         """
         Verify removal of Constant Contact 'complianceLinks' table which contains
         unsubscribe and profile update links.
         """
         html = """
-        <table class="complianceLinks complianceLinks--padding-vertical" width="100%" border="0" cellpadding="0" cellspacing="0"> 
-            <tr> 
-                <td class="complianceLinks_content-cell content-padding-horizontal"> 
-                    <p style="margin: 0;"> 
+        <table class="complianceLinks complianceLinks--padding-vertical" width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="complianceLinks_content-cell content-padding-horizontal">
+                    <p style="margin: 0;">
                         <a href="https://visitor.constantcontact.com/do?p=un&m=001r86HdJl4hkGTgDfzqSqKMg==..." data-track="false">Unsubscribe</a>
                         <span> | </span>
                         <a href="https://visitor.constantcontact.com/do?ch=d1ca2354-e8de-11f0-9b67-024270638287&p=oo..." data-track="false">Update Profile</a>
                         <span> | </span>
                         <a href="https://www.constantcontact.com/legal/customer-contact-data-notice" data-track="false">Constant Contact Data Notice</a>
-                    </p> 
-                </td> 
-            </tr> 
+                    </p>
+                </td>
+            </tr>
         </table>
         """
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
@@ -61,28 +61,28 @@ class TestUserCases(unittest.TestCase):
         self.assertNotIn("Unsubscribe", sanitized)
         self.assertNotIn("Update Profile", sanitized)
 
-    def test_case_3_constant_contact_footer(self):
+    def test_case_3_constant_contact_footer(self) -> None:
         """
         Test handling of generic Constant Contact footer images/logos.
         Currently, these benign logos are expected to match if they contain tracked links,
         or be preserved if they are just images. This test primarily ensures no exceptions occur.
         """
         html = """
-        <table class="image_container-caption text" width="100%" border="0" cellpadding="0" cellspacing="0"> 
-            <tr> 
-                <td class="text_content-cell"> 
+        <table class="image_container-caption text" width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="text_content-cell">
                     <a href="https://www.constantcontact.com/landing1/vr/home?cc=nge..." data-trackable="false">
                         <img class="image_content" src="https://imgssl.constantcontact.com/letters/images/CPE/referralLogos/H-Stacked-FC-WhiteBG-Email-Footer.png" alt="Constant Contact" align="center">
-                    </a>  
-                </td> 
-            </tr> 
+                    </a>
+                </td>
+            </tr>
         </table>
         """
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
         # No specific removal assertion required for generic logos unless they become a privacy issue.
         self.assertIsNotNone(sanitized)
 
-    def test_case_4_view_in_browser(self):
+    def test_case_4_view_in_browser(self) -> None:
         """
         Verify removal of 'View in browser' links, a common pattern in newsletters.
         """
@@ -97,7 +97,7 @@ class TestUserCases(unittest.TestCase):
         self.assertNotIn("mailchi.mp", sanitized)
         self.assertNotIn("<a href=", sanitized)
 
-    def test_case_5_artifacts(self):
+    def test_case_5_artifacts(self) -> None:
         """
         Verify robustness against artifacting.
         With the safer sanitization approach, we assert that SENSITIVE URLs are removed,

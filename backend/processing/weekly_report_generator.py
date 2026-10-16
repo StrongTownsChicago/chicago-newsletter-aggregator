@@ -8,16 +8,16 @@ Two-phase LLM processing:
 Designed to aggregate newsletter content by topic and generate insight-driven summaries.
 """
 
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime
 
+from models.types import NewsletterID
 from models.weekly_report import (
     FactExtraction,
     KeyDevelopment,
     WeeklySynthesis,
     WeeklyTopicReport,
 )
-from models.types import NewsletterID
 from processing.llm_processor import TOPICS, call_llm
 from prompts.weekly_synthesis import FACTUAL_SUMMARY
 from shared.db import get_supabase_client
@@ -104,7 +104,7 @@ Newsletter:
             for description in data.developments
         ]
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  per-newsletter LLM boundary: log and continue
         print(f"    ⚠ Extraction failed for newsletter {newsletter_id[:8]}: {e}")
         return []
 
@@ -211,7 +211,7 @@ def synthesize_weekly_summary(
         print(f"  ✓ Generated summary ({len(data.summary)} chars)")
         return data.summary
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no summary
         print(f"  ✗ Summary synthesis failed for {topic}: {e}")
         return ""
 
@@ -272,7 +272,7 @@ def generate_weekly_topic_report(
         week_end = str(week_range["week_end"])
         print(f"  → Querying newsletters from {week_start} to {week_end}...")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and skip the report
         print(f"  ✗ Failed to calculate week range: {e}")
         return None
 
@@ -345,12 +345,12 @@ def generate_weekly_topic_report(
             report_summary=summary,
             newsletter_ids=newsletter_ids,
             key_developments=facts,
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
         )
 
         print("  ✓ Report generated successfully")
         return report
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  per-report boundary: log and skip the report
         print(f"  ✗ Report generation failed: {e}")
         return None

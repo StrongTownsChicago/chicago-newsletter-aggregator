@@ -5,14 +5,15 @@ Generates reports in multiple formats (text, JSON, CSV) for LLM cost analysis.
 """
 
 from dataclasses import dataclass
-from typing import Any
 from datetime import datetime
+from typing import Any
 
+from shared.utils import CHICAGO_TIMEZONE
+from utils.cost_calculator import ModelPricing, calculate_cost
 from utils.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
     WeeklyReportTokenAnalysis,
 )
-from utils.cost_calculator import ModelPricing, calculate_cost
 
 
 @dataclass
@@ -63,7 +64,9 @@ def generate_text_report(
     report.append("=" * 65)
     report.append("LLM TOKEN COST ANALYSIS")
     report.append("=" * 65)
-    report.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append(
+        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     report.append(f"Newsletters Analyzed: {len(analyses)}")
     report.append(f"Model: {model_pricing.model} ({model_pricing.provider})")
     report.append(
@@ -142,7 +145,7 @@ def generate_json_report(
 
     return {
         "metadata": {
-            "analysis_date": datetime.now().isoformat(),
+            "analysis_date": datetime.now(CHICAGO_TIMEZONE).isoformat(),
             "newsletter_count": len(analyses),
             "model": model_pricing.model,
             "provider": model_pricing.provider,
@@ -257,7 +260,7 @@ def generate_comparison_report(
     sorted_models = sorted(model_costs.items(), key=lambda x: x[1]["total_cost"])
 
     # Format report
-    newsletter_count = len(list(analyses_by_model.values())[0])
+    newsletter_count = len(next(iter(analyses_by_model.values())))
     report = []
     report.append("=" * 75)
     report.append(f"MODEL COST COMPARISON ({newsletter_count} newsletters)")
@@ -365,7 +368,9 @@ def generate_combined_text_report(
     report.append("=" * 65)
     report.append("LLM TOKEN COST ANALYSIS (NEWSLETTER + WEEKLY REPORTS)")
     report.append("=" * 65)
-    report.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append(
+        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     report.append(f"Newsletters Analyzed: {len(newsletter_analyses)}")
     report.append(f"Weekly Reports Generated: {weekly_report_count}")
     report.append(f"Model: {model_pricing.model} ({model_pricing.provider})")
@@ -456,7 +461,7 @@ def generate_combined_text_report(
     if weekly_analyses:
         # Estimate weekly reports per month (assume 4 weeks, avg topics)
         avg_reports_per_week = weekly_report_count / max(
-            len(set(a.week_id for a in weekly_analyses)), 1
+            len({a.week_id for a in weekly_analyses}), 1
         )
         monthly_weekly_reports = avg_reports_per_week * 4
         monthly_weekly_cost = weekly_cost_per_report * monthly_weekly_reports

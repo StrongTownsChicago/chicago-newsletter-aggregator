@@ -8,8 +8,9 @@ notifications for delivery.
 from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
-from shared.db import get_supabase_client
+
 from notifications.error_logger import log_notification_error
+from shared.db import get_supabase_client
 
 
 def match_newsletter_to_rules(
@@ -85,7 +86,7 @@ def match_newsletter_to_rules(
 
         return matched_rules
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  matching must not fail ingestion: log to file
         error_file = log_notification_error(
             error_type="matching",
             error_message=str(e),
@@ -125,23 +126,19 @@ def _rule_matches_newsletter(
 
     # Topics filter (at least one topic must match)
     rule_topics = rule.get("topics", [])
-    if rule_topics:
-        # At least one rule topic must be in newsletter topics
-        if not any(topic in newsletter_topics for topic in rule_topics):
-            return False
+    if rule_topics and not any(topic in newsletter_topics for topic in rule_topics):
+        return False
 
     # Search Term filter (phrase match)
     search_term = rule.get("search_term")
-    if search_term:
-        # Search term must appear in newsletter text (case-insensitive)
-        if search_term.lower() not in newsletter_text:
-            return False
+    # Search term must appear in newsletter text (case-insensitive)
+    if search_term and search_term.lower() not in newsletter_text:
+        return False
 
     # Ward filter (newsletter must be from alderman in one of specified wards)
     rule_wards = rule.get("ward_numbers", [])
-    if rule_wards:
-        if newsletter_ward not in rule_wards:
-            return False
+    if rule_wards and newsletter_ward not in rule_wards:  # noqa: SIM103  one guard per filter
+        return False
 
     # All conditions passed
     return True
@@ -171,17 +168,16 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
         today = datetime.now(chicago_tz).date().isoformat()
 
         # Prepare notifications for batch insert
-        notifications = []
-        for match in matched_rules:
-            notifications.append(
-                {
-                    "user_id": match["user_id"],
-                    "newsletter_id": newsletter_id,
-                    "rule_id": match["rule_id"],
-                    "status": "pending",
-                    "digest_batch_id": today,
-                }
-            )
+        notifications = [
+            {
+                "user_id": match["user_id"],
+                "newsletter_id": newsletter_id,
+                "rule_id": match["rule_id"],
+                "status": "pending",
+                "digest_batch_id": today,
+            }
+            for match in matched_rules
+        ]
 
         # Insert notifications individually to handle duplicates gracefully
         # Unique constraint on (user_id, newsletter_id, rule_id) will prevent duplicates
@@ -192,7 +188,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
             try:
                 supabase.table("notification_queue").insert(notification).execute()
                 queued_count += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  per-notification boundary: duplicates are expected
                 # Track failures that aren't just duplicates
                 error_str = str(e)
                 if (
@@ -219,7 +215,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
 
         return queued_count
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  queuing must not fail ingestion: log to file
         error_file = log_notification_error(
             error_type="queuing",
             error_message=str(e),

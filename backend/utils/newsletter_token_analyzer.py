@@ -6,22 +6,22 @@ Replicates exact prompt construction from llm_processor.py and weekly_report_gen
 without actually calling LLMs.
 """
 
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
+from models.weekly_report import FactExtraction, WeeklySynthesis
 from processing.llm_client import parse_model_string
 from processing.llm_processor import (
-    TOPICS,
-    TopicsExtraction,
-    Summary,
     MAX_NEWSLETTER_CHARS,
+    TOPICS,
+    Summary,
+    TopicsExtraction,
 )
-from models.weekly_report import FactExtraction, WeeklySynthesis
+from shared.utils import CHICAGO_TIMEZONE
 from utils.token_counter import (
     estimate_llm_call_tokens,
 )
-
 
 # Estimated response sizes based on actual newsletter data
 # These are median values derived from real LLM outputs
@@ -95,7 +95,7 @@ def analyze_newsletter_tokens(
         plain_text = plain_text[:max_chars]
 
     # Replicate content construction from llm_processor.py:372-374
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(CHICAGO_TIMEZONE).strftime("%Y-%m-%d")
     content = (
         f"Today's date: {today}\n\nSubject: {newsletter['subject']}\n\n{plain_text}"
     )
@@ -279,11 +279,10 @@ Newsletter:
 
     # Phase 2: Synthesize summary from aggregated facts
     # Create mock facts list for prompt
-    facts_text = []
-    for i in range(1, min(len(newsletters), 10) + 1):  # Up to 10 example facts
-        facts_text.append(
-            f"{i}. New bike lane approved on Main Street, construction starts March (Ward 42)"
-        )
+    facts_text = [
+        f"{i}. New bike lane approved on Main Street, construction starts March (Ward 42)"
+        for i in range(1, min(len(newsletters), 10) + 1)  # Up to 10 example facts
+    ]
 
     facts_list = "\n".join(facts_text)
 

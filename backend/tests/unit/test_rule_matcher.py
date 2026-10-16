@@ -6,26 +6,27 @@ duplicate handling, and grouping.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 from notifications.rule_matcher import (
     _rule_matches_newsletter,
+    get_pending_notifications_by_user,
     match_newsletter_to_rules,
     queue_notifications,
-    get_pending_notifications_by_user,
-)
-from tests.fixtures.user_factory import (
-    create_test_user,
-    create_test_rule,
-    create_test_notification,
 )
 from tests.fixtures.mock_helpers import create_mock_supabase
+from tests.fixtures.user_factory import (
+    create_test_notification,
+    create_test_rule,
+    create_test_user,
+)
 
 
 class TestRuleMatchesNewsletter(unittest.TestCase):
     """Tests for _rule_matches_newsletter() internal matching logic"""
 
-    def test_topic_match_single(self):
+    def test_topic_match_single(self) -> None:
         """Rule with single topic matches newsletter"""
         rule = create_test_rule(topics=["bike_lanes"])
         newsletter_data = {
@@ -36,7 +37,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_topic_match_multiple(self):
+    def test_topic_match_multiple(self) -> None:
         """Rule with multiple topics (OR logic)"""
         rule = create_test_rule(topics=["bike_lanes", "transit_funding"])
         newsletter_data = {"topics": ["bike_lanes"]}  # Only one matches
@@ -45,7 +46,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)  # One match is sufficient (OR logic)
 
-    def test_topic_no_match(self):
+    def test_topic_no_match(self) -> None:
         """No topic overlap returns False"""
         rule = create_test_rule(topics=["transit_funding"])
         newsletter_data = {"topics": ["zoning_or_development_meeting_or_approval"]}
@@ -54,7 +55,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_topic_filter_empty_matches_all(self):
+    def test_topic_filter_empty_matches_all(self) -> None:
         """Rule with empty topics matches all newsletters"""
         rule = create_test_rule(topics=[])
         newsletter_data = {"topics": ["anything"]}
@@ -63,7 +64,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_search_term_match(self):
+    def test_search_term_match(self) -> None:
         """Keyword found in newsletter text"""
         rule = create_test_rule(search_term="parking")
         newsletter_data = {
@@ -75,7 +76,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_search_term_no_match(self):
+    def test_search_term_no_match(self) -> None:
         """Keyword not found returns False"""
         rule = create_test_rule(search_term="parking")
         newsletter_data = {
@@ -87,7 +88,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_search_term_case_insensitive(self):
+    def test_search_term_case_insensitive(self) -> None:
         """Search term matching is case-insensitive"""
         rule = create_test_rule(search_term="PARKING")
         newsletter_data = {
@@ -99,7 +100,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_search_term_empty_matches_all(self):
+    def test_search_term_empty_matches_all(self) -> None:
         """No search term matches all"""
         rule = create_test_rule(search_term=None)
         newsletter_data = {"topics": [], "plain_text": "Any content"}
@@ -108,7 +109,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_ward_filter_match(self):
+    def test_ward_filter_match(self) -> None:
         """Newsletter from specified ward matches"""
         rule = create_test_rule(ward_numbers=[1, 2])
         newsletter_data = {"topics": [], "ward_number": 1}
@@ -117,7 +118,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_ward_filter_no_match(self):
+    def test_ward_filter_no_match(self) -> None:
         """Newsletter from wrong ward returns False"""
         rule = create_test_rule(ward_numbers=[1, 2])
         newsletter_data = {"topics": [], "ward_number": 5}
@@ -126,7 +127,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_ward_filter_empty_matches_all(self):
+    def test_ward_filter_empty_matches_all(self) -> None:
         """No ward filter matches all wards"""
         rule = create_test_rule(ward_numbers=[])
         newsletter_data = {"topics": [], "ward_number": 99}
@@ -135,7 +136,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_all_filters_and_logic(self):
+    def test_all_filters_and_logic(self) -> None:
         """Topics AND search term AND ward (all must pass)"""
         rule = create_test_rule(
             topics=["bike_lanes"], search_term="cycling", ward_numbers=[1]
@@ -159,7 +160,7 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_topics_or_within_filter(self):
+    def test_topics_or_within_filter(self) -> None:
         """Multiple topics in rule = OR logic"""
         rule = create_test_rule(topics=["bike_lanes", "transit_funding", "city_budget"])
         newsletter_data = {"topics": ["city_budget"]}  # Only one matches
@@ -168,25 +169,25 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertTrue(result)  # Any one topic is sufficient
 
-    def test_missing_plain_text_handled(self):
+    def test_missing_plain_text_handled(self) -> None:
         """Newsletter without plain_text doesn't crash"""
         rule = create_test_rule(search_term="parking")
-        newsletter_data = {"topics": []}  # No plain_text key
+        newsletter_data: dict[str, Any] = {"topics": []}  # No plain_text key
 
         result = _rule_matches_newsletter(rule, newsletter_data)
 
         self.assertFalse(result)  # Search term can't match
 
-    def test_none_ward_number_handled(self):
+    def test_none_ward_number_handled(self) -> None:
         """Newsletter with ward_number=None doesn't crash"""
         rule = create_test_rule(ward_numbers=[1])
-        newsletter_data = {"topics": [], "ward_number": None}
+        newsletter_data: dict[str, Any] = {"topics": [], "ward_number": None}
 
         result = _rule_matches_newsletter(rule, newsletter_data)
 
         self.assertFalse(result)  # None not in [1]
 
-    def test_legacy_min_relevance_score_ignored(self):
+    def test_legacy_min_relevance_score_ignored(self) -> None:
         """Deprecated min_relevance_score on existing rules is ignored (it never filtered)"""
         rule = create_test_rule(topics=["bike_lanes"], min_relevance_score=10)
         newsletter_data = {"topics": ["bike_lanes"]}
@@ -201,7 +202,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_match_single_rule(self, mock_print, mock_get_supabase):
+    def test_match_single_rule(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """One rule matches newsletter"""
         user = create_test_user(user_id="user1", notifications_enabled=True)
         rule = create_test_rule(user_id="user1", topics=["bike_lanes"], is_active=True)
@@ -224,7 +227,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_match_multiple_rules(self, mock_print, mock_get_supabase):
+    def test_match_multiple_rules(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Multiple rules match same newsletter"""
         user1 = create_test_user(user_id="user1", notifications_enabled=True)
         user2 = create_test_user(user_id="user2", notifications_enabled=True)
@@ -253,7 +258,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_no_rules_match(self, mock_print, mock_get_supabase):
+    def test_no_rules_match(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """No rules match newsletter"""
         user = create_test_user(user_id="user1", notifications_enabled=True)
         rule = create_test_rule(
@@ -275,7 +282,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_filters_disabled_users(self, mock_print, mock_get_supabase):
+    def test_filters_disabled_users(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Users with notifications_enabled=false excluded"""
         user = create_test_user(
             user_id="user1", notifications_enabled=False
@@ -297,7 +306,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_filters_inactive_rules(self, mock_print, mock_get_supabase):
+    def test_filters_inactive_rules(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Only is_active=true rules considered"""
         # Rule with is_active=False should not be returned by query
         # (the query filters .eq("is_active", True))
@@ -315,8 +326,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
     @patch("notifications.rule_matcher.log_notification_error")
     @patch("builtins.print")
     def test_error_handling_returns_empty(
-        self, mock_print, mock_log, mock_get_supabase
-    ):
+        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Database error returns empty list"""
         mock_get_supabase.side_effect = Exception("Database connection failed")
 
@@ -331,7 +342,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
     @patch("builtins.print")
-    def test_error_logged_on_failure(self, mock_print, mock_log, mock_get_supabase):
+    def test_error_logged_on_failure(
+        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Errors logged to file"""
         mock_get_supabase.side_effect = Exception("Test error")
 
@@ -347,7 +360,9 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("builtins.print")
-    def test_no_active_rules_returns_empty(self, mock_print, mock_get_supabase):
+    def test_no_active_rules_returns_empty(
+        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Empty rules list returns empty matches"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])  # No rules
@@ -367,8 +382,11 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
     def test_queue_single_notification(
-        self, mock_print, mock_datetime, mock_get_supabase
-    ):
+        self,
+        mock_print: MagicMock,
+        mock_datetime: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
         """Basic insertion of one notification"""
         # Mock datetime.now() to return a specific date
         mock_now = Mock()
@@ -392,8 +410,11 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
     def test_queue_multiple_notifications(
-        self, mock_print, mock_datetime, mock_get_supabase
-    ):
+        self,
+        mock_print: MagicMock,
+        mock_datetime: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
         """Batch insert of multiple notifications"""
         # Mock datetime.now() to return a specific date
         mock_now = Mock()
@@ -418,7 +439,12 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
-    def test_generates_batch_id(self, mock_print, mock_datetime, mock_get_supabase):
+    def test_generates_batch_id(
+        self,
+        mock_print: MagicMock,
+        mock_datetime: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
         """Uses today's date (YYYY-MM-DD) as batch_id"""
         # Mock datetime.now() to return a specific date in Chicago timezone
         mock_now = Mock()
@@ -440,7 +466,12 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
-    def test_duplicate_handling(self, mock_print, mock_datetime, mock_get_supabase):
+    def test_duplicate_handling(
+        self,
+        mock_print: MagicMock,
+        mock_datetime: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
         """Unique constraint on (user_id, newsletter_id, rule_id) handled gracefully"""
         # Mock datetime.now() to return a specific date
         mock_now = Mock()
@@ -478,8 +509,12 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.datetime")
     @patch("builtins.print")
     def test_partial_failure_continues(
-        self, mock_print, mock_datetime, mock_log, mock_get_supabase
-    ):
+        self,
+        mock_print: MagicMock,
+        mock_datetime: MagicMock,
+        mock_log: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
         """Some insertions fail, others succeed"""
         # Mock datetime.now() to return a specific date
         mock_now = Mock()
@@ -511,7 +546,7 @@ class TestQueueNotifications(unittest.TestCase):
         # Error logged for non-duplicate failure
         self.assertEqual(mock_log.call_count, 1)
 
-    def test_empty_rules_returns_zero(self):
+    def test_empty_rules_returns_zero(self) -> None:
         """No rules to queue returns 0"""
         result = queue_notifications("newsletter_id", [])
 
@@ -520,7 +555,9 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
     @patch("builtins.print")
-    def test_error_logged_on_failure(self, mock_print, mock_log, mock_get_supabase):
+    def test_error_logged_on_failure(
+        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+    ) -> None:
         """Failures logged to file"""
         mock_get_supabase.side_effect = Exception("Database connection failed")
 
@@ -537,7 +574,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
     """Tests for get_pending_notifications_by_user() function"""
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_groups_by_user(self, mock_get_supabase):
+    def test_groups_by_user(self, mock_get_supabase: MagicMock) -> None:
         """Notifications grouped correctly by user_id"""
         notification1 = create_test_notification(user_id="user1", newsletter_id="n1")
         notification2 = create_test_notification(user_id="user1", newsletter_id="n2")
@@ -556,7 +593,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         self.assertEqual(len(result["user2"]), 1)  # user2 has 1 notification
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_filters_by_batch_id(self, mock_get_supabase):
+    def test_filters_by_batch_id(self, mock_get_supabase: MagicMock) -> None:
         """Only specified date returned"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])
@@ -571,7 +608,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         mock_supabase.eq.assert_any_call("digest_batch_id", "2026-01-24")
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_filters_pending_status(self, mock_get_supabase):
+    def test_filters_pending_status(self, mock_get_supabase: MagicMock) -> None:
         """Only status='pending' notifications returned"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])
@@ -583,7 +620,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         mock_supabase.eq.assert_any_call("status", "pending")
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_orders_by_created_at(self, mock_get_supabase):
+    def test_orders_by_created_at(self, mock_get_supabase: MagicMock) -> None:
         """Chronological order by created_at"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])
@@ -595,7 +632,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         mock_supabase.order.assert_called_once_with("created_at", desc=False)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_joins_newsletter_and_rule_data(self, mock_get_supabase):
+    def test_joins_newsletter_and_rule_data(self, mock_get_supabase: MagicMock) -> None:
         """Nested data structure with joins"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])
@@ -609,7 +646,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         self.assertIn("rule:notification_rules", select_call)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_empty_queue_returns_empty_dict(self, mock_get_supabase):
+    def test_empty_queue_returns_empty_dict(self, mock_get_supabase: MagicMock) -> None:
         """No pending notifications returns empty dict"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])
@@ -620,7 +657,7 @@ class TestGetPendingNotificationsByUser(unittest.TestCase):
         self.assertEqual(result, {})
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    def test_batch_id_none_gets_all(self, mock_get_supabase):
+    def test_batch_id_none_gets_all(self, mock_get_supabase: MagicMock) -> None:
         """No filter when batch_id=None"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])

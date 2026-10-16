@@ -29,7 +29,7 @@ def make_email(
 class TestFetchStoredEmailUids(unittest.TestCase):
     """Test paging through stored newsletter UIDs."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.mock_supabase = Mock()
         self.mock_table = Mock()
         self.mock_supabase.table.return_value = self.mock_table
@@ -37,7 +37,7 @@ class TestFetchStoredEmailUids(unittest.TestCase):
         self.mock_table.order.return_value = self.mock_table
         self.mock_table.range.return_value = self.mock_table
 
-    def test_pages_until_short_page(self):
+    def test_pages_until_short_page(self) -> None:
         """Fetches successive pages and stops after a page smaller than page_size."""
         self.mock_table.execute.side_effect = [
             Mock(data=[{"id": 1, "email_uid": "1"}, {"id": 2, "email_uid": "2"}]),
@@ -51,7 +51,7 @@ class TestFetchStoredEmailUids(unittest.TestCase):
         self.mock_table.range.assert_any_call(2, 3)
         self.assertEqual(self.mock_table.execute.call_count, 2)
 
-    def test_orders_query_for_stable_pagination(self):
+    def test_orders_query_for_stable_pagination(self) -> None:
         """Orders by id so pages neither overlap nor skip rows."""
         self.mock_table.execute.return_value = Mock(data=[])
 
@@ -59,7 +59,7 @@ class TestFetchStoredEmailUids(unittest.TestCase):
 
         self.mock_table.order.assert_called_once_with("id")
 
-    def test_skips_null_uids(self):
+    def test_skips_null_uids(self) -> None:
         """Scraped newsletters have no email_uid and are excluded."""
         self.mock_table.execute.return_value = Mock(
             data=[{"id": 1, "email_uid": "10"}, {"id": 2, "email_uid": None}]
@@ -69,7 +69,7 @@ class TestFetchStoredEmailUids(unittest.TestCase):
 
         self.assertEqual(result, {"10"})
 
-    def test_exact_multiple_of_page_size_fetches_empty_final_page(self):
+    def test_exact_multiple_of_page_size_fetches_empty_final_page(self) -> None:
         """A full last page triggers one more fetch, which returns empty."""
         self.mock_table.execute.side_effect = [
             Mock(data=[{"id": 1, "email_uid": "1"}, {"id": 2, "email_uid": "2"}]),
@@ -85,7 +85,7 @@ class TestFetchStoredEmailUids(unittest.TestCase):
 class TestFetchMailboxEmails(unittest.TestCase):
     """Test that mailbox fetching is read-only and maps header fields."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.mock_mailbox = Mock()
         self.mock_mailbox.fetch.return_value = [
             Mock(
@@ -97,7 +97,7 @@ class TestFetchMailboxEmails(unittest.TestCase):
             Mock(uid="43", from_="other@example.org", subject=None, date=None),
         ]
 
-    def test_fetches_without_marking_seen(self):
+    def test_fetches_without_marking_seen(self) -> None:
         """Never marks messages read; doing so would hide them from ingestion."""
         fetch_mailbox_emails(self.mock_mailbox, "INBOX")
 
@@ -105,12 +105,12 @@ class TestFetchMailboxEmails(unittest.TestCase):
             headers_only=True, mark_seen=False, bulk=True
         )
 
-    def test_selects_requested_folder(self):
+    def test_selects_requested_folder(self) -> None:
         fetch_mailbox_emails(self.mock_mailbox, "[Gmail]/Spam")
 
         self.mock_mailbox.folder.set.assert_called_once_with("[Gmail]/Spam")
 
-    def test_maps_header_fields(self):
+    def test_maps_header_fields(self) -> None:
         result = fetch_mailbox_emails(self.mock_mailbox, "INBOX")
 
         self.assertEqual(
@@ -125,21 +125,21 @@ class TestFetchMailboxEmails(unittest.TestCase):
 class TestFindUnprocessedEmails(unittest.TestCase):
     """Test diffing mailbox emails against stored UIDs."""
 
-    def test_returns_only_unstored_emails(self):
+    def test_returns_only_unstored_emails(self) -> None:
         emails = [make_email("1"), make_email("2"), make_email("3")]
 
         result = find_unprocessed_emails(emails, {"1", "3"})
 
         self.assertEqual([email.uid for email in result], ["2"])
 
-    def test_empty_stored_set_returns_all(self):
+    def test_empty_stored_set_returns_all(self) -> None:
         emails = [make_email("1"), make_email("2")]
 
         result = find_unprocessed_emails(emails, set())
 
         self.assertEqual(len(result), 2)
 
-    def test_sorts_by_sender_case_insensitively_then_date(self):
+    def test_sorts_by_sender_case_insensitively_then_date(self) -> None:
         emails = [
             make_email("1", "b@example.org", date=datetime(2026, 9, 2)),
             make_email("2", "A@example.org", date=datetime(2026, 9, 3)),
@@ -155,7 +155,7 @@ class TestFindUnprocessedEmails(unittest.TestCase):
 class TestFormatTsvRow(unittest.TestCase):
     """Test TSV row formatting."""
 
-    def test_formats_fields_in_order(self):
+    def test_formats_fields_in_order(self) -> None:
         email = make_email("42", "ward@example.org", "Hello", datetime(2026, 9, 1, 8))
 
         self.assertEqual(
@@ -163,12 +163,12 @@ class TestFormatTsvRow(unittest.TestCase):
             "2026-09-01T08:00:00\t42\tward@example.org\tHello",
         )
 
-    def test_missing_date_is_unknown(self):
+    def test_missing_date_is_unknown(self) -> None:
         row = format_tsv_row(make_email("42", date=None))
 
         self.assertTrue(row.startswith("unknown\t"))
 
-    def test_escapes_tabs_and_newlines(self):
+    def test_escapes_tabs_and_newlines(self) -> None:
         email = make_email("42", subject="Line one\tcol\r\nLine two")
 
         fields = format_tsv_row(email).split("\t")
@@ -176,7 +176,7 @@ class TestFormatTsvRow(unittest.TestCase):
         self.assertEqual(len(fields), 4)
         self.assertNotIn("\n", fields[3])
 
-    def test_truncates_long_subject(self):
+    def test_truncates_long_subject(self) -> None:
         row = format_tsv_row(make_email("42", subject="x" * 200))
 
         self.assertEqual(len(row.split("\t")[3]), 70)
