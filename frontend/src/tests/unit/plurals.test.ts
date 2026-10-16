@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { foldPlural, foldTerm } from "../../lib/plurals";
+import { foldPlural, foldTerm } from "../../lib/analytics/plurals";
 
 const SHARED_CASES_PATH = path.resolve(__dirname, "../../../../backend/tests/fixtures/plural_fold_cases.json");
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type BroadCoverageWindow, type LensDefinition } from "../../lib/analytics";
+import { type BroadCoverageWindow, type LensDefinition } from "../../lib/analytics/core";
 import {
   describeBroadCoverageRule,
   describeMonthSpan,
@@ -8,7 +8,7 @@ import {
   describeTopicMatching,
   describeWardScope,
   pluralize,
-} from "../../lib/analytics-descriptions";
+} from "../../lib/analytics/descriptions";
 
 const window: BroadCoverageWindow = {
   startMonth: "2026-01",

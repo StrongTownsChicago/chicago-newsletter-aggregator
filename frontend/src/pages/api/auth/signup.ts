@@ -2,7 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase, notificationsEnabled } from "../../../lib/supabase";
 import { WELCOME_PATH, buildEmailConfirmationRedirect } from "../../../lib/onboarding";
-import { formText } from "../../../lib/form-data";
+import { formText } from "../../../lib/server/form-data";
 
 export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (!notificationsEnabled()) {

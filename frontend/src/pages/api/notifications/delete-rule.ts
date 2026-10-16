@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
-import { formText } from "../../../lib/form-data";
+import { formText } from "../../../lib/server/form-data";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {

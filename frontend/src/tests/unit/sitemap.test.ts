@@ -6,7 +6,7 @@ import {
   buildWardSitemapPages,
   fetchNewsletterSitemapEntries,
   type NewsletterSitemapEntry,
-} from '../../lib/sitemap';
+} from '../../lib/server/sitemap';
 
 const SITE = 'https://chicago-newsletter-aggregator.open-advocacy.com';
 

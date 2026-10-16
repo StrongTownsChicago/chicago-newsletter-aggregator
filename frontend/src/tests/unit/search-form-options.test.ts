@@ -3,8 +3,8 @@ import {
   buildSourceOptions,
   extractSourceTypes,
   extractWardNumbers,
-} from '../../lib/search-form-options';
-import type { SearchSourceRow } from '../../lib/search-form-options';
+} from '../../lib/server/search-form-options';
+import type { SearchSourceRow } from '../../lib/server/search-form-options';
 
 const SOURCES: SearchSourceRow[] = [
   { id: 51, name: 'Chicago Transit Authority', ward_number: null, source_type: 'agency' },

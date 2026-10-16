@@ -10,7 +10,7 @@ const SITE_URL = "https://chicago-newsletter-aggregator.open-advocacy.com";
 // Keep in sync with the Disallow rules in public/robots.txt.
 const NON_INDEXABLE_PATHS = ["/preferences", "/unsubscribe", "/login", "/signup"];
 
-// Versions the edge page cache (src/lib/page-cache.ts) so each deploy, including
+// Versions the edge page cache (src/lib/server/page-cache.ts) so each deploy, including
 // a redeploy of the same commit, starts empty. Cloudflare Pages sets the commit.
 const BUILD_ID = `${process.env.CF_PAGES_COMMIT_SHA || "local"}-${Date.now()}`;
 

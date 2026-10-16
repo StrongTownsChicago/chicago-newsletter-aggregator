@@ -5,7 +5,7 @@ import {
   NEWSLETTER_DETAIL_SELECT,
   SOURCE_WARD_DIRECTORY_SELECT,
   SOURCE_WARD_PROFILE_SELECT,
-} from '../../lib/newsletter-queries';
+} from '../../lib/server/newsletter-queries';
 
 /** Split a PostgREST select string into top-level columns and the sources embed. */
 const parseSelect = (select: string) => {

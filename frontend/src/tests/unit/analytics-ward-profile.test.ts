@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { median, type NewsletterFact, type SourceCoverage } from "../../lib/analytics";
+import { median, type NewsletterFact, type SourceCoverage } from "../../lib/analytics/core";
 import {
   buildWardProfile,
   computeCityMedianPerTrackedMonth,
   MIN_WARD_MONTHS_FOR_SHARES,
   MIN_WARD_NEWSLETTERS_FOR_SHARES,
   summarizeCadence,
-} from "../../lib/analytics-ward-profile";
+} from "../../lib/analytics/ward-profile";
 
 let nextId = 0;
 function fact(overrides: Partial<NewsletterFact> = {}): NewsletterFact {

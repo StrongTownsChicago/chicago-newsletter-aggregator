@@ -4,7 +4,7 @@ import {
   countNewslettersByWardMonth,
   findLongestGaps,
   summarizeWardCoverage,
-} from "../../lib/analytics-coverage";
+} from "../../lib/analytics/coverage";
 import { fact, source } from "../analytics-fixtures";
 
 describe("cadence", () => {

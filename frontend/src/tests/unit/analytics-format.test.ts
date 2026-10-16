@@ -10,7 +10,7 @@ import {
   formatWard,
   LENS_WARD_STATUS_LABELS,
   sourceLabel,
-} from "../../lib/analytics-format";
+} from "../../lib/analytics/format";
 
 describe("analytics formats", () => {
   it("formats shares as percentages with one decimal", () => {

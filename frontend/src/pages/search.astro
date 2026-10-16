@@ -6,9 +6,9 @@ import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import SearchTimeline from '../components/SearchTimeline.astro';
 import { supabase } from '../lib/supabase';
-import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
-import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
-import type { NewsletterCardRow } from '../lib/newsletter-queries';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
+import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/server/newsletter-queries';
+import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
 import { TOPIC_CATEGORIES } from '../lib/topics';
 import { humanizeIdentifier } from '../lib/format';
 import {
@@ -29,8 +29,8 @@ import {
   buildSourceOptions,
   extractSourceTypes,
   extractWardNumbers,
-} from '../lib/search-form-options';
-import type { SearchSourceRow } from '../lib/search-form-options';
+} from '../lib/server/search-form-options';
+import type { SearchSourceRow } from '../lib/server/search-form-options';
 import {
   buildSearchUrlWithoutDates,
   normalizeTimelineQuery,

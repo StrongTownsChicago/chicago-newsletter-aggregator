@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import wardGlanceData from '../../data/ward-glance.json';
+import wardGlanceData from '../../generated/ward-glance.json';
 import {
   describeCadence,
   describeCityReach,

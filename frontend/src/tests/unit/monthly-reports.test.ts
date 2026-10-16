@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import reportsData from '../../data/monthly-reports.json';
+import reportsData from '../../generated/monthly-reports.json';
 import { META_DESCRIPTION_MAX_LENGTH, SITE_NAME } from '../../lib/seo';
 import { LAST_WARD } from '../../lib/wards';
 import {

@@ -2,11 +2,11 @@
 export const prerender = false;
 
 // The browser fetches the committed JSON in
-// public/analytics-data/ at runtime (lib/analytics-data.ts); server-rendered so
+// public/analytics-data/ at runtime (lib/analytics/data.ts); server-rendered so
 // the header reflects the signed-in user.
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
-import { MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
+import { MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics/core';
 
 
 const controlClass =
@@ -33,7 +33,7 @@ const controlClass =
       <p class="text-gray-700 mb-3">
         Generate <code>frontend/public/analytics-data/</code> from <code>backend/</code>, then reload:
       </p>
-      <pre class="bg-gray-100 rounded p-3 text-sm overflow-x-auto"><code>uv run python -m utils.compute_analytics</code></pre>
+      <pre class="bg-gray-100 rounded p-3 text-sm overflow-x-auto"><code>uv run python -m cli.compute_analytics</code></pre>
       <p class="text-sm text-gray-500 mt-3">Missing: <span id="analytics-missing-files"></span></p>
     </div>
 
@@ -225,8 +225,8 @@ const controlClass =
 </Layout>
 
 <script>
-  import { loadCoreAnalyticsData } from '../lib/analytics-data';
-  import { describeDataAsOf } from '../lib/analytics';
+  import { loadCoreAnalyticsData } from '../lib/analytics/data';
+  import { describeDataAsOf } from '../lib/analytics/core';
 
   function showSection(id: string): void {
     document.getElementById('analytics-loading')?.setAttribute('hidden', '');
@@ -254,7 +254,7 @@ const controlClass =
     document.getElementById('analytics-data-as-of')?.removeAttribute('hidden');
     showSection('analytics-dashboard');
     // The charting bundle loads only when there is data to chart.
-    const { startAnalyticsDashboard } = await import('../scripts/analytics-dashboard');
+    const { startAnalyticsDashboard } = await import('../client/analytics/dashboard');
     startAnalyticsDashboard(result.data);
   }
 

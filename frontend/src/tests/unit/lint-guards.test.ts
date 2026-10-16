@@ -7,7 +7,7 @@ const FRONTEND_ROOT = path.resolve(__dirname, "../../..");
 const GUARD_RULES = new Set(["no-restricted-imports", "no-restricted-syntax"]);
 
 // Real files, so the type-aware parser finds them in the project; only their text is replaced.
-const OUTSIDE_API = "src/lib/form-data.ts";
+const OUTSIDE_API = "src/lib/server/form-data.ts";
 const API_ROUTE = "src/pages/api/auth/signin.ts";
 
 const eslint = new ESLint({

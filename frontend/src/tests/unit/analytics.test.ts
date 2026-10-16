@@ -22,7 +22,7 @@ import {
   wardsInScope,
   trimSparseEdges,
   type AnalyticsMetadata,
-} from "../../lib/analytics";
+} from "../../lib/analytics/core";
 import { fact, filters, source } from "../analytics-fixtures";
 
 describe("dates and wards", () => {

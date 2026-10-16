@@ -3,10 +3,10 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import { supabase } from '../lib/supabase';
-import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
-import type { WardDirectorySource } from '../lib/newsletter-queries';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
+import type { WardDirectorySource } from '../lib/server/newsletter-queries';
 import { SITE_NAME } from '../lib/seo';
-import { fetchWardDirectorySources } from '../lib/ward-queries';
+import { fetchWardDirectorySources } from '../lib/server/ward-queries';
 import { buildWardDirectory, buildWardPath, formatAlderNames } from '../lib/wards';
 
 let sources: WardDirectorySource[] = [];

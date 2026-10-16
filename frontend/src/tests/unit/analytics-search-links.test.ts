@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FILTERS, type AnalyticsFilters } from "../../lib/analytics";
-import { buildSearchUrl, monthDateRange, searchScopeForFilters } from "../../lib/analytics-search-links";
+import { EMPTY_FILTERS, type AnalyticsFilters } from "../../lib/analytics/core";
+import { buildSearchUrl, monthDateRange, searchScopeForFilters } from "../../lib/analytics/search-links";
 
 describe("buildSearchUrl", () => {
   it("builds search links and quotes phrases", () => {

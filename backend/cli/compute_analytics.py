@@ -5,7 +5,7 @@ Reads newsletters and sources from a local snapshot (see
 `analytics/`, and writes compact JSON files to `frontend/public/analytics-data/`.
 That folder is committed and deployed as public static files, which the page
 fetches at runtime. It also writes two small summaries to
-`frontend/src/data/` for the public pages: per-ward "at a glance" figures,
+`frontend/src/generated/` for the public pages: per-ward "at a glance" figures,
 imported by the server-rendered ward pages, and monthly citywide reports,
 prerendered at build time. To publish a refresh: run this script, commit both
 folders, and push.
@@ -81,7 +81,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"
 # Imported by page code rather than fetched, so keep these files small: the
 # ward summary is bundled into the server worker.
-DEFAULT_SITE_DATA_DIR = REPO_ROOT / "frontend" / "src" / "data"
+DEFAULT_SITE_DATA_DIR = REPO_ROOT / "frontend" / "src" / "generated"
 
 # Text repeated in at least this share of one source's newsletters is template
 # (footers, office hours, resource lists) and is left out of every term metric.

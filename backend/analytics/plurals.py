@@ -5,7 +5,7 @@ The rules are a conservative variant of the English "S-stemmer" (Harman,
 easy to predict and explain. Words are folded for counting only; each merged
 term is displayed in its most common written form (see `choose_display_forms`).
 The frontend term explorer folds queries with a TypeScript port
-(`frontend/src/lib/plurals.ts`); keep the two in step, and add cases to
+(`frontend/src/lib/analytics/plurals.ts`); keep the two in step, and add cases to
 `tests/fixtures/plural_fold_cases.json`, which both test suites read.
 """
 

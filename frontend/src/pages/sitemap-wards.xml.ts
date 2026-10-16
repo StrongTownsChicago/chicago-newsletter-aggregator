@@ -5,7 +5,7 @@ import {
   SITEMAP_RESPONSE_HEADERS,
   buildSitemapXml,
   buildWardSitemapPages,
-} from "../lib/sitemap";
+} from "../lib/server/sitemap";
 
 // Ward pages are server-rendered, so @astrojs/sitemap cannot discover them.
 export const GET: APIRoute = ({ site, url }) =>

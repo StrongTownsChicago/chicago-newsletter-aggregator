@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLensWardGrid, computeLensWardReach, isReachFaded } from "../../lib/analytics-reach";
+import { buildLensWardGrid, computeLensWardReach, isReachFaded } from "../../lib/analytics/reach";
 import { fact } from "../analytics-fixtures";
 
 describe("lens ward reach", () => {

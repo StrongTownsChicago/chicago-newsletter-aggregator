@@ -1,4 +1,4 @@
-// Helpers for the ward page summary. Data: src/data/ward-glance.json, from
+// Helpers for the ward page summary. Data: src/generated/ward-glance.json, from
 // backend/analytics/ward_glance.py.
 
 import { formatLongMonth, formatMonthRange } from "./archive-months";

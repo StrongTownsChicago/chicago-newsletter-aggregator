@@ -6,7 +6,7 @@ import {
   focusedWard,
   selectDashboardView,
   VIEW_PANELS,
-} from "../../lib/analytics-views";
+} from "../../lib/analytics/views";
 
 const labels = { ward: (ward: string) => `Ward ${ward}`, topic: (id: string) => id.toUpperCase() };
 

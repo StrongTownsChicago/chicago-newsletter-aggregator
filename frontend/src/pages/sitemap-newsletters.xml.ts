@@ -6,7 +6,7 @@ import {
   SITEMAP_RESPONSE_HEADERS,
   buildNewsletterSitemapXml,
   fetchNewsletterSitemapEntries,
-} from "../lib/sitemap";
+} from "../lib/server/sitemap";
 
 export const GET: APIRoute = async ({ site, url }) => {
   try {

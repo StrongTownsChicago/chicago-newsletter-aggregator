@@ -1,5 +1,5 @@
 // Builders for analytics test data: newsletter facts, filters and sources with sensible defaults.
-import { EMPTY_FILTERS, type AnalyticsFilters, type NewsletterFact, type SourceCoverage } from "../lib/analytics";
+import { EMPTY_FILTERS, type AnalyticsFilters, type NewsletterFact, type SourceCoverage } from "../lib/analytics/core";
 
 let nextId = 0;
 export function fact(overrides: Partial<NewsletterFact> = {}): NewsletterFact {

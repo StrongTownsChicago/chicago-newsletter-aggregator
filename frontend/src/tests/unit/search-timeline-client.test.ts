@@ -3,7 +3,7 @@ import {
   describeTimeline,
   fetchTimelineMonths,
   renderTimeline,
-} from "../../scripts/search-timeline";
+} from "../../client/search-timeline";
 
 const months = [
   { month: "2026-01", newsletterCount: 1, wardCount: 1 },

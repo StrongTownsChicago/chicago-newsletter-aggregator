@@ -10,7 +10,7 @@ describe("getSupabaseAdmin", () => {
     vi.stubEnv("SSR", false);
 
     try {
-      await import("../../lib/supabase-admin");
+      await import("../../lib/server/supabase-admin");
       expect.fail("Should have thrown error");
     } catch (e: unknown) {
       if (e instanceof Error) {
@@ -27,7 +27,7 @@ describe("getSupabaseAdmin", () => {
     vi.stubEnv("SUPABASE_SERVICE_KEY", "");
 
     try {
-      const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
+      const { getSupabaseAdmin } = await import("../../lib/server/supabase-admin");
       getSupabaseAdmin();
       expect.fail("Should have thrown error");
     } catch (e: unknown) {
@@ -44,7 +44,7 @@ describe("getSupabaseAdmin", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_KEY", "service-role-key");
 
-    const { getSupabaseAdmin } = await import("../../lib/supabase-admin");
+    const { getSupabaseAdmin } = await import("../../lib/server/supabase-admin");
     const client = getSupabaseAdmin();
     expect(client).toBeDefined();
   });

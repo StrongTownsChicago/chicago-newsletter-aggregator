@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { APIContext } from "astro";
-import type { EdgeCache } from "../../lib/edge-cache";
+import type { EdgeCache } from "../../lib/server/edge-cache";
 import {
   SEARCH_TIMELINE_CACHE_CONTROL,
   SEARCH_TIMELINE_ERRORS,
   buildTimelineCacheKey,
   respondWithSearchTimeline,
-} from "../../lib/search-timeline-endpoint";
+} from "../../lib/server/search-timeline-endpoint";
 
 const { mockRpc } = vi.hoisted(() => ({ mockRpc: vi.fn() }));
 

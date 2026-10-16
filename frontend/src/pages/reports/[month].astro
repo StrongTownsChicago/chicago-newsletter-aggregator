@@ -1,10 +1,10 @@
 ---
-// Prerendered from src/data/monthly-reports.json; no database query.
+// Prerendered from src/generated/monthly-reports.json; no database query.
 export const prerender = true;
 
 import type { GetStaticPaths } from 'astro';
 import Layout from '../../layouts/Layout.astro';
-import reportsData from '../../data/monthly-reports.json';
+import reportsData from '../../generated/monthly-reports.json';
 import ReportFootnote from '../../components/reports/ReportFootnote.astro';
 import { formatLongDate, formatLongMonth } from '../../lib/archive-months';
 import {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LensReachCell } from "../../lib/analytics-reach";
+import type { LensReachCell } from "../../lib/analytics/reach";
 import {
   describeSparkline,
   describeTopicReach,
@@ -18,7 +18,7 @@ import {
   reachDeviation,
   summarizeTopicTrends,
   tightShareDomain,
-} from "../../lib/analytics-topic-trends";
+} from "../../lib/analytics/topic-trends";
 
 function cell(lens: string, month: string, wardsMentioning: number, activeWards = 10): LensReachCell {
   return { lens, month, wardsMentioning, activeWards, share: activeWards ? wardsMentioning / activeWards : null };

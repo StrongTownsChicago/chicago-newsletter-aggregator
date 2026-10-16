@@ -1,4 +1,4 @@
-// Helpers for the prerendered /reports pages. Data: src/data/monthly-reports.json,
+// Helpers for the prerendered /reports pages. Data: src/generated/monthly-reports.json,
 // from backend/analytics/monthly_reports.py.
 
 import { formatLongMonth } from "./archive-months";

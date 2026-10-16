@@ -3,7 +3,7 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import { supabase } from '../../lib/supabase';
-import { NEWSLETTER_DETAIL_SELECT, type NewsletterDetailRow } from '../../lib/newsletter-queries';
+import { NEWSLETTER_DETAIL_SELECT, type NewsletterDetailRow } from '../../lib/server/newsletter-queries';
 import { buildNewsletterDescription } from '../../lib/seo';
 import { buildWardPath, parseWardParam } from '../../lib/wards';
 

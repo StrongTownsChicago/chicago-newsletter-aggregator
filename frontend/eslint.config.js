@@ -52,7 +52,7 @@ export default defineConfig(
   },
   {
     files: ["src/**/*.{ts,astro}"],
-    ignores: ["src/pages/api/**", "src/lib/supabase-admin.ts", "src/tests/**"],
+    ignores: ["src/pages/api/**", "src/lib/server/supabase-admin.ts", "src/tests/**"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{
