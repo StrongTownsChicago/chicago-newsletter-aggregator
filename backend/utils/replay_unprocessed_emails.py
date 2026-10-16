@@ -1,47 +1,30 @@
-"""
-Replay Unprocessed Emails
+"""Replay unprocessed emails: mark them unread so the next ingestion stores them.
 
-Marks unprocessed Gmail messages unread so the next ingestion run stores them.
 Ingestion fetches only unread mail and marks unmapped senders' mail read, so
 emails that arrived before their sender was added to email_source_mappings are
 never revisited. This utility finds INBOX messages with no newsletters row whose
 sender now maps to a source, and clears their \\Seen flag.
 
-Usage:
-    Run from the backend/ directory:
-
-    # Dry run (default): list what would be replayed, grouped by source
-    $ uv run python -m utils.replay_unprocessed_emails
-
-    # Limit to one source, or to mail received on or after a date
-    $ uv run python -m utils.replay_unprocessed_emails --source-id 28
+Run from backend/. A dry run lists what would be replayed, grouped by source;
+--apply clears the flag. --source-id, --since and --uids narrow the selection:
     $ uv run python -m utils.replay_unprocessed_emails --since 2026-09-01
-
-    # Replay specific UIDs only
-    $ uv run python -m utils.replay_unprocessed_emails --uids 1201 1202 1305
-
-    # Mark the selected messages unread so ingestion picks them up
     $ uv run python -m utils.replay_unprocessed_emails --apply
 
-Follow-up after --apply:
+After --apply, run ingestion, then LLM metadata with no --latest limit
+(replayed emails keep their original received_date, so newer newsletters
+missing metadata would sort ahead of them and crowd them out):
     $ uv run python -m ingest.email.process_emails
     $ uv run python -m utils.process_llm_metadata --missing-metadata
 
-    No --latest limit: replayed emails keep their original received_date, so
-    newer newsletters missing metadata would sort ahead of them and crowd them out.
+The only mailbox change ever made is clearing \\Seen on selected UIDs, and only
+with --apply; nothing is marked read, moved, or deleted. Senders still unmapped
+are never selected (ingestion would skip them again). The ingestion run that
+stores replayed emails queues notifications if ENABLE_NOTIFICATIONS=true (as in
+the scheduled GitHub Actions workflow), so matching rules will alert users about
+these older newsletters.
 
-Notes:
-    - The only mailbox change ever made is clearing \\Seen on selected UIDs, and
-      only with --apply. Nothing is marked read, moved, or deleted.
-    - Messages whose sender is still unmapped are never selected; ingestion
-      would just skip them again.
-    - Whichever ingestion run stores replayed emails queues notifications if
-      ENABLE_NOTIFICATIONS=true (as in the scheduled GitHub Actions workflow),
-      so matching rules will alert users about these older newsletters.
-
-Required environment variables (.env file):
-    - GMAIL_ADDRESS, GMAIL_APP_PASSWORD
-    - SUPABASE_URL, SUPABASE_SERVICE_KEY
+Needs GMAIL_ADDRESS, GMAIL_APP_PASSWORD, SUPABASE_URL and SUPABASE_SERVICE_KEY
+in .env.
 """
 
 import argparse

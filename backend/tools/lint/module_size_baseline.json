@@ -1,0 +1,30 @@
+{
+  "measured_on": "e9d6f2696b4ea29d68fe23eb6d93140f07d75adf",
+  "modules": {
+    "analytics/lenses.py": {
+      "lines": 594
+    },
+    "notifications/email_sender.py": {
+      "lines": 643
+    },
+    "tests/unit/test_analytics_terms.py": {
+      "lines": 435
+    },
+    "tests/unit/test_compute_analytics.py": {
+      "lines": 473
+    },
+    "tests/unit/test_email_sender.py": {
+      "lines": 411
+    },
+    "tests/unit/test_rule_matcher.py": {
+      "lines": 406
+    },
+    "tests/unit/test_sanitization_comprehensive.py": {
+      "lines": 404
+    },
+    "utils/compute_analytics.py": {
+      "lines": 472,
+      "public": 44
+    }
+  }
+}

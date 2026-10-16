@@ -1,6 +1,7 @@
 .env
 .venv
 __pycache__/
+.import_linter_cache/
 .vscode
 .misc
 backend/samples/

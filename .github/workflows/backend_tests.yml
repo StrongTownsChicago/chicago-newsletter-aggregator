@@ -46,6 +46,26 @@ jobs:
           cd backend
           uv run --locked mypy .
 
+      - name: Run Import Contracts
+        run: |
+          cd backend
+          uv run --locked lint-imports
+
+      - name: Run Docstring Budget
+        run: |
+          cd backend
+          uv run --locked python -m tools.lint.check_docstrings
+
+      - name: Run Module Size Ratchet
+        run: |
+          cd backend
+          uv run --locked python -m tools.lint.check_module_size
+
+      - name: Run Symbol Reachability
+        run: |
+          cd backend
+          uv run --locked python -m tools.lint.check_symbol_reachability
+
       - name: Run Tests
         run: |
           cd backend

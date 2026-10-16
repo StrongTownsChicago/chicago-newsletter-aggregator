@@ -1,35 +1,17 @@
 """Keyword lenses: reviewed phrase lists that say what a newsletter mentions.
 
-A lens is a named list of words and phrases, such as "street sweeping" for
-city services or "tax" for budget and taxes. A newsletter mentions a lens when
-its subject and text contain the lens's phrases often enough (see
-`LensMatcher.lenses_mentioned`). Unlike LLM topic
-labels, lenses are transparent (the phrase list is the definition), cheap to
-re-run over the whole archive, and do not drift when a prompt or model
-changes.
-
-Matching is explainable by design:
-
-- Text is lowercased, URLs and email addresses are dropped, and each word is
-  plural-folded (`analytics.plurals`), so "speed hump" also finds "Speed
-  Humps". Phrases are folded the same way.
-- A phrase matches whole words only, in order, within one sentence or list
-  item: "park" never matches "parking", and no phrase spans a period,
-  bullet or paragraph break. Line breaks inside a paragraph do not split a
-  phrase, because some sources hard-wrap their text.
-- Words with a common second meaning are only listed inside a qualifying
-  phrase ("ice agents", not "ice"; "park district", not "park"). See
-  AMBIGUOUS_WORDS, which `validate_lenses` enforces.
-- A lens counts mentions, not phrase hits: phrases of one lens that overlap
-  or sit side by side ("aldermanic menu money", "city council meeting",
-  "zoning map amendment") are one mention, so a single reference cannot
-  reach a minimum of two on its own.
+A lens is a named list of words and phrases, such as "street sweeping" for city
+services or "tax" for budget and taxes. A newsletter mentions a lens when its
+subject and text contain the lens's phrases often enough (see
+`LensMatcher.lenses_mentioned`). Unlike LLM topic labels, lenses are transparent
+(the phrase list is the definition), cheap to re-run over the whole archive, and
+do not drift when a prompt or model changes. Matching is explainable by design:
+see `split_into_sentences`, `AMBIGUOUS_WORDS` and `LensMatcher.match`.
 
 Lists may overlap: the two Strong Towns Chicago focus lenses are deliberately
 narrower slices of the broad housing and transportation lenses. Which text is
-matched (boilerplate-cleaned or raw) and how many phrase occurrences make a
-mention are set in `utils/compute_analytics.py`, where the choices are
-explained.
+matched (boilerplate-cleaned or raw) and how many mentions a newsletter needs
+are set, and explained, in `utils/compute_analytics.py`.
 """
 
 import re
@@ -43,8 +25,8 @@ from analytics.records import NewsletterRecord
 from analytics.text import WORD_PATTERN, contains_word_run, normalize_text
 
 POSSESSIVE_SUFFIX = "'s"
-# Sentence and list punctuation ends a phrase. Line breaks do not (see the
-# module docstring); blank lines, which separate paragraphs, do.
+# Sentence and list punctuation ends a phrase. Line breaks do not (see
+# `split_into_sentences`); blank lines, which separate paragraphs, do.
 SENTENCE_BOUNDARY_PATTERN = re.compile(r"[.,;:!?()\[\]{}<>\"|/\\*#=+•·–—…]+")
 PARAGRAPH_BREAK_PATTERN = re.compile(r"\n\s*\n")
 # Joins a subject to its body as a separate paragraph.
@@ -530,7 +512,15 @@ def phrase_key(phrase: str) -> str:
 
 
 def split_into_sentences(text: str) -> Iterator[list[str]]:
-    """Yield the folded words of each sentence or list item of text."""
+    """Yield the folded words of each sentence or list item of text.
+
+    Text is lowercased, URLs and email addresses are dropped, and each word is
+    plural-folded (`analytics.plurals`), so "speed hump" also finds "Speed
+    Humps"; phrases are folded the same way. A phrase matches whole words only,
+    in order, within one sentence or list item: "park" never matches "parking",
+    and no phrase spans a period, bullet or paragraph break. Line breaks inside a
+    paragraph do not split a phrase, because some sources hard-wrap their text.
+    """
     for paragraph in PARAGRAPH_BREAK_PATTERN.split(normalize_text(text)):
         for sentence in SENTENCE_BOUNDARY_PATTERN.split(paragraph):
             words = tokenize_phrase(sentence)
@@ -623,7 +613,12 @@ class LensMatcher:
                     yield start, end, candidate
 
     def match(self, text: str) -> TextMatches:
-        """Count the phrase occurrences and the separate lens mentions in text."""
+        """Count the phrase occurrences and the separate lens mentions in text.
+
+        Phrases of one lens that overlap or sit side by side ("aldermanic menu
+        money", "city council meeting", "zoning map amendment") are one mention,
+        so a single reference cannot reach a minimum of two on its own.
+        """
         matches = TextMatches()
         for words in split_into_sentences(text):
             # Where each lens's current mention ends (exclusive) in this sentence.

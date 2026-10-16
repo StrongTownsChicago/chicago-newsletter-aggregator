@@ -1,5 +1,4 @@
-"""
-Process newsletters with LLM to add or update metadata (topics, summary).
+"""Process newsletters with LLM to add or update metadata (topics, summary).
 
 Usage:
     # Process latest 10 newsletters
@@ -16,12 +15,6 @@ Usage:
 
     # Process and queue notifications for matched rules
     uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
-
-    # Process all newsletters
-    uv run python -m utils.process_llm_metadata --all
-
-    # Process specific newsletter by ID
-    uv run python -m utils.process_llm_metadata --newsletter-id abc-123-def
 
     # Combine filters: latest 20 from source 3
     uv run python -m utils.process_llm_metadata --latest 20 --source-id 3
