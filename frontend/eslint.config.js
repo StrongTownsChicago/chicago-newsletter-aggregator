@@ -8,6 +8,14 @@ const maxLines = (max) => ({
   "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
 });
 
+const computedEnvRead = {
+  selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
+  message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
+};
+
+const supabaseAdminMessage =
+  "supabase-admin carries the service key: import it only from src/pages/api/** server routes.";
+
 export default defineConfig(
   { ignores: ["dist/**", ".astro/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**"] },
   ...tseslint.configs.recommended,
@@ -39,10 +47,7 @@ export default defineConfig(
       "prefer-const": "error",
       // newsletter raw_html is rendered with set:html; every use needs a written reason
       "astro/no-set-html-directive": "error",
-      "no-restricted-syntax": ["error", {
-        selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
-        message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
-      }],
+      "no-restricted-syntax": ["error", computedEnvRead],
     },
   },
   {
@@ -52,8 +57,14 @@ export default defineConfig(
       "no-restricted-imports": ["error", {
         patterns: [{
           group: ["**/supabase-admin", "**/supabase-admin.ts"],
-          message: "supabase-admin carries the service key: import it only from src/pages/api/** server routes.",
+          message: supabaseAdminMessage,
         }],
+      }],
+      // Catches import("…/supabase-admin"). ESLint replaces a rule set again in a later
+      // block rather than merging it, so the shared selector is repeated here.
+      "no-restricted-syntax": ["error", computedEnvRead, {
+        selector: "ImportExpression[source.value=/supabase-admin/]",
+        message: supabaseAdminMessage,
       }],
     },
   },
