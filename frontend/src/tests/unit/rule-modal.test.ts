@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initRuleModal } from "../../scripts/rule-modal";
+import { initRuleModal } from "../../client/rule-modal";
 
 /** The ids and inputs the rule modal script relies on, as RuleList and RuleModal render them. */
 function renderPage({ starterRule }: { starterRule?: string } = {}): void {

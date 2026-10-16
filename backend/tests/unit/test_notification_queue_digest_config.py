@@ -11,13 +11,13 @@ from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 from zoneinfo import ZoneInfo
 
-from notifications.digest_config import DigestType
-from notifications.process_notification_queue import (
+from cli.process_notification_queue import (
     DIGEST_CONFIGS,
     _calculate_daily_batch_id,
     _calculate_weekly_batch_id,
     process_digests,
 )
+from notifications.digest_config import DigestType
 
 
 class TestDigestConfig(unittest.TestCase):
@@ -64,7 +64,7 @@ class TestDigestConfigs(unittest.TestCase):
 class TestCalculateDailyBatchId(unittest.TestCase):
     """Tests for _calculate_daily_batch_id() function."""
 
-    @patch("notifications.process_notification_queue.datetime")
+    @patch("cli.process_notification_queue.datetime")
     def test_returns_yesterday_in_chicago_time(self, mock_datetime: MagicMock) -> None:
         """Returns yesterday's date in YYYY-MM-DD format (Chicago time)."""
         # Arrange - Mock "today" as 2026-01-26 in Chicago
@@ -83,7 +83,7 @@ class TestCalculateDailyBatchId(unittest.TestCase):
 class TestCalculateWeeklyBatchId(unittest.TestCase):
     """Tests for _calculate_weekly_batch_id() function."""
 
-    @patch("notifications.process_notification_queue.datetime")
+    @patch("cli.process_notification_queue.datetime")
     def test_returns_previous_week_in_iso_format(
         self, mock_datetime: MagicMock
     ) -> None:
@@ -113,9 +113,9 @@ class TestProcessDigests(unittest.TestCase):
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
-    @patch("notifications.process_notification_queue.send_digest")
-    @patch("notifications.process_notification_queue.get_supabase_client")
-    @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
+    @patch("cli.process_notification_queue.send_digest")
+    @patch("cli.process_notification_queue.get_supabase_client")
+    @patch("cli.process_notification_queue.get_pending_notifications_by_user")
     def test_processes_daily_digest(
         self, mock_get_notifs: MagicMock, mock_supabase: MagicMock, mock_send: MagicMock
     ) -> None:
@@ -163,7 +163,7 @@ class TestProcessDigests(unittest.TestCase):
         self.assertEqual(config.notification_type, "weekly")
         self.assertEqual(config.delivery_type, "weekly_digest")
 
-    @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
+    @patch("cli.process_notification_queue.get_pending_notifications_by_user")
     def test_uses_default_batch_id_when_not_provided(
         self, mock_get_notifs: MagicMock
     ) -> None:
@@ -172,9 +172,7 @@ class TestProcessDigests(unittest.TestCase):
         mock_get_notifs.return_value = {}
 
         # Act
-        with patch(
-            "notifications.process_notification_queue.datetime"
-        ) as mock_datetime:
+        with patch("cli.process_notification_queue.datetime") as mock_datetime:
             from datetime import datetime as real_datetime
             from zoneinfo import ZoneInfo
 
@@ -187,7 +185,7 @@ class TestProcessDigests(unittest.TestCase):
         # Assert - should have calculated and used batch_id
         mock_get_notifs.assert_called()
 
-    @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
+    @patch("cli.process_notification_queue.get_pending_notifications_by_user")
     def test_dry_run_mode_does_not_send_emails(
         self, mock_get_notifs: MagicMock
     ) -> None:
@@ -199,8 +197,8 @@ class TestProcessDigests(unittest.TestCase):
 
         # Act
         with (
-            patch("notifications.process_notification_queue.get_supabase_client"),
-            patch("notifications.process_notification_queue.send_digest") as mock_send,
+            patch("cli.process_notification_queue.get_supabase_client"),
+            patch("cli.process_notification_queue.send_digest") as mock_send,
         ):
             result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
 

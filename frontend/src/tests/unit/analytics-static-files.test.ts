@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ANALYTICS_DATA_BASE_PATH, analyticsFileUrl, CORE_ANALYTICS_FILES } from "../../lib/analytics-data";
+import { ANALYTICS_DATA_BASE_PATH, analyticsFileUrl, CORE_ANALYTICS_FILES } from "../../lib/analytics/data";
 import { disallowRulesFor, isPathDisallowed } from "../robots-rules";
 
 const PUBLIC_DIRECTORY = path.resolve(__dirname, "../../../public");

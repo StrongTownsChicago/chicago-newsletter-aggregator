@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildLoginUrl, getSafeRedirectPath } from '../../lib/redirects';
+import { buildLoginUrl, getSafeRedirectPath } from '../../lib/server/redirects';
 
 describe('getSafeRedirectPath', () => {
   it('keeps encoded slashes as same-origin paths', () => {

@@ -42,8 +42,8 @@ class TestClasses(FakeBackendTestCase):
             {
                 "shared/__init__.py": "",
                 "shared/db.py": "def connect() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": "from shared.db import connect\n",
+                "cli/__init__.py": "",
+                "cli/job.py": "from shared.db import connect\n",
             }
         )
         self.assertEqual(self.names(), set())
@@ -72,8 +72,8 @@ class TestClasses(FakeBackendTestCase):
     def test_a_symbol_used_only_by_its_own_main_guard_is_live(self) -> None:
         self.build(
             {
-                "utils/__init__.py": "",
-                "utils/job.py": """
+                "cli/__init__.py": "",
+                "cli/job.py": """
                     def main() -> None: ...
 
                     if __name__ == "__main__":
@@ -101,8 +101,8 @@ class TestResolution(FakeBackendTestCase):
             {
                 "shared/__init__.py": "",
                 "shared/db.py": "def connect() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": """
+                "cli/__init__.py": "",
+                "cli/job.py": """
                     def connect() -> None: ...
 
                     connect()
@@ -126,8 +126,8 @@ class TestResolution(FakeBackendTestCase):
                     def caller(other: Other) -> None:
                         other.helper()
                     """,
-                "utils/__init__.py": "",
-                "utils/job.py": "from shared.db import caller\n",
+                "cli/__init__.py": "",
+                "cli/job.py": "from shared.db import caller\n",
             }
         )
         self.assertEqual(self.names(), {"shared.db.helper"})
@@ -138,8 +138,8 @@ class TestResolution(FakeBackendTestCase):
                 "ingest/__init__.py": "",
                 "ingest/email/__init__.py": "",
                 "ingest/email/email_parser.py": "def sanitize() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": """
+                "cli/__init__.py": "",
+                "cli/job.py": """
                     import ingest.email.email_parser as ep
 
                     ep.sanitize()
@@ -154,8 +154,8 @@ class TestResolution(FakeBackendTestCase):
                 "ingest/__init__.py": "",
                 "ingest/email/__init__.py": "",
                 "ingest/email/email_parser.py": "def sanitize() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": """
+                "cli/__init__.py": "",
+                "cli/job.py": """
                     import ingest.email.email_parser
 
                     ingest.email.email_parser.sanitize()
@@ -170,8 +170,8 @@ class TestResolution(FakeBackendTestCase):
                 "ingest/__init__.py": "",
                 "ingest/email/__init__.py": "",
                 "ingest/email/email_parser.py": "def sanitize() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": """
+                "cli/__init__.py": "",
+                "cli/job.py": """
                     from ingest.email import email_parser
 
                     email_parser.sanitize()
@@ -185,8 +185,8 @@ class TestResolution(FakeBackendTestCase):
             {
                 "shared/__init__.py": "",
                 "shared/db.py": "def connect() -> None: ...\n",
-                "utils/__init__.py": "",
-                "utils/job.py": "from shared.db import *\n",
+                "cli/__init__.py": "",
+                "cli/job.py": "from shared.db import *\n",
             }
         )
         with self.assertRaisesRegex(ValueError, "star import"):

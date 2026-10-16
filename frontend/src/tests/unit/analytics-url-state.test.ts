@@ -12,7 +12,7 @@ import {
   serializeDashboardUrlState,
   type DashboardUrlContext,
   type DashboardViewState,
-} from "../../lib/analytics-url-state";
+} from "../../lib/analytics/url-state";
 
 const context: DashboardUrlContext = {
   wards: ["1", "2", "4", "10", "36"],

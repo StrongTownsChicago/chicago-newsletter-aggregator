@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formText, formTexts } from '../../lib/form-data';
+import { formText, formTexts } from '../../lib/server/form-data';
 
 const upload = () => new File(['contents'], 'upload.txt', { type: 'text/plain' });
 

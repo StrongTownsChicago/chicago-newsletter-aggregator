@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FILTERS, type TermIndex } from "../../lib/analytics";
+import { EMPTY_FILTERS, type TermIndex } from "../../lib/analytics/core";
 import {
   expandTermPostings,
   normalizeTermQuery,
@@ -7,7 +7,7 @@ import {
   suggestTerms,
   termMentionsByMonth,
   termMentionsByWard,
-} from "../../lib/analytics-terms";
+} from "../../lib/analytics/terms";
 import { fact, filters } from "../analytics-fixtures";
 
 describe("term explorer", () => {

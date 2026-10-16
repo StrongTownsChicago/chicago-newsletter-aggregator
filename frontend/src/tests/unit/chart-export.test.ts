@@ -7,7 +7,7 @@ import {
   EXPORT_CAVEAT,
   wrapText,
   type ChartExportContext,
-} from "../../lib/chart-export";
+} from "../../lib/analytics/charts/export";
 
 const context: ChartExportContext = {
   title: "Civic calendar",

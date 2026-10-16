@@ -1,9 +1,9 @@
 ---
-// Ward summary from the precomputed src/data/ward-glance.json (no database
+// Ward summary from the precomputed src/generated/ward-glance.json (no database
 // query). Renders nothing for wards with no archived newsletters in the
 // window: a row of zeros would read as "sent nothing", which the archive
 // cannot tell.
-import wardGlanceData from '../data/ward-glance.json';
+import wardGlanceData from '../generated/ward-glance.json';
 import { formatLongDate, formatLongMonth, formatShortMonthName, monthOfDate } from '../lib/archive-months';
 import { REPORTS_INDEX_PATH } from '../lib/site';
 import {

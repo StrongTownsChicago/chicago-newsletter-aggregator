@@ -1,7 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
-import { readServerSecret } from "../../../lib/server-env";
+import { readServerSecret } from "../../../lib/server/server-env";
 
 interface ValidateTokenRequestBody {
   token?: string;

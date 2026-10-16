@@ -1,22 +1,23 @@
 [importlinter]
 root_packages =
     analytics
+    cli
     config
     ingest
+    llm_costs
     models
     notifications
     processing
     prompts
     shared
-    utils
 include_external_packages = True
 
 [importlinter:contract:layers]
 name = CLI scripts sit above ingestion, which sits above the services, which sit above the leaf packages
 type = layers
 layers =
-    utils
-    ingest
+    cli
+    ingest | llm_costs
     notifications | processing
     analytics | config | models | prompts | shared
 # `|` also makes siblings independent: notifications never imports processing,

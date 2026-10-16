@@ -8,9 +8,9 @@ preparation, and that process_digests handles this error by skipping.
 import unittest
 from unittest.mock import MagicMock, patch
 
+from cli.process_notification_queue import process_digests
 from notifications.digest_config import DigestType
 from notifications.email_sender import send_digest
-from notifications.process_notification_queue import process_digests
 
 
 class TestPreventEmptyDigests(unittest.TestCase):
@@ -65,8 +65,8 @@ class TestPreventEmptyDigests(unittest.TestCase):
         mock_prepare.assert_called_once()
 
     @patch("builtins.print")
-    @patch("notifications.process_notification_queue.get_supabase_client")
-    @patch("notifications.process_notification_queue.send_digest")
+    @patch("cli.process_notification_queue.get_supabase_client")
+    @patch("cli.process_notification_queue.send_digest")
     def test_process_digests_handles_empty_result(
         self, mock_send: MagicMock, mock_supabase: MagicMock, mock_print: MagicMock
     ) -> None:
@@ -97,7 +97,7 @@ class TestPreventEmptyDigests(unittest.TestCase):
 
         # Patch the DIGEST_CONFIGS to use our mock
         with patch(
-            "notifications.process_notification_queue.DIGEST_CONFIGS",
+            "cli.process_notification_queue.DIGEST_CONFIGS",
             {DigestType.DAILY: config_mock},
         ):
             # Act

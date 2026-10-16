@@ -2,7 +2,7 @@
 /**
  * Newsletters per month matching a search, over the search's date range. Each
  * month links to the search narrowed to that month. Space is reserved while
- * `scripts/search-timeline.ts` loads the counts; the card is removed if they
+ * `client/search-timeline.ts` loads the counts; the card is removed if they
  * can't load.
  */
 import type { TimelineMonthRange } from '../lib/search-timeline';
@@ -51,7 +51,7 @@ const { query, range, selectedMonth, allMonthsUrl, hasOtherFilters } = Astro.pro
 </section>
 
 <script>
-  import { initSearchTimeline } from '../scripts/search-timeline';
+  import { initSearchTimeline } from '../client/search-timeline';
 
   initSearchTimeline();
 </script>

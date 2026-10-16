@@ -18,7 +18,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from processing.llm_client import call_llm
-from shared.utils import CHICAGO_TIMEZONE
+from shared.dates import CHICAGO_TIMEZONE
 
 __all__ = ["call_llm"]
 

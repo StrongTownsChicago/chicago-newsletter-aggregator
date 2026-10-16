@@ -6,7 +6,7 @@ import {
   buildEmailConfirmationRedirect,
   shouldShowWelcome,
 } from '../../lib/onboarding';
-import { getSafeRedirectPath } from '../../lib/redirects';
+import { getSafeRedirectPath } from '../../lib/server/redirects';
 
 describe('shouldShowWelcome', () => {
   it('shows welcome when the flag is set and the user has no rules', () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readServerSecret } from "../../lib/server-env";
+import { readServerSecret } from "../../lib/server/server-env";
 
 const withRuntimeEnv = (env: Record<string, unknown>) =>
   ({ runtime: { env } }) as unknown as Pick<App.Locals, "runtime">;

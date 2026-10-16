@@ -1,7 +1,7 @@
 // Node, like Workers, keeps Set-Cookie on responses; happy-dom strips it.
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { EdgeCache } from "../../lib/edge-cache";
+import type { EdgeCache } from "../../lib/server/edge-cache";
 import {
   BROWSER_CACHE_CONTROL,
   PAGE_CACHE_HEADER,
@@ -18,7 +18,7 @@ import {
   respondWithPageCache,
   type PageCacheDependencies,
   type PageCacheRequest,
-} from "../../lib/page-cache";
+} from "../../lib/server/page-cache";
 
 const ORIGIN = "https://example.test";
 const VERSION = "abc123-1700000000000";

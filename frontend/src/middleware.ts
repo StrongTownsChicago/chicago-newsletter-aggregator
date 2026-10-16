@@ -2,8 +2,8 @@ import { defineMiddleware } from "astro:middleware";
 import type { APIContext, MiddlewareNext } from "astro";
 import { createClient } from "@supabase/supabase-js";
 import { isNonProductionHost } from "./lib/seo";
-import { getDefaultEdgeCache } from "./lib/edge-cache";
-import { respondWithPageCache, resolvePageCacheVersion } from "./lib/page-cache";
+import { getDefaultEdgeCache } from "./lib/server/edge-cache";
+import { respondWithPageCache, resolvePageCacheVersion } from "./lib/server/page-cache";
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;

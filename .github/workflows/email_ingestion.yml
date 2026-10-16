@@ -42,7 +42,7 @@ jobs:
           ENABLE_NOTIFICATIONS: true
         run: |
           cd backend
-          uv run python -m ingest.email.process_emails
+          uv run python -m cli.process_emails
 
       - name: Upload unmapped emails report (if exists)
         if: always()

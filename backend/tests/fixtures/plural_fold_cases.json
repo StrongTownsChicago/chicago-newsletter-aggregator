@@ -1,5 +1,5 @@
 {
-  "description": "Expected plural folds, shared by backend/tests/unit/test_analytics_plurals.py and frontend/src/tests/unit/plurals.test.ts so the Python fold (analytics/plurals.py) and its TypeScript port (frontend/src/lib/plurals.ts) stay in sync.",
+  "description": "Expected plural folds, shared by backend/tests/unit/test_analytics_plurals.py and frontend/src/tests/unit/plurals.test.ts so the Python fold (analytics/plurals.py) and its TypeScript port (frontend/src/lib/analytics/plurals.ts) stay in sync.",
   "words": [
     ["lanes", "lane"],
     ["humps", "hump"],

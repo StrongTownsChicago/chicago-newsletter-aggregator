@@ -1,8 +1,8 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase } from "../../lib/supabase";
-import { getDefaultEdgeCache } from "../../lib/edge-cache";
-import { respondWithSearchTimeline } from "../../lib/search-timeline-endpoint";
+import { getDefaultEdgeCache } from "../../lib/server/edge-cache";
+import { respondWithSearchTimeline } from "../../lib/server/search-timeline-endpoint";
 
 /**
  * Monthly match counts for a search query, loaded by the /search page timeline.

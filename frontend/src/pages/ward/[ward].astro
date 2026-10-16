@@ -6,8 +6,8 @@ import NewsletterCard from '../../components/NewsletterCard.astro';
 import Pagination from '../../components/Pagination.astro';
 import WardGlance from '../../components/WardGlance.astro';
 import { supabase } from '../../lib/supabase';
-import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../../lib/page-cache';
-import type { WardProfileSource } from '../../lib/newsletter-queries';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../../lib/server/page-cache';
+import type { WardProfileSource } from '../../lib/server/newsletter-queries';
 import { countPages, parsePageParam } from '../../lib/pagination';
 import { SITE_NAME, buildWardDescription, buildWardTitle, formatReceivedDate } from '../../lib/seo';
 import {
@@ -15,7 +15,7 @@ import {
   fetchWardNewsletterPage,
   fetchWardSources,
   type WardNewsletterPage,
-} from '../../lib/ward-queries';
+} from '../../lib/server/ward-queries';
 import {
   WARD_DIRECTORY_PATH,
   buildWardContactLinks,

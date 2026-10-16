@@ -1,8 +1,8 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
-import { getSupabaseAdmin } from "../../../lib/supabase-admin";
-import { readServerSecret } from "../../../lib/server-env";
+import { getSupabaseAdmin } from "../../../lib/server/supabase-admin";
+import { readServerSecret } from "../../../lib/server/server-env";
 
 interface UnsubscribeRequestBody {
   token?: string;

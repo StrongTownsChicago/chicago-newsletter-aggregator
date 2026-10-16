@@ -177,7 +177,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
   <RuleModal isWelcome={isWelcome} availableWards={availableWards} />
 
   <script>
-    import { initRuleModal } from '../scripts/rule-modal';
+    import { initRuleModal } from '../client/rule-modal';
 
     initRuleModal();
   </script>

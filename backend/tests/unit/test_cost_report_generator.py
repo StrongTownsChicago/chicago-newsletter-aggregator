@@ -7,13 +7,13 @@ processing pipeline makes (topic extraction and summary generation).
 
 import unittest
 
-from utils.cost_calculator import ModelPricing
-from utils.cost_report_generator import (
+from llm_costs.cost_calculator import ModelPricing
+from llm_costs.cost_report_generator import (
     generate_csv_report,
     generate_json_report,
     generate_text_report,
 )
-from utils.newsletter_token_analyzer import NewsletterTokenAnalysis, OperationTokens
+from llm_costs.newsletter_token_analyzer import NewsletterTokenAnalysis, OperationTokens
 
 TOPIC_INPUT_TOKENS = 1000
 TOPIC_OUTPUT_TOKENS = 100

@@ -5,12 +5,12 @@ import {
   fetchWardDirectorySources,
   fetchWardNewsletterPage,
   fetchWardSources,
-} from '../../lib/ward-queries';
+} from '../../lib/server/ward-queries';
 import {
   SOURCE_WARD_DIRECTORY_SELECT,
   SOURCE_WARD_PROFILE_SELECT,
   buildNewsletterCardSelect,
-} from '../../lib/newsletter-queries';
+} from '../../lib/server/newsletter-queries';
 
 type QueryResult = { data?: unknown; count?: number | null; error: { message: string } | null };
 

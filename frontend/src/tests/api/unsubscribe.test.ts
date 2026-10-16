@@ -22,7 +22,7 @@ const { mockSupabaseAdmin } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../lib/supabase-admin", () => ({
+vi.mock("../../lib/server/supabase-admin", () => ({
   getSupabaseAdmin: vi.fn(() => mockSupabaseAdmin),
 }));
 

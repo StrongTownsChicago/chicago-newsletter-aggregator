@@ -10,7 +10,7 @@ import {
   type AnalyticsDataFile,
   type AnalyticsDataFiles,
   type FetchFunction,
-} from "../../lib/analytics-data";
+} from "../../lib/analytics/data";
 
 const FILE_CONTENTS: AnalyticsDataFiles = {
   metadata: {

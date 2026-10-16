@@ -5,9 +5,9 @@ import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import { supabase } from '../lib/supabase';
-import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
-import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
-import type { NewsletterCardRow } from '../lib/newsletter-queries';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
+import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/server/newsletter-queries';
+import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
 
 // Pagination setup
 const page = parseInt(Astro.url.searchParams.get('page') || '1');

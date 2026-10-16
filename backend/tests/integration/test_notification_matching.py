@@ -112,7 +112,7 @@ class TestNotificationMatching(unittest.TestCase):
 
     def test_reprocessing_triggers_notifications(self) -> None:
         """Verify that reprocessing flow correctly triggers notification matching."""
-        from utils.process_llm_metadata import reprocess_newsletter
+        from cli.process_llm_metadata import reprocess_newsletter
 
         # Create mock newsletter data
         newsletter_id = "newsletter_123"
@@ -185,9 +185,7 @@ class TestNotificationMatching(unittest.TestCase):
         mock_supabase.table.side_effect = table_router
 
         # Mock LLM processor
-        with patch(
-            "utils.process_llm_metadata.extract_newsletter_metadata"
-        ) as mock_llm:
+        with patch("cli.process_llm_metadata.extract_newsletter_metadata") as mock_llm:
             mock_llm.return_value = {
                 "topics": ["bike_lanes"],
                 "summary": "Newsletter about bike lanes",

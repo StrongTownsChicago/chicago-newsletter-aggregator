@@ -11,7 +11,7 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
-from notifications.process_notification_queue import _extract_content_ids
+from cli.process_notification_queue import _extract_content_ids
 
 
 class TestExtractContentIds(unittest.TestCase):
@@ -128,10 +128,10 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
         """Restore stdout."""
         sys.stdout = sys.__stdout__
 
-    @patch("notifications.weekly_notification_queue.get_supabase_client")
+    @patch("cli.weekly_notification_queue.get_supabase_client")
     def test_queues_with_report_id_column(self, mock_get_client: MagicMock) -> None:
         """Weekly notifications use report_id column, not newsletter_id."""
-        from notifications.weekly_notification_queue import queue_weekly_notifications
+        from cli.weekly_notification_queue import queue_weekly_notifications
 
         # Arrange
         mock_supabase = Mock()
@@ -232,10 +232,10 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
 class TestWeeklyNotificationFetching(unittest.TestCase):
     """Tests for fetching weekly notifications with proper joins."""
 
-    @patch("notifications.process_notification_queue.get_supabase_client")
+    @patch("cli.process_notification_queue.get_supabase_client")
     def test_fetches_with_report_join(self, mock_get_client: MagicMock) -> None:
         """Weekly notification fetching joins to weekly_topic_reports via report_id."""
-        from notifications.process_notification_queue import _fetch_weekly_notifications
+        from cli.process_notification_queue import _fetch_weekly_notifications
 
         # Arrange
         mock_supabase = Mock()

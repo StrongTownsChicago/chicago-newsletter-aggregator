@@ -140,13 +140,13 @@ class TestProseRules(unittest.TestCase):
 
     def test_a_date_is_reported_but_advisory(self) -> None:
         source = 'def f() -> None:\n    """Use --since 2026-09-01."""\n'
-        violations = checker.check_source(source, "utils/thing.py")
+        violations = checker.check_source(source, "cli/thing.py")
         self.assertEqual([v.rule for v in violations], ["DS102"])
         self.assertEqual(checker.gating(violations), [])
 
     def test_superseded_narrative_is_advisory(self) -> None:
         source = 'def f() -> None:\n    """The ratio approach was refuted."""\n'
-        violations = checker.check_source(source, "utils/thing.py")
+        violations = checker.check_source(source, "cli/thing.py")
         self.assertEqual([v.rule for v in violations], ["DS106"])
         self.assertEqual(checker.gating(violations), [])
 
@@ -156,12 +156,12 @@ class TestProseRules(unittest.TestCase):
 
 class TestRatchet(unittest.TestCase):
     def test_ds002_is_ratcheted_not_gated_per_site(self) -> None:
-        violations = checker.check_source(def_docstring(20), "utils/thing.py")
+        violations = checker.check_source(def_docstring(20), "cli/thing.py")
         self.assertEqual(checker.gating(violations), [])
         self.assertEqual(checker.ratchet_counts(violations), {"DS002": 1})
 
     def test_a_count_over_the_frozen_number_fails(self) -> None:
-        violations = checker.check_source(def_docstring(20), "utils/thing.py")
+        violations = checker.check_source(def_docstring(20), "cli/thing.py")
         with mock.patch.dict(checker.FROZEN, {"DS002": 0}):
             self.assertEqual(len(checker.ratchet_failures(violations)), 1)
         with mock.patch.dict(checker.FROZEN, {"DS002": 1}):
@@ -183,13 +183,13 @@ class TestRepository(unittest.TestCase):
             path.relative_to(checker.ROOT).parts[0]
             for path in source_trees.python_files(checker.ROOT)
         }
-        self.assertTrue({"analytics", "utils", "tests", "tools"} <= scanned)
+        self.assertTrue({"analytics", "cli", "tests", "tools"} <= scanned)
 
     def test_main_fails_and_names_the_site(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "utils").mkdir()
-            (root / "utils" / "long.py").write_text(
+            (root / "cli").mkdir()
+            (root / "cli" / "long.py").write_text(
                 module_docstring(checker.MODULE_DOC_MAX + 1), encoding="utf-8"
             )
             stderr = io.StringIO()
@@ -200,7 +200,7 @@ class TestRepository(unittest.TestCase):
             ):
                 exit_code = checker.main([])
         self.assertEqual(exit_code, 1)
-        self.assertIn("utils/long.py:1: DS001", stderr.getvalue())
+        self.assertIn("cli/long.py:1: DS001", stderr.getvalue())
 
 
 if __name__ == "__main__":

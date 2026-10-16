@@ -26,7 +26,7 @@ vi.mock('astro:middleware', () => ({
 
 import { createClient } from '@supabase/supabase-js';
 import { onRequest } from '../middleware';
-import { PAGE_CACHE_HEADER } from '../lib/page-cache';
+import { PAGE_CACHE_HEADER } from '../lib/server/page-cache';
 import { createMockContext } from './helpers';
 import type { APIContext } from 'astro';
 
