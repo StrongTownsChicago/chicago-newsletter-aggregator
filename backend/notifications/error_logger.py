@@ -4,8 +4,8 @@ Error logging utility for notification system.
 Logs notification processing errors to timestamped files for debugging.
 """
 
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 
@@ -24,15 +24,15 @@ def log_notification_error(
         Path to the log file created
     """
     # Create logs directory if it doesn't exist
-    log_dir = os.path.join(os.path.dirname(__file__), "logs")
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir = Path(__file__).parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = os.path.join(log_dir, f"notification_error_{timestamp}.txt")
+    log_path = log_dir / f"notification_error_{timestamp}.txt"
 
     # Write error to file
-    with open(filename, "w", encoding="utf-8") as f:
+    with log_path.open("w", encoding="utf-8") as f:
         f.write(f"Notification Error Report - {datetime.now()}\n")
         f.write("=" * 60 + "\n\n")
         f.write(f"Error Type: {error_type}\n")
@@ -43,4 +43,4 @@ def log_notification_error(
             f.write("-" * 60 + "\n")
             f.writelines(f"{key}: {value}\n" for key, value in context.items())
 
-    return filename
+    return str(log_path)

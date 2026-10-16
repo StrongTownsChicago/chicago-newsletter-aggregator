@@ -379,8 +379,9 @@ class TestCallOpenAI(unittest.TestCase):
         mock_client.chat.completions.create.side_effect = auth_error
         mock_get_client.return_value = mock_client
 
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(Exception, "failed after 2 attempts") as ctx:
             _call_openai("gpt-5", "test prompt", None, 2)
+        self.assertIs(ctx.exception.__cause__, auth_error)
 
 
 class TestAddAdditionalPropertiesFalse(unittest.TestCase):

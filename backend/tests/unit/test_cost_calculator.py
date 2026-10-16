@@ -5,9 +5,9 @@ Tests pricing data loading, cost calculation accuracy, and model lookup logic.
 """
 
 import json
-import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from utils.cost_calculator import (
     PricingData,
@@ -20,8 +20,10 @@ class TestCostCalculator(unittest.TestCase):
 
     def setUp(self):
         """Create temporary pricing file for tests."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.pricing_file = os.path.join(self.temp_dir, "test_pricing.json")
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        self.temp_dir = Path(temp_dir.name)
+        self.pricing_file = str(self.temp_dir / "test_pricing.json")
 
         # Create valid test pricing data
         test_pricing = {
@@ -49,14 +51,7 @@ class TestCostCalculator(unittest.TestCase):
             ],
         }
 
-        with open(self.pricing_file, "w") as f:
-            json.dump(test_pricing, f)
-
-    def tearDown(self):
-        """Clean up temporary files."""
-        if os.path.exists(self.pricing_file):
-            os.remove(self.pricing_file)
-        os.rmdir(self.temp_dir)
+        Path(self.pricing_file).write_text(json.dumps(test_pricing))
 
     def test_load_pricing_data_valid(self):
         """Test loading valid pricing file."""
@@ -66,14 +61,11 @@ class TestCostCalculator(unittest.TestCase):
 
     def test_load_pricing_data_invalid_json(self):
         """Test invalid JSON handling."""
-        invalid_file = os.path.join(self.temp_dir, "invalid.json")
-        with open(invalid_file, "w") as f:
-            f.write("{invalid json")
+        invalid_file = self.temp_dir / "invalid.json"
+        invalid_file.write_text("{invalid json")
 
         with self.assertRaises(json.JSONDecodeError):
-            PricingData(invalid_file)
-
-        os.remove(invalid_file)
+            PricingData(str(invalid_file))
 
     def test_load_pricing_data_missing_file(self):
         """Test missing pricing file."""
@@ -200,16 +192,13 @@ class TestCostCalculator(unittest.TestCase):
             ],
         }
 
-        invalid_file = os.path.join(self.temp_dir, "invalid_schema.json")
-        with open(invalid_file, "w") as f:
-            json.dump(invalid_data, f)
+        invalid_file = self.temp_dir / "invalid_schema.json"
+        invalid_file.write_text(json.dumps(invalid_data))
 
         with self.assertRaises(ValueError) as cm:
-            PricingData(invalid_file)
+            PricingData(str(invalid_file))
 
         self.assertIn("Missing required field", str(cm.exception))
-
-        os.remove(invalid_file)
 
 
 if __name__ == "__main__":

@@ -41,10 +41,13 @@ select = [
     "E", "F", "W",      # pycodestyle, pyflakes
     "I",                # isort
     "UP",               # pyupgrade (enforces the modern type hints CLAUDE.md asks for)
+    "B",                # bugbear
     "C4",               # comprehensions
     "SIM",              # simplify
     "RUF",              # ruff-specific
-    "PIE",              # misc
+    "ARG",              # unused arguments
+    "PTH",              # pathlib
+    "PIE", "N", "ERA",  # misc, naming, commented-out code
     "FURB", "PERF",
 ]
 ignore = [
@@ -56,6 +59,8 @@ ignore = [
 allowed-confusables = ["–", "‘", "’", "ℹ"]
 
 [tool.ruff.lint.per-file-ignores]
+# Tests: mock signatures.
+"tests/*" = ["ARG001", "ARG002"]
 # Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
 # which Pydantic turns into a named schema reference instead of the plain type.
 "models/types.py" = ["UP040"]

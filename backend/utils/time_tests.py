@@ -29,11 +29,11 @@ class TimingResult(unittest.TextTestResult):
         self.recorded_durations: list[tuple[str, float]] = []
         self._start_time: float = 0.0
 
-    def startTest(self, test: unittest.TestCase) -> None:
+    def startTest(self, test: unittest.TestCase) -> None:  # noqa: N802  unittest API override
         self._start_time = time.time()
         super().startTest(test)
 
-    def stopTest(self, test: unittest.TestCase) -> None:
+    def stopTest(self, test: unittest.TestCase) -> None:  # noqa: N802  unittest API override
         duration = time.time() - self._start_time
         self.recorded_durations.append((str(test), duration))
         super().stopTest(test)
@@ -42,7 +42,7 @@ class TimingResult(unittest.TextTestResult):
 class TimingRunner(unittest.TextTestRunner):
     """Custom TestRunner that uses TimingResult and prints slow tests."""
 
-    def _makeResult(self) -> TimingResult:
+    def _makeResult(self) -> TimingResult:  # noqa: N802  unittest API override
         # Override _makeResult to return our custom TimingResult
         return TimingResult(self.stream, self.descriptions, self.verbosity)
 

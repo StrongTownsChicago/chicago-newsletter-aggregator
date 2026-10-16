@@ -28,7 +28,7 @@ class NewsletterArchiveStrategy(ABC):
 class MailChimpArchiveStrategy(NewsletterArchiveStrategy):
     """Strategy for MailChimp-based archives (Ward 1, 2, etc.)"""
 
-    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:
+    def extract_newsletters(self, html: str, base_url: str) -> list[dict[str, str]]:  # noqa: ARG002  strategy interface: MailChimp archive links are used as given
         soup = BeautifulSoup(html, "html.parser")
         newsletters: list[dict[str, str]] = []
 

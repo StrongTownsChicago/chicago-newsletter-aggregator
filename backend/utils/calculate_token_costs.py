@@ -25,6 +25,7 @@ import argparse
 import sys
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from shared.db import get_supabase_client
@@ -387,7 +388,7 @@ Examples:
 
             report_data = generate_json_report(analyses, model_pricing)
             # TODO: Add weekly data to JSON report
-            with open(args.output_json, "w") as f:
+            with Path(args.output_json).open("w") as f:
                 json.dump(report_data, f, indent=2)
             print(f"\nJSON report saved to: {args.output_json}")
 
@@ -395,7 +396,7 @@ Examples:
         if args.output_csv:
             csv_data = generate_csv_report(analyses, model_pricing)
             # TODO: Add weekly data to CSV report
-            with open(args.output_csv, "w") as f:
+            with Path(args.output_csv).open("w") as f:
                 f.write(csv_data)
             print(f"CSV report saved to: {args.output_csv}")
 

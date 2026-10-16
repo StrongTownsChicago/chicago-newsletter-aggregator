@@ -915,7 +915,7 @@ def _format_week_range(week_id: str) -> str:
         week_start = week_1_monday + timedelta(weeks=week - 1)
         week_end = week_start + timedelta(days=6)
 
-        # Format: "January 26 - February 1, 2026"
+        # Formats as "January 26 - February 1, 2026"
         if week_start.month == week_end.month:
             return f"{week_start.strftime('%B %d')} - {week_end.strftime('%d, %Y')}"
         else:

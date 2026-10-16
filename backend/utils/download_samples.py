@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -6,7 +5,7 @@ from typing import Any, cast
 from shared.db import get_supabase_client
 
 MAX_SAMPLES_PER_SOURCE = 1
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "../samples")
+OUTPUT_DIR = Path(__file__).parent / "../samples"
 
 
 def download_samples() -> None:
@@ -14,7 +13,7 @@ def download_samples() -> None:
     supabase = get_supabase_client()
 
     # ensure output directory exists
-    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"[{datetime.now()}] Starting sample download to {OUTPUT_DIR}...")
 
@@ -57,20 +56,16 @@ def download_samples() -> None:
                 # Save HTML
                 raw_html = cast(str | None, nl.get("raw_html"))
                 if raw_html:
-                    with open(
-                        os.path.join(OUTPUT_DIR, f"{base_filename}.html"),
-                        "w",
-                        encoding="utf-8",
+                    with (OUTPUT_DIR / f"{base_filename}.html").open(
+                        "w", encoding="utf-8"
                     ) as f:
                         f.write(raw_html)
 
                 # Save Plain Text
                 plain_text = cast(str | None, nl.get("plain_text"))
                 if plain_text:
-                    with open(
-                        os.path.join(OUTPUT_DIR, f"{base_filename}.txt"),
-                        "w",
-                        encoding="utf-8",
+                    with (OUTPUT_DIR / f"{base_filename}.txt").open(
+                        "w", encoding="utf-8"
                     ) as f:
                         f.write(plain_text)
 

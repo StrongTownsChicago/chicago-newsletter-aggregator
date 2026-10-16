@@ -27,6 +27,7 @@ Output:
 
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, cast
 
 from dotenv import load_dotenv
@@ -64,7 +65,7 @@ def save_unmapped_report(unmapped_emails: list[dict[str, str]]) -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"unmapped_emails_{timestamp}.txt"
 
-    with open(filename, "w", encoding="utf-8") as f:
+    with Path(filename).open("w", encoding="utf-8") as f:
         f.write(f"Unmapped Emails Report - {datetime.now()}\n")
         f.write("=" * 60 + "\n\n")
 
@@ -118,8 +119,7 @@ def process_new_newsletters() -> None:
     with MailBox("imap.gmail.com").login(GMAIL_ADDRESS, GMAIL_PASSWORD) as mailbox:  # type: ignore[no-untyped-call]
         # Fetch unread emails
         messages = mailbox.fetch(AND(seen=False))
-        # Below line can be uncommented to process all emails for testing
-        # messages = mailbox.fetch()
+        # To process every email when testing, call mailbox.fetch() with no criteria.
 
         processed_count = 0
         skipped_count = 0
@@ -159,12 +159,10 @@ def process_new_newsletters() -> None:
                     try:
                         from processing.llm_processor import extract_newsletter_metadata
 
-                        OLLAMA_MODEL = os.getenv(
+                        llm_model = os.getenv(
                             "LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
                         )
-                        llm_result = extract_newsletter_metadata(
-                            newsletter, OLLAMA_MODEL
-                        )
+                        llm_result = extract_newsletter_metadata(newsletter, llm_model)
                         newsletter.update(llm_result)
                         print("  LLM processing complete")
                     except ImportError:

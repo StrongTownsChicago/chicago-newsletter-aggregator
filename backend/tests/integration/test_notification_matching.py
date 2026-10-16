@@ -166,7 +166,7 @@ class TestNotificationMatching(unittest.TestCase):
                 return mock_update_table
             if table_name == "notification_rules":
                 mock_rules_table = MagicMock()
-                # Handle .select().eq().eq().execute()
+                # Handles the select, eq, eq, execute chain
                 mock_rules_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_rules_response
                 return mock_rules_table
             elif table_name == "user_profiles":
