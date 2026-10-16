@@ -46,7 +46,23 @@ jobs:
           cd backend
           uv run --locked mypy .
 
-      - name: Run Tests
+      - name: Run Tests with Coverage
         run: |
           cd backend
-          uv run --locked python -m unittest discover -s tests -p "test_*.py"
+          uv run --locked coverage run -m unittest discover -s tests -p "test_*.py"
+          uv run --locked coverage report
+
+      - name: Build Coverage Report
+        if: always()
+        run: |
+          cd backend
+          # The floor is enforced by the step above; the report is wanted either way.
+          uv run --locked coverage html --fail-under 0
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-html
+          path: backend/htmlcov
+          if-no-files-found: ignore

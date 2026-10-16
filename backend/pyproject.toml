@@ -105,3 +105,14 @@ max-statements = 65   # notifications/process_notification_queue.process_digests
 
 [tool.ruff.lint.isort]
 known-first-party = ["analytics", "config", "ingest", "models", "notifications", "processing", "prompts", "shared", "tools", "utils"]
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "tools/*", ".venv/*", "samples/*", "migrations/*"]
+branch = true
+
+[tool.coverage.report]
+precision = 1
+# Erosion backstop, not a target: raise it as coverage rises, keep ~2 pts under.
+fail_under = 59
+exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:", "raise NotImplementedError"]
