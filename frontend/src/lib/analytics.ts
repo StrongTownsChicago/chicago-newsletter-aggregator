@@ -42,6 +42,8 @@ export interface DistinctiveTerm {
   ward_newsletters: number;
   ward_share: number;
   rest_share: number;
+  /** Other terms from (nearly) the same newsletters that this entry stands for. */
+  related_terms?: number;
 }
 
 /** A term mentioned by more wards in the latest month than in a typical recent month. */
@@ -53,7 +55,7 @@ export interface RisingTerm {
   baseline_month_wards: number[];
   ward_gain: number;
   latest_newsletters: number;
-  /** Optional: true when the backend flags the rise as seasonal. */
+  /** A recurring calendar event (holiday, heritage month, seasonal program). */
   seasonal?: boolean;
 }
 

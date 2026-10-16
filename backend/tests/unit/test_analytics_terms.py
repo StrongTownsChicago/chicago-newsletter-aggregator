@@ -5,14 +5,21 @@ from datetime import date
 
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.terms import (
+    DistinctiveTerm,
     NewsletterTerms,
     build_name_tokens_by_ward,
     build_newsletter_terms,
     build_term_index,
+    build_word_specificity,
+    choose_representative_term,
+    collapse_terms_sharing_newsletters,
     compute_distinctive_terms,
     compute_rising_terms,
+    contains_filler_word,
     count_newsletters_per_term,
     drop_overlapping_terms,
+    is_rising_candidate,
+    jaccard_similarity,
     score_distinctive_term,
     select_latest_complete_month,
     select_vocabulary,
@@ -147,6 +154,7 @@ class TestDistinctiveTerms(unittest.TestCase):
             "min_ward_newsletters": 2,
             "min_term_newsletters_in_ward": 2,
             "max_ward_share": 0.9,
+            "min_nested_term_similarity": 0.8,
         }
         params.update(overrides)
         return compute_distinctive_terms(self.documents, self.vocabulary, **params)
@@ -170,6 +178,36 @@ class TestDistinctiveTerms(unittest.TestCase):
 
     def test_omits_small_wards(self):
         self.assertNotIn("1", self.compute(min_ward_newsletters=6))
+
+    def test_terms_from_the_same_newsletters_are_one_entry(self):
+        # "wicker park" is in exactly the newsletters "wicker" is in.
+        self.documents = [
+            doc(item.terms | {"wicker park"}, ward=item.ward)
+            if "wicker" in item.terms
+            else item
+            for item in self.documents
+        ]
+        self.vocabulary.add("wicker park")
+        related = {item["term"]: item["related_terms"] for item in self.compute()["1"]}
+        self.assertEqual(related, {"signature": 0, "wicker park": 1})
+
+    def test_overlapping_unrelated_terms_stay_apart(self):
+        # "signature" (4 newsletters) and "wicker" (3 of those 4): Jaccard 0.75
+        # but not one phrase, so they stay apart even at a lower threshold.
+        result = self.compute(min_nested_term_similarity=0.5)["1"]
+        self.assertEqual([item["related_terms"] for item in result], [0, 0])
+
+    def test_skips_terms_with_filler_words(self):
+        self.documents = [
+            doc(item.terms | {"stay informed"}, ward=item.ward)
+            if "wicker" in item.terms
+            else item
+            for item in self.documents
+        ]
+        self.vocabulary.add("stay informed")
+        terms = [item["term"] for item in self.compute()["1"]]
+        self.assertNotIn("stay informed", terms)
+        self.assertIn("wicker", terms)
 
     def test_score_fields(self):
         item = score_distinctive_term("wicker", 4, 5, 0, 5)
@@ -221,6 +259,7 @@ class TestRisingTerms(unittest.TestCase):
             "min_latest_wards": 3,
             "min_ward_gain": 2,
             "top_n": 10,
+            "min_phrase_words": 1,
         }
         params.update(overrides)
         return compute_rising_terms(self.documents, self.vocabulary, **params)
@@ -241,6 +280,31 @@ class TestRisingTerms(unittest.TestCase):
         self.assertEqual(top["baseline_wards"], 0)
         self.assertEqual(top["ward_gain"], 6)
         self.assertEqual(top["latest_newsletters"], 6)
+
+    def test_phrases_only_when_min_phrase_words_is_two(self):
+        self.assertEqual(self.terms(min_phrase_words=2), ["senior fest", "labor day"])
+
+    def test_tags_recurring_calendar_events_as_seasonal(self):
+        seasonal = {item["term"]: item["seasonal"] for item in self.compute()["terms"]}
+        self.assertEqual(seasonal, {"senior fest": True, "labor": False})
+
+    def test_phrases_with_filler_words_are_excluded(self):
+        terms = {"accessible throughout", "tenant ordinance"}
+        documents = [doc(terms, ward="1", month="2026-08")]
+        documents += [doc(terms, ward=w, month="2026-09") for w in "1234"]
+        result = compute_rising_terms(
+            documents,
+            terms,
+            latest_month="2026-09",
+            baseline_months=1,
+            min_latest_wards=3,
+            min_ward_gain=2,
+            top_n=10,
+            min_phrase_words=2,
+        )
+        self.assertEqual(
+            [item["term"] for item in result["terms"]], ["tenant ordinance"]
+        )
 
     def test_one_prolific_ward_cannot_make_a_trend(self):
         self.assertNotIn("solo", self.terms())
@@ -274,6 +338,7 @@ class TestRisingTerms(unittest.TestCase):
             min_latest_wards=3,
             min_ward_gain=2,
             top_n=10,
+            min_phrase_words=1,
         )
         self.assertEqual(result["baseline_active_wards"], [0, 0, 1])
         (fest,) = result["terms"]
@@ -281,6 +346,176 @@ class TestRisingTerms(unittest.TestCase):
         # Median of June alone, not of 0, 0, 1.
         self.assertEqual(fest["baseline_wards"], 1)
         self.assertEqual(fest["ward_gain"], 3)
+
+
+class TestContainsFillerWord(unittest.TestCase):
+    def test_any_word_in_any_plural_form(self):
+        self.assertTrue(contains_filler_word("chicago residents"))
+        self.assertTrue(contains_filler_word("next weeks"))
+        self.assertFalse(contains_filler_word("tenant ordinance"))
+
+
+class TestIsRisingCandidate(unittest.TestCase):
+    def test_requires_min_phrase_words(self):
+        self.assertFalse(is_rising_candidate("fall", min_phrase_words=2))
+        self.assertTrue(is_rising_candidate("tenant ordinance", min_phrase_words=2))
+        self.assertTrue(is_rising_candidate("fall", min_phrase_words=1))
+
+    def test_rejects_phrases_with_filler_words_in_any_plural_form(self):
+        for term in ("accessible throughout", "next week", "two weeks"):
+            self.assertFalse(is_rising_candidate(term, min_phrase_words=2), term)
+        self.assertFalse(is_rising_candidate("chicago residents", min_phrase_words=2))
+
+
+def distinctive(term: str, score: float = 1.0) -> DistinctiveTerm:
+    return DistinctiveTerm(
+        term=term,
+        score=score,
+        lift=2.0,
+        ward_newsletters=1,
+        ward_share=0.1,
+        rest_share=0.0,
+    )
+
+
+def no_specificity(term: str) -> float:
+    return 0.0
+
+
+class TestJaccardSimilarity(unittest.TestCase):
+    def test_shared_share_of_union(self):
+        self.assertEqual(jaccard_similarity({1, 2, 3}, {1, 2, 3}), 1.0)
+        self.assertEqual(jaccard_similarity({1, 2, 3, 4}, {1, 2, 3}), 0.75)
+        self.assertEqual(jaccard_similarity({1}, {2}), 0.0)
+        self.assertEqual(jaccard_similarity(set(), set()), 1.0)
+
+
+class TestWordSpecificity(unittest.TestCase):
+    def test_rare_words_score_higher_and_plurals_fold(self):
+        specificity = build_word_specificity(
+            {
+                "helps": 50,
+                "identify": 40,
+                "gunshot": 2,
+                "detection": 3,
+                "helps identify": 5,
+            },
+            total_newsletters=100,
+        )
+        self.assertGreater(
+            specificity("gunshot detection"), specificity("helps identify")
+        )
+        self.assertEqual(specificity("gunshots"), specificity("gunshot"))
+
+
+class TestChooseRepresentativeTerm(unittest.TestCase):
+    def test_prefers_a_phrase_over_a_higher_scoring_word(self):
+        group = [distinctive("houseless", 3.0), distinctive("houseless neighbors", 2.0)]
+        chosen = choose_representative_term(group, no_specificity)
+        self.assertEqual(chosen.term, "houseless neighbors")
+
+    def test_prefers_the_most_specific_phrase(self):
+        group = [
+            distinctive("helps identify", 3.0),
+            distinctive("gunshot detection", 2.0),
+        ]
+        specificity = {"helps identify": 1.0, "gunshot detection": 5.0}
+        chosen = choose_representative_term(group, specificity.__getitem__)
+        self.assertEqual(chosen.term, "gunshot detection")
+
+    def test_prefers_the_phrase_whose_words_recur_in_the_group(self):
+        group = [
+            distinctive("shakman exempt", 3.0),
+            distinctive("attorney hiring", 1.0),
+            distinctive("hiring senior", 1.0),
+            distinctive("hiring mid", 1.0),
+            distinctive("attorney", 1.0),
+        ]
+        specificity = {"shakman exempt": 9.0}
+        chosen = choose_representative_term(
+            group, lambda term: specificity.get(term, 0.0)
+        )
+        self.assertEqual(chosen.term, "attorney hiring")
+
+    def test_ties_go_to_the_higher_score(self):
+        group = [distinctive("award range", 1.0), distinctive("procurement news", 2.0)]
+        chosen = choose_representative_term(group, no_specificity)
+        self.assertEqual(chosen.term, "procurement news")
+
+
+class TestCollapseTermsSharingNewsletters(unittest.TestCase):
+    def setUp(self):
+        block = set(range(24))
+        self.newsletters_by_term = {
+            "procurement news": block,
+            "certified vendor": block,
+            # Another standing section, in 23 of the block's 24 newsletters
+            # (Jaccard 0.958): nearly the same issues, different content.
+            "attorney hiring": set(range(23)),
+            "truman college": {30, 31, 32, 33, 34},
+            # Nests with "truman college" (Jaccard 0.83).
+            "truman": {30, 31, 32, 33, 34, 35},
+            "bike lane": {30, 40, 41},
+        }
+        self.ranked = [
+            distinctive("procurement news", 3.0),
+            distinctive("truman", 2.8),
+            distinctive("bike lane", 2.5),
+            distinctive("certified vendor", 2.0),
+            distinctive("attorney hiring", 1.5),
+            distinctive("truman college", 1.0),
+        ]
+
+    def collapse(self, min_similarity=0.8, limit=10, specificity=no_specificity):
+        return collapse_terms_sharing_newsletters(
+            self.ranked, self.newsletters_by_term, min_similarity, limit, specificity
+        )
+
+    def test_identical_sets_and_nested_terms_become_one_entry(self):
+        result = self.collapse()
+        self.assertEqual(
+            [(item.term, item.related_terms) for item in result],
+            [
+                ("procurement news", 1),
+                ("bike lane", 0),
+                ("attorney hiring", 0),
+                ("truman college", 1),
+            ],
+        )
+
+    def test_nearly_identical_sets_of_unrelated_terms_stay_apart(self):
+        result = self.collapse(min_similarity=0.5)
+        self.assertIn("attorney hiring", [item.term for item in result])
+
+    def test_threshold_keeps_loosely_overlapping_nested_terms_apart(self):
+        result = self.collapse(min_similarity=0.9)
+        self.assertIn("truman", [item.term for item in result])
+        self.assertIn("truman college", [item.term for item in result])
+
+    def test_nested_terms_join_only_near_the_first_term(self):
+        # "truman" is in 6 newsletters; "truman square" shares only 3 with it,
+        # so it does not join even though it nests with "truman".
+        self.newsletters_by_term["truman square"] = {33, 34, 35}
+        self.ranked.append(distinctive("truman square", 0.5))
+        result = self.collapse()
+        self.assertIn("truman square", [item.term for item in result])
+
+    def test_limit_counts_entries_not_terms(self):
+        result = self.collapse(limit=2)
+        self.assertEqual(
+            [(item.term, item.related_terms) for item in result],
+            [("procurement news", 1), ("truman college", 1)],
+        )
+
+    def test_entries_are_ranked_by_their_representative_score(self):
+        specificity = {"certified vendor": 9.0}
+        result = self.collapse(
+            specificity=lambda term: specificity.get(term, 0.0),
+        )
+        self.assertEqual(
+            [item.term for item in result],
+            ["bike lane", "certified vendor", "attorney hiring", "truman college"],
+        )
 
 
 class TestDropOverlappingTerms(unittest.TestCase):

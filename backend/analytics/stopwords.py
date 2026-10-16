@@ -57,3 +57,16 @@ NEWSLETTER_BOILERPLATE: frozenset[str] = frozenset(
 EXCLUDED_TERMS: frozenset[str] = (
     ENGLISH_STOPWORDS | SPANISH_STOPWORDS | CALENDAR_WORDS | NEWSLETTER_BOILERPLATE
 )
+
+# Generic words that say how, when, or for whom rather than what. They stay in
+# the term index, but a rising or distinctive term built with one ("accessible
+# throughout", "next week", "chicago residents", "stay informed") is a turn of
+# phrase many unrelated stories share, not a subject. Written in singular form:
+# terms are compared with plurals folded.
+TREND_FILLER_WORDS: frozenset[str] = frozenset(
+    """
+    across additional concern event help info information largest member
+    regular resident stay throughout upcoming week whole
+    two three four five several
+    """.split()
+)

@@ -123,6 +123,13 @@ DISTINCTIVE_TOP_N = 20
 DISTINCTIVE_MIN_WARD_NEWSLETTERS = 5
 DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD = 3
 DISTINCTIVE_MAX_WARD_SHARE = 0.6
+# Distinctive terms in exactly the same newsletters of a ward are fragments of
+# one standing block and are listed as one entry (ward 46: 30 terms in the same
+# 24 of 81 issues). A word and a phrase containing it ("truman" and "truman
+# college") are merged when the Jaccard similarity of their newsletter sets is
+# at least this. Looser matching of unrelated terms merged whole digests: ward
+# 46 runs several standing sections in nearly the same issues.
+DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY = 0.8
 # Keyword lenses match on boilerplate-cleaned text. Lenses feed ward reach
 # ("did this ward write about X this month"), and a standing block such as a
 # resource directory repeated in every issue would answer yes every month
@@ -148,6 +155,10 @@ RISING_BASELINE_MONTHS = 3
 RISING_MIN_LATEST_WARDS = 5
 RISING_MIN_WARD_GAIN = 3
 RISING_TOP_N = 15
+# Rising terms are phrases: single words rise every month for unrelated
+# reasons (September 2026: "fall", "pro", "moving"), while the phrases that
+# carried those stories ("residential landlord", "tenant ordinance") rise too.
+RISING_MIN_PHRASE_WORDS = 2
 # Monthly reports cover complete months in which at least this many wards
 # sent a newsletter; thinner months describe the archive's gaps, not the city.
 REPORT_MIN_SENDING_WARDS = 30
@@ -348,6 +359,7 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
             min_latest_wards=RISING_MIN_LATEST_WARDS,
             min_ward_gain=RISING_MIN_WARD_GAIN,
             top_n=RISING_TOP_N,
+            min_phrase_words=RISING_MIN_PHRASE_WORDS,
         )
         if latest_month
         else {
@@ -396,6 +408,7 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
                 min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
                 min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
                 max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
+                min_nested_term_similarity=DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY,
             )
         },
         "rising": rising,
@@ -498,6 +511,7 @@ def print_report(outputs: dict[str, Any]) -> None:
         print(
             f"  {item['term']:<30} {item['latest_wards']:>3} wards "
             f"(baseline {item['baseline_wards']:g}, +{item['ward_gain']:g})"
+            f"{' seasonal' if item['seasonal'] else ''}"
         )
 
     print("\nDistinctive vocabulary (sample wards):")
