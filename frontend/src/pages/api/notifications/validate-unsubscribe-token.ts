@@ -1,10 +1,15 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
+import { readServerSecret } from "../../../lib/server-env";
+
+interface ValidateTokenRequestBody {
+  token?: string;
+}
 
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
-    const { token } = await request.json();
+    const { token } = (await request.json()) as ValidateTokenRequestBody;
 
     if (!token) {
       return new Response(JSON.stringify({ error: "Token required" }), {
@@ -14,7 +19,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Get secret key from Cloudflare runtime environment
-    const secretKeyStr = locals.runtime?.env?.UNSUBSCRIBE_SECRET_KEY || import.meta.env.UNSUBSCRIBE_SECRET_KEY;
+    const secretKeyStr = readServerSecret(locals, "UNSUBSCRIBE_SECRET_KEY");
     if (!secretKeyStr) {
       console.error("UNSUBSCRIBE_SECRET_KEY not configured");
       return new Response(

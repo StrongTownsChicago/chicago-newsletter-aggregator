@@ -232,9 +232,12 @@ export async function fetchSearchTimeline(
   query: string,
   now: Date,
 ): Promise<SearchTimelineResult> {
-  const { data, error } = await supabase.rpc(SEARCH_TIMELINE_RPC, {
+  const response = await supabase.rpc(SEARCH_TIMELINE_RPC, {
     search_query: query,
   });
+  const { error } = response;
+  // Untyped client: parseTimelineRpcRows validates the rows.
+  const data: unknown = response.data;
 
   if (error) {
     if (isMissingFunctionError(error)) return { status: "unavailable" };

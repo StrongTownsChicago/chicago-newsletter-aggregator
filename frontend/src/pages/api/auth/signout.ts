@@ -2,7 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
 
-export const POST: APIRoute = async ({ cookies, redirect }) => {
+export const POST: APIRoute = ({ cookies, redirect }) => {
   if (!notificationsEnabled()) {
     return new Response("Notifications are disabled", { status: 404 });
   }
