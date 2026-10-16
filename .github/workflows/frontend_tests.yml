@@ -45,7 +45,7 @@ jobs:
       - name: Run Tests
         run: |
           cd frontend
-          npm test
+          npm run test:coverage
 
       # Placeholder Supabase env, as in playwright.analytics.config.ts: the build reads no database.
       - name: Build
