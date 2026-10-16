@@ -1,8 +1,8 @@
 {
-  "measured_on": "77bed5ead10a22d5e08f3709c912bcfe1b60a7ce",
+  "measured_on": "2aac13a39fbd9235ba9d36c80342f65d3685241d",
   "modules": {
     "analytics/lenses.py": {
-      "lines": 564
+      "lines": 451
     },
     "utils/compute_analytics.py": {
       "lines": 472,

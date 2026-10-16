@@ -6,7 +6,8 @@ duplicate id, an ambiguous lone word or a redundant phrase fails CI.
 
 from collections.abc import Iterable
 
-from analytics.lenses import AMBIGUOUS_WORDS, Lens, tokenize_phrase
+from analytics.lens_matching import tokenize_phrase
+from analytics.lenses import AMBIGUOUS_WORDS, Lens
 from analytics.text import contains_word_run
 
 # Phrases are folded before the check, so "CAPS" (folded to "cap") is caught.

@@ -46,13 +46,13 @@ from analytics.facts import (
     build_source_coverage,
     is_text_unavailable,
 )
-from analytics.lenses import (
-    LENSES,
+from analytics.lens_matching import (
     LensMatcher,
     TextMatches,
     match_newsletters,
     summarize_lens_hits,
 )
+from analytics.lenses import LENSES
 from analytics.monthly_reports import MonthlyReportSettings, build_monthly_reports
 from analytics.records import (
     CHICAGO_TIMEZONE,

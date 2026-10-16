@@ -1,19 +1,17 @@
-"""Unit tests for analytics/lenses.py keyword lenses."""
+"""Unit tests for the keyword lenses (analytics/lenses.py) and their matching (analytics/lens_matching.py)."""
 
 import unittest
 from collections import Counter
 from datetime import date
 
-from analytics.lenses import (
-    AMBIGUOUS_WORDS,
-    LENSES,
-    Lens,
+from analytics.lens_matching import (
     LensMatcher,
     match_newsletters,
     phrase_key,
     split_into_sentences,
     summarize_lens_hits,
 )
+from analytics.lenses import AMBIGUOUS_WORDS, LENSES, Lens
 from analytics.records import NewsletterRecord
 from tests.fixtures.lens_validation import validate_lenses
 
