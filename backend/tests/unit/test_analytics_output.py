@@ -1,11 +1,11 @@
-"""Unit tests for utils/analytics_output.py."""
+"""Unit tests for analytics/io/output.py."""
 
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from utils.analytics_output import write_outputs
+from analytics.io.output import write_outputs
 
 
 class TestWriteOutputs(unittest.TestCase):

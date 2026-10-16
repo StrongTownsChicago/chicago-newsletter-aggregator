@@ -1,7 +1,7 @@
 """Compute analytics JSON files for the unlisted /analytics dashboard.
 
 Reads newsletters and sources from a local snapshot (see
-`utils/analytics_snapshot.py`), computes metrics with the pure functions in
+`analytics/io/snapshot_store.py`), computes metrics with the pure functions in
 `analytics/`, and writes compact JSON files to `frontend/public/analytics-data/`.
 That folder is committed and deployed as public static files, which the page
 fetches at runtime. It also writes two small summaries to
@@ -23,9 +23,9 @@ The production database has a small disk IO budget, so it is read gently:
   plain_text) or after deletions.
 
 Usage:
-    uv run python -m utils.compute_analytics
-    uv run python -m utils.compute_analytics --offline
-    uv run python -m utils.compute_analytics --full-refresh
+    uv run python -m cli.compute_analytics
+    uv run python -m cli.compute_analytics --offline
+    uv run python -m cli.compute_analytics --full-refresh
 """
 
 import argparse
@@ -43,6 +43,9 @@ from analytics.facts import (
     build_source_coverage,
     is_text_unavailable,
 )
+from analytics.io.output import print_report, print_sizes, write_outputs
+from analytics.io.snapshot_refresh import load_or_refresh_snapshot
+from analytics.io.snapshot_store import DEFAULT_SNAPSHOT_DIR, SnapshotError
 from analytics.lens_matching import (
     LensMatcher,
     TextMatches,
@@ -73,9 +76,6 @@ from analytics.topic_reach import (
     select_broad_complete_months,
 )
 from analytics.ward_glance import WardGlanceSettings, build_ward_glances
-from utils.analytics_output import print_report, print_sizes, write_outputs
-from utils.analytics_snapshot import DEFAULT_SNAPSHOT_DIR, SnapshotError
-from utils.analytics_snapshot_refresh import load_or_refresh_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"

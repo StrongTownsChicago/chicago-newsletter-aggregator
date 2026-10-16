@@ -8,7 +8,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import Mock
 
-from utils.find_unprocessed_emails import (
+from cli.find_unprocessed_emails import (
     MailboxEmail,
     fetch_mailbox_emails,
     fetch_stored_email_uids,

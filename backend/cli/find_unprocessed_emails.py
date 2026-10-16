@@ -8,8 +8,8 @@ mid-processing) or never stored (unmapped senders).
 Usage:
     Run from the backend/ directory:
 
-    $ uv run python -m utils.find_unprocessed_emails > unprocessed.tsv
-    $ uv run python -m utils.find_unprocessed_emails --folder "[Gmail]/Spam"
+    $ uv run python -m cli.find_unprocessed_emails > unprocessed.tsv
+    $ uv run python -m cli.find_unprocessed_emails --folder "[Gmail]/Spam"
 
 Output:
     UTF-8 tab-separated rows (date, uid, sender, subject) on stdout, sorted by sender

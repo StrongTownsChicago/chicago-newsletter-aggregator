@@ -69,13 +69,11 @@ external = ["DS"]
 # Tests: mock signatures, fixture datetimes, factories with many fields.
 "tests/*" = ["ARG001", "ARG002", "DTZ001", "DTZ005", "T20", "PLR0913"]
 # CLI surfaces: printing is the job.
-"utils/*" = ["T20"]
+"cli/*" = ["T20"]
 "tools/*" = ["T20"]
-"ingest/email/process_emails.py" = ["T20"]
-"ingest/scraper/process_scraped_newsletters.py" = ["T20"]
-"notifications/process_notification_queue.py" = ["T20"]
-"notifications/weekly_notification_queue.py" = ["T20"]
-"notifications/test_matcher.py" = ["T20"]
+# Console reports for the analytics CLI.
+"analytics/io/output.py" = ["T20"]
+"analytics/io/snapshot_refresh.py" = ["T20"]
 # Library modules that use print as logging. This list only shrinks: moving one to `logging` removes its line.
 "ingest/email/email_parser.py" = ["T20"]
 "ingest/scraper/newsletter_scraper.py" = ["T20"]
@@ -84,14 +82,14 @@ external = ["DS"]
 "processing/llm_client.py" = ["T20"]
 "processing/llm_processor.py" = ["T20"]
 "processing/weekly_report_generator.py" = ["T20"]
-"shared/utils.py" = ["T20"]
+"ingest/summary.py" = ["T20"]
 # Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
 # which Pydantic turns into a named schema reference instead of the plain type.
 "models/types.py" = ["UP040"]
 # One-shot maintenance scripts, ratcheted separately from the product.
-"utils/calculate_token_costs.py" = ["C901", "PLR0912", "PLR0915"]
-"utils/migrate_topics.py" = ["C901", "PLR0912", "PLR0915"]
-"utils/cost_report_generator.py" = ["PLR0915"]
+"cli/calculate_token_costs.py" = ["C901", "PLR0912", "PLR0915"]
+"cli/migrate_topics.py" = ["C901", "PLR0912", "PLR0915"]
+"llm_costs/cost_report_generator.py" = ["PLR0915"]
 
 # Budget ceilings, not contracts: lower them freely, never raise them.
 # Each sits at today's worst function, named in its comment; walk them down by
@@ -103,11 +101,11 @@ max-complexity = 21   # ingest/email/email_parser.sanitize_content
 max-args = 8          # analytics/terms.compute_distinctive_terms, compute_rising_terms
 max-returns = 9       # processing/weekly_report_generator.generate_weekly_topic_report
 max-branches = 21     # ingest/email/email_parser.sanitize_content
-max-statements = 65   # notifications/process_notification_queue.process_digests
+max-statements = 65   # cli/process_notification_queue.process_digests
 
 
 [tool.ruff.lint.isort]
-known-first-party = ["analytics", "config", "ingest", "models", "notifications", "processing", "prompts", "shared", "tools", "utils"]
+known-first-party = ["analytics", "cli", "config", "ingest", "llm_costs", "models", "notifications", "processing", "prompts", "shared", "tools"]
 
 [tool.coverage.run]
 source = ["."]

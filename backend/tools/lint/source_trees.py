@@ -5,14 +5,15 @@ from pathlib import Path
 #: The top-level product packages, each run from ``backend/``.
 PRODUCT_PACKAGES = (
     "analytics",
+    "cli",
     "config",
     "ingest",
+    "llm_costs",
     "models",
     "notifications",
     "processing",
     "prompts",
     "shared",
-    "utils",
 )
 
 TREES = (*PRODUCT_PACKAGES, "tests", "tools")

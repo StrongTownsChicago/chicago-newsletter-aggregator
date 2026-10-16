@@ -22,7 +22,7 @@ from analytics.snapshot import (
     source_to_row,
 )
 
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SNAPSHOT_DIR = BACKEND_ROOT / "data" / "analytics_snapshot"
 
 SNAPSHOT_FORMAT_VERSION = 1

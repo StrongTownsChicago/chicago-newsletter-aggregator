@@ -6,7 +6,7 @@ execution. It outputs the top 20 slowest tests to help identify performance
 bottlenecks in the test suite.
 
 Usage:
-    uv run python utils/time_tests.py
+    uv run python -m tools.time_test_suite
 """
 
 import sys
@@ -14,11 +14,6 @@ import time
 import unittest
 from pathlib import Path
 from typing import Any
-
-# Add the backend directory to sys.path to resolve local imports correctly
-backend_root = Path(__file__).parent.parent.absolute()
-if str(backend_root) not in sys.path:
-    sys.path.insert(0, str(backend_root))
 
 
 class TimingResult(unittest.TextTestResult):

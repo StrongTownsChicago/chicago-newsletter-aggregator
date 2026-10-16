@@ -6,13 +6,13 @@ to validate formatting and content before sending.
 
 Usage:
     # Preview with real data from database
-    uv run python -m utils.preview_weekly_digest --topic bike_lanes --week 2026-W04
+    uv run python -m cli.preview_weekly_digest --topic bike_lanes --week 2026-W04
 
     # Preview with sample data
-    uv run python -m utils.preview_weekly_digest --sample
+    uv run python -m cli.preview_weekly_digest --sample
 
     # Save output to files
-    uv run python -m utils.preview_weekly_digest --topic bike_lanes --week 2026-W04 --save
+    uv run python -m cli.preview_weekly_digest --topic bike_lanes --week 2026-W04 --save
 """
 
 import argparse

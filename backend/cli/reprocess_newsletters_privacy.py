@@ -9,16 +9,16 @@ Usage Examples:
 Run from the backend/ directory:
 
 1.  Dry Run on a single newsletter:
-    uv run python -m utils.reprocess_newsletters_privacy <newsletter_uuid>
+    uv run python -m cli.reprocess_newsletters_privacy <newsletter_uuid>
 
 2.  Commit changes for a single newsletter:
-    uv run python -m utils.reprocess_newsletters_privacy <newsletter_uuid> --update
+    uv run python -m cli.reprocess_newsletters_privacy <newsletter_uuid> --update
 
 3.  Dry Run on ALL newsletters (minimal output):
-    uv run python -m utils.reprocess_newsletters_privacy --all --quiet
+    uv run python -m cli.reprocess_newsletters_privacy --all --quiet
 
 4.  Commit changes for ALL newsletters:
-    uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
+    uv run python -m cli.reprocess_newsletters_privacy --all --update --quiet
 """
 
 import argparse

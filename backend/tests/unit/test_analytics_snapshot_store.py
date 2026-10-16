@@ -1,4 +1,4 @@
-"""Unit tests for utils/analytics_snapshot.py (temporary directories only)."""
+"""Unit tests for analytics/io/snapshot_store.py (temporary directories only)."""
 
 import gzip
 import json
@@ -8,9 +8,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from analytics.records import NewsletterRecord, SourceRecord
-from analytics.snapshot import Snapshot
-from utils.analytics_snapshot import (
+from analytics.io.snapshot_store import (
     METADATA_FILE,
     NEWSLETTERS_FILE,
     SOURCES_FILE,
@@ -19,6 +17,8 @@ from utils.analytics_snapshot import (
     load_snapshot,
     save_snapshot,
 )
+from analytics.records import NewsletterRecord, SourceRecord
+from analytics.snapshot import Snapshot
 
 SAVED_AT = datetime(2026, 10, 13, 9, 0, tzinfo=UTC)
 

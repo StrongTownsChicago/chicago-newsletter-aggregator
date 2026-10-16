@@ -54,7 +54,7 @@ ADVISORY = frozenset({"DS102", "DS106"})
 
 #: The ratchet, not a target: lower it freely, never raise it. A test fails
 #: when it is above the measured count, so removing a site forces it down.
-#: Held up mostly by notifications/ and utils/ (``--report`` lists every site).
+#: Held up mostly by notifications/ and cli/ (``--report`` lists every site).
 FROZEN = {"DS002": 48}
 
 _PLANNING_DOC = re.compile(r"feature_planning/|handoff_archive/|HANDOFF|docs/plans")

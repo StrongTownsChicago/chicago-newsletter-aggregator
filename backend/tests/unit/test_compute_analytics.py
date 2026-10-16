@@ -1,4 +1,4 @@
-"""Unit tests for utils/compute_analytics.py orchestration (no database)."""
+"""Unit tests for cli/compute_analytics.py orchestration (no database)."""
 
 import unittest
 from datetime import date, datetime
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from analytics.facts import MIN_EXTRACTED_WORDS
 from analytics.records import NewsletterRecord, SourceRecord
-from utils.compute_analytics import (
+from cli.compute_analytics import (
     BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
     LENS_MIN_MENTIONS,
     MATCH_LENSES_ON_CLEANED_TEXT,
@@ -168,7 +168,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
             make_newsletter("d", date(2026, 10, 2), 1, self.filler),
             make_newsletter("e", date(2026, 10, 2), 2, self.filler),
         ]
-        with patch("utils.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
+        with patch("cli.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
             outputs = compute_site_outputs(
                 analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
             )
@@ -210,7 +210,7 @@ class TestComputeSiteOutputs(unittest.TestCase):
             make_newsletter("c", date(2026, 9, 14), 1, self.filler),
             make_newsletter("d", date(2026, 9, 15), 2, self.filler),
         ]
-        with patch("utils.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
+        with patch("cli.compute_analytics.REPORT_MIN_SENDING_WARDS", 2):
             outputs = compute_site_outputs(
                 analyze_archive(self.sources, newsletters, 1, datetime(2026, 10, 11))
             )

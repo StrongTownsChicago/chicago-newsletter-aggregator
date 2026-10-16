@@ -200,43 +200,41 @@ def run_main(argv: list[str]) -> tuple[int, str]:
 
 class TestMain(unittest.TestCase):
     def test_the_gate_fails_and_names_a_file_that_is_too_long(self) -> None:
-        with sandbox({"utils/big.py": body(checker.LINE_CAP + 1)}):
+        with sandbox({"cli/big.py": body(checker.LINE_CAP + 1)}):
             exit_code, stderr = run_main([])
         self.assertEqual(exit_code, 1)
-        self.assertIn("utils/big.py: MS001", stderr)
+        self.assertIn("cli/big.py: MS001", stderr)
 
     def test_the_gate_passes_a_small_file(self) -> None:
-        with sandbox({"utils/small.py": body(10)}):
+        with sandbox({"cli/small.py": body(10)}):
             self.assertEqual(run_main([])[0], 0)
 
     def test_a_baselined_file_passes_until_it_grows(self) -> None:
         over = body(checker.LINE_CAP + 10)
-        recorded = {"utils/big.py": {"lines": checker.LINE_CAP + 10}}
-        with sandbox({"utils/big.py": over}, recorded) as root:
+        recorded = {"cli/big.py": {"lines": checker.LINE_CAP + 10}}
+        with sandbox({"cli/big.py": over}, recorded) as root:
             self.assertEqual(run_main([])[0], 0)
-            (root / "utils" / "big.py").write_text(
-                over + "_more = 1\n", encoding="utf-8"
-            )
+            (root / "cli" / "big.py").write_text(over + "_more = 1\n", encoding="utf-8")
             exit_code, stderr = run_main([])
         self.assertEqual(exit_code, 1)
         self.assertIn("big.py", stderr)
 
     def test_a_stale_entry_fails_the_gate(self) -> None:
-        with sandbox({"utils/small.py": body(10)}, {"utils/small.py": {"lines": 900}}):
+        with sandbox({"cli/small.py": body(10)}, {"cli/small.py": {"lines": 900}}):
             exit_code, stderr = run_main([])
         self.assertEqual(exit_code, 1)
         self.assertIn("no longer needed", stderr)
 
     def test_update_refuses_to_raise_a_number(self) -> None:
-        recorded = {"utils/big.py": {"lines": checker.LINE_CAP + 10}}
-        with sandbox({"utils/big.py": body(checker.LINE_CAP + 60)}, recorded):
+        recorded = {"cli/big.py": {"lines": checker.LINE_CAP + 10}}
+        with sandbox({"cli/big.py": body(checker.LINE_CAP + 60)}, recorded):
             exit_code, stderr = run_main(["--update"])
         self.assertEqual(exit_code, 1)
         self.assertIn("only goes down", stderr)
 
     def test_update_accepts_a_split_that_lowers_the_total(self) -> None:
-        files = {"utils/part_a.py": body(300), "utils/part_b.py": body(300)}
-        with sandbox(files, {"utils/whole.py": {"lines": 900}}):
+        files = {"cli/part_a.py": body(300), "cli/part_b.py": body(300)}
+        with sandbox(files, {"cli/whole.py": {"lines": 900}}):
             self.assertEqual(run_main(["--update"])[0], 0)
             self.assertEqual(checker.load_baseline(), {})
 

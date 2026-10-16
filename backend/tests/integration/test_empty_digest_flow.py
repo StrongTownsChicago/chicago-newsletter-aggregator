@@ -8,14 +8,14 @@ the system correctly skips sending the email and marks the notification as faile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from notifications.process_notification_queue import process_daily_digests
+from cli.process_notification_queue import process_daily_digests
 
 
 class TestEmptyDigestFlow(unittest.TestCase):
     """Integration tests for end-to-end empty digest handling."""
 
     @patch("builtins.print")
-    @patch("notifications.process_notification_queue.get_supabase_client")
+    @patch("cli.process_notification_queue.get_supabase_client")
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.email_sender.resend.Emails.send")
     @patch("notifications.email_sender._build_unsubscribe_url")
@@ -85,9 +85,7 @@ class TestEmptyDigestFlow(unittest.TestCase):
         mock_sb.table.side_effect = table_router
 
         # Act
-        with patch(
-            "notifications.process_notification_queue.ZoneInfo"
-        ):  # Avoid TZ issues
+        with patch("cli.process_notification_queue.ZoneInfo"):  # Avoid TZ issues
             stats = process_daily_digests(batch_id=batch_id)
 
         # Assert

@@ -6,10 +6,10 @@ without running the full weekly report pipeline.
 
 Usage:
     # Test with an existing report from database
-    uv run python -m utils.test_weekly_summary --topic bike_lanes --week 2026-W04
+    uv run python -m cli.try_weekly_summary --topic bike_lanes --week 2026-W04
 
     # Test with sample data (no database query)
-    uv run python -m utils.test_weekly_summary --sample
+    uv run python -m cli.try_weekly_summary --sample
 """
 
 import argparse

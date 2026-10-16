@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from llm_costs.token_counter import (
+    estimate_llm_call_tokens,
+)
 from models.weekly_report import FactExtraction, WeeklySynthesis
 from processing.llm_client import parse_model_string
 from processing.llm_processor import (
@@ -18,10 +21,7 @@ from processing.llm_processor import (
     Summary,
     TopicsExtraction,
 )
-from shared.utils import CHICAGO_TIMEZONE
-from utils.token_counter import (
-    estimate_llm_call_tokens,
-)
+from shared.dates import CHICAGO_TIMEZONE
 
 # Estimated response sizes based on actual newsletter data
 # These are median values derived from real LLM outputs

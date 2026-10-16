@@ -6,19 +6,19 @@ Simulates prompts and counts tokens to estimate costs across providers.
 
 Usage:
     # Analyze latest 10 newsletters with GPT-5 pricing
-    uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5
+    uv run python -m cli.calculate_token_costs --latest 10 --model gpt-5
 
     # Include weekly report synthesis costs
-    uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5 --include-weekly
+    uv run python -m cli.calculate_token_costs --latest 10 --model gpt-5 --include-weekly
 
     # Compare multiple models
-    uv run python -m utils.calculate_token_costs --latest 10 --models gpt-5,claude-sonnet-4.5,gemini-2.5-pro
+    uv run python -m cli.calculate_token_costs --latest 10 --models gpt-5,claude-sonnet-4.5,gemini-2.5-pro
 
     # List available models
-    uv run python -m utils.calculate_token_costs --list-models
+    uv run python -m cli.calculate_token_costs --list-models
 
     # Output to JSON/CSV
-    uv run python -m utils.calculate_token_costs --latest 10 --model gpt-5 --output-json costs.json
+    uv run python -m cli.calculate_token_costs --latest 10 --model gpt-5 --output-json costs.json
 """
 
 import argparse
@@ -28,19 +28,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from shared.db import get_supabase_client
-from utils.cost_calculator import PricingData
-from utils.cost_report_generator import (
+from llm_costs.cost_calculator import PricingData
+from llm_costs.cost_report_generator import (
     generate_combined_text_report,
     generate_comparison_report,
     generate_csv_report,
     generate_json_report,
     generate_text_report,
 )
-from utils.newsletter_token_analyzer import (
+from llm_costs.newsletter_token_analyzer import (
     analyze_newsletter_tokens,
     analyze_weekly_report_tokens,
 )
+from shared.db import get_supabase_client
 
 
 def fetch_newsletters(

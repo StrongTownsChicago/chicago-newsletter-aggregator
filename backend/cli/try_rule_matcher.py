@@ -5,10 +5,10 @@ Fetches a recent newsletter and tests rule matching + queuing without sending em
 
 Usage:
     # Test matching only (don't queue)
-    uv run python -m notifications.test_matcher
+    uv run python -m cli.try_rule_matcher
 
     # Test matching AND queuing
-    uv run python -m notifications.test_matcher --queue
+    uv run python -m cli.try_rule_matcher --queue
 """
 
 import argparse

@@ -3,13 +3,13 @@ CLI script for processing notification queue and sending emails.
 
 Usage:
     # Send daily digest emails (defaults to yesterday's batch in Chicago timezone)
-    uv run python -m notifications.process_notification_queue --daily-digest
+    uv run python -m cli.process_notification_queue --daily-digest
 
     # Process specific batch ID
-    uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
+    uv run python -m cli.process_notification_queue --daily-digest --batch-id 2026-01-21
 
     # Dry run (don't actually send emails)
-    uv run python -m notifications.process_notification_queue --daily-digest --dry-run
+    uv run python -m cli.process_notification_queue --daily-digest --dry-run
 """
 
 import argparse

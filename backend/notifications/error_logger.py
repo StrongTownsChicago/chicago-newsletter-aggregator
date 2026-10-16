@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from shared.utils import CHICAGO_TIMEZONE
+from shared.dates import CHICAGO_TIMEZONE
 
 
 def log_notification_error(

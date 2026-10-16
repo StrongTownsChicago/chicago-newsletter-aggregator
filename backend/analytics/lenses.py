@@ -10,7 +10,7 @@ over the whole archive, and do not drift when a prompt or model changes.
 Lists may overlap: the two Strong Towns Chicago focus lenses are deliberately
 narrower slices of the broad housing and transportation lenses. Which text is
 matched (boilerplate-cleaned or raw) and how many mentions a newsletter needs
-are set, and explained, in `utils/compute_analytics.py`.
+are set, and explained, in `cli/compute_analytics.py`.
 """
 
 from dataclasses import dataclass

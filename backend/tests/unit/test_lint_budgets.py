@@ -42,9 +42,9 @@ SIZE_CODES = frozenset(code for _, code in CEILINGS.values())
 EXEMPT_PATHS = frozenset(
     {
         "tests/*",
-        "utils/calculate_token_costs.py",
-        "utils/migrate_topics.py",
-        "utils/cost_report_generator.py",
+        "cli/calculate_token_costs.py",
+        "cli/migrate_topics.py",
+        "llm_costs/cost_report_generator.py",
     }
 )
 

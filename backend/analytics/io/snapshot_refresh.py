@@ -3,7 +3,7 @@
 The production database has a small disk IO budget, so rows are read in small
 pages with a pause between them, and the default refresh fetches only
 newsletters created since the snapshot's cursor. `load_or_refresh_snapshot`
-picks the mode `utils.compute_analytics` was run with.
+picks the mode `cli.compute_analytics` was run with.
 """
 
 import argparse
@@ -12,6 +12,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
+from analytics.io.snapshot_store import load_snapshot, save_snapshot
 from analytics.records import SourceRecord, parse_newsletter_row, parse_source_row
 from analytics.snapshot import (
     Snapshot,
@@ -20,7 +21,6 @@ from analytics.snapshot import (
     newest_created_at,
 )
 from shared.db import get_supabase_client
-from utils.analytics_snapshot import load_snapshot, save_snapshot
 
 # Small pages with a pause between them keep reads well under the database's
 # disk IO budget; repeated full reads of every plain_text exhausted it once.

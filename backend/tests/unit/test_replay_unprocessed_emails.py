@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 from imap_tools import MailMessageFlags  # type: ignore[attr-defined]
 
-from utils.find_unprocessed_emails import MailboxEmail
-from utils.replay_unprocessed_emails import (
+from cli.find_unprocessed_emails import MailboxEmail
+from cli.replay_unprocessed_emails import (
     ReplayCandidate,
     ReplayFilters,
     find_unmatched_requested_uids,
@@ -58,7 +58,7 @@ SENDER_SOURCES: dict[str, dict[str, Any] | None] = {
 class TestResolveSenderSources(unittest.TestCase):
     """Test that each distinct sender is resolved exactly once."""
 
-    @patch("utils.replay_unprocessed_emails.lookup_source_by_email")
+    @patch("cli.replay_unprocessed_emails.lookup_source_by_email")
     def test_looks_up_each_sender_once(self, mock_lookup: MagicMock) -> None:
         mock_lookup.side_effect = lambda sender, _: (
             WARD_28 if sender.endswith("aldermanervin.com") else None
@@ -188,7 +188,7 @@ class TestGroupingAndFormatting(unittest.TestCase):
     def test_follow_up_includes_ingestion_and_llm_backfill(self) -> None:
         commands = format_follow_up_commands()
 
-        self.assertIn("uv run python -m ingest.email.process_emails", commands)
+        self.assertIn("uv run python -m cli.process_emails", commands)
         self.assertIn("process_llm_metadata --missing-metadata\n", commands)
 
     def test_follow_up_backfill_has_no_latest_limit(self) -> None:
@@ -255,15 +255,15 @@ class TestMain(unittest.TestCase):
         )
 
         patchers: list[Any] = [
-            patch("utils.replay_unprocessed_emails.MailBox", mailbox_factory),
-            patch("utils.replay_unprocessed_emails.load_dotenv"),
-            patch("utils.replay_unprocessed_emails.get_supabase_client"),
+            patch("cli.replay_unprocessed_emails.MailBox", mailbox_factory),
+            patch("cli.replay_unprocessed_emails.load_dotenv"),
+            patch("cli.replay_unprocessed_emails.get_supabase_client"),
             patch(
-                "utils.replay_unprocessed_emails.fetch_stored_email_uids",
+                "cli.replay_unprocessed_emails.fetch_stored_email_uids",
                 return_value={"4"},
             ),
             patch(
-                "utils.replay_unprocessed_emails.lookup_source_by_email",
+                "cli.replay_unprocessed_emails.lookup_source_by_email",
                 side_effect=lambda sender, _: SENDER_SOURCES.get(sender),
             ),
             patch.dict(

@@ -6,16 +6,16 @@ Designed to run weekly (e.g., Monday morning) via cron or GitHub Actions.
 
 Usage:
     # Generate reports for previous week (default)
-    uv run python -m utils.process_weekly_reports
+    uv run python -m cli.process_weekly_reports
 
     # Generate for specific week
-    uv run python -m utils.process_weekly_reports --week-id 2026-W05
+    uv run python -m cli.process_weekly_reports --week-id 2026-W05
 
     # Dry run (generate but don't store)
-    uv run python -m utils.process_weekly_reports --dry-run
+    uv run python -m cli.process_weekly_reports --dry-run
 
     # Force regenerate even if reports exist
-    uv run python -m utils.process_weekly_reports --force
+    uv run python -m cli.process_weekly_reports --force
 """
 
 import argparse

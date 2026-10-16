@@ -6,7 +6,7 @@ Processes unread newsletters from Gmail inbox, matches them to sources, and stor
 Usage:
     Run from the backend/ directory:
 
-    $ uv run python -m ingest.email.process_emails
+    $ uv run python -m cli.process_emails
 
 Required environment variables (.env file):
     - GMAIL_ADDRESS: Gmail account email address
@@ -35,8 +35,9 @@ from imap_tools import AND, MailBox, MailMessageFlags  # type: ignore[attr-defin
 
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import parse_newsletter
+from ingest.summary import print_summary
+from shared.dates import CHICAGO_TIMEZONE
 from shared.db import get_supabase_client
-from shared.utils import CHICAGO_TIMEZONE, print_summary
 
 load_dotenv()
 
@@ -88,7 +89,7 @@ def process_new_newsletters() -> None:
     Usage:
         Run from the backend/ directory:
 
-        $ uv run python -m ingest.email.process_emails
+        $ uv run python -m cli.process_emails
 
     Required environment variables:
         - GMAIL_ADDRESS: Gmail account email address

@@ -5,7 +5,7 @@ Queues notifications for weekly topic reports based on user notification rules.
 Designed to run after weekly report generation is complete.
 
 Usage:
-    from notifications.weekly_notification_queue import queue_weekly_notifications
+    from cli.weekly_notification_queue import queue_weekly_notifications
 
     stats = queue_weekly_notifications("2026-W05")
     print(f"Queued {stats['queued']} notifications for {stats['users']} users")

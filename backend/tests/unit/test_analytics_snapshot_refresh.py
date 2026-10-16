@@ -1,4 +1,4 @@
-"""Unit tests for utils/analytics_snapshot_refresh.py (fake database)."""
+"""Unit tests for analytics/io/snapshot_refresh.py (fake database)."""
 
 import argparse
 import tempfile
@@ -9,10 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from analytics.records import NewsletterRecord, SourceRecord
-from analytics.snapshot import Snapshot
-from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
-from utils.analytics_snapshot_refresh import (
+from analytics.io.snapshot_refresh import (
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
@@ -22,6 +19,13 @@ from utils.analytics_snapshot_refresh import (
     load_or_refresh_snapshot,
     refresh_snapshot,
 )
+from analytics.io.snapshot_store import (
+    SnapshotNotFoundError,
+    load_snapshot,
+    save_snapshot,
+)
+from analytics.records import NewsletterRecord, SourceRecord
+from analytics.snapshot import Snapshot
 
 
 class FakeQuery:
@@ -248,9 +252,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             seed = self.save_seed(path)
-            with patch(
-                "utils.analytics_snapshot_refresh.get_supabase_client"
-            ) as client:
+            with patch("analytics.io.snapshot_refresh.get_supabase_client") as client:
                 snapshot = load_or_refresh_snapshot(
                     self.make_args(path, offline=True), self.NOW
                 )
@@ -271,10 +273,10 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             )
             with (
                 patch(
-                    "utils.analytics_snapshot_refresh.get_supabase_client",
+                    "analytics.io.snapshot_refresh.get_supabase_client",
                     return_value=supabase,
                 ),
-                patch("utils.analytics_snapshot_refresh.time.sleep"),
+                patch("analytics.io.snapshot_refresh.time.sleep"),
             ):
                 snapshot = load_or_refresh_snapshot(self.make_args(path), self.NOW)
             self.assertEqual(
@@ -285,7 +287,7 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
     def test_default_mode_without_snapshot_does_not_touch_the_database(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with (
-                patch("utils.analytics_snapshot_refresh.get_supabase_client") as client,
+                patch("analytics.io.snapshot_refresh.get_supabase_client") as client,
                 self.assertRaises(SnapshotNotFoundError),
             ):
                 load_or_refresh_snapshot(
@@ -304,10 +306,10 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
             )
             with (
                 patch(
-                    "utils.analytics_snapshot_refresh.get_supabase_client",
+                    "analytics.io.snapshot_refresh.get_supabase_client",
                     return_value=supabase,
                 ),
-                patch("utils.analytics_snapshot_refresh.time.sleep"),
+                patch("analytics.io.snapshot_refresh.time.sleep"),
             ):
                 snapshot = load_or_refresh_snapshot(
                     self.make_args(path, full_refresh=True), self.NOW

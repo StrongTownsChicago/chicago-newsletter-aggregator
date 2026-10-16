@@ -1,29 +1,33 @@
 [importlinter]
 root_packages =
     analytics
+    cli
     config
     ingest
+    llm_costs
     models
     notifications
     processing
     prompts
     shared
-    utils
 include_external_packages = True
 
 [importlinter:contract:layers]
 name = CLI scripts sit above ingestion, which sits above the services, which sit above the leaf packages
 type = layers
 layers =
-    utils
-    ingest
+    cli
+    ingest | llm_costs
     notifications | processing
     analytics | config | models | prompts | shared
 # `|` also makes siblings independent: notifications never imports processing,
-# and no leaf package imports another.
+# and no leaf package imports another. The one exception is the analytics
+# snapshot refresh, which reads the database.
+ignore_imports =
+    analytics.io.snapshot_refresh -> shared.db
 
 [importlinter:contract:analytics-pure]
-name = analytics is pure: no database, network, or LLM clients
+name = analytics is pure: no database, network, or LLM clients (outside the snapshot refresh)
 type = forbidden
 source_modules =
     analytics
@@ -36,3 +40,5 @@ forbidden_modules =
     imap_tools
     dotenv
     shared
+ignore_imports =
+    analytics.io.snapshot_refresh -> shared.db

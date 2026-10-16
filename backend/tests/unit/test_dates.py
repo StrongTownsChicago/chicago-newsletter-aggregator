@@ -1,13 +1,10 @@
 """
-Unit tests for shared/utils.py
-
-Tests date parsing utilities and summary printing.
+Unit tests for shared/dates.py
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
 
-from shared.utils import parse_date_string, print_summary
+from shared.dates import parse_date_string
 
 
 class TestParseDateString(unittest.TestCase):
@@ -79,24 +76,6 @@ class TestParseDateString(unittest.TestCase):
         else:
             # If it doesn't overflow, that's fine too
             self.assertIsNotNone(result)
-
-
-class TestPrintSummary(unittest.TestCase):
-    """Tests for print_summary() function."""
-
-    @patch("builtins.print")
-    def test_prints_counts(self, mock_print: MagicMock) -> None:
-        """Output includes processed, skipped, failed counts."""
-        print_summary(processed=10, skipped=2, failed=1)
-
-        # Verify print was called
-        self.assertTrue(mock_print.called)
-
-        # Check that output contains the counts
-        printed_output = " ".join(str(call[0][0]) for call in mock_print.call_args_list)
-        self.assertIn("10", printed_output)
-        self.assertIn("2", printed_output)
-        self.assertIn("1", printed_output)
 
 
 if __name__ == "__main__":

@@ -7,14 +7,14 @@ sender now maps to a source, and clears their \\Seen flag.
 
 Run from backend/. A dry run lists what would be replayed, grouped by source;
 --apply clears the flag. --source-id, --since and --uids narrow the selection:
-    $ uv run python -m utils.replay_unprocessed_emails --since 2026-09-01
-    $ uv run python -m utils.replay_unprocessed_emails --apply
+    $ uv run python -m cli.replay_unprocessed_emails --since 2026-09-01
+    $ uv run python -m cli.replay_unprocessed_emails --apply
 
 After --apply, run ingestion, then LLM metadata with no --latest limit
 (replayed emails keep their original received_date, so newer newsletters
 missing metadata would sort ahead of them and crowd them out):
-    $ uv run python -m ingest.email.process_emails
-    $ uv run python -m utils.process_llm_metadata --missing-metadata
+    $ uv run python -m cli.process_emails
+    $ uv run python -m cli.process_llm_metadata --missing-metadata
 
 The only mailbox change ever made is clearing \\Seen on selected UIDs, and only
 with --apply; nothing is marked read, moved, or deleted. Senders still unmapped
@@ -39,15 +39,15 @@ from typing import Any
 from dotenv import load_dotenv
 from imap_tools import MailBox, MailMessageFlags  # type: ignore[attr-defined]
 
-from ingest.email.email_parser import lookup_source_by_email
-from shared.db import get_supabase_client
-from utils.find_unprocessed_emails import (
+from cli.find_unprocessed_emails import (
     INGESTED_FOLDER,
     MailboxEmail,
     fetch_mailbox_emails,
     fetch_stored_email_uids,
     find_unprocessed_emails,
 )
+from ingest.email.email_parser import lookup_source_by_email
+from shared.db import get_supabase_client
 
 SUBJECT_PREVIEW_LENGTH = 60
 
@@ -188,8 +188,8 @@ def format_follow_up_commands() -> str:
     """Commands to ingest the replayed emails and backfill their LLM metadata."""
     return (
         "Next steps (from backend/):\n"
-        "    uv run python -m ingest.email.process_emails\n"
-        "    uv run python -m utils.process_llm_metadata --missing-metadata\n"
+        "    uv run python -m cli.process_emails\n"
+        "    uv run python -m cli.process_llm_metadata --missing-metadata\n"
         "Note: an ingestion run with ENABLE_NOTIFICATIONS=true (including the "
         "scheduled GitHub Actions workflow) queues digest notifications for "
         "replayed emails that match user rules."

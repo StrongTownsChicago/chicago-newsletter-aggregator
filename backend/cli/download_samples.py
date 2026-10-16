@@ -2,8 +2,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from shared.dates import CHICAGO_TIMEZONE
 from shared.db import get_supabase_client
-from shared.utils import CHICAGO_TIMEZONE
 
 MAX_SAMPLES_PER_SOURCE = 1
 OUTPUT_DIR = Path(__file__).parent / "../samples"

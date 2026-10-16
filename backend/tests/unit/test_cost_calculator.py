@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from utils.cost_calculator import (
+from llm_costs.cost_calculator import (
     PricingData,
     calculate_cost,
 )

@@ -9,15 +9,15 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
-from notifications.digest_config import DigestType
-from notifications.digest_html import build_digest_html
-from notifications.digest_text import build_digest_text
-from notifications.email_sender import send_digest
-from notifications.process_notification_queue import (
+from cli.process_notification_queue import (
     _calculate_daily_batch_id,
     _calculate_weekly_batch_id,
     process_digests,
 )
+from notifications.digest_config import DigestType
+from notifications.digest_html import build_digest_html
+from notifications.digest_text import build_digest_text
+from notifications.email_sender import send_digest
 
 
 class TestDigestEmailTemplates(unittest.TestCase):
@@ -203,7 +203,7 @@ class TestDigestSending(unittest.TestCase):
 class TestBatchIdCalculation(unittest.TestCase):
     """Tests for batch ID calculation functions."""
 
-    @patch("notifications.process_notification_queue.datetime")
+    @patch("cli.process_notification_queue.datetime")
     def test_calculates_yesterday_chicago_time(self, mock_datetime: MagicMock) -> None:
         """Daily batch ID is yesterday in Chicago timezone."""
         chicago_tz = ZoneInfo("America/Chicago")
@@ -214,7 +214,7 @@ class TestBatchIdCalculation(unittest.TestCase):
 
         self.assertEqual(result, "2026-01-25")
 
-    @patch("notifications.process_notification_queue.datetime")
+    @patch("cli.process_notification_queue.datetime")
     def test_calculates_previous_iso_week(self, mock_datetime: MagicMock) -> None:
         """Weekly batch ID is previous week in ISO format."""
         chicago_tz = ZoneInfo("America/Chicago")
@@ -243,7 +243,7 @@ class TestDigestProcessing(unittest.TestCase):
 
         sys.stdout = sys.__stdout__
 
-    @patch("notifications.process_notification_queue.get_pending_notifications_by_user")
+    @patch("cli.process_notification_queue.get_pending_notifications_by_user")
     def test_dry_run_counts_but_doesnt_send(self, mock_get_notifs: MagicMock) -> None:
         """Dry run mode processes notifications without sending emails."""
         mock_get_notifs.return_value = {
@@ -251,8 +251,8 @@ class TestDigestProcessing(unittest.TestCase):
         }
 
         with (
-            patch("notifications.process_notification_queue.get_supabase_client"),
-            patch("notifications.process_notification_queue.send_digest") as mock_send,
+            patch("cli.process_notification_queue.get_supabase_client"),
+            patch("cli.process_notification_queue.send_digest") as mock_send,
         ):
             result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
 
