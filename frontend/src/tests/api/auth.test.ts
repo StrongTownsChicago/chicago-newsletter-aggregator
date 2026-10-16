@@ -42,6 +42,8 @@ import { createMockContext } from '../helpers';
 import { supabase, notificationsEnabled } from '../../lib/supabase';
 import { WELCOME_PATH } from '../../lib/onboarding';
 
+const upload = () => new File(['x'], 'upload.txt');
+
 const successfulSignIn = () =>
   vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
     data: { session: mockSession, user: mockUser },
@@ -131,6 +133,17 @@ describe('Auth API Routes', () => {
 
 
 
+    it('treats an uploaded File as a missing field', async () => {
+      const missing = await signinPOST(createMockContext({ formData: { password: 'password123' } }));
+      const withFile = await signinPOST(
+        createMockContext({ formData: { email: upload(), password: 'password123' } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('/login?');
+      expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    });
+
     it("returns 404 if notifications are disabled", async () => {
       vi.mocked(notificationsEnabled).mockReturnValue(false);
 
@@ -198,6 +211,17 @@ describe('Auth API Routes', () => {
       expect(redirectTo.origin).toBe("http://localhost:4321");
       expect(redirectTo.pathname).toBe("/login");
       expect(redirectTo.searchParams.get("next")).toBe(WELCOME_PATH);
+    });
+
+    it('treats an uploaded File as a missing field', async () => {
+      const missing = await signupPOST(createMockContext({ formData: { email: 'test@example.com' } }));
+      const withFile = await signupPOST(
+        createMockContext({ formData: { email: 'test@example.com', password: upload() } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('error=Email and password are required');
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
     });
 
     it("redirects to /signup with error on validation failure (short password)", async () => {

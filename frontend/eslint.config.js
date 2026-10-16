@@ -8,6 +8,14 @@ const maxLines = (max) => ({
   "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
 });
 
+const computedEnvRead = {
+  selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
+  message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
+};
+
+const supabaseAdminMessage =
+  "supabase-admin carries the service key: import it only from src/pages/api/** server routes.";
+
 export default defineConfig(
   { ignores: ["dist/**", ".astro/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**"] },
   ...tseslint.configs.recommended,
@@ -39,10 +47,7 @@ export default defineConfig(
       "prefer-const": "error",
       // newsletter raw_html is rendered with set:html; every use needs a written reason
       "astro/no-set-html-directive": "error",
-      "no-restricted-syntax": ["error", {
-        selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
-        message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
-      }],
+      "no-restricted-syntax": ["error", computedEnvRead],
     },
   },
   {
@@ -52,8 +57,14 @@ export default defineConfig(
       "no-restricted-imports": ["error", {
         patterns: [{
           group: ["**/supabase-admin", "**/supabase-admin.ts"],
-          message: "supabase-admin carries the service key: import it only from src/pages/api/** server routes.",
+          message: supabaseAdminMessage,
         }],
+      }],
+      // Catches import("…/supabase-admin") and import(`…/supabase-admin`). ESLint replaces a
+      // rule set again in a later block rather than merging it, so the shared selector is repeated here.
+      "no-restricted-syntax": ["error", computedEnvRead, {
+        selector: "ImportExpression > :matches(Literal[value=/supabase-admin/], TemplateLiteral:has(TemplateElement[value.raw=/supabase-admin/])).source",
+        message: supabaseAdminMessage,
       }],
     },
   },
@@ -78,18 +89,5 @@ export default defineConfig(
       "@typescript-eslint/require-await": "off",
       "@typescript-eslint/unbound-method": "off",
     },
-  },
-  // FormDataEntryValue.toString() turns a File into "[object File]". These routes only
-  // receive text fields from their own forms; narrowing to strings would change how a
-  // forged File is handled, so it waits for a deliberate change. Remove files as they are fixed.
-  {
-    files: [
-      "src/pages/api/auth/signin.ts",
-      "src/pages/api/auth/signup.ts",
-      "src/pages/api/notifications/create-rule.ts",
-      "src/pages/api/notifications/delete-rule.ts",
-      "src/pages/api/notifications/update-rule.ts",
-    ],
-    rules: { "@typescript-eslint/no-base-to-string": "off" },
   },
 );
