@@ -224,31 +224,6 @@ def send_digest(
         return {"success": False, "error": str(e)}
 
 
-def send_daily_digest(
-    user_id: str,
-    user_email: str,
-    notifications: list[dict[str, Any]],
-    preferences_url: str | None = None,
-) -> dict[str, Any]:
-    """
-    Send a daily digest email with all matched newsletters.
-
-    Wrapper around send_digest() for backward compatibility.
-
-    Args:
-        user_id: User's unique identifier (for generating unsubscribe token)
-        user_email: Recipient email address
-        notifications: List of notification records (from notification_queue)
-        preferences_url: URL to preferences page for managing notifications
-
-    Returns:
-        Dictionary with 'success' (bool), 'email_id' (str if success), 'error' (str if failed)
-    """
-    return send_digest(
-        user_id, user_email, notifications, DigestType.DAILY, preferences_url
-    )
-
-
 def _render_daily_content_html(prepared_newsletters: list[dict[str, Any]]) -> str:
     """Render daily digest content section (newsletter cards) as HTML."""
     content = ""
@@ -723,31 +698,6 @@ Built for Strong Towns Chicago - https://strongtownschicago.org
 """
 
     return text
-
-
-def send_weekly_digest(
-    user_id: str,
-    user_email: str,
-    notifications: list[dict[str, Any]],
-    preferences_url: str | None = None,
-) -> dict[str, Any]:
-    """
-    Send a weekly digest email with topic-based reports.
-
-    Wrapper around send_digest() for backward compatibility.
-
-    Args:
-        user_id: User's unique identifier
-        user_email: Recipient email address
-        notifications: List of notification records (report references)
-        preferences_url: URL to preferences page
-
-    Returns:
-        Dictionary with 'success' (bool), 'email_id' (str if success), 'error' (str if failed)
-    """
-    return send_digest(
-        user_id, user_email, notifications, DigestType.WEEKLY, preferences_url
-    )
 
 
 # ============================================================================

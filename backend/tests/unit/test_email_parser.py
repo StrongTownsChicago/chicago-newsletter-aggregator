@@ -7,7 +7,6 @@ from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import (
     clean_html_content,
     email_matches_pattern,
-    extract_name_from_sender,
     lookup_source_by_email,
     parse_newsletter,
 )
@@ -274,46 +273,6 @@ class TestLookupSourceByEmail(unittest.TestCase):
         result = lookup_source_by_email("test@example.com", mock_supabase)
 
         self.assertIsNone(result)
-
-
-class TestExtractNameFromSender(unittest.TestCase):
-    """Tests for extract_name_from_sender() function."""
-
-    def test_extract_name_with_angle_brackets(self) -> None:
-        """Standard format: Name <email@example.com>."""
-        result = extract_name_from_sender("John Smith <john@example.com>")
-
-        self.assertEqual(result, "John Smith")
-
-    def test_extract_name_with_quotes(self) -> None:
-        """Quoted name: "Ward Office" <email@example.com>."""
-        result = extract_name_from_sender('"Ward Office" <office@ward.org>')
-
-        self.assertEqual(result, "Ward Office")
-
-    def test_no_display_name_returns_none(self) -> None:
-        """Plain email address with no name."""
-        result = extract_name_from_sender("email@example.com")
-
-        self.assertIsNone(result)
-
-    def test_empty_string_returns_none(self) -> None:
-        """Empty string returns None."""
-        result = extract_name_from_sender("")
-
-        self.assertIsNone(result)
-
-    def test_complex_name_formats(self) -> None:
-        """Names with special characters and multiple words."""
-        result = extract_name_from_sender("María García-López <maria@example.com>")
-
-        self.assertEqual(result, "María García-López")
-
-    def test_single_quoted_name(self) -> None:
-        """Single quotes around name."""
-        result = extract_name_from_sender("'Office' <office@ward.org>")
-
-        self.assertEqual(result, "Office")
 
 
 class TestCleanHtmlContent(unittest.TestCase):

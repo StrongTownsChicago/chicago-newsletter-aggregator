@@ -27,10 +27,8 @@ from tools.lint.source_trees import PRODUCT_PACKAGES, python_files
 ROOT = Path(__file__).resolve().parents[2]
 
 #: The ratchet, not a target: lower it freely, never raise it. A test fails
-#: when it is above the measured count. Held up by test-only or unused symbols
-#: in lenses, email_parser, email_sender, unsubscribe_tokens and
-#: cost_report_generator; ``--report`` names them.
-FROZEN_FINDINGS = 5
+#: when it is above the measured count; ``--report`` names any finding.
+FROZEN_FINDINGS = 0
 
 #: Consumers whose import does NOT keep a symbol alive, as (tier, tree).
 #: Letting a test hold a symbol alive would pin dead code forever.

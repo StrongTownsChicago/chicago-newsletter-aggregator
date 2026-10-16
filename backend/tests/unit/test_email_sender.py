@@ -14,7 +14,7 @@ from notifications.email_sender import (
     _build_digest_html,
     _build_digest_text,
     _prepare_newsletter_data,
-    send_daily_digest,
+    send_digest,
 )
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 
@@ -162,7 +162,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
 
 class TestSendDailyDigest(unittest.TestCase):
-    """Tests for send_daily_digest() function."""
+    """Tests for send_digest() with DigestType.DAILY."""
 
     def setUp(self) -> None:
         """Set up test environment with secret key."""
@@ -190,7 +190,9 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = send_daily_digest("user-123", "user@example.com", notifications)
+        result = send_digest(
+            "user-123", "user@example.com", notifications, DigestType.DAILY
+        )
 
         self.assertTrue(result["success"])
         self.assertEqual(result["email_id"], "email_123")
@@ -204,14 +206,16 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = send_daily_digest("user-123", "user@example.com", notifications)
+        result = send_digest(
+            "user-123", "user@example.com", notifications, DigestType.DAILY
+        )
 
         self.assertFalse(result["success"])
         self.assertIn("API Error", result["error"])
 
     def test_empty_notifications_returns_error(self) -> None:
         """Empty notifications list returns error."""
-        result = send_daily_digest("user-123", "user@example.com", [])
+        result = send_digest("user-123", "user@example.com", [], DigestType.DAILY)
 
         self.assertFalse(result["success"])
         self.assertIn("No notifications", result["error"])
@@ -224,7 +228,7 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        send_daily_digest("user-123", "user@example.com", notifications)
+        send_digest("user-123", "user@example.com", notifications, DigestType.DAILY)
 
         # Check that HTML contains preferences link
         call_args = mock_send.call_args[0][0]
@@ -238,10 +242,11 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        send_daily_digest(
+        send_digest(
             "user-123",
             "user@example.com",
             notifications,
+            DigestType.DAILY,
             preferences_url="https://custom.com/prefs",
         )
 
@@ -260,7 +265,7 @@ class TestSendDailyDigest(unittest.TestCase):
             {"newsletter": newsletter2, "rule": {"name": "Rule 1"}},
         ]
 
-        send_daily_digest("user-123", "user@example.com", notifications)
+        send_digest("user-123", "user@example.com", notifications, DigestType.DAILY)
 
         call_args = mock_send.call_args[0][0]
         self.assertIn("2 newsletters", call_args["subject"])
@@ -273,7 +278,7 @@ class TestSendDailyDigest(unittest.TestCase):
         newsletter = create_test_newsletter()
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        send_daily_digest("user-123", "user@example.com", notifications)
+        send_digest("user-123", "user@example.com", notifications, DigestType.DAILY)
 
         self.assertTrue(mock_send.called)
         call_args = mock_send.call_args[0][0]

@@ -55,7 +55,7 @@ ADVISORY = frozenset({"DS102", "DS106"})
 #: The ratchet, not a target: lower it freely, never raise it. A test fails
 #: when it is above the measured count, so removing a site forces it down.
 #: Held up mostly by notifications/ and utils/ (``--report`` lists every site).
-FROZEN = {"DS002": 50}
+FROZEN = {"DS002": 48}
 
 _PLANNING_DOC = re.compile(r"feature_planning/|handoff_archive/|HANDOFF|docs/plans")
 _ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")

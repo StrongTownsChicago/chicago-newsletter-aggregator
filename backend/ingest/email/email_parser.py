@@ -171,24 +171,6 @@ def lookup_source_by_email(
     return None
 
 
-def extract_name_from_sender(from_address: str) -> str | None:
-    """
-    Extract display name from email sender field.
-
-    Example: "Alderman John Smith <ward01@example.com>" -> "John Smith"
-    Returns None if no display name present.
-    """
-    # Try parsing display name from email header
-    match = re.match(r"^(.+?)\s*<", from_address)
-    if match:
-        name = match.group(1).strip()
-        # Remove quotes if present
-        name = name.strip('"').strip("'")
-        return name if name else None
-
-    return None
-
-
 def clean_html_content(html: str) -> str:
     """Convert HTML to clean plain text using html2text, removing excessive whitespace."""
     if not html:

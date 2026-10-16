@@ -13,9 +13,9 @@ from analytics.lenses import (
     phrase_key,
     split_into_sentences,
     summarize_lens_hits,
-    validate_lenses,
 )
 from analytics.records import NewsletterRecord
+from tests.fixtures.lens_validation import validate_lenses
 
 MATCHER = LensMatcher(LENSES)
 
