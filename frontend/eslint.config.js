@@ -60,10 +60,10 @@ export default defineConfig(
           message: supabaseAdminMessage,
         }],
       }],
-      // Catches import("…/supabase-admin"). ESLint replaces a rule set again in a later
-      // block rather than merging it, so the shared selector is repeated here.
+      // Catches import("…/supabase-admin") and import(`…/supabase-admin`). ESLint replaces a
+      // rule set again in a later block rather than merging it, so the shared selector is repeated here.
       "no-restricted-syntax": ["error", computedEnvRead, {
-        selector: "ImportExpression[source.value=/supabase-admin/]",
+        selector: "ImportExpression > :matches(Literal[value=/supabase-admin/], TemplateLiteral:has(TemplateElement[value.raw=/supabase-admin/])).source",
         message: supabaseAdminMessage,
       }],
     },
