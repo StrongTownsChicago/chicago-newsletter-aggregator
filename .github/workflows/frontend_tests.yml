@@ -37,10 +37,26 @@ jobs:
           cd frontend
           npm run lint
 
+      - name: Type check
+        run: |
+          cd frontend
+          npm run typecheck
+
       - name: Run Tests
         run: |
           cd frontend
           npm test
+
+      # Placeholder Supabase env, as in playwright.analytics.config.ts: the build reads no database.
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
+        env:
+          PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          PUBLIC_ENABLE_NOTIFICATIONS: "false"
+          SUPABASE_SERVICE_KEY: placeholder-service-key
 
       # Fixture data, placeholder Supabase env, and off-origin requests aborted (playwright.analytics.config.ts).
       - name: Install Playwright Chromium

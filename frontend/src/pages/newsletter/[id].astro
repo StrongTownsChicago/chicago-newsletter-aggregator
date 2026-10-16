@@ -3,17 +3,18 @@ export const prerender = false;
 
 import Layout from '../../layouts/Layout.astro';
 import { supabase } from '../../lib/supabase';
-import { NEWSLETTER_DETAIL_SELECT } from '../../lib/newsletter-queries';
+import { NEWSLETTER_DETAIL_SELECT, type NewsletterDetailRow } from '../../lib/newsletter-queries';
 import { buildNewsletterDescription } from '../../lib/seo';
 import { buildWardPath, parseWardParam } from '../../lib/wards';
 
 const { id } = Astro.params;
 
-const { data: newsletter, error } = await supabase
+const { data, error } = await supabase
   .from('newsletters')
   .select(NEWSLETTER_DETAIL_SELECT)
   .eq('id', id)
   .single();
+const newsletter = data as NewsletterDetailRow | null;
 
 if (error || !newsletter) {
   return Astro.redirect('/404');

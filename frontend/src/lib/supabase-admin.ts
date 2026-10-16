@@ -11,14 +11,15 @@ if (!import.meta.env.SSR) {
 }
 
 // Factory function for creating admin client (supports both dev and Cloudflare runtime)
-export function getSupabaseAdmin(locals?: {
-  runtime?: { env?: Record<string, string> };
-}): SupabaseClient {
+export function getSupabaseAdmin(
+  locals?: Pick<App.Locals, "runtime">,
+): SupabaseClient {
   const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 
   // Try to get service role key from Cloudflare runtime env first, then fall back to import.meta.env for local dev
+  const runtimeServiceKey = locals?.runtime?.env?.SUPABASE_SERVICE_KEY;
   const serviceRoleKey =
-    locals?.runtime?.env?.SUPABASE_SERVICE_KEY ||
+    (typeof runtimeServiceKey === "string" ? runtimeServiceKey : "") ||
     import.meta.env.SUPABASE_SERVICE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
