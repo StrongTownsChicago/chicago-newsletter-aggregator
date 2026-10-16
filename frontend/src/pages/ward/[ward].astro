@@ -6,6 +6,7 @@ import NewsletterCard from '../../components/NewsletterCard.astro';
 import Pagination from '../../components/Pagination.astro';
 import WardGlance from '../../components/WardGlance.astro';
 import { supabase } from '../../lib/supabase';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../../lib/page-cache';
 import type { WardProfileSource } from '../../lib/newsletter-queries';
 import { countPages, parsePageParam } from '../../lib/pagination';
 import { SITE_NAME, buildWardDescription, buildWardTitle, formatReceivedDate } from '../../lib/seo';
@@ -44,6 +45,8 @@ if (wardNumber === null) {
   } catch (error) {
     console.error(`Error loading ward ${wardNumber}:`, error);
     loadFailed = true;
+    // Keep a failed load out of the edge page cache.
+    Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
   }
 }
 

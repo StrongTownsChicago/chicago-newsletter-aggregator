@@ -3,6 +3,7 @@ export const prerender = false;
 
 import Layout from '../layouts/Layout.astro';
 import { supabase } from '../lib/supabase';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
 import type { WardDirectorySource } from '../lib/newsletter-queries';
 import { SITE_NAME } from '../lib/seo';
 import { fetchWardDirectorySources } from '../lib/ward-queries';
@@ -16,6 +17,8 @@ try {
 } catch (error) {
   console.error('Error loading ward directory:', error);
   loadFailed = true;
+  // Keep a failed load out of the edge page cache.
+  Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
 
 const wardDirectory = buildWardDirectory(sources);

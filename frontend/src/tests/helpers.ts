@@ -4,12 +4,23 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const createMockCookies = () => {
   const store = new Map<string, unknown>();
+  // Set-Cookie values queued for the response, like AstroCookies.headers().
+  const outgoing: string[] = [];
   return {
     get: vi.fn((key: string) => store.get(key)),
-    set: vi.fn((key: string, value: string) => store.set(key, { value })),
-    delete: vi.fn((key: string) => store.delete(key)),
+    set: vi.fn((key: string, value: string) => {
+      outgoing.push(`${key}=${value}`);
+      store.set(key, { value });
+    }),
+    delete: vi.fn((key: string) => {
+      outgoing.push(`${key}=deleted`);
+      return store.delete(key);
+    }),
     has: vi.fn((key: string) => store.has(key)),
     getAll: vi.fn(() => Array.from(store.values())),
+    headers: vi.fn(function* () {
+      yield* outgoing;
+    }),
   };
 };
 

@@ -6,6 +6,7 @@ import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import SearchTimeline from '../components/SearchTimeline.astro';
 import { supabase } from '../lib/supabase';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/newsletter-queries';
 import { TOPIC_CATEGORIES } from '../lib/topics';
@@ -57,11 +58,17 @@ const sourcesQuery = supabase
   .select(SEARCH_SOURCE_COLUMNS.join(', '))
   .overrideTypes<SearchSourceRow[], { merge: false }>();
 
-const [{ count }, { data }, { data: sourceData }] = await Promise.all([
-  countQuery,
-  dataQuery.range(start, end),
-  sourcesQuery,
-]);
+const [
+  { count, error: countError },
+  { data, error: dataError },
+  { data: sourceData, error: sourcesError },
+] = await Promise.all([countQuery, dataQuery.range(start, end), sourcesQuery]);
+
+if (countError || dataError || sourcesError) {
+  console.error('Error loading search results:', countError ?? dataError ?? sourcesError);
+  // Keep a failed load out of the edge page cache.
+  Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
+}
 
 const totalPages = Math.ceil((count || 0) / SEARCH_PAGE_SIZE);
 const newsletters = data as NewsletterCardRow[] | null;
