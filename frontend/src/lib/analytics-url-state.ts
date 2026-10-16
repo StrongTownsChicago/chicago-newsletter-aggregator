@@ -1,6 +1,7 @@
 // The /analytics view as a query string, for sharing and back/forward.
 // Parsing never throws: invalid values fall back to the defaults.
-import { compareWards, normalizeTermQuery, type AnalyticsFilters } from "./analytics";
+import { compareWards, type AnalyticsFilters } from "./analytics";
+import { normalizeTermQuery } from "./analytics-terms";
 
 /** Query parameter names; readers see "topic", never the internal "lens". */
 export const DASHBOARD_URL_PARAMS = {

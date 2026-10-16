@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ESLint, type Linter } from "eslint";
 import { describe, expect, it } from "vitest";
@@ -7,15 +8,9 @@ import eslintConfig from "../../../eslint.config.js";
 const FRONTEND_ROOT = path.resolve(__dirname, "../../..");
 const DEFAULT_MAX_LINES = 400;
 
-// Same numbers as the max-lines ceilings in eslint.config.js. Raising one is a
-// two-place change on purpose; lower both when a file shrinks.
-const ADOPTED_CEILINGS: Record<string, number> = {
-  "src/scripts/analytics-dashboard.ts": 1170,
-  "src/lib/analytics-charts.ts": 851,
-  "src/pages/preferences.astro": 785,
-  "src/lib/analytics.ts": 635,
-  "src/tests/unit/analytics.test.ts": 488,
-};
+// Per-file max-lines ceilings in eslint.config.js, repeated here. Every file is
+// under the default cap, so there are none; adding one is a two-place change on purpose.
+const ADOPTED_CEILINGS: Record<string, number> = {};
 
 interface MaxLinesBlock {
   files: string[];
@@ -31,6 +26,23 @@ function collectMaxLinesBlocks(configs: Linter.Config[]): MaxLinesBlock[] {
     return [{ files, max: options.max }];
   });
 }
+
+/** Every file the cap covers, relative to the frontend root with forward slashes. */
+function listCappedFiles(): string[] {
+  const roots: [string, RegExp][] = [
+    ["src", /\.(ts|astro)$/],
+    ["e2e", /\.ts$/],
+  ];
+  return roots.flatMap(([root, pattern]) =>
+    readdirSync(path.join(FRONTEND_ROOT, root), { recursive: true, encoding: "utf8" })
+      .map((file) => `${root}/${file.split(path.sep).join("/")}`)
+      .filter((file) => pattern.test(file)),
+  );
+}
+
+// An eslint-disable comment naming max-lines or no rule at all, or an inline `eslint max-lines:` setting.
+const INLINE_MAX_LINES_OVERRIDE =
+  /(?:\/\/|\/\*)\s*(?:eslint-disable(?:-next-line|-line)?(?:\s*(?:\*\/|--|$)|[^\n]*\bmax-lines\b)|eslint\s[^\n]*\bmax-lines\b)/m;
 
 const blocks = collectMaxLinesBlocks(eslintConfig as Linter.Config[]);
 const ceilingBlocks = blocks.filter((block) => block.max !== DEFAULT_MAX_LINES);
@@ -50,7 +62,26 @@ describe("max-lines budgets", () => {
     }
   });
 
-  it("has no slack: each ceiling equals the file's measured size", async () => {
+  // Catches what the block check above can't see: "off", a numeric severity, or a later block.
+  it("applies the cap, or the file's adopted ceiling, to every file", async () => {
+    const eslint = new ESLint({ cwd: FRONTEND_ROOT });
+    for (const file of listCappedFiles()) {
+      const config = (await eslint.calculateConfigForFile(file)) as Linter.Config;
+      expect(config.rules?.["max-lines"], file).toEqual([
+        2,
+        { max: ADOPTED_CEILINGS[file] ?? DEFAULT_MAX_LINES, skipBlankLines: true, skipComments: true },
+      ]);
+    }
+  });
+
+  it("has no inline max-lines overrides", () => {
+    const overridden = listCappedFiles().filter((file) =>
+      INLINE_MAX_LINES_OVERRIDE.test(readFileSync(path.join(FRONTEND_ROOT, file), "utf8")),
+    );
+    expect(overridden).toEqual([]);
+  });
+
+  it.runIf(Object.keys(ADOPTED_CEILINGS).length > 0)("has no slack: each ceiling equals the file's measured size", async () => {
     const eslint = new ESLint({
       cwd: FRONTEND_ROOT,
       ruleFilter: ({ ruleId }) => ruleId === "max-lines",

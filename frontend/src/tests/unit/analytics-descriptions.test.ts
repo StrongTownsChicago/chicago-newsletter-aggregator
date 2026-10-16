@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { type BroadCoverageWindow, type LensDefinition } from "../../lib/analytics";
 import {
   describeBroadCoverageRule,
+  describeMonthSpan,
+  describeRecency,
   describeTopicDefinition,
   describeTopicMatching,
+  describeWardScope,
   pluralize,
 } from "../../lib/analytics-descriptions";
 
@@ -70,5 +73,25 @@ describe("describeTopicDefinition", () => {
 describe("describeBroadCoverageRule", () => {
   it("states the minimum number of sending wards", () => {
     expect(describeBroadCoverageRule(window)).toBe("at least 34 wards sent newsletters");
+  });
+});
+
+describe("dashboard scope text", () => {
+  it("spans the first and last month", () => {
+    expect(describeMonthSpan(["2026-01", "2026-02", "2026-03"])).toBe("Jan 2026 – Mar 2026");
+    expect(describeMonthSpan([])).toBe("–");
+  });
+
+  it("dates a newsletter against the archive's newest", () => {
+    expect(describeRecency("2026-10-13", "2026-10-13")).toBe("Newest in the archive");
+    expect(describeRecency("2026-10-01", "2026-10-13")).toBe("12 days before the archive's newest");
+    expect(describeRecency("2026-10-12", "2026-10-13")).toBe("1 day before the archive's newest");
+    expect(describeRecency("2026-10-01", null)).toBe("");
+  });
+
+  it("names the selected wards", () => {
+    expect(describeWardScope({ wards: [] })).toBe("All wards");
+    expect(describeWardScope({ wards: ["5"] })).toBe("Ward 5");
+    expect(describeWardScope({ wards: ["5", "12"] })).toBe("Wards 5, 12");
   });
 });

@@ -1,7 +1,8 @@
 // Pure logic for the /analytics topic overview: each topic's ward reach
 // against its own average, the civic calendar's row order, and the headline
 // topics for the summary tiles.
-import { formatMonth, isReachFaded, type LensReachCell } from "./analytics";
+import { formatMonth } from "./analytics";
+import { isReachFaded, type LensReachCell } from "./analytics-reach";
 
 /**
  * Sparklines and the topic trend use a y scale spanning at least this share
@@ -158,4 +159,20 @@ export function formatPointChange(change: number): string {
   const points = Math.round(change * 100);
   const sign = points > 0 ? "+" : points < 0 ? "−" : "";
   return `${sign}${formatPoints(change)}`;
+}
+
+/** The last full month's reach cell, or null when no ward sent newsletters then. */
+export function latestReachCell(trend: TopicTrend): LensReachCell | null {
+  return trend.latest && trend.latest.activeWards > 0 ? trend.latest : null;
+}
+
+/** "28 of 37": wards mentioning a topic in the last full month, of wards sending. */
+export function formatLatestReach(trend: TopicTrend): string {
+  const latest = latestReachCell(trend);
+  return latest ? `${latest.wardsMentioning} of ${latest.activeWards}` : "–";
+}
+
+/** "28 of 37 wards". */
+export function describeTopicReach(trend: TopicTrend): string {
+  return latestReachCell(trend) ? `${formatLatestReach(trend)} wards` : "";
 }
