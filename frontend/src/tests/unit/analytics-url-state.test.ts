@@ -6,6 +6,7 @@ import {
   HISTORY_COALESCE_MS,
   reconcileDateWindow,
   FULL_ARCHIVE_WINDOW,
+  LEGACY_PROFILE_WARD_PARAM,
   MAX_TERM_QUERY_LENGTH,
   parseDashboardUrlState,
   serializeDashboardUrlState,
@@ -14,8 +15,7 @@ import {
 } from "../../lib/analytics-url-state";
 
 const context: DashboardUrlContext = {
-  filterWards: ["1", "2", "10", "36"],
-  profileWards: ["1", "2", "4", "10", "36"],
+  wards: ["1", "2", "4", "10", "36"],
   months: ["2025-11", "2025-12", "2026-01", "2026-02", "2026-03"],
   lensIds: ["public_safety", "budget_taxes"],
   defaultFromMonth: "2026-01",
@@ -27,7 +27,6 @@ function parse(query: string): DashboardViewState {
 
 const defaultView: DashboardViewState = {
   filters: { wards: [], lens: null, fromMonth: "2026-01", toMonth: null },
-  profileWard: null,
   term: "",
 };
 
@@ -37,11 +36,16 @@ describe("parseDashboardUrlState", () => {
   });
 
   it("reads every parameter", () => {
-    expect(parse("wards=2,1&topic=budget_taxes&from=2025-12&to=2026-02&ward=4&term=Bike%20Lanes")).toEqual({
+    expect(parse("wards=2,1&topic=budget_taxes&from=2025-12&to=2026-02&term=Bike%20Lanes")).toEqual({
       filters: { wards: ["1", "2"], lens: "budget_taxes", fromMonth: "2025-12", toMonth: "2026-02" },
-      profileWard: "4",
       term: "bike lanes",
     });
+  });
+
+  it("opens a ward from the former ward profile parameter, over any ward filter", () => {
+    expect(parse(`${LEGACY_PROFILE_WARD_PARAM}=4`).filters.wards).toEqual(["4"]);
+    expect(parse(`wards=1,2&${LEGACY_PROFILE_WARD_PARAM}=4`).filters.wards).toEqual(["4"]);
+    expect(parse(`wards=1,2&${LEGACY_PROFILE_WARD_PARAM}=99`).filters.wards).toEqual(["1", "2"]);
   });
 
   it("starts at the beginning of the archive for window=all", () => {
@@ -70,7 +74,7 @@ describe("parseDashboardUrlState", () => {
   });
 
   it("ignores inherited object keys", () => {
-    expect(parse("topic=constructor&ward=__proto__").filters.lens).toBeNull();
+    expect(parse("topic=constructor&ward=__proto__").filters).toMatchObject({ wards: [], lens: null });
   });
 });
 
@@ -83,12 +87,11 @@ describe("serializeDashboardUrlState", () => {
     const query = serializeDashboardUrlState(
       {
         filters: { wards: ["10", "2"], lens: "public_safety", fromMonth: "2025-12", toMonth: "2026-02" },
-        profileWard: "36",
         term: "  Zoning ",
       },
       context,
     );
-    expect(query).toBe("wards=2,10&topic=public_safety&from=2025-12&to=2026-02&ward=36&term=zoning");
+    expect(query).toBe("wards=2,10&topic=public_safety&from=2025-12&to=2026-02&term=zoning");
   });
 
   it("marks the full archive explicitly when the default is a narrower window", () => {
@@ -101,7 +104,7 @@ describe("serializeDashboardUrlState", () => {
     const views: DashboardViewState[] = [
       defaultView,
       { ...defaultView, filters: { wards: ["1", "36"], lens: "budget_taxes", fromMonth: null, toMonth: "2026-01" } },
-      { filters: { wards: [], lens: null, fromMonth: "2026-03", toMonth: "2026-03" }, profileWard: "10", term: "speed hump" },
+      { filters: { wards: ["10"], lens: null, fromMonth: "2026-03", toMonth: "2026-03" }, term: "speed hump" },
     ];
     for (const view of views) {
       const query = serializeDashboardUrlState(view, context);
@@ -141,7 +144,7 @@ describe("reconcileDateWindow", () => {
   });
 
   it("gives a window the URL parser keeps", () => {
-    const view = { filters: reconcileDateWindow(filters, "to"), profileWard: null, term: "" };
+    const view = { filters: reconcileDateWindow(filters, "to"), term: "" };
     expect(parse(serializeDashboardUrlState(view, context))).toEqual(view);
   });
 });

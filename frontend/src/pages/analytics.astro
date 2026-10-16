@@ -88,139 +88,136 @@ const controlClass =
         </div>
       </form>
 
-      <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite">
-        {['Newsletters', 'Wards sending', 'Most mentioned topic', 'Biggest change'].map((label) => (
-          <div class="bg-white rounded-lg shadow-md p-4 border border-gray-200">
-            <p class="text-sm text-gray-600" data-tile-label>{label}</p>
-            <p class="text-xl sm:text-2xl font-semibold text-gray-900 mt-1" data-tile-value></p>
-            <p class="text-xs text-gray-500 mt-1" data-tile-detail></p>
-          </div>
-        ))}
+      <div id="dashboard-view-bar" class="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="dashboard-view-heading" tabindex="-1" aria-live="polite" class="text-2xl font-bold text-gray-900 focus:outline-none">Overview</h2>
+        <button type="button" id="back-to-overview" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm" hidden>
+          ← Back to overview
+        </button>
       </div>
 
-      <AnalyticsPanel
-        id="term-explorer"
-        title="Term explorer"
-        description={`Search a word or two-word phrase. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are blank.`}
-      >
-        <form id="term-form" class="flex gap-2 mb-2" role="search">
-          <label for="term-input" class="sr-only">Term</label>
-          <input id="term-input" type="search" autocomplete="off" placeholder="e.g. bike lanes, zoning, budget" class={controlClass} />
-          <button type="submit" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Explore</button>
-        </form>
-        <div id="term-suggestions" class="flex flex-wrap gap-2"></div>
-        <p id="term-message" class="text-sm text-gray-700 mt-3" aria-live="polite"></p>
-        <div id="term-results" data-export-region hidden>
-          <div id="term-timeline" class="overflow-x-auto mt-3"></div>
-          <h3 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Top wards using this term</h3>
-          <div id="term-wards" class="overflow-x-auto"></div>
-        </div>
-      </AnalyticsPanel>
+      <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite"></div>
 
-      <AnalyticsPanel
-        id="civic-calendar"
-        title="Civic calendar"
-        description="Wards mentioning each topic, by month. Click a topic for its detail."
-      >
-        <div data-export-region>
-          <p class="text-xs text-gray-600 mb-2" data-export-text>
-            Blue: more wards than the topic's average month. Red: fewer. Numbers are wards. Topics that swing most (highest minus lowest month) come first.
-          </p>
-          <p id="civic-calendar-scroll-hint" class="text-xs font-medium text-blue-700 mb-1" hidden>Scroll sideways for later months →</p>
-          <div data-chart class="overflow-x-auto"></div>
-          <h3 class="text-sm font-semibold text-gray-700 mt-5 mb-2" data-export-text id="topic-trends-title">Ward reach by topic</h3>
-          <div id="topic-trends" class="overflow-x-auto"></div>
-        </div>
-      </AnalyticsPanel>
+      <div id="dashboard-panels" class="space-y-6">
+        <AnalyticsPanel
+          id="term-explorer"
+          title="Term explorer"
+          description={`Search a word or two-word phrase. Months with fewer than ${MIN_MONTH_NEWSLETTERS_FOR_SHARES} newsletters are blank.`}
+        >
+          <form id="term-form" class="flex gap-2 mb-2" role="search">
+            <label for="term-input" class="sr-only">Term</label>
+            <input id="term-input" type="search" autocomplete="off" placeholder="e.g. bike lanes, zoning, budget" class={controlClass} />
+            <button type="submit" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Explore</button>
+          </form>
+          <div id="term-suggestions" class="flex flex-wrap gap-2"></div>
+          <p id="term-message" class="text-sm text-gray-700 mt-3" aria-live="polite"></p>
+          <div id="term-results" data-export-region hidden>
+            <div id="term-timeline" class="overflow-x-auto mt-3"></div>
+            <h3 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Top wards using this term</h3>
+            <div id="term-wards" class="overflow-x-auto"></div>
+          </div>
+        </AnalyticsPanel>
 
-      <AnalyticsPanel
-        id="topic-detail"
-        title="Topic detail"
-        description="One topic's ward reach by month, and which wards mentioned it."
-        hidden
-      >
-        <div data-export-region>
-          <h3 id="topic-detail-heading" tabindex="-1" class="text-lg font-semibold text-gray-900 focus:outline-none" data-export-text></h3>
-          <div id="topic-detail-trend" class="overflow-x-auto"></div>
-          <h4 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Wards by month</h4>
-          <div id="topic-detail-wards" class="overflow-x-auto"></div>
-        </div>
-      </AnalyticsPanel>
+        <AnalyticsPanel
+          id="civic-calendar"
+          title="Civic calendar"
+          description="Wards mentioning each topic, by month. Click a topic for its detail."
+        >
+          <div data-export-region>
+            <p class="text-xs text-gray-600 mb-2" data-export-text>
+              Blue: more wards than the topic's average month. Red: fewer. Numbers are wards. Topics that swing most (highest minus lowest month) come first.
+            </p>
+            <p id="civic-calendar-scroll-hint" class="text-xs font-medium text-blue-700 mb-1" hidden>Scroll sideways for later months →</p>
+            <div data-chart class="overflow-x-auto"></div>
+            <h3 class="text-sm font-semibold text-gray-700 mt-5 mb-2" data-export-text id="topic-trends-title">Ward reach by topic</h3>
+            <div id="topic-trends" class="overflow-x-auto"></div>
+          </div>
+        </AnalyticsPanel>
 
-      <AnalyticsPanel
-        id="ward-profile"
-        title="Ward profile"
-        description="One ward's newsletters against its own history and all wards."
-        hidden
-      >
-        <div data-export-region>
-          <p id="profile-message" class="text-sm text-gray-600" aria-live="polite" hidden></p>
-          <div id="profile-content" class="space-y-5" hidden>
-            <h3 id="profile-heading" class="text-lg font-semibold text-gray-900" data-export-text></h3>
-            <dl id="profile-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {['In these dates', 'All dates', 'Per month', 'Days between'].map((label) => (
-                <div class="rounded-lg border border-gray-200 p-3">
-                  <dt class="text-xs text-gray-600" data-export-text>{label}</dt>
-                  <dd class="text-lg font-semibold text-gray-900 mt-1" data-tile-value data-export-text></dd>
-                  <dd class="text-xs text-gray-500 mt-1" data-tile-detail data-export-text></dd>
-                </div>
-              ))}
-            </dl>
-            <div>
-              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Newsletters per month</h4>
-              <div id="profile-cadence" class="overflow-x-auto"></div>
-            </div>
-            <div>
-              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics by month</h4>
-              <div id="profile-topics" class="overflow-x-auto"></div>
-            </div>
-            <div>
-              <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics compared with all wards</h4>
-              <div id="profile-comparison" class="overflow-x-auto"></div>
-            </div>
-            <div>
-              <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Distinctive vocabulary</h4>
-              <p class="text-xs text-gray-500 mb-2" data-export-text>
-                Words this ward uses far more than the rest of the city, all dates. Click a bar to search.
-              </p>
-              <div id="profile-distinctive" class="overflow-x-auto"></div>
+        <AnalyticsPanel
+          id="topic-detail"
+          title="Topic detail"
+          description="One topic's ward reach by month, and which wards mentioned it."
+          hidden
+        >
+          <div data-export-region>
+            <h3 id="topic-detail-heading" tabindex="-1" class="text-lg font-semibold text-gray-900 focus:outline-none" data-export-text></h3>
+            <div id="topic-detail-trend" class="overflow-x-auto"></div>
+            <h4 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Wards by month</h4>
+            <div id="topic-detail-wards" class="overflow-x-auto"></div>
+          </div>
+        </AnalyticsPanel>
+
+        <AnalyticsPanel
+          id="ward-profile"
+          title="Ward profile"
+          description="One ward's newsletters against its own history and all wards."
+          hidden
+        >
+          <div data-export-region>
+            <p id="profile-message" class="text-sm text-gray-600" aria-live="polite" hidden></p>
+            <div id="profile-content" class="space-y-5" hidden>
+              <h3 id="profile-heading" class="text-lg font-semibold text-gray-900" data-export-text></h3>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Newsletters per month</h4>
+                <div id="profile-cadence" class="overflow-x-auto"></div>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Gaps</h4>
+                <p id="profile-gap-typical" class="text-sm text-gray-700" data-export-text></p>
+                <ol id="profile-gaps" class="text-sm text-gray-700 mt-1 space-y-0.5"></ol>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics by month</h4>
+                <div id="profile-topics" class="overflow-x-auto"></div>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-700 mb-2" data-export-text>Topics compared with all wards</h4>
+                <div id="profile-comparison" class="overflow-x-auto"></div>
+              </div>
+              <div>
+                <h4 class="text-sm font-semibold text-gray-700 mb-1" data-export-text>Distinctive vocabulary</h4>
+                <p class="text-xs text-gray-500 mb-2" data-export-text>
+                  Words this ward uses far more than the rest of the city, all dates. Click a bar to search.
+                </p>
+                <div id="profile-distinctive" class="overflow-x-auto"></div>
+              </div>
             </div>
           </div>
-        </div>
-      </AnalyticsPanel>
+        </AnalyticsPanel>
 
-      <AnalyticsPanel
-        id="rising-terms"
-        title="Rising terms"
-        description="Terms far more wards used in the latest full month than in a typical recent month. All wards and dates."
-      >
-        <div data-chart class="overflow-x-auto"></div>
-      </AnalyticsPanel>
+        <AnalyticsPanel
+          id="rising-terms"
+          title="Rising terms"
+          description="Terms far more wards used in the latest full month than in a typical recent month. All wards and dates."
+        >
+          <div data-chart class="overflow-x-auto"></div>
+        </AnalyticsPanel>
 
-      <AnalyticsPanel
-        id="sending-cadence"
-        title="Sending cadence"
-        description="Longest gaps between newsletters from the same alderman. A gap may be missed newsletters, not a pause."
-        hasTable={false}
-        exportable={false}
-      >
-        <div id="cadence-gaps" class="overflow-x-auto"></div>
-      </AnalyticsPanel>
+        <AnalyticsPanel
+          id="sending-cadence"
+          title="Sending cadence"
+          description="Longest gaps between newsletters from the same alderman. A gap may be missed newsletters, not a pause."
+          hasTable={false}
+          exportable={false}
+        >
+          <div id="cadence-gaps" class="overflow-x-auto"></div>
+        </AnalyticsPanel>
 
-      <AnalyticsPanel
-        id="coverage"
-        title="About the data"
-        description="Every panel reflects only the newsletters archived here. A ward with none here may still publish one."
-      >
-        <details class="text-sm" id="coverage-details">
-          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Newsletters per ward per month</summary>
-          <div data-chart class="overflow-x-auto mt-2"></div>
-        </details>
-        <details class="mt-3 text-sm" id="lens-definitions">
-          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
-          <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
-        </details>
-      </AnalyticsPanel>
+        <AnalyticsPanel
+          id="coverage"
+          title="About the data"
+          description="Every panel reflects only the newsletters archived here. A ward with none here may still publish one."
+        >
+          <details class="text-sm" id="coverage-details">
+            <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Newsletters per ward per month</summary>
+            <div data-chart class="overflow-x-auto mt-2"></div>
+          </details>
+          <details class="mt-3 text-sm" id="lens-definitions">
+            <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
+            <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
+          </details>
+        </AnalyticsPanel>
+      </div>
     </div>
   </div>
 </Layout>

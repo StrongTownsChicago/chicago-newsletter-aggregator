@@ -116,6 +116,14 @@ export function findLargestChangeTopic(trends: TopicTrend[]): TopicTrend | null 
   }, null);
 }
 
+/** The full month with the topic's widest ward reach (the latest on a tie), or null. */
+export function findPeakPoint(trend: TopicTrend): TopicTrendPoint | null {
+  return trend.points.reduce<TopicTrendPoint | null>((best, point) => {
+    if (point.share === null) return best;
+    return best === null || point.share >= (best.share ?? 0) ? point : best;
+  }, null);
+}
+
 /** A cell's ward reach minus its topic's average, or null when either is missing. */
 export function reachDeviation(cell: Pick<LensReachCell, "share">, averageShare: number | null): number | null {
   return cell.share === null || averageShare === null ? null : cell.share - averageShare;

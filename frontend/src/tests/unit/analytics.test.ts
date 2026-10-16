@@ -16,6 +16,7 @@ import {
   filterFacts,
   findBroadCoverageWindow,
   findLongestGaps,
+  formatDay,
   formatMonth,
   isReachFaded,
   listMonths,
@@ -173,6 +174,11 @@ describe("date windows", () => {
   it("formats months for display", () => {
     expect(formatMonth("2026-02")).toBe("Feb 2026");
     expect(formatMonth("2025-12")).toBe("Dec 2025");
+  });
+
+  it("formats days for display, whatever the reader's time zone", () => {
+    expect(formatDay("2026-01-03")).toBe("Jan 3, 2026");
+    expect(formatDay("2025-12-31")).toBe("Dec 31, 2025");
   });
 
   it("lists the months a window spans, defaulting open ends to the data", () => {

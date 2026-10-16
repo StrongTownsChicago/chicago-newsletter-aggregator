@@ -66,6 +66,10 @@ const SPARKLINE_HEIGHT = 28;
 const TREND_HEIGHT = 200;
 /** Right margin of the distinctive terms chart when labels end in "+N related". */
 const DISTINCTIVE_RELATED_MARGIN = 220;
+const DISTINCTIVE_LEFT_MARGIN = 170;
+const DISTINCTIVE_RIGHT_MARGIN = 150;
+/** Narrow screens scroll the distinctive terms chart sideways rather than squeeze its bars below this. */
+const MIN_DISTINCTIVE_BAR_SPAN = 120;
 /** Right margin of the rising terms chart when a "seasonal" tag may sit past the last dot. */
 const SEASONAL_TAG_MARGIN = 64;
 
@@ -513,12 +517,14 @@ export function renderWardTopicGrid(
   lenses: { id: string; label: string }[],
   months: string[],
   ward: string,
+  selectedLens: string | null,
   width: number,
 ): Element {
   const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
   const marginLeft = longestLabelMargin(lenses.map((lens) => lens.label));
   const marginRight = 10;
   const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
+  const selectedRow = selectedLens ? months.map((month) => ({ month, lens: selectedLens })) : [];
   const heading = (cell: WardTopicMonthCell) =>
     `${labelOf.get(cell.lens) ?? cell.lens} · ${formatWard(ward)} · ${formatMonth(cell.month)}`;
   const plot = Plot.plot({
@@ -562,6 +568,7 @@ export function renderWardTopicGrid(
           tip: true,
         },
       ),
+      Plot.cell(selectedRow, { x: "month", y: "lens", fill: "none", stroke: CHART_COLORS.mutedInk, strokeWidth: 1.5 }),
     ],
   });
   return wrap(
@@ -761,12 +768,12 @@ export function renderDistinctiveTerms(
   const label = (item: DistinctiveTerm) =>
     `${item.ward_newsletters} of ${wardNewsletters} · ${formatPercent(item.rest_share)} elsewhere` +
     (item.related_terms ? ` · +${item.related_terms} related` : "");
-  const hasRelated = terms.some((item) => item.related_terms);
+  const marginRight = terms.some((item) => item.related_terms) ? DISTINCTIVE_RELATED_MARGIN : DISTINCTIVE_RIGHT_MARGIN;
   return Plot.plot({
-    ...baseOptions(width),
+    ...baseOptions(Math.max(width, DISTINCTIVE_LEFT_MARGIN + marginRight + MIN_DISTINCTIVE_BAR_SPAN)),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND,
-    marginLeft: 170,
-    marginRight: hasRelated ? DISTINCTIVE_RELATED_MARGIN : 150,
+    marginLeft: DISTINCTIVE_LEFT_MARGIN,
+    marginRight,
     x: { label: "Share of this ward's newsletters (%)", percent: true, grid: true },
     y: { label: null, domain: terms.map((item) => item.term), padding: 1 - MAX_BAR_THICKNESS },
     marks: [
