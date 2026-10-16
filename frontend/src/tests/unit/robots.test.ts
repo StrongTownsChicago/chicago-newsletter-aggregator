@@ -17,11 +17,14 @@ describe("robots.txt", () => {
     },
   );
 
-  it.each(["Googlebot", "Bingbot"])("lets the search engine %s crawl public pages", (userAgent) => {
+  it.each(["Googlebot", "Bingbot", "ChatGPT-User", "Claude-User", "Perplexity-User"])(
+    "lets %s fetch public pages",
+    (userAgent) => {
     expect(blocks(userAgent, "/")).toBe(false);
     expect(blocks(userAgent, "/newsletter/some-id")).toBe(false);
     expect(blocks(userAgent, "/ward/1")).toBe(false);
-  });
+    },
+  );
 
   it("keeps account pages and the API out for every crawler", () => {
     expect(blocks("Googlebot", "/preferences")).toBe(true);
