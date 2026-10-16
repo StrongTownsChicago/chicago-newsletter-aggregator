@@ -36,6 +36,18 @@ export default defineConfig(
       "astro/no-set-html-directive": "error",
     },
   },
+  {
+    files: ["src/**/*.{ts,astro}"],
+    ignores: ["src/pages/api/**", "src/lib/supabase-admin.ts", "src/tests/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["**/supabase-admin", "**/supabase-admin.ts"],
+          message: "supabase-admin carries the service key: import it only from src/pages/api/** server routes.",
+        }],
+      }],
+    },
+  },
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,
   // and `expect(obj.method)` assertions on mocked methods.
   {
