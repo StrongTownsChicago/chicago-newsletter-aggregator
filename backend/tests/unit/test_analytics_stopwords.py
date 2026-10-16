@@ -2,7 +2,8 @@
 
 import unittest
 
-from analytics.stopwords import EXCLUDED_TERMS, SPANISH_STOPWORDS
+from analytics.plurals import fold_plural
+from analytics.stopwords import EXCLUDED_TERMS, SPANISH_STOPWORDS, TREND_FILLER_WORDS
 
 
 def is_mojibake(word: str) -> bool:
@@ -29,3 +30,15 @@ class TestStopwordEncoding(unittest.TestCase):
 
     def test_accented_spanish_stopword_is_spelled_correctly(self):
         self.assertIn("más", SPANISH_STOPWORDS)
+
+
+class TestTrendFillerWords(unittest.TestCase):
+    def test_written_in_folded_singular_form(self):
+        # Rising terms fold each word before looking it up.
+        self.assertEqual(
+            [word for word in TREND_FILLER_WORDS if fold_plural(word) != word], []
+        )
+
+    def test_not_already_excluded_from_the_index(self):
+        # Excluded words never reach a term, so listing them would be dead weight.
+        self.assertEqual(TREND_FILLER_WORDS & EXCLUDED_TERMS, frozenset())
