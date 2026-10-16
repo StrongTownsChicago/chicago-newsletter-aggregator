@@ -4,6 +4,7 @@ import {
   describeSparkline,
   findAsOfMonth,
   findLargestChangeTopic,
+  findPeakPoint,
   findWidestReachTopic,
   formatPointChange,
   formatPoints,
@@ -166,5 +167,30 @@ describe("formatting", () => {
       ]),
     ).toBe("Parks, Jan 2026 – Feb 2026: 50%, no data.");
     expect(describeSparkline("Parks", [])).toBe("Parks: no full months.");
+  });
+});
+
+describe("findPeakPoint", () => {
+  const trendOf = (shares: (number | null)[]) => ({
+    lens: "x",
+    points: shares.map((share, index) => ({ month: months[index], share })),
+    averageShare: null,
+    swing: 0,
+    latest: null,
+    latestChange: null,
+  });
+
+  it("finds the month with the widest reach, the latest on a tie", () => {
+    expect(findPeakPoint(trendOf([0.4, 0.7, 0.5]))).toEqual({ month: "2026-02", share: 0.7 });
+    expect(findPeakPoint(trendOf([0.7, 0.2, 0.7]))?.month).toBe("2026-03");
+  });
+
+  it("skips months without a share", () => {
+    expect(findPeakPoint(trendOf([null, 0.1, null]))?.month).toBe("2026-02");
+    expect(findPeakPoint(trendOf([null, null, null]))).toBeNull();
+  });
+
+  it("has no peak when no ward mentioned the topic", () => {
+    expect(findPeakPoint(trendOf([0, 0, null]))).toBeNull();
   });
 });

@@ -36,6 +36,15 @@ async function openDashboard(page: Page, query = ''): Promise<void> {
   await expect(page.locator('#analytics-dashboard')).toBeVisible();
 }
 
+/** The ids of the shown panels, top to bottom. */
+function visiblePanelIds(page: Page): Promise<string[]> {
+  return page
+    .locator('#dashboard-panels > section')
+    .evaluateAll((sections) => sections.filter((section) => !(section as HTMLElement).hidden).map((section) => section.id));
+}
+
+const OVERVIEW_PANELS = ['term-explorer', 'civic-calendar', 'rising-terms', 'sending-cadence', 'coverage'];
+
 test.beforeEach(async ({ page, baseURL }) => {
   externalRequests = [];
   await serveFixtures(page, baseURL ?? '');
@@ -52,9 +61,10 @@ test('loads the dashboard from the fixture data', async ({ page }) => {
   await expect(page.locator('#summary-tiles [data-tile-value]').first()).toHaveText(String(DEFAULT_WINDOW_NEWSLETTERS));
   await expect(page.locator('#civic-calendar svg').first()).toBeVisible();
   await expect(page.locator('#topic-trends button[data-topic]')).toHaveCount(2);
-  // Panels that wait for a selection stay out of the way.
-  await expect(page.locator('#topic-detail')).toBeHidden();
-  await expect(page.locator('#ward-profile')).toBeHidden();
+  // The overview: panels that wait for a selection stay out of the way.
+  expect(await visiblePanelIds(page)).toEqual(OVERVIEW_PANELS);
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
+  await expect(page.getByRole('button', { name: 'Back to overview' })).toBeHidden();
   await expect(page.locator('#term-results')).toBeHidden();
   // The rising terms chart tags a term the data marks as seasonal.
   await expect(page.locator('#rising-terms svg text', { hasText: 'seasonal' })).toHaveCount(1);
@@ -83,6 +93,31 @@ test('choosing a topic in the overview opens its detail', async ({ page }) => {
   await expect(page.locator('#topic-detail-trend svg')).toBeVisible();
   await expect(page.locator('#topic-detail-wards svg')).toBeVisible();
   await expect(page.locator('#topic-detail [data-caption]')).toContainText('Mar 2026: 2 of 3 wards');
+});
+
+test('the topic view leads with the topic and keeps the calendar for switching', async ({ page }) => {
+  await openDashboard(page, '?wards=1,2,3&topic=budget_taxes');
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Budget & taxes');
+  expect(await visiblePanelIds(page)).toEqual([
+    'topic-detail',
+    'civic-calendar',
+    'term-explorer',
+    'rising-terms',
+    'sending-cadence',
+    'coverage',
+  ]);
+  const tiles = page.locator('#summary-tiles > div');
+  await expect(tiles).toHaveCount(4);
+  await expect(tiles.nth(2)).toContainText('Wards mentioning it, Mar 2026');
+  await expect(tiles.nth(2)).toContainText('2 of 3');
+  await expect(tiles.nth(2)).toContainText('vs its average');
+  await expect(tiles.nth(3)).toContainText('Peak month');
+  await expect(page.getByRole('button', { name: 'Show Budget & taxes detail' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('#topic-trends button[data-topic="public_safety"]').click();
+  await expect(page).toHaveURL(/[?&]topic=public_safety/);
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Public safety');
+  await expect(page.locator('#topic-detail-heading')).toBeFocused();
 });
 
 test('calendar row labels are keyboard buttons that open the topic detail', async ({ page }) => {
@@ -119,25 +154,89 @@ test('filters change the panels and the URL', async ({ page }) => {
   await expect(page).toHaveURL(/[?&]wards=2(&|$)/);
   // A single selected ward opens its profile.
   await expect(page.locator('#profile-heading')).toHaveText('Ward 2 · Bo Example');
-  await expect(page).toHaveURL(/[?&]ward=2(&|$)/);
+  await expect(page.locator('#profile-ward')).toHaveValue('2');
+  await page.locator('input[name="ward"][value="3"]').check();
+  await expect(page.locator('#ward-profile')).toBeHidden();
+  await expect(page.locator('#profile-ward')).toHaveValue('');
+});
+
+test('the ward view swaps city-wide panels for the ward profile', async ({ page }) => {
+  await openDashboard(page, '?wards=2&term=zoning');
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Ward 2');
+  expect(await visiblePanelIds(page)).toEqual(['ward-profile', 'term-explorer', 'coverage']);
+  const tiles = page.locator('#summary-tiles > div');
+  await expect(tiles).toHaveCount(4);
+  await expect(tiles.nth(0)).toContainText('Newsletters a month');
+  await expect(tiles.nth(0)).toContainText('All wards');
+  await expect(tiles.nth(1)).toContainText('Last newsletter');
+  await expect(tiles.nth(1)).toContainText('Apr 17, 2026');
+  await expect(tiles.nth(2)).toContainText('Newsletters');
+  await expect(tiles.nth(3)).toContainText('Coverage start');
+  await expect(tiles.nth(3)).toContainText('Jan 10, 2026');
+  // The ward's longest gaps fold into its profile.
+  await expect(page.locator('#profile-gap-typical')).toContainText('days apart');
+  await expect(page.locator('#profile-gaps li').first()).toContainText(/\d+ days: \w{3} \d+, 2026 – /);
+  // The term explorer counts only this ward's newsletters.
+  await expect(page.locator('#term-message')).toContainText('"zoning" appears in 1 of');
+  await page.getByRole('button', { name: 'Back to overview' }).click();
+  await expect(page.locator('#term-message')).toContainText('"zoning" appears in 6 of');
+});
+
+test('a ward and a topic together show the ward view with the topic named', async ({ page }) => {
+  await openDashboard(page, '?wards=1&topic=budget_taxes');
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Ward 1 · Budget & taxes');
+  expect(await visiblePanelIds(page)).toEqual(['ward-profile', 'term-explorer', 'coverage']);
+  await expect(page.locator('#summary-tiles > div').nth(2)).toContainText('mention Budget & taxes');
+  await expect(page.locator('#profile-topics svg').first()).toBeVisible();
+  // A distinctive term standing for others from the same newsletters says so.
+  await expect(page.locator('#profile-distinctive svg text', { hasText: '+3 related' })).toHaveCount(1);
+});
+
+test('a former ward profile link opens that ward', async ({ page }) => {
+  await openDashboard(page, '?wards=1,3&topic=budget_taxes&ward=1');
+  await expect(page).toHaveURL(/\/analytics\?wards=1&topic=budget_taxes$/);
+  await expect(page.locator('#profile-heading')).toHaveText('Ward 1 · Ada Example');
+  await expect(page.locator('input[name="ward"][value="3"]')).not.toBeChecked();
+  await expect(page.locator('#profile-ward')).toHaveValue('1');
+});
+
+test('Back to overview clears the ward and topic but keeps the dates', async ({ page }) => {
+  await openDashboard(page, '?wards=1&topic=budget_taxes&from=2026-03&term=zoning');
+  const back = page.getByRole('button', { name: 'Back to overview' });
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL(/\/analytics\?from=2026-03&term=zoning$/);
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
+  await expect(page.locator('#dashboard-view-heading')).toBeFocused();
+  // Focus already reads the heading out; the status stays quiet.
+  await expect(page.locator('#dashboard-view-status')).toHaveText('');
+  await expect(back).toBeHidden();
+  expect(await visiblePanelIds(page)).toEqual(OVERVIEW_PANELS);
+  await expect(page.locator('select[name="from"]')).toHaveValue('2026-03');
+
+  await page.goBack();
+  await expect(page).toHaveURL(/wards=1&topic=budget_taxes/);
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Ward 1 · Budget & taxes');
+  await expect(page.locator('#dashboard-view-status')).toHaveText('Ward 1 · Budget & taxes');
+  expect(await visiblePanelIds(page)).toEqual(['ward-profile', 'term-explorer', 'coverage']);
+  await page.goForward();
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
 });
 
 test('restores a shared view from the URL and supports back and forward', async ({ page }) => {
-  await openDashboard(page, '?wards=1,3&topic=budget_taxes&window=all&ward=1&term=zoning');
+  await openDashboard(page, '?wards=1,3&topic=budget_taxes&window=all&term=zoning');
   await expect(page.locator('select[name="lens"]')).toHaveValue('budget_taxes');
   await expect(page.locator('select[name="from"]')).toHaveValue('');
   await expect(page.locator('input[name="ward"][value="1"]')).toBeChecked();
   await expect(page.locator('input[name="ward"][value="3"]')).toBeChecked();
-  await expect(page.locator('#profile-ward')).toHaveValue('1');
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Budget & taxes');
   await expect(page.locator('#term-input')).toHaveValue('zoning');
   await expect(page.locator('#term-message')).toContainText('"zoning" appears in');
   await expect(page.locator('#term-results svg').first()).toBeVisible();
 
   await page.reload();
   await expect(page.locator('select[name="lens"]')).toHaveValue('budget_taxes');
-  await expect(page.locator('#profile-heading')).toHaveText('Ward 1 · Ada Example');
-  // A distinctive term standing for others from the same newsletters says so.
-  await expect(page.locator('#profile-distinctive svg text', { hasText: '+3 related' })).toHaveCount(1);
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Budget & taxes');
 
   await page.locator('select[name="lens"]').selectOption('public_safety');
   await expect(page).toHaveURL(/topic=public_safety/);
@@ -180,6 +279,7 @@ test('shows a ward with no archived newsletters neutrally', async ({ page }) => 
   await openDashboard(page, '?ward=4');
   await expect(page.locator('#profile-message')).toHaveText('No Ward 4 newsletters in the archive yet.');
   await expect(page.locator('#profile-content')).toBeHidden();
+  await expect(page).toHaveURL(/\/analytics\?wards=4$/);
 });
 
 test('opens a ward profile from the filter bar', async ({ page }) => {
@@ -188,9 +288,11 @@ test('opens a ward profile from the filter bar', async ({ page }) => {
   await expect(page.locator('#ward-profile')).toBeVisible();
   await expect(page.locator('#profile-heading')).toHaveText('Ward 3 · Cy Example');
   await expect(page.locator('#profile-topics svg').first()).toBeVisible();
-  await expect(page).toHaveURL(/[?&]ward=3(&|$)/);
+  await expect(page).toHaveURL(/[?&]wards=3(&|$)/);
+  await expect(page.locator('input[name="ward"][value="3"]')).toBeChecked();
   await page.getByRole('button', { name: 'Reset filters' }).click();
   await expect(page.locator('#ward-profile')).toBeHidden();
+  await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
   await expect(page).toHaveURL(/\/analytics$/);
 });
 

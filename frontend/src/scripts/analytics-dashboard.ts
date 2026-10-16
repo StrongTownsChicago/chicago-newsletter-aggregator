@@ -10,7 +10,9 @@ import {
   expandTermPostings,
   filterFacts,
   findBroadCoverageWindow,
+  daysBetween,
   findLongestGaps,
+  formatDay,
   formatMonth,
   isReachFaded,
   listSourceWards,
@@ -85,6 +87,7 @@ import {
   describeSparkline,
   findAsOfMonth,
   findLargestChangeTopic,
+  findPeakPoint,
   findWidestReachTopic,
   formatPointChange,
   formatPoints,
@@ -95,12 +98,23 @@ import {
   tightShareDomain,
   type TopicTrend,
 } from "../lib/analytics-topic-trends";
+import {
+  clearViewSelection,
+  DASHBOARD_PANEL_IDS,
+  describeDashboardView,
+  focusedWard,
+  selectDashboardView,
+  VIEW_PANELS,
+  type DashboardPanelId,
+  type DashboardView,
+} from "../lib/analytics-views";
 import { downloadChartPng, EXPORT_TEXT_ATTRIBUTE } from "../lib/chart-export";
 import { SITE_NAME } from "../lib/seo";
 
 const TERM_WARD_LIMIT = 15;
 const TERM_SUGGESTION_LIMIT = 8;
 const GAP_LIMIT = 10;
+const WARD_GAP_LIMIT = 3;
 const COVERAGE_STATUS_LABELS: Record<CoverageStatus, string> = {
   untracked: "Not tracked yet",
   silent: "None received",
@@ -127,6 +141,8 @@ interface DashboardState {
   /** Null until the term explorer first needs it. */
   terms: TermIndex | null;
   termsError: string | null;
+  /** The view whose panel layout is on the page; null before the first render. */
+  view: DashboardView | null;
 }
 
 // Shared by every request so concurrent triggers fetch terms.json once.
@@ -301,67 +317,173 @@ function buildTopicOverview(
   return { cells, trends: summarizeTopicTrends(cells, lensIds, fullMonths, threshold), fullMonths, threshold };
 }
 
+/** The last full month's reach cell, or null when no ward sent newsletters then. */
+function latestReachCell(trend: TopicTrend): LensReachCell | null {
+  return trend.latest && trend.latest.activeWards > 0 ? trend.latest : null;
+}
+
 /** "28 of 37": wards mentioning a topic in the last full month, of wards sending. */
 function formatLatestReach(trend: TopicTrend): string {
-  return trend.latest ? `${trend.latest.wardsMentioning} of ${trend.latest.activeWards}` : "–";
+  const latest = latestReachCell(trend);
+  return latest ? `${latest.wardsMentioning} of ${latest.activeWards}` : "–";
 }
 
 /** "28 of 37 wards". */
 function describeTopicReach(trend: TopicTrend): string {
-  return trend.latest ? `${formatLatestReach(trend)} wards` : "";
+  return latestReachCell(trend) ? `${formatLatestReach(trend)} wards` : "";
 }
 
-function renderSummary(
-  state: DashboardState,
-  filters: AnalyticsFilters,
-  facts: NewsletterFact[],
-  factsIgnoringLens: NewsletterFact[],
-  overview: TopicOverview,
-): void {
-  const wardCounts = summarizeWardCounts(
-    wardsInScope(state.allWards, filters),
-    factsIgnoringLens,
-    state.data.newsletters,
+/** Everything one render of the dashboard needs, computed once. */
+interface DashboardRender {
+  state: DashboardState;
+  filters: AnalyticsFilters;
+  facts: NewsletterFact[];
+  factsIgnoringLens: NewsletterFact[];
+  months: string[];
+  overview: TopicOverview;
+  /** The focused ward's profile in the ward view, else null. */
+  profile: WardProfile | null;
+  selectTopic: (lensId: string) => void;
+}
+
+interface SummaryTile {
+  label: string;
+  value: string;
+  detail: string;
+}
+
+function buildTile({ label, value, detail }: SummaryTile): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = "bg-white rounded-lg shadow-md p-4 border border-gray-200";
+  const parts: [string, string, string][] = [
+    [label, "tileLabel", "text-sm text-gray-600"],
+    [value, "tileValue", "text-xl sm:text-2xl font-semibold text-gray-900 mt-1"],
+    [detail, "tileDetail", "text-xs text-gray-500 mt-1"],
+  ];
+  tile.append(
+    ...parts.map(([text, dataKey, className]) => {
+      const line = document.createElement("p");
+      line.className = className;
+      line.dataset[dataKey] = "";
+      line.textContent = text;
+      return line;
+    }),
   );
-  const span = describeMonthSpan(listWindowMonths(filters, state.dataMonths));
+  return tile;
+}
+
+/** ", Mar 2026": the last full month, for tile labels. */
+function inLatestFullMonth(overview: TopicOverview): string {
   const latestMonth = overview.fullMonths.at(-1);
-  const inLatestMonth = latestMonth ? `, ${formatMonth(latestMonth)}` : "";
+  return latestMonth ? `, ${formatMonth(latestMonth)}` : "";
+}
+
+function newslettersTile({ state, filters, facts }: DashboardRender): SummaryTile {
+  const span = describeMonthSpan(listWindowMonths(filters, state.dataMonths));
+  return {
+    label: "Newsletters",
+    value: numberFormat.format(facts.length),
+    detail: filters.lens ? `${span} · mentioning ${lensLabel(state, filters.lens)}` : span,
+  };
+}
+
+function wardsSendingTile({ state, filters, factsIgnoringLens }: DashboardRender): SummaryTile {
+  const wardCounts = summarizeWardCounts(wardsInScope(state.allWards, filters), factsIgnoringLens, state.data.newsletters);
+  const neverArchived = wardCounts.wardsNeverArchived;
+  return {
+    label: "Wards sending",
+    value: `${wardCounts.wardsWithNewsletters} of ${wardCounts.scopeWards}`,
+    detail: neverArchived.length ? `None archived: ${neverArchived.join(", ")}` : "",
+  };
+}
+
+function buildOverviewTiles(render: DashboardRender): SummaryTile[] {
+  const { state, overview } = render;
   const widest = findWidestReachTopic(overview.trends);
   const largestChange = findLargestChangeTopic(overview.trends);
-  const neverArchived = wardCounts.wardsNeverArchived;
-  const tiles: [string, string, string][] = [
-    [
-      "Newsletters",
-      numberFormat.format(facts.length),
-      filters.lens ? `${span} · mentioning ${lensLabel(state, filters.lens)}` : span,
-    ],
-    [
-      "Wards sending",
-      `${wardCounts.wardsWithNewsletters} of ${wardCounts.scopeWards}`,
-      neverArchived.length ? `None archived: ${neverArchived.join(", ")}` : "",
-    ],
-    [
-      `Most mentioned topic${inLatestMonth}`,
-      widest ? lensLabel(state, widest.lens) : "–",
-      widest ? describeTopicReach(widest) : "",
-    ],
-    [
-      `Biggest change${inLatestMonth}`,
-      largestChange ? lensLabel(state, largestChange.lens) : "–",
-      largestChange?.latestChange != null
-        ? `${describeTopicReach(largestChange)}, ${formatPointChange(largestChange.latestChange)} vs average`
-        : "",
-    ],
+  return [
+    newslettersTile(render),
+    wardsSendingTile(render),
+    {
+      label: `Most mentioned topic${inLatestFullMonth(overview)}`,
+      value: widest ? lensLabel(state, widest.lens) : "–",
+      detail: widest ? describeTopicReach(widest) : "",
+    },
+    {
+      label: `Biggest change${inLatestFullMonth(overview)}`,
+      value: largestChange ? lensLabel(state, largestChange.lens) : "–",
+      detail:
+        largestChange?.latestChange != null
+          ? `${describeTopicReach(largestChange)}, ${formatPointChange(largestChange.latestChange)} vs average`
+          : "",
+    },
   ];
-  const labels = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-label]");
-  const values = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-value]");
-  const details = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-detail]");
-  tiles.forEach(([label, value, detail], index) => {
-    labels[index].textContent = label;
-    values[index].textContent = value;
-    details[index].textContent = detail;
-  });
 }
+
+function buildTopicTiles(render: DashboardRender): SummaryTile[] {
+  const { filters, overview } = render;
+  const trend = overview.trends.find((item) => item.lens === filters.lens) ?? null;
+  const peak = trend ? findPeakPoint(trend) : null;
+  const peakCell = peak ? overview.cells.find((cell) => cell.lens === filters.lens && cell.month === peak.month) : null;
+  return [
+    newslettersTile(render),
+    wardsSendingTile(render),
+    {
+      label: `Wards mentioning it${inLatestFullMonth(overview)}`,
+      value: trend ? formatLatestReach(trend) : "–",
+      detail: trend?.latestChange != null ? `${formatPointChange(trend.latestChange)} vs its average` : "",
+    },
+    {
+      label: "Peak month",
+      value: peak ? formatMonth(peak.month) : "–",
+      detail: peakCell ? `${peakCell.wardsMentioning} of ${peakCell.activeWards} wards` : "",
+    },
+  ];
+}
+
+/** "Newest in the archive", "12 days before the archive's newest". */
+function describeRecency(date: string, archiveLastDate: string | null): string {
+  if (!archiveLastDate) return "";
+  const days = daysBetween(date, archiveLastDate);
+  return days <= 0 ? "Newest in the archive" : `${pluralize(days, "day")} before the archive's newest`;
+}
+
+function buildWardTiles({ state, filters, profile }: DashboardRender): SummaryTile[] {
+  if (!profile) return [];
+  const { cadence, archiveCadence } = profile;
+  const span = describeMonthSpan(listWindowMonths(filters, state.dataMonths));
+  const topic = filters.lens ? profile.topics.find((item) => item.lens === filters.lens) : undefined;
+  return [
+    {
+      label: "Newsletters a month",
+      value: formatMedian(cadence.medianPerTrackedMonth),
+      detail: `All wards ${formatMedian(profile.cityMedianPerTrackedMonth)} · all dates ${formatMedian(archiveCadence.medianPerTrackedMonth)}`,
+    },
+    {
+      label: "Last newsletter",
+      value: profile.lastDate ? formatDay(profile.lastDate) : "–",
+      detail: profile.lastDate ? describeRecency(profile.lastDate, state.data.metadata.last_date) : "None archived",
+    },
+    {
+      label: "Newsletters",
+      value: numberFormat.format(profile.windowNewsletters),
+      detail: topic
+        ? `${span} · ${numberFormat.format(topic.newslettersMentioning)} mention ${lensLabel(state, topic.lens)}`
+        : span,
+    },
+    {
+      label: "Coverage start",
+      value: profile.firstDate ? formatDay(profile.firstDate) : "–",
+      detail: `${pluralize(profile.archiveNewsletters, "newsletter")}, all dates`,
+    },
+  ];
+}
+
+const VIEW_TILES: Record<DashboardView, (render: DashboardRender) => SummaryTile[]> = {
+  overview: buildOverviewTiles,
+  topic: buildTopicTiles,
+  ward: buildWardTiles,
+};
 
 function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): void {
   const { chart, caption, table } = panel("coverage");
@@ -681,17 +803,10 @@ function renderLensDefinitions(state: DashboardState): void {
   container.replaceChildren(rules, list);
 }
 
-/** The chosen topic's ward-reach trend and its ward × month grid; hidden without a topic. */
-function renderTopicDetailPanel(
-  state: DashboardState,
-  filters: AnalyticsFilters,
-  overview: TopicOverview,
-  scopeFacts: NewsletterFact[],
-  months: string[],
-): void {
+/** The chosen topic's ward-reach trend and its ward × month grid. */
+function renderTopicDetailPanel({ state, filters, overview, factsIgnoringLens: scopeFacts, months }: DashboardRender): void {
   const { section, caption, table } = panel("topic-detail");
   const lens = filters.lens;
-  section.hidden = !lens;
   if (!lens) return;
   const label = lensLabel(state, lens);
   const trend = overview.trends.find((item) => item.lens === lens);
@@ -758,32 +873,24 @@ function formatMedian(value: number | null): string {
   return value === null ? "–" : medianFormat.format(value);
 }
 
-function setProfileTiles(tiles: [string, string][]): void {
-  const values = document.querySelectorAll<HTMLElement>("#profile-tiles [data-tile-value]");
-  const details = document.querySelectorAll<HTMLElement>("#profile-tiles [data-tile-detail]");
-  tiles.forEach(([value, detail], index) => {
-    values[index].textContent = value;
-    details[index].textContent = detail;
-  });
-}
-
-function renderProfileTiles(profile: WardProfile): void {
+/** The ward's typical gap and its longest gaps in these dates. */
+function renderWardGaps(section: HTMLElement, profile: WardProfile, wardFacts: NewsletterFact[]): void {
   const { cadence, archiveCadence } = profile;
-  setProfileTiles([
-    [
-      numberFormat.format(profile.windowNewsletters),
-      `Sent in ${cadence.monthsWithNewsletters} of ${pluralize(cadence.trackedMonths, "tracked month")}`,
-    ],
-    [
-      numberFormat.format(profile.archiveNewsletters),
-      profile.firstDate ? `${profile.firstDate} to ${profile.lastDate}` : "",
-    ],
-    [
-      formatMedian(cadence.medianPerTrackedMonth),
-      `All dates ${formatMedian(archiveCadence.medianPerTrackedMonth)} · all wards ${formatMedian(profile.cityMedianPerTrackedMonth)}`,
-    ],
-    [formatMedian(cadence.medianDaysBetween), `All dates ${formatMedian(archiveCadence.medianDaysBetween)}`],
-  ]);
+  const gaps = findLongestGaps(wardFacts, WARD_GAP_LIMIT);
+  requireElement<HTMLElement>("#profile-gap-typical", section).textContent =
+    cadence.medianDaysBetween === null
+      ? "Fewer than two newsletters in these dates."
+      : `Median ${formatMedian(cadence.medianDaysBetween)} days apart (all dates ${formatMedian(archiveCadence.medianDaysBetween)}). Longest:`;
+  const namesAlderman = profile.aldermen.length > 1;
+  requireElement<HTMLElement>("#profile-gaps", section).replaceChildren(
+    ...gaps.map((gap) => {
+      const item = document.createElement("li");
+      item.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
+      const alderman = namesAlderman && gap.alder ? ` · ${gap.alder}` : "";
+      item.textContent = `${pluralize(gap.days, "day")}: ${formatDay(gap.from)} – ${formatDay(gap.to)}${alderman}`;
+      return item;
+    }),
+  );
 }
 
 function wardProfileColumns(state: DashboardState): TableColumn<WardProfile["topics"][number]>[] {
@@ -801,14 +908,14 @@ function wardProfileColumns(state: DashboardState): TableColumn<WardProfile["top
   ];
 }
 
-/** The chosen ward over the window's months, hidden without one; the ward and topic filters don't apply. */
-function renderWardProfilePanel(state: DashboardState, ward: string, months: string[]): void {
+/** The focused ward over the window's months; the chosen topic is outlined. */
+function renderWardProfilePanel({ state, filters, profile, factsIgnoringLens, months }: DashboardRender): void {
   const { section, caption, table } = panel("ward-profile");
   const message = requireElement<HTMLElement>("#profile-message", section);
   const content = requireElement<HTMLElement>("#profile-content", section);
   const tableView = requireElement<HTMLElement>("[data-table-view]", section);
-  section.hidden = !ward;
-  if (!ward) return;
+  if (!profile) return;
+  const { ward } = profile;
   const showMessage = (text: string) => {
     message.textContent = text;
     message.hidden = false;
@@ -817,14 +924,6 @@ function renderWardProfilePanel(state: DashboardState, ward: string, months: str
     caption.textContent = "";
   };
   const lenses = state.data.lenses.lenses;
-  const profile = buildWardProfile(
-    state.data.newsletters,
-    state.data.sources,
-    ward,
-    months,
-    state.dataMonths,
-    lenses.map((lens) => lens.id),
-  );
   if (profile.archiveNewsletters === 0) {
     showMessage(`No ${formatWard(ward)} newsletters in the archive yet.`);
     return;
@@ -837,18 +936,18 @@ function renderWardProfilePanel(state: DashboardState, ward: string, months: str
     ? `${formatWard(ward)} · ${aldermen}`
     : formatWard(ward);
   caption.textContent = "";
-  renderProfileTiles(profile);
 
   const cadenceChart = requireElement<HTMLElement>("#profile-cadence", section);
   replaceContent(
     cadenceChart,
     months.length ? renderWardCadence(profile.months, months, chartWidth(cadenceChart)) : emptyMessage("Nothing in these dates."),
   );
+  renderWardGaps(section, profile, factsIgnoringLens);
   const topicsChart = requireElement<HTMLElement>("#profile-topics", section);
   replaceContent(
     topicsChart,
     months.length
-      ? renderWardTopicGrid(profile.topicCells, lenses, months, ward, chartWidth(topicsChart))
+      ? renderWardTopicGrid(profile.topicCells, lenses, months, ward, filters.lens, chartWidth(topicsChart))
       : emptyMessage("Nothing in these dates."),
   );
 
@@ -995,16 +1094,15 @@ function describeWardScope(filters: AnalyticsFilters): string {
 function describeExportScope(state: DashboardState, panelId: string, view: DashboardViewState): string {
   if (CITY_WIDE_PANELS.has(panelId)) return "City-wide";
   const span = describeMonthSpan(listWindowMonths(view.filters, state.dataMonths));
-  const wards =
-    panelId === "ward-profile" && view.profileWard ? formatWard(view.profileWard) : describeWardScope(view.filters);
-  return `${span} · ${wards}`;
+  return `${span} · ${describeWardScope(view.filters)}`;
 }
 
 function describeExportTitle(state: DashboardState, panelId: string, title: string, view: DashboardViewState): string {
   const lens = view.filters.lens ? lensLabel(state, view.filters.lens) : null;
+  const ward = focusedWard(view.filters);
   if (panelId === "topic-detail" && lens) return `${title}: ${lens}`;
   if (panelId === "term-explorer" && view.term) return `${title}: "${view.term}"`;
-  if (panelId === "ward-profile" && view.profileWard) return `${title}: ${formatWard(view.profileWard)}`;
+  if (panelId === "ward-profile" && ward) return `${title}: ${formatWard(ward)}`;
   return title;
 }
 
@@ -1058,27 +1156,86 @@ async function exportPanel(state: DashboardState, button: HTMLButtonElement, vie
 // ---------------------------------------------------------------------------
 // Orchestration
 
+const PANEL_RENDERERS: Record<DashboardPanelId, (render: DashboardRender) => void> = {
+  "term-explorer": ({ state, filters }) => renderTermExplorer(state, filters),
+  "civic-calendar": ({ state, filters, overview, months, selectTopic }) =>
+    renderCivicCalendarPanel(state, filters, overview, months, selectTopic),
+  "topic-detail": renderTopicDetailPanel,
+  "ward-profile": renderWardProfilePanel,
+  "rising-terms": ({ state }) => renderRisingPanel(state),
+  "sending-cadence": ({ factsIgnoringLens }) => renderCadencePanel(factsIgnoringLens),
+  coverage: ({ state, filters }) => renderCoveragePanel(state, filters),
+};
+
+/** Show the view's panels in its order and hide the rest. */
+function applyViewLayout(view: DashboardView): void {
+  const panels = VIEW_PANELS[view];
+  for (const id of DASHBOARD_PANEL_IDS) requireElement<HTMLElement>(`#${id}`).hidden = !panels.includes(id);
+  requireElement<HTMLElement>("#dashboard-panels").append(...panels.map((id) => requireElement<HTMLElement>(`#${id}`)));
+}
+
+/**
+ * Name the view in the heading. `announce` also reads a new view out; it is
+ * false when focus moves to a heading that names it, which screen readers read anyway.
+ */
+function renderViewBar(state: DashboardState, filters: AnalyticsFilters, view: DashboardView, announce: boolean): void {
+  // The overview keeps its heading for screen readers only, so the page looks as before.
+  requireElement<HTMLElement>("#dashboard-view-bar").classList.toggle("sr-only", view === "overview");
+  requireElement<HTMLButtonElement>("#back-to-overview").hidden = view === "overview";
+  const heading = requireElement<HTMLElement>("#dashboard-view-heading");
+  const text = describeDashboardView(filters, { ward: formatWard, topic: (lensId) => lensLabel(state, lensId) });
+  if (heading.textContent === text) return;
+  heading.textContent = text;
+  // Cleared when not announced, so returning to the same view later is still read out.
+  requireElement<HTMLElement>("#dashboard-view-status").textContent = announce ? text : "";
+}
+
+function buildRender(state: DashboardState, filters: AnalyticsFilters, selectTopic: (lensId: string) => void): DashboardRender {
+  const factsIgnoringLens = filterFacts(state.data.newsletters, filters, { ignoreLens: true });
+  const months = listWindowMonths(filters, state.dataMonths);
+  const ward = focusedWard(filters);
+  return {
+    state,
+    filters,
+    facts: filterFacts(state.data.newsletters, filters),
+    factsIgnoringLens,
+    months,
+    overview: buildTopicOverview(state, filters, factsIgnoringLens, months),
+    profile:
+      ward === null
+        ? null
+        : buildWardProfile(
+            state.data.newsletters,
+            state.data.sources,
+            ward,
+            months,
+            state.dataMonths,
+            state.urlContext.lensIds,
+          ),
+    selectTopic,
+  };
+}
+
 function renderDashboard(
   state: DashboardState,
   controls: DashboardControls,
   selectTopic: (lensId: string) => void,
+  announce: boolean,
 ): void {
   const filters = readFilters(controls.form);
+  const view = selectDashboardView(filters);
   updateWardSummary(filters);
-  const facts = filterFacts(state.data.newsletters, filters);
-  const factsIgnoringLens = filterFacts(state.data.newsletters, filters, { ignoreLens: true });
-  const months = listWindowMonths(filters, state.dataMonths);
-  const overview = buildTopicOverview(state, filters, factsIgnoringLens, months);
-
+  controls.profileSelect.value = focusedWard(filters) ?? "";
+  // Moving panels drops focus inside them, so reorder only when the view changes.
+  if (view !== state.view) {
+    applyViewLayout(view);
+    state.view = view;
+  }
+  renderViewBar(state, filters, view, announce);
   renderDateWindowStatus(state, filters);
-  renderSummary(state, filters, facts, factsIgnoringLens, overview);
-  renderTermExplorer(state, filters);
-  renderCivicCalendarPanel(state, filters, overview, months, selectTopic);
-  renderTopicDetailPanel(state, filters, overview, factsIgnoringLens, months);
-  renderWardProfilePanel(state, controls.profileSelect.value, months);
-  renderRisingPanel(state);
-  renderCadencePanel(factsIgnoringLens);
-  renderCoveragePanel(state, filters);
+  const render = buildRender(state, filters, selectTopic);
+  requireElement<HTMLElement>("#summary-tiles").replaceChildren(...VIEW_TILES[view](render).map(buildTile));
+  for (const id of VIEW_PANELS[view]) PANEL_RENDERERS[id](render);
   refreshExportButtons();
 }
 
@@ -1113,8 +1270,7 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
     asOfMonth: findAsOfMonth(data.metadata.generated_at),
     broadWindow,
     urlContext: {
-      filterWards: listWards(data.newsletters),
-      profileWards: allWards,
+      wards: allWards,
       months: dataMonths,
       lensIds: data.lenses.lenses.map((lens) => lens.id),
       defaultFromMonth: broadWindow?.startMonth ?? null,
@@ -1122,6 +1278,7 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
     term: "",
     terms: null,
     termsError: null,
+    view: null,
   };
 }
 
@@ -1135,21 +1292,23 @@ interface DashboardControls {
 function readViewState(state: DashboardState, controls: DashboardControls): DashboardViewState {
   return {
     filters: readFilters(controls.form),
-    profileWard: controls.profileSelect.value || null,
     term: normalizeTermQuery(state.term),
   };
 }
 
+function setWardSelection(form: HTMLFormElement, wards: string[]): void {
+  form.querySelectorAll<HTMLInputElement>('input[name="ward"]').forEach((input) => {
+    input.checked = wards.includes(input.value);
+  });
+}
+
 /** Set every control to a view (from the URL) without rendering. */
 function applyViewState(state: DashboardState, controls: DashboardControls, view: DashboardViewState): void {
-  const { form, profileSelect, termInput } = controls;
-  form.querySelectorAll<HTMLInputElement>('input[name="ward"]').forEach((input) => {
-    input.checked = view.filters.wards.includes(input.value);
-  });
+  const { form, termInput } = controls;
+  setWardSelection(form, view.filters.wards);
   requireElement<HTMLSelectElement>('select[name="lens"]', form).value = view.filters.lens ?? "";
   requireElement<HTMLSelectElement>('select[name="from"]', form).value = view.filters.fromMonth ?? "";
   requireElement<HTMLSelectElement>('select[name="to"]', form).value = view.filters.toMonth ?? "";
-  profileSelect.value = view.profileWard ?? "";
   termInput.value = view.term;
   state.term = view.term;
 }
@@ -1186,7 +1345,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const { form, profileSelect, termInput } = controls;
   populateFilterOptions(
     form,
-    state.urlContext.filterWards,
+    state.urlContext.wards,
     state.dataMonths,
     data.lenses.lenses,
     state.urlContext.defaultFromMonth,
@@ -1198,31 +1357,27 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   /** Choose a topic from the overview, then bring its detail into view. */
   const selectTopic = (lensId: string) => {
     requireElement<HTMLSelectElement>('select[name="lens"]', form).value = lensId;
-    commit();
+    commit({ announce: false });
     requireElement<HTMLElement>("#topic-detail").scrollIntoView({ behavior: "smooth", block: "start" });
     // The clicked control was redrawn; move focus to where the reader now is.
     requireElement<HTMLElement>("#topic-detail-heading").focus({ preventScroll: true });
   };
-  const rerender = () => renderDashboard(state, controls, selectTopic);
+  const rerender = ({ announce = true } = {}) => renderDashboard(state, controls, selectTopic, announce);
   /** Render a change the reader made and record it in the history. */
-  const commit = () => {
-    rerender();
+  const commit = ({ announce = true } = {}) => {
+    rerender({ announce });
     syncUrl(state, controls, "change");
   };
-  const restoreFromUrl = () => {
+  const restoreFromUrl = ({ announce }: { announce: boolean }) => {
     applyViewState(state, controls, parseDashboardUrlState(new URLSearchParams(window.location.search), state.urlContext));
     if (state.term) requestTermIndex(state, filtersNow);
-    rerender();
+    rerender({ announce });
   };
 
-  // Covers the ward profile select too, which sits in the filter form.
   form.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
-    // Follow a single selected ward in the ward profile.
-    if (target.name === "ward") {
-      const selected = readFilters(form).wards;
-      if (selected.length === 1) profileSelect.value = selected[0];
-    }
+    // The ward profile select is a shortcut to selecting just that ward.
+    if (event.target === profileSelect) setWardSelection(form, profileSelect.value ? [profileSelect.value] : []);
     if (target.name === "from" || target.name === "to") {
       const { fromMonth, toMonth } = reconcileDateWindow(readFilters(form), target.name);
       requireElement<HTMLSelectElement>('select[name="from"]', form).value = fromMonth ?? "";
@@ -1233,13 +1388,17 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   form.addEventListener("reset", () => {
     requireElement<HTMLDetailsElement>("#ward-picker").open = false;
     // Form reset updates control values after the event; render on the next tick.
-    setTimeout(commit);
+    setTimeout(() => commit());
   });
   requireElement<HTMLButtonElement>("#clear-wards").addEventListener("click", () => {
-    form.querySelectorAll<HTMLInputElement>('input[name="ward"]').forEach((input) => {
-      input.checked = false;
-    });
+    setWardSelection(form, []);
     commit();
+  });
+  requireElement<HTMLButtonElement>("#back-to-overview").addEventListener("click", () => {
+    applyViewState(state, controls, { filters: clearViewSelection(filtersNow()), term: state.term });
+    commit({ announce: false });
+    // The button is gone; the heading now names the overview.
+    requireElement<HTMLElement>("#dashboard-view-heading").focus();
   });
   requireElement<HTMLButtonElement>("#date-window-toggle").addEventListener("click", () => {
     const showingFullArchive = classifyDateWindow(readFilters(form), state.broadWindow) === "full";
@@ -1283,7 +1442,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
 
   window.addEventListener("popstate", () => {
     lastHistoryPushMs = null;
-    restoreFromUrl();
+    restoreFromUrl({ announce: true });
   });
 
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1292,10 +1451,10 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     if (window.innerWidth === lastWidth) return;
     lastWidth = window.innerWidth;
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(rerender, RESIZE_DEBOUNCE_MS);
+    resizeTimer = setTimeout(() => rerender(), RESIZE_DEBOUNCE_MS);
   });
 
-  restoreFromUrl();
+  restoreFromUrl({ announce: false });
   // Drop any invalid or default parameters from the address the reader shares.
   syncUrl(state, controls, "replace");
 }

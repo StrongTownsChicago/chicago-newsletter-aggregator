@@ -9,9 +9,11 @@ export const DASHBOARD_URL_PARAMS = {
   from: "from",
   to: "to",
   window: "window",
-  profileWard: "ward",
   term: "term",
 } as const;
+
+/** The former ward profile parameter. It still opens that ward and wins over `wards`. */
+export const LEGACY_PROFILE_WARD_PARAM = "ward";
 
 /** `window=` value for a window starting at the beginning of the archive. */
 export const FULL_ARCHIVE_WINDOW = "all";
@@ -22,8 +24,6 @@ const ENCODED_WARD_LIST_SEPARATOR = encodeURIComponent(WARD_LIST_SEPARATOR);
 
 export interface DashboardViewState {
   filters: AnalyticsFilters;
-  /** The ward shown in the ward profile, or null. */
-  profileWard: string | null;
   /** The term explorer query (normalized), or "". */
   term: string;
 }
@@ -31,9 +31,7 @@ export interface DashboardViewState {
 /** The values a URL may choose from; anything else is ignored. */
 export interface DashboardUrlContext {
   /** Wards the ward filter offers. */
-  filterWards: string[];
-  /** Wards the ward profile offers. */
-  profileWards: string[];
+  wards: string[];
   /** Every month the date filters offer, in order. */
   months: string[];
   lensIds: string[];
@@ -70,14 +68,14 @@ export function parseDashboardUrlState(params: URLSearchParams, context: Dashboa
   const toCandidate = parseChoice(params.get(DASHBOARD_URL_PARAMS.to), context.months);
   // A window that ends before it starts is ignored rather than shown empty.
   const toMonth = toCandidate !== null && (fromMonth === null || toCandidate >= fromMonth) ? toCandidate : null;
+  const legacyWard = parseChoice(params.get(LEGACY_PROFILE_WARD_PARAM), context.wards);
   return {
     filters: {
-      wards: parseWards(params.get(DASHBOARD_URL_PARAMS.wards), context.filterWards),
+      wards: legacyWard !== null ? [legacyWard] : parseWards(params.get(DASHBOARD_URL_PARAMS.wards), context.wards),
       lens: parseChoice(params.get(DASHBOARD_URL_PARAMS.topic), context.lensIds),
       fromMonth,
       toMonth,
     },
-    profileWard: parseChoice(params.get(DASHBOARD_URL_PARAMS.profileWard), context.profileWards),
     term: parseTerm(params.get(DASHBOARD_URL_PARAMS.term)),
   };
 }
@@ -100,7 +98,6 @@ export function serializeDashboardUrlState(state: DashboardViewState, context: D
     params.set(DASHBOARD_URL_PARAMS.from, filters.fromMonth);
   }
   if (filters.toMonth) params.set(DASHBOARD_URL_PARAMS.to, filters.toMonth);
-  if (state.profileWard) params.set(DASHBOARD_URL_PARAMS.profileWard, state.profileWard);
   const term = normalizeTermQuery(state.term);
   if (term) params.set(DASHBOARD_URL_PARAMS.term, term);
   // Commas are valid in a query string; leaving them unescaped keeps shared links readable ("wards=1,2").

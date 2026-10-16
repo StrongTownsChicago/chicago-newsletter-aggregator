@@ -51,10 +51,10 @@ export interface WardTopicSummary {
 }
 
 export interface WardCadence {
-  /** Months from the ward's first archived newsletter (or the window start) to the window end. */
-  trackedMonths: number;
-  monthsWithNewsletters: number;
-  /** Median newsletters per tracked month, counting months with none as zero. */
+  /**
+   * Median newsletters per tracked month (from the ward's first archived
+   * newsletter, or the window start, to the window end), counting months with none as zero.
+   */
   medianPerTrackedMonth: number | null;
   /** Median days between consecutive newsletters, or null with fewer than two. */
   medianDaysBetween: number | null;
@@ -91,8 +91,6 @@ function medianDaysBetween(dates: string[]): number | null {
 export function summarizeCadence(cells: CoverageCell[], dates: string[]): WardCadence {
   const tracked = cells.filter((cell) => cell.status !== "untracked");
   return {
-    trackedMonths: tracked.length,
-    monthsWithNewsletters: tracked.filter((cell) => cell.newsletters > 0).length,
     medianPerTrackedMonth: median(tracked.map((cell) => cell.newsletters)),
     medianDaysBetween: medianDaysBetween(dates),
   };
