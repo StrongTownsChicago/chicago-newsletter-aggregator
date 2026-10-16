@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from tools.lint import check_docstrings as checker
+from tools.lint import source_trees
 
 
 def rules_hit(source: str, rel: str = "analytics/thing.py") -> list[str]:
@@ -161,7 +162,7 @@ class TestRepository(unittest.TestCase):
     def test_the_scan_covers_product_tests_and_tools(self) -> None:
         scanned = {
             path.relative_to(checker.ROOT).parts[0]
-            for path in checker.python_files(checker.ROOT)
+            for path in source_trees.python_files(checker.ROOT)
         }
         self.assertTrue({"analytics", "utils", "tests", "tools"} <= scanned)
 

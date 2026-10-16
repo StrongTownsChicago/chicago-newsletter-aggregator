@@ -24,25 +24,10 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from tools.lint.source_trees import python_files
+
 #: ``backend/``: this file sits two directories below it.
 ROOT = Path(__file__).resolve().parents[2]
-
-TREES = (
-    "analytics",
-    "config",
-    "ingest",
-    "models",
-    "notifications",
-    "processing",
-    "prompts",
-    "shared",
-    "utils",
-    "tests",
-    "tools",
-)
-SKIPPED_DIRECTORIES = frozenset(
-    {".venv", "data", "samples", "migrations", "htmlcov", "__pycache__"}
-)
 
 MODULE_DOC_MAX = 15
 #: A CLI entry module's docstring is its usage documentation.
@@ -219,21 +204,6 @@ def check_source(source: str, rel: str) -> list[Violation]:
                 if v.rule not in suppressed
             )
     return found
-
-
-def python_files(root: Path) -> list[Path]:
-    """Every scanned file under ``root``, in a stable order."""
-    files: list[Path] = []
-    for tree in TREES:
-        directory = root / tree
-        if not directory.is_dir():
-            continue
-        files.extend(
-            path
-            for path in sorted(directory.rglob("*.py"))
-            if not SKIPPED_DIRECTORIES.intersection(path.relative_to(root).parts)
-        )
-    return files
 
 
 def scan_repo(root: Path = ROOT) -> list[Violation]:

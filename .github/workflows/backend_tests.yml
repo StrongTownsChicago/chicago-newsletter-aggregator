@@ -56,6 +56,11 @@ jobs:
           cd backend
           uv run --locked python -m tools.lint.check_docstrings
 
+      - name: Run Module Size Ratchet
+        run: |
+          cd backend
+          uv run --locked python -m tools.lint.check_module_size
+
       - name: Run Tests
         run: |
           cd backend
