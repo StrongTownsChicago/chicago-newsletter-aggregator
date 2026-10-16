@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ESLint, type Linter } from "eslint";
 import { describe, expect, it } from "vitest";
@@ -26,6 +27,23 @@ function collectMaxLinesBlocks(configs: Linter.Config[]): MaxLinesBlock[] {
   });
 }
 
+/** Every file the cap covers, relative to the frontend root with forward slashes. */
+function listCappedFiles(): string[] {
+  const roots: [string, RegExp][] = [
+    ["src", /\.(ts|astro)$/],
+    ["e2e", /\.ts$/],
+  ];
+  return roots.flatMap(([root, pattern]) =>
+    readdirSync(path.join(FRONTEND_ROOT, root), { recursive: true, encoding: "utf8" })
+      .map((file) => `${root}/${file.split(path.sep).join("/")}`)
+      .filter((file) => pattern.test(file)),
+  );
+}
+
+// An eslint-disable comment naming max-lines or no rule at all, or an inline `eslint max-lines:` setting.
+const INLINE_MAX_LINES_OVERRIDE =
+  /(?:\/\/|\/\*)\s*(?:eslint-disable(?:-next-line|-line)?(?:\s*(?:\*\/|--|$)|[^\n]*\bmax-lines\b)|eslint\s[^\n]*\bmax-lines\b)/m;
+
 const blocks = collectMaxLinesBlocks(eslintConfig as Linter.Config[]);
 const ceilingBlocks = blocks.filter((block) => block.max !== DEFAULT_MAX_LINES);
 
@@ -42,6 +60,25 @@ describe("max-lines budgets", () => {
     for (const [file, max] of Object.entries(configured)) {
       expect(max, file).toBeLessThanOrEqual(ADOPTED_CEILINGS[file]);
     }
+  });
+
+  // Catches what the block check above can't see: "off", a numeric severity, or a later block.
+  it("applies the cap, or the file's adopted ceiling, to every file", async () => {
+    const eslint = new ESLint({ cwd: FRONTEND_ROOT });
+    for (const file of listCappedFiles()) {
+      const config = (await eslint.calculateConfigForFile(file)) as Linter.Config;
+      expect(config.rules?.["max-lines"], file).toEqual([
+        2,
+        { max: ADOPTED_CEILINGS[file] ?? DEFAULT_MAX_LINES, skipBlankLines: true, skipComments: true },
+      ]);
+    }
+  });
+
+  it("has no inline max-lines overrides", () => {
+    const overridden = listCappedFiles().filter((file) =>
+      INLINE_MAX_LINES_OVERRIDE.test(readFileSync(path.join(FRONTEND_ROOT, file), "utf8")),
+    );
+    expect(overridden).toEqual([]);
   });
 
   it.runIf(Object.keys(ADOPTED_CEILINGS).length > 0)("has no slack: each ceiling equals the file's measured size", async () => {
