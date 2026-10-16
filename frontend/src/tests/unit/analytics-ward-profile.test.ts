@@ -63,8 +63,6 @@ describe("summarizeCadence", () => {
       ["2026-02-01", "2026-02-11", "2026-04-01"],
     );
     expect(cadence).toEqual({
-      trackedMonths: 3,
-      monthsWithNewsletters: 2,
       medianPerTrackedMonth: 2,
       medianDaysBetween: (10 + 49) / 2,
     });
@@ -110,8 +108,8 @@ describe("buildWardProfile", () => {
     expect(profile.archiveNewsletters).toBe(3);
     expect(profile.windowNewsletters).toBe(3);
     expect(profile.months.map((cell) => cell.status)).toEqual(["untracked", "received", "silent", "received"]);
-    expect(profile.cadence.trackedMonths).toBe(3);
-    expect(profile.cadence.monthsWithNewsletters).toBe(2);
+    // Three tracked months (2, 0 and 1 newsletters): the untracked first month is left out.
+    expect(profile.cadence.medianPerTrackedMonth).toBe(1);
     const budget = profile.topicCells.filter((cell) => cell.lens === "budget").map((cell) => cell.status);
     expect(budget).toEqual(["no_newsletter", "mentioned", "no_newsletter", "not_mentioned"]);
     // Shaded by the share of that month's newsletters mentioning the topic.

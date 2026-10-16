@@ -189,4 +189,8 @@ describe("findPeakPoint", () => {
     expect(findPeakPoint(trendOf([null, 0.1, null]))?.month).toBe("2026-02");
     expect(findPeakPoint(trendOf([null, null, null]))).toBeNull();
   });
+
+  it("has no peak when no ward mentioned the topic", () => {
+    expect(findPeakPoint(trendOf([0, 0, null]))).toBeNull();
+  });
 });

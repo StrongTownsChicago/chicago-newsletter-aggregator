@@ -317,14 +317,20 @@ function buildTopicOverview(
   return { cells, trends: summarizeTopicTrends(cells, lensIds, fullMonths, threshold), fullMonths, threshold };
 }
 
+/** The last full month's reach cell, or null when no ward sent newsletters then. */
+function latestReachCell(trend: TopicTrend): LensReachCell | null {
+  return trend.latest && trend.latest.activeWards > 0 ? trend.latest : null;
+}
+
 /** "28 of 37": wards mentioning a topic in the last full month, of wards sending. */
 function formatLatestReach(trend: TopicTrend): string {
-  return trend.latest ? `${trend.latest.wardsMentioning} of ${trend.latest.activeWards}` : "–";
+  const latest = latestReachCell(trend);
+  return latest ? `${latest.wardsMentioning} of ${latest.activeWards}` : "–";
 }
 
 /** "28 of 37 wards". */
 function describeTopicReach(trend: TopicTrend): string {
-  return trend.latest ? `${formatLatestReach(trend)} wards` : "";
+  return latestReachCell(trend) ? `${formatLatestReach(trend)} wards` : "";
 }
 
 /** Everything one render of the dashboard needs, computed once. */
@@ -1168,14 +1174,20 @@ function applyViewLayout(view: DashboardView): void {
   requireElement<HTMLElement>("#dashboard-panels").append(...panels.map((id) => requireElement<HTMLElement>(`#${id}`)));
 }
 
-function renderViewBar(state: DashboardState, filters: AnalyticsFilters, view: DashboardView): void {
+/**
+ * Name the view in the heading. `announce` also reads a new view out; it is
+ * false when focus moves to a heading that names it, which screen readers read anyway.
+ */
+function renderViewBar(state: DashboardState, filters: AnalyticsFilters, view: DashboardView, announce: boolean): void {
   // The overview keeps its heading for screen readers only, so the page looks as before.
   requireElement<HTMLElement>("#dashboard-view-bar").classList.toggle("sr-only", view === "overview");
   requireElement<HTMLButtonElement>("#back-to-overview").hidden = view === "overview";
   const heading = requireElement<HTMLElement>("#dashboard-view-heading");
   const text = describeDashboardView(filters, { ward: formatWard, topic: (lensId) => lensLabel(state, lensId) });
-  // Rewriting the same text would re-announce the live heading.
-  if (heading.textContent !== text) heading.textContent = text;
+  if (heading.textContent === text) return;
+  heading.textContent = text;
+  // Cleared when not announced, so returning to the same view later is still read out.
+  requireElement<HTMLElement>("#dashboard-view-status").textContent = announce ? text : "";
 }
 
 function buildRender(state: DashboardState, filters: AnalyticsFilters, selectTopic: (lensId: string) => void): DashboardRender {
@@ -1208,6 +1220,7 @@ function renderDashboard(
   state: DashboardState,
   controls: DashboardControls,
   selectTopic: (lensId: string) => void,
+  announce: boolean,
 ): void {
   const filters = readFilters(controls.form);
   const view = selectDashboardView(filters);
@@ -1218,7 +1231,7 @@ function renderDashboard(
     applyViewLayout(view);
     state.view = view;
   }
-  renderViewBar(state, filters, view);
+  renderViewBar(state, filters, view, announce);
   renderDateWindowStatus(state, filters);
   const render = buildRender(state, filters, selectTopic);
   requireElement<HTMLElement>("#summary-tiles").replaceChildren(...VIEW_TILES[view](render).map(buildTile));
@@ -1344,21 +1357,21 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   /** Choose a topic from the overview, then bring its detail into view. */
   const selectTopic = (lensId: string) => {
     requireElement<HTMLSelectElement>('select[name="lens"]', form).value = lensId;
-    commit();
+    commit({ announce: false });
     requireElement<HTMLElement>("#topic-detail").scrollIntoView({ behavior: "smooth", block: "start" });
     // The clicked control was redrawn; move focus to where the reader now is.
     requireElement<HTMLElement>("#topic-detail-heading").focus({ preventScroll: true });
   };
-  const rerender = () => renderDashboard(state, controls, selectTopic);
+  const rerender = ({ announce = true } = {}) => renderDashboard(state, controls, selectTopic, announce);
   /** Render a change the reader made and record it in the history. */
-  const commit = () => {
-    rerender();
+  const commit = ({ announce = true } = {}) => {
+    rerender({ announce });
     syncUrl(state, controls, "change");
   };
-  const restoreFromUrl = () => {
+  const restoreFromUrl = ({ announce }: { announce: boolean }) => {
     applyViewState(state, controls, parseDashboardUrlState(new URLSearchParams(window.location.search), state.urlContext));
     if (state.term) requestTermIndex(state, filtersNow);
-    rerender();
+    rerender({ announce });
   };
 
   form.addEventListener("change", (event) => {
@@ -1375,7 +1388,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   form.addEventListener("reset", () => {
     requireElement<HTMLDetailsElement>("#ward-picker").open = false;
     // Form reset updates control values after the event; render on the next tick.
-    setTimeout(commit);
+    setTimeout(() => commit());
   });
   requireElement<HTMLButtonElement>("#clear-wards").addEventListener("click", () => {
     setWardSelection(form, []);
@@ -1383,7 +1396,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   });
   requireElement<HTMLButtonElement>("#back-to-overview").addEventListener("click", () => {
     applyViewState(state, controls, { filters: clearViewSelection(filtersNow()), term: state.term });
-    commit();
+    commit({ announce: false });
     // The button is gone; the heading now names the overview.
     requireElement<HTMLElement>("#dashboard-view-heading").focus();
   });
@@ -1429,7 +1442,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
 
   window.addEventListener("popstate", () => {
     lastHistoryPushMs = null;
-    restoreFromUrl();
+    restoreFromUrl({ announce: true });
   });
 
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1438,10 +1451,10 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     if (window.innerWidth === lastWidth) return;
     lastWidth = window.innerWidth;
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(rerender, RESIZE_DEBOUNCE_MS);
+    resizeTimer = setTimeout(() => rerender(), RESIZE_DEBOUNCE_MS);
   });
 
-  restoreFromUrl();
+  restoreFromUrl({ announce: false });
   // Drop any invalid or default parameters from the address the reader shares.
   syncUrl(state, controls, "replace");
 }

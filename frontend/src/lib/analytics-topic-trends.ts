@@ -116,10 +116,10 @@ export function findLargestChangeTopic(trends: TopicTrend[]): TopicTrend | null 
   }, null);
 }
 
-/** The full month with the topic's widest ward reach (the latest on a tie), or null. */
+/** The full month with the topic's widest ward reach (the latest on a tie), or null when no ward mentioned it. */
 export function findPeakPoint(trend: TopicTrend): TopicTrendPoint | null {
   return trend.points.reduce<TopicTrendPoint | null>((best, point) => {
-    if (point.share === null) return best;
+    if (!point.share) return best;
     return best === null || point.share >= (best.share ?? 0) ? point : best;
   }, null);
 }

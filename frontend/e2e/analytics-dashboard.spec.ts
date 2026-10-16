@@ -208,6 +208,8 @@ test('Back to overview clears the ward and topic but keeps the dates', async ({ 
   await expect(page).toHaveURL(/\/analytics\?from=2026-03&term=zoning$/);
   await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
   await expect(page.locator('#dashboard-view-heading')).toBeFocused();
+  // Focus already reads the heading out; the status stays quiet.
+  await expect(page.locator('#dashboard-view-status')).toHaveText('');
   await expect(back).toBeHidden();
   expect(await visiblePanelIds(page)).toEqual(OVERVIEW_PANELS);
   await expect(page.locator('select[name="from"]')).toHaveValue('2026-03');
@@ -215,6 +217,7 @@ test('Back to overview clears the ward and topic but keeps the dates', async ({ 
   await page.goBack();
   await expect(page).toHaveURL(/wards=1&topic=budget_taxes/);
   await expect(page.locator('#dashboard-view-heading')).toHaveText('Ward 1 · Budget & taxes');
+  await expect(page.locator('#dashboard-view-status')).toHaveText('Ward 1 · Budget & taxes');
   expect(await visiblePanelIds(page)).toEqual(['ward-profile', 'term-explorer', 'coverage']);
   await page.goForward();
   await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');

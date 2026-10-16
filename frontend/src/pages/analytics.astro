@@ -89,11 +89,13 @@ const controlClass =
       </form>
 
       <div id="dashboard-view-bar" class="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="dashboard-view-heading" tabindex="-1" aria-live="polite" class="text-2xl font-bold text-gray-900 focus:outline-none">Overview</h2>
+        <h2 id="dashboard-view-heading" tabindex="-1" class="text-2xl font-bold text-gray-900 focus:outline-none">Overview</h2>
         <button type="button" id="back-to-overview" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm" hidden>
           ← Back to overview
         </button>
       </div>
+
+      <p id="dashboard-view-status" class="sr-only" role="status"></p>
 
       <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite"></div>
 
