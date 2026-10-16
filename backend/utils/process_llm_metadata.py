@@ -30,12 +30,14 @@ Usage:
     uv run python -m utils.process_llm_metadata --latest 10 --dry-run
 """
 
-import os
 import argparse
+import os
 from typing import Any, cast
+
 from dotenv import load_dotenv
-from shared.db import get_supabase_client
+
 from processing.llm_processor import extract_newsletter_metadata
+from shared.db import get_supabase_client
 
 load_dotenv()
 
@@ -131,6 +133,8 @@ def reprocess_newsletter(
                 try:
                     from notifications.rule_matcher import (
                         match_newsletter_to_rules,
+                    )
+                    from notifications.rule_matcher import (
                         queue_notifications as queue_notifs,
                     )
 

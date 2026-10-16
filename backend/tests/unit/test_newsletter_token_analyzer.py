@@ -5,6 +5,7 @@ Tests token analysis for newsletter processing and weekly report workflows.
 """
 
 import unittest
+
 from utils.newsletter_token_analyzer import (
     analyze_newsletter_tokens,
     analyze_weekly_report_tokens,

@@ -9,11 +9,11 @@ import unittest
 from unittest.mock import patch
 
 from notifications.email_sender import (
-    _prepare_newsletter_data,
-    send_daily_digest,
+    DigestType,
     _build_digest_html,
     _build_digest_text,
-    DigestType,
+    _prepare_newsletter_data,
+    send_daily_digest,
 )
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 

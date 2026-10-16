@@ -9,9 +9,9 @@ Usage:
     uv run python utils/time_tests.py
 """
 
-import unittest
-import time
 import sys
+import time
+import unittest
 from pathlib import Path
 from typing import Any
 

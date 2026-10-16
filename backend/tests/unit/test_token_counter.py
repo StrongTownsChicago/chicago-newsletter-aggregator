@@ -5,12 +5,13 @@ Tests token counting accuracy, encoder selection, and schema overhead calculatio
 """
 
 import unittest
+
 from utils.token_counter import (
-    count_tokens,
     count_schema_tokens,
+    count_tokens,
     estimate_llm_call_tokens,
-    get_encoding_for_model,
     get_encoder_for_model,
+    get_encoding_for_model,
 )
 
 

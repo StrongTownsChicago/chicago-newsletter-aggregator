@@ -4,12 +4,14 @@ Unit tests for unsubscribe token generation and validation.
 
 import os
 import unittest
-import jwt
 from datetime import datetime, timedelta, timezone
+
+import jwt
+
 from notifications.unsubscribe_tokens import (
+    ALGORITHM,
     generate_unsubscribe_token,
     validate_unsubscribe_token,
-    ALGORITHM,
 )
 
 

@@ -6,7 +6,8 @@ the system correctly skips sending the email and marks the notification as faile
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from notifications.process_notification_queue import process_daily_digests
 
 

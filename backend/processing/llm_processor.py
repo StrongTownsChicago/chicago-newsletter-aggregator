@@ -13,8 +13,9 @@ Pass a provider-prefixed model string (e.g., "openai:gpt-5") to use a cloud prov
 Bare model names default to Ollama for backward compatibility.
 """
 
-from pydantic import BaseModel, Field
 from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 from processing.llm_client import call_llm
 

@@ -6,8 +6,9 @@ Tokens are stateless (no database storage needed).
 """
 
 import os
-import jwt
 from datetime import datetime, timedelta, timezone
+
+import jwt
 
 ALGORITHM = "HS256"
 

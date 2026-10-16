@@ -5,10 +5,11 @@ Tests the ability of notification_queue to handle both newsletters (daily)
 and weekly topic reports (weekly) using dedicated newsletter_id and report_id columns.
 """
 
-import sys
 import io
+import sys
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
 from notifications.process_notification_queue import _extract_content_ids
 
 

@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import patch
 
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import (
     clean_html_content,
     email_matches_pattern,
@@ -15,7 +16,6 @@ from tests.fixtures.newsletter_factory import (
     create_test_email_mapping,
     create_test_source,
 )
-from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestEmailMatchesPattern(unittest.TestCase):

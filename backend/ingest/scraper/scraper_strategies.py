@@ -3,12 +3,13 @@ Scraping strategies for different alderman newsletter archive formats.
 Each strategy knows how to extract newsletter links from a specific site structure.
 """
 
+import re
 from abc import ABC, abstractmethod
+from typing import cast
+from urllib.parse import urljoin
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from urllib.parse import urljoin
-from typing import cast
-import re
 
 
 class NewsletterArchiveStrategy(ABC):

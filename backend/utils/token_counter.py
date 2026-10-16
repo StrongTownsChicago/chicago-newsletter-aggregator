@@ -6,9 +6,9 @@ tiktoken library. Supports model-specific encodings and schema overhead calculat
 for structured outputs.
 """
 
-import tiktoken
 from typing import Any
 
+import tiktoken
 
 # Cache encoders to avoid reloading
 _encoder_cache: dict[str, tiktoken.Encoding] = {}

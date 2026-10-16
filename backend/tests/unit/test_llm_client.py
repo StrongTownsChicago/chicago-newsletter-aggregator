@@ -9,17 +9,17 @@ import unittest
 from unittest.mock import Mock, patch
 
 import processing.llm_client as llm_client
+from models.weekly_report import FactExtraction
 from processing.llm_client import (
-    parse_model_string,
-    call_llm,
+    _add_additional_properties_false,
     _call_ollama,
     _call_openai,
     _extract_json,
     _get_ollama_client,
     _get_openai_client,
-    _add_additional_properties_false,
+    call_llm,
+    parse_model_string,
 )
-from models.weekly_report import FactExtraction
 from tests.fixtures.mock_helpers import (
     create_mock_ollama_client,
     create_mock_openai_client,
@@ -365,8 +365,8 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("builtins.print")
     def test_api_key_error_propagated(self, mock_print, mock_sleep, mock_get_client):
         """AuthenticationError propagates after exhausting retries."""
-        from openai import AuthenticationError
         import httpx
+        from openai import AuthenticationError
 
         mock_client = Mock()
         auth_error = AuthenticationError(

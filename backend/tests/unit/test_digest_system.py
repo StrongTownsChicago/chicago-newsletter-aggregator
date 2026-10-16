@@ -5,15 +5,15 @@ Tests template selection, business rules, error handling.
 """
 
 import unittest
-from unittest.mock import patch
 from datetime import datetime
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from notifications.email_sender import (
     DigestType,
-    send_digest,
     _build_digest_html,
     _build_digest_text,
+    send_digest,
 )
 from notifications.process_notification_queue import (
     _calculate_daily_batch_id,
@@ -231,8 +231,8 @@ class TestDigestProcessing(unittest.TestCase):
 
     def setUp(self):
         """Suppress print output."""
-        import sys
         import io
+        import sys
 
         self.held_output = io.StringIO()
         sys.stdout = self.held_output

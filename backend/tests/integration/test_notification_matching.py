@@ -9,7 +9,7 @@ test_user_cases.py.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 class TestNotificationMatching(unittest.TestCase):

@@ -8,8 +8,8 @@ archive page formats (MailChimp, generic).
 import unittest
 
 from ingest.scraper.scraper_strategies import (
-    MailChimpArchiveStrategy,
     GenericListStrategy,
+    MailChimpArchiveStrategy,
     get_strategy_for_url,
 )
 

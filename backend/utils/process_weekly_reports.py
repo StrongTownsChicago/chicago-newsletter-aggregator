@@ -22,6 +22,7 @@ import argparse
 import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
 
 from models.weekly_report import WeeklyTopicReport

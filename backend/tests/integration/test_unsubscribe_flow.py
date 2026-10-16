@@ -4,15 +4,17 @@ Integration tests for complete unsubscribe workflow.
 
 import os
 import unittest
-import jwt
-from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+import jwt
+
+from notifications.email_sender import send_daily_digest
 from notifications.unsubscribe_tokens import (
+    ALGORITHM,
     generate_unsubscribe_token,
     validate_unsubscribe_token,
-    ALGORITHM,
 )
-from notifications.email_sender import send_daily_digest
 
 
 class TestUnsubscribeFlow(unittest.TestCase):

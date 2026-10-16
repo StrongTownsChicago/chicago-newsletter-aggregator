@@ -5,10 +5,12 @@ Handles sending digest emails (daily and weekly) to users with matched content.
 """
 
 import os
+from datetime import datetime
 from enum import Enum
 from typing import Any
-from datetime import datetime
+
 import resend
+
 from notifications.unsubscribe_tokens import generate_unsubscribe_token
 from shared.db import get_supabase_client
 

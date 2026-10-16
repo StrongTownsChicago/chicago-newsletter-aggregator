@@ -1,8 +1,9 @@
-import re
 import os
+import re
+from typing import Any, cast
+
 from bs4 import BeautifulSoup
 from html2text import html2text
-from typing import Any, cast
 
 
 def sanitize_content(

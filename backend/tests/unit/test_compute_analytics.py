@@ -9,20 +9,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from analytics.facts import MIN_EXTRACTED_WORDS
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import Snapshot
 from utils.analytics_snapshot import SnapshotNotFoundError, load_snapshot, save_snapshot
-from analytics.facts import MIN_EXTRACTED_WORDS
 from utils.compute_analytics import (
     BOILERPLATE_MIN_SOURCE_NEWSLETTERS,
-    LENS_MIN_MENTIONS,
-    MATCH_LENSES_ON_CLEANED_TEXT,
     FETCH_PAGE_SIZE,
     FETCH_PAUSE_SECONDS,
     INCREMENTAL_OVERLAP,
+    LENS_MIN_MENTIONS,
+    MATCH_LENSES_ON_CLEANED_TEXT,
     NEWSLETTER_COLUMNS,
-    build_full_snapshot,
     analyze_archive,
+    build_full_snapshot,
     compute_outputs,
     compute_site_outputs,
     fetch_rows,

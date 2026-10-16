@@ -14,14 +14,15 @@ Usage:
 
 import argparse
 import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from typing import Any, cast, Callable
 from dataclasses import dataclass
-from shared.db import get_supabase_client
-from notifications.rule_matcher import get_pending_notifications_by_user
-from notifications.email_sender import send_digest, DigestType
+from datetime import datetime, timedelta
+from typing import Any, Callable, cast
+from zoneinfo import ZoneInfo
+
+from notifications.email_sender import DigestType, send_digest
 from notifications.error_logger import log_notification_error
+from notifications.rule_matcher import get_pending_notifications_by_user
+from shared.db import get_supabase_client
 
 
 @dataclass

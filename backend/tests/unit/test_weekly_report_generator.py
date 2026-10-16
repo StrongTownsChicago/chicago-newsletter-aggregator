@@ -4,16 +4,17 @@ Unit tests for processing/weekly_report_generator.py
 Tests aggregation, error handling, and resilience.
 """
 
-import unittest
-import sys
 import io
+import sys
+import unittest
 from unittest.mock import patch
+
+from models.weekly_report import KeyDevelopment
 from processing.weekly_report_generator import (
     extract_facts_from_newsletters,
     extract_facts_from_single_newsletter,
     synthesize_weekly_summary,
 )
-from models.weekly_report import KeyDevelopment
 
 
 class TestExtractFactsFromNewsletters(unittest.TestCase):

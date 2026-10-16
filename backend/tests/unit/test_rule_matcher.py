@@ -10,16 +10,16 @@ from unittest.mock import Mock, patch
 
 from notifications.rule_matcher import (
     _rule_matches_newsletter,
+    get_pending_notifications_by_user,
     match_newsletter_to_rules,
     queue_notifications,
-    get_pending_notifications_by_user,
-)
-from tests.fixtures.user_factory import (
-    create_test_user,
-    create_test_rule,
-    create_test_notification,
 )
 from tests.fixtures.mock_helpers import create_mock_supabase
+from tests.fixtures.user_factory import (
+    create_test_notification,
+    create_test_rule,
+    create_test_user,
+)
 
 
 class TestRuleMatchesNewsletter(unittest.TestCase):

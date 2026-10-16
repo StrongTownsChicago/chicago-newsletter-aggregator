@@ -6,8 +6,9 @@ preparation, and that process_digests handles this error by skipping.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
-from notifications.email_sender import send_digest, DigestType
+from unittest.mock import MagicMock, patch
+
+from notifications.email_sender import DigestType, send_digest
 from notifications.process_notification_queue import process_digests
 
 

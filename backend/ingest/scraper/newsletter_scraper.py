@@ -2,10 +2,12 @@
 Main newsletter scraper - fetches newsletter archives and individual newsletters.
 """
 
-import requests
-from bs4 import BeautifulSoup
 import time
 from typing import cast
+
+import requests
+from bs4 import BeautifulSoup
+
 from ingest.email.email_parser import clean_html_content
 from ingest.scraper.scraper_strategies import get_strategy_for_url
 

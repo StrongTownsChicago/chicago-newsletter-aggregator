@@ -28,12 +28,14 @@ Output:
 import os
 from datetime import datetime
 from typing import Any, cast
-from imap_tools import MailBox, AND, MailMessageFlags  # type: ignore[attr-defined]
+
+from dotenv import load_dotenv
+from imap_tools import AND, MailBox, MailMessageFlags  # type: ignore[attr-defined]
+
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import parse_newsletter
 from shared.db import get_supabase_client
 from shared.utils import print_summary
-from config.privacy_patterns import PRIVACY_PATTERNS_DICT
-from dotenv import load_dotenv
 
 load_dotenv()
 

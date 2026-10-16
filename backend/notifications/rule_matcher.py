@@ -8,8 +8,9 @@ notifications for delivery.
 from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
-from shared.db import get_supabase_client
+
 from notifications.error_logger import log_notification_error
+from shared.db import get_supabase_client
 
 
 def match_newsletter_to_rules(

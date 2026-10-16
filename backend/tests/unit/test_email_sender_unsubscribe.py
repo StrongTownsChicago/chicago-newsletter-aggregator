@@ -5,9 +5,10 @@ Unit tests for email sender unsubscribe functionality.
 import os
 import unittest
 from unittest.mock import patch
+
 from notifications.email_sender import (
-    send_daily_digest,
     _build_unsubscribe_url,
+    send_daily_digest,
 )
 from notifications.unsubscribe_tokens import validate_unsubscribe_token
 

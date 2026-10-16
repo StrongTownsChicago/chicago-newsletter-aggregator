@@ -1,8 +1,8 @@
-import unittest
 import os
+import unittest
 
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
 
 
 class TestSanitizationComprehensive(unittest.TestCase):

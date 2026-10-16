@@ -26,6 +26,24 @@ dev = [
     "coverage>=7.13.1",
     "mypy>=1.13.0",
     "pip-audit>=2.10.0",
-    "ruff>=0.14.14",
+    "ruff>=0.14.14,<0.15",
     "tiktoken>=0.12.0",
 ]
+
+[tool.ruff]
+# Pinned: an unbounded version lets two environments lint the same tree differently.
+required-version = ">=0.14,<0.15"
+target-version = "py313"
+# line-length stays at the default 88: the formatter already owns it, and changing it reformats every file.
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",      # pycodestyle, pyflakes
+    "I",                # isort
+]
+ignore = [
+    "E501",    # the formatter owns line length; what remains is long strings and URLs
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["analytics", "config", "ingest", "models", "notifications", "processing", "prompts", "shared", "tools", "utils"]

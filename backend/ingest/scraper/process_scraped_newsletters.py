@@ -3,11 +3,13 @@ Scrape newsletters from alderman websites and save to database.
 """
 
 import os
-import time
 import random
+import time
 from datetime import datetime
 from typing import Any, cast
+
 from dotenv import load_dotenv
+
 from ingest.scraper.newsletter_scraper import NewsletterScraper
 from shared.db import get_supabase_client
 from shared.utils import parse_date_string, print_summary

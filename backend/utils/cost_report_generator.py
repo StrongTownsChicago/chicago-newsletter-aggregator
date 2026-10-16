@@ -5,14 +5,14 @@ Generates reports in multiple formats (text, JSON, CSV) for LLM cost analysis.
 """
 
 from dataclasses import dataclass
-from typing import Any
 from datetime import datetime
+from typing import Any
 
+from utils.cost_calculator import ModelPricing, calculate_cost
 from utils.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
     WeeklyReportTokenAnalysis,
 )
-from utils.cost_calculator import ModelPricing, calculate_cost
 
 
 @dataclass

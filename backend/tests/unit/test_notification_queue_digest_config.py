@@ -4,20 +4,20 @@ Unit tests for digest configuration system in process_notification_queue.py
 Tests DigestConfig, DIGEST_CONFIGS, and unified process_digests function.
 """
 
-import unittest
-import sys
 import io
-from unittest.mock import patch, Mock
+import sys
+import unittest
 from datetime import datetime
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
+from notifications.email_sender import DigestType
 from notifications.process_notification_queue import (
     DIGEST_CONFIGS,
     _calculate_daily_batch_id,
     _calculate_weekly_batch_id,
     process_digests,
 )
-from notifications.email_sender import DigestType
 
 
 class TestDigestConfig(unittest.TestCase):

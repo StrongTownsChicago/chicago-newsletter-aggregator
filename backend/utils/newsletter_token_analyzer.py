@@ -6,22 +6,21 @@ Replicates exact prompt construction from llm_processor.py and weekly_report_gen
 without actually calling LLMs.
 """
 
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
+from models.weekly_report import FactExtraction, WeeklySynthesis
 from processing.llm_client import parse_model_string
 from processing.llm_processor import (
-    TOPICS,
-    TopicsExtraction,
-    Summary,
     MAX_NEWSLETTER_CHARS,
+    TOPICS,
+    Summary,
+    TopicsExtraction,
 )
-from models.weekly_report import FactExtraction, WeeklySynthesis
 from utils.token_counter import (
     estimate_llm_call_tokens,
 )
-
 
 # Estimated response sizes based on actual newsletter data
 # These are median values derived from real LLM outputs

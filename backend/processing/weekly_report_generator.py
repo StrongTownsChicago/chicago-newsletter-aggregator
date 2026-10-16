@@ -8,16 +8,16 @@ Two-phase LLM processing:
 Designed to aggregate newsletter content by topic and generate insight-driven summaries.
 """
 
-from typing import Any
 from datetime import datetime
+from typing import Any
 
+from models.types import NewsletterID
 from models.weekly_report import (
     FactExtraction,
     KeyDevelopment,
     WeeklySynthesis,
     WeeklyTopicReport,
 )
-from models.types import NewsletterID
 from processing.llm_processor import TOPICS, call_llm
 from prompts.weekly_synthesis import FACTUAL_SUMMARY
 from shared.db import get_supabase_client

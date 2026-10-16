@@ -1,7 +1,7 @@
 import unittest
 
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
 
 
 class TestUserCases(unittest.TestCase):
@@ -40,18 +40,18 @@ class TestUserCases(unittest.TestCase):
         unsubscribe and profile update links.
         """
         html = """
-        <table class="complianceLinks complianceLinks--padding-vertical" width="100%" border="0" cellpadding="0" cellspacing="0"> 
-            <tr> 
-                <td class="complianceLinks_content-cell content-padding-horizontal"> 
-                    <p style="margin: 0;"> 
+        <table class="complianceLinks complianceLinks--padding-vertical" width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="complianceLinks_content-cell content-padding-horizontal">
+                    <p style="margin: 0;">
                         <a href="https://visitor.constantcontact.com/do?p=un&m=001r86HdJl4hkGTgDfzqSqKMg==..." data-track="false">Unsubscribe</a>
                         <span> | </span>
                         <a href="https://visitor.constantcontact.com/do?ch=d1ca2354-e8de-11f0-9b67-024270638287&p=oo..." data-track="false">Update Profile</a>
                         <span> | </span>
                         <a href="https://www.constantcontact.com/legal/customer-contact-data-notice" data-track="false">Constant Contact Data Notice</a>
-                    </p> 
-                </td> 
-            </tr> 
+                    </p>
+                </td>
+            </tr>
         </table>
         """
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
@@ -68,14 +68,14 @@ class TestUserCases(unittest.TestCase):
         or be preserved if they are just images. This test primarily ensures no exceptions occur.
         """
         html = """
-        <table class="image_container-caption text" width="100%" border="0" cellpadding="0" cellspacing="0"> 
-            <tr> 
-                <td class="text_content-cell"> 
+        <table class="image_container-caption text" width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="text_content-cell">
                     <a href="https://www.constantcontact.com/landing1/vr/home?cc=nge..." data-trackable="false">
                         <img class="image_content" src="https://imgssl.constantcontact.com/letters/images/CPE/referralLogos/H-Stacked-FC-WhiteBG-Email-Footer.png" alt="Constant Contact" align="center">
-                    </a>  
-                </td> 
-            </tr> 
+                    </a>
+                </td>
+            </tr>
         </table>
         """
         sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)

@@ -8,8 +8,8 @@ This module handles:
 - Processing notification queue (daily digests)
 """
 
-from .rule_matcher import match_newsletter_to_rules, queue_notifications
 from .email_sender import send_daily_digest
+from .rule_matcher import match_newsletter_to_rules, queue_notifications
 
 __all__ = [
     "match_newsletter_to_rules",

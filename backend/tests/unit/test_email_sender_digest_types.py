@@ -6,13 +6,14 @@ Tests DigestType enum, unified send_digest function, and template rendering.
 
 import unittest
 from unittest.mock import patch
+
 from notifications.email_sender import (
     DigestType,
-    send_digest,
-    _render_daily_content_html,
-    _render_weekly_content_html,
     _build_digest_html,
     _build_digest_text,
+    _render_daily_content_html,
+    _render_weekly_content_html,
+    send_digest,
 )
 
 

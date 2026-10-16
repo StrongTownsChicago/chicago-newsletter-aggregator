@@ -9,10 +9,10 @@ import unittest
 from unittest.mock import patch
 
 from processing.llm_processor import (
+    TOPICS,
+    extract_newsletter_metadata,
     extract_topics,
     generate_summary,
-    extract_newsletter_metadata,
-    TOPICS,
 )
 
 
