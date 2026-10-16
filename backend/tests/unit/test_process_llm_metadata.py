@@ -182,17 +182,17 @@ class TestNotificationQueuing(unittest.TestCase):
         }
 
         # Act
-        with patch("builtins.print"):
-            with patch(
-                "notifications.rule_matcher.match_newsletter_to_rules"
-            ) as mock_match:
-                result = reprocess_newsletter(
-                    mock_supabase,
-                    newsletter,
-                    "gpt-oss:20b",
-                    dry_run=False,
-                    queue_notifications_flag=False,
-                )
+        with (
+            patch("builtins.print"),
+            patch("notifications.rule_matcher.match_newsletter_to_rules") as mock_match,
+        ):
+            result = reprocess_newsletter(
+                mock_supabase,
+                newsletter,
+                "gpt-oss:20b",
+                dry_run=False,
+                queue_notifications_flag=False,
+            )
 
         # Assert
         self.assertTrue(result)

@@ -23,7 +23,6 @@ class NewsletterArchiveStrategy(ABC):
         Returns:
             List of dicts with keys: title, url, date_str (optional)
         """
-        pass
 
 
 class MailChimpArchiveStrategy(NewsletterArchiveStrategy):

@@ -278,11 +278,10 @@ Newsletter:
 
     # Phase 2: Synthesize summary from aggregated facts
     # Create mock facts list for prompt
-    facts_text = []
-    for i in range(1, min(len(newsletters), 10) + 1):  # Up to 10 example facts
-        facts_text.append(
-            f"{i}. New bike lane approved on Main Street, construction starts March (Ward 42)"
-        )
+    facts_text = [
+        f"{i}. New bike lane approved on Main Street, construction starts March (Ward 42)"
+        for i in range(1, min(len(newsletters), 10) + 1)  # Up to 10 example facts
+    ]
 
     facts_list = "\n".join(facts_text)
 

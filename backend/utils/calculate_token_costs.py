@@ -99,7 +99,7 @@ def fetch_newsletters(
         if not isinstance(nl, dict):
             continue
         nl_dict: dict[str, Any] = dict(nl)
-        if "sources" in nl_dict and nl_dict["sources"]:
+        if nl_dict.get("sources"):
             source = nl_dict["sources"]
             # Type narrow: source should be a dict from the join
             if isinstance(source, dict):
@@ -122,7 +122,7 @@ def get_iso_week_id(date_str: str) -> str:
     Returns:
         Week ID string (e.g., "2026-W05")
     """
-    date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    date = datetime.fromisoformat(date_str)
     year, week, _ = date.isocalendar()
     return f"{year}-W{week:02d}"
 

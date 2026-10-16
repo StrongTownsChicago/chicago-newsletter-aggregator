@@ -236,10 +236,11 @@ class TestRisingTerms(unittest.TestCase):
 
     def setUp(self):
         wards = [str(ward) for ward in range(1, 7)]
-        documents = []
-        for month in ("2026-06", "2026-07", "2026-08", "2026-09"):
-            for ward in wards:
-                documents.append(doc({"budget"}, ward=ward, month=month))
+        documents = [
+            doc({"budget"}, ward=ward, month=month)
+            for month in ("2026-06", "2026-07", "2026-08", "2026-09")
+            for ward in wards
+        ]
         # Six wards newly mention "senior fest"; one ward did in July.
         documents += [doc({"senior fest"}, ward=w, month="2026-09") for w in wards]
         documents.append(doc({"senior fest"}, ward="1", month="2026-07"))

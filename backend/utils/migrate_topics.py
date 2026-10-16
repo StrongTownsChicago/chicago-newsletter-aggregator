@@ -70,7 +70,7 @@ def remap_topics(old_topics: list[str]) -> list[str]:
         if candidate_topic in VALID_TOPICS:
             new_topics.add(candidate_topic)
 
-    return sorted(list(new_topics))
+    return sorted(new_topics)
 
 
 def migrate_topics(dry_run: bool = False) -> None:

@@ -7,6 +7,7 @@ import unittest
 from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from analytics.facts import MIN_EXTRACTED_WORDS
@@ -165,7 +166,7 @@ class TestComputeOutputs(unittest.TestCase):
 
 
 class TestComputeSiteOutputs(unittest.TestCase):
-    sources = [
+    sources: ClassVar = [
         SourceRecord(1, "Ada Alder", "1", "alderman"),
         SourceRecord(2, "Bo Alder", "2", "alderman"),
         SourceRecord(3, "Cy Alder", "3", "alderman"),
@@ -504,11 +505,13 @@ class TestLoadOrRefreshSnapshot(unittest.TestCase):
 
     def test_default_mode_without_snapshot_does_not_touch_the_database(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch("utils.compute_analytics.get_supabase_client") as client:
-                with self.assertRaises(SnapshotNotFoundError):
-                    load_or_refresh_snapshot(
-                        self.make_args(Path(directory) / "absent"), self.NOW
-                    )
+            with (
+                patch("utils.compute_analytics.get_supabase_client") as client,
+                self.assertRaises(SnapshotNotFoundError),
+            ):
+                load_or_refresh_snapshot(
+                    self.make_args(Path(directory) / "absent"), self.NOW
+                )
             client.assert_not_called()
 
     def test_full_refresh_builds_and_saves_a_new_snapshot(self):

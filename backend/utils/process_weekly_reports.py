@@ -89,7 +89,7 @@ def get_active_weekly_topics() -> list[str]:
             if isinstance(topics_list, list):
                 all_topics.update(topics_list)
 
-        return sorted(list(all_topics))
+        return sorted(all_topics)
 
     except Exception as e:
         print(f"⚠ Error querying active topics: {e}")

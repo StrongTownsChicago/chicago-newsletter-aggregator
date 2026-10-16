@@ -202,12 +202,11 @@ class TestSanitizationComprehensive(unittest.TestCase):
             with self.subTest(name=name):
                 html = f"<body><div>Content</div>{snippet}</body>"
                 sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
-                if should_remove:
-                    # We look for a fragment of the snippet that shouldn't be there
-                    # (Simple check: find a unique attribute or the text)
-                    if "class=" in snippet:
-                        attr = snippet.split('class="')[1].split('"')[0]
-                        self.assertNotIn(attr, sanitized)
+                # We look for a fragment of the snippet that shouldn't be there
+                # (Simple check: find a unique attribute or the text)
+                if should_remove and "class=" in snippet:
+                    attr = snippet.split('class="')[1].split('"')[0]
+                    self.assertNotIn(attr, sanitized)
                 self.assertIn("Content", sanitized)
 
     def test_keyword_safety_in_regular_text(self):

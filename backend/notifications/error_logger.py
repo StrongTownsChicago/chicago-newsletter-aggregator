@@ -41,7 +41,6 @@ def log_notification_error(
         if context:
             f.write("Context:\n")
             f.write("-" * 60 + "\n")
-            for key, value in context.items():
-                f.write(f"{key}: {value}\n")
+            f.writelines(f"{key}: {value}\n" for key, value in context.items())
 
     return filename

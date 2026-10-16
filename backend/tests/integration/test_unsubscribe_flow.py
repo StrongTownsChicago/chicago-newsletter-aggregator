@@ -4,7 +4,7 @@ Integration tests for complete unsubscribe workflow.
 
 import os
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import jwt
@@ -115,7 +115,7 @@ class TestUnsubscribeFlow(unittest.TestCase):
         # Manually create an expired token
         expired_payload = {
             "sub": user_id,
-            "exp": datetime.now(timezone.utc) - timedelta(days=1),
+            "exp": datetime.now(UTC) - timedelta(days=1),
             "type": "unsubscribe",
         }
         token = jwt.encode(expired_payload, self.test_secret, algorithm=ALGORITHM)

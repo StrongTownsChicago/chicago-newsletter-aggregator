@@ -83,14 +83,14 @@ class TestNotificationMatching(unittest.TestCase):
         mock_queue_table.insert.return_value = mock_queue_insert
 
         # Route table() calls
+        tables = {
+            "notification_rules": mock_rules_table,
+            "user_profiles": mock_users_table,
+            "notification_queue": mock_queue_table,
+        }
+
         def table_router(table_name):
-            if table_name == "notification_rules":
-                return mock_rules_table
-            elif table_name == "user_profiles":
-                return mock_users_table
-            elif table_name == "notification_queue":
-                return mock_queue_table
-            return MagicMock()
+            return tables.get(table_name) or MagicMock()
 
         mock_supabase.table.side_effect = table_router
 

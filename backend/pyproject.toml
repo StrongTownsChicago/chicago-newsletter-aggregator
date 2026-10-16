@@ -40,10 +40,25 @@ target-version = "py313"
 select = [
     "E", "F", "W",      # pycodestyle, pyflakes
     "I",                # isort
+    "UP",               # pyupgrade (enforces the modern type hints CLAUDE.md asks for)
+    "C4",               # comprehensions
+    "SIM",              # simplify
+    "RUF",              # ruff-specific
+    "PIE",              # misc
+    "FURB", "PERF",
 ]
 ignore = [
     "E501",    # the formatter owns line length; what remains is long strings and URLs
+    "SIM108",  # a ternary is not always clearer
+    "SIM905",  # word lists written as one "...".split() string read better than a list literal
 ]
+# Newsletter text uses typographic quotes and dashes; console output uses the info sign.
+allowed-confusables = ["–", "‘", "’", "ℹ"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
+# which Pydantic turns into a named schema reference instead of the plain type.
+"models/types.py" = ["UP040"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["analytics", "config", "ingest", "models", "notifications", "processing", "prompts", "shared", "tools", "utils"]

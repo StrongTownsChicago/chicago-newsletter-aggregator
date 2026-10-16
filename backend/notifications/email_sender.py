@@ -114,7 +114,7 @@ def _prepare_newsletter_data(
         received_date = newsletter.get("received_date", "")
         if received_date:
             try:
-                date_obj = datetime.fromisoformat(received_date.replace("Z", "+00:00"))
+                date_obj = datetime.fromisoformat(received_date)
                 date_formatted = date_obj.strftime("%B %d, %Y")
             except (ValueError, TypeError):
                 date_formatted = received_date[:10]
@@ -329,9 +329,7 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
             for nl in report["referenced_newsletters"]:
                 # Format date
                 try:
-                    date_obj = datetime.fromisoformat(
-                        nl["received_date"].replace("Z", "+00:00")
-                    )
+                    date_obj = datetime.fromisoformat(nl["received_date"])
                     date_str = date_obj.strftime("%B %d, %Y")
                 except (ValueError, TypeError):
                     date_str = nl["received_date"][:10]
@@ -651,9 +649,7 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
             for nl in report["referenced_newsletters"]:
                 # Format date
                 try:
-                    date_obj = datetime.fromisoformat(
-                        nl["received_date"].replace("Z", "+00:00")
-                    )
+                    date_obj = datetime.fromisoformat(nl["received_date"])
                     date_str = date_obj.strftime("%B %d, %Y")
                 except (ValueError, TypeError):
                     date_str = nl["received_date"][:10]

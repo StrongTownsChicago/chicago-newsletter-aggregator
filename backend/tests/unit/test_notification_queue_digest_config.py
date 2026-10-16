@@ -190,11 +190,11 @@ class TestProcessDigests(unittest.TestCase):
         }
 
         # Act
-        with patch("notifications.process_notification_queue.get_supabase_client"):
-            with patch(
-                "notifications.process_notification_queue.send_digest"
-            ) as mock_send:
-                result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
+        with (
+            patch("notifications.process_notification_queue.get_supabase_client"),
+            patch("notifications.process_notification_queue.send_digest") as mock_send,
+        ):
+            result = process_digests(DigestType.DAILY, "2026-01-25", dry_run=True)
 
         # Assert
         self.assertEqual(result["sent"], 1)  # Counted

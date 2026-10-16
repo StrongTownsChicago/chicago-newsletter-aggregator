@@ -2,6 +2,7 @@
 
 import unittest
 from datetime import date
+from typing import ClassVar
 
 from analytics.lenses import Lens
 from analytics.records import NewsletterRecord, SourceRecord
@@ -59,7 +60,7 @@ class TestBuildTopicNewsletters(unittest.TestCase):
 
 
 class TestGrouping(unittest.TestCase):
-    items = [
+    items: ClassVar = [
         item("a", "1", date(2026, 8, 1), topics={"schools": 2}),
         item("b", "2", date(2026, 8, 2), readable=False),
         item("c", "2", date(2026, 9, 2), topics={"schools": 2}),

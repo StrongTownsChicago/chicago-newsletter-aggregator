@@ -4,7 +4,7 @@ Unit tests for unsubscribe token generation and validation.
 
 import os
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -81,7 +81,7 @@ class TestUnsubscribeTokens(unittest.TestCase):
         # Manually create an expired token
         expired_payload = {
             "sub": user_id,
-            "exp": datetime.now(timezone.utc) - timedelta(days=1),
+            "exp": datetime.now(UTC) - timedelta(days=1),
             "type": "unsubscribe",
         }
         token = jwt.encode(expired_payload, self.test_secret, algorithm=ALGORITHM)
@@ -109,7 +109,7 @@ class TestUnsubscribeTokens(unittest.TestCase):
         user_id = "test-user-wrong-type"
         payload = {
             "sub": user_id,
-            "exp": datetime.now(timezone.utc) + timedelta(days=1),
+            "exp": datetime.now(UTC) + timedelta(days=1),
             "type": "access_token",  # Wrong type
         }
         token = jwt.encode(payload, self.test_secret, algorithm=ALGORITHM)

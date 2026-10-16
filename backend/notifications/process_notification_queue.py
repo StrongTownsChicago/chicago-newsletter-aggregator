@@ -14,9 +14,10 @@ Usage:
 
 import argparse
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from notifications.email_sender import DigestType, send_digest
@@ -205,7 +206,7 @@ def process_digests(
                 # Record in history
                 # Extract content IDs (works for both newsletter_id and report_id)
                 content_ids = _extract_content_ids(notifications)
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
 
                 supabase.table("notification_history").insert(
                     {
@@ -228,7 +229,7 @@ def process_digests(
 
                 # Record skip in history (as failure, but with specific reason)
                 content_ids = _extract_content_ids(notifications)
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
                 supabase.table("notification_history").insert(
                     {
                         "user_id": user_id,
@@ -264,7 +265,7 @@ def process_digests(
                 _mark_notifications_failed(supabase, notifications, error_msg)
 
                 # Record failure in history
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
 
                 supabase.table("notification_history").insert(
                     {

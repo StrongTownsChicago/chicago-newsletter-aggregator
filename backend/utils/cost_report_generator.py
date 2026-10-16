@@ -257,7 +257,7 @@ def generate_comparison_report(
     sorted_models = sorted(model_costs.items(), key=lambda x: x[1]["total_cost"])
 
     # Format report
-    newsletter_count = len(list(analyses_by_model.values())[0])
+    newsletter_count = len(next(iter(analyses_by_model.values())))
     report = []
     report.append("=" * 75)
     report.append(f"MODEL COST COMPARISON ({newsletter_count} newsletters)")
@@ -456,7 +456,7 @@ def generate_combined_text_report(
     if weekly_analyses:
         # Estimate weekly reports per month (assume 4 weeks, avg topics)
         avg_reports_per_week = weekly_report_count / max(
-            len(set(a.week_id for a in weekly_analyses)), 1
+            len({a.week_id for a in weekly_analyses}), 1
         )
         monthly_weekly_reports = avg_reports_per_week * 4
         monthly_weekly_cost = weekly_cost_per_report * monthly_weekly_reports
