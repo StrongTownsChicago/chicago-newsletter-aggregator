@@ -14,19 +14,19 @@ You can run the LLM processor on already-ingested newsletters using the `process
 
 ```bash
 # Process the 10 most recent newsletters
-uv run python -m utils.process_llm_metadata --latest 10
+uv run python -m cli.process_llm_metadata --latest 10
 
 # Process newsletters that are missing LLM metadata
-uv run python -m utils.process_llm_metadata --missing-metadata --latest 50
+uv run python -m cli.process_llm_metadata --missing-metadata --latest 50
 
 # Process newsletters and trigger notifications for matched rules
-uv run python -m utils.process_llm_metadata --latest 10 --queue-notifications
+uv run python -m cli.process_llm_metadata --latest 10 --queue-notifications
 
 # Process all newsletters from a specific source
-uv run python -m utils.process_llm_metadata --source-id 5
+uv run python -m cli.process_llm_metadata --source-id 5
 
 # Process a single newsletter by ID
-uv run python -m utils.process_llm_metadata --newsletter-id <uuid>
+uv run python -m cli.process_llm_metadata --newsletter-id <uuid>
 ```
 
 ## Recommended Schedule

@@ -69,66 +69,66 @@ uv sync
 
 ```bash
 # Process unread Gmail newsletters (queues notifications if ENABLE_NOTIFICATIONS=true)
-uv run python -m ingest.email.process_emails
+uv run python -m cli.process_emails
 ```
 
 #### Web Scraping
 
 ```bash
 # Scrape all aldermen with newsletter_archive_url set
-uv run python -m ingest.scraper.process_scraped_newsletters
+uv run python -m cli.process_scraped_newsletters
 
 # Scrape specific source (source_id, archive_url, optional limit)
-uv run python -m ingest.scraper.process_scraped_newsletters 1 "https://..." 10
+uv run python -m cli.process_scraped_newsletters 1 "https://..." 10
 ```
 
 #### Utilities
 
 ```bash
 # Reprocess newsletters with current LLM prompts
-uv run python -m utils.process_llm_metadata --latest 10
+uv run python -m cli.process_llm_metadata --latest 10
 
 # Reapply privacy sanitization to existing newsletters
-uv run python -m utils.reprocess_newsletters_privacy --all --update --quiet
+uv run python -m cli.reprocess_newsletters_privacy --all --update --quiet
 
 # Refresh the /analytics dashboard, ward summaries and /reports: compute, check
-# http://localhost:4321/analytics, then commit frontend/public/analytics-data/ and frontend/src/data/
+# http://localhost:4321/analytics, then commit frontend/public/analytics-data/ and frontend/src/generated/
 # and push; the deploy publishes them. The JSON files are public.
 # (fetches only newsletters newer than the local snapshot in backend/data/; --offline skips the database,
 #  --full-refresh rebuilds it from every newsletter: needed once on a fresh checkout; run it when the site is quiet)
-uv run python -m utils.compute_analytics
+uv run python -m cli.compute_analytics
 ```
 
 #### Notifications
 
 ```bash
 # Test rule matching against recent newsletters (dry run)
-uv run python -m notifications.test_matcher
+uv run python -m cli.try_rule_matcher
 
 # Test and queue notifications
-uv run python -m notifications.test_matcher --queue
+uv run python -m cli.try_rule_matcher --queue
 
 # Send daily digest (dry run)
-uv run python -m notifications.process_notification_queue --daily-digest --dry-run
+uv run python -m cli.process_notification_queue --daily-digest --dry-run
 
 # Send today's daily digest
-uv run python -m notifications.process_notification_queue --daily-digest
+uv run python -m cli.process_notification_queue --daily-digest
 
 # Send specific date's digest
-uv run python -m notifications.process_notification_queue --daily-digest --batch-id 2026-01-21
+uv run python -m cli.process_notification_queue --daily-digest --batch-id 2026-01-21
 ```
 
 #### Weekly Reports
 
 ```bash
 # Generate weekly reports for active topics
-uv run python -m utils.process_weekly_reports
+uv run python -m cli.process_weekly_reports
 
 # Queue notifications for generated reports
-uv run python -m notifications.weekly_notification_queue
+uv run python -m cli.weekly_notification_queue
 
 # Send weekly digest emails
-uv run python -m notifications.process_notification_queue --weekly-digest
+uv run python -m cli.process_notification_queue --weekly-digest
 ```
 
 #### Testing
@@ -179,13 +179,13 @@ backend/
   ├── ingest/           # Email and web scraping ingestion
   ├── processing/       # LLM topic extraction and summarization
   ├── notifications/    # User alerts and daily digest delivery
-  ├── utils/            # Maintenance scripts (reprocess, migrate, privacy reapply)
+  ├── cli/              # Command-line entry points (ingestion, digests, reprocess, migrate, analytics)
   ├── tests/            # Test suite
   │   ├── unit/         # Unit tests
   │   ├── integration/  # Integration tests
   │   └── fixtures/     # Test data and fixtures
   ├── config/           # Privacy patterns configuration
-  ├── shared/           # Shared database client and utilities
+  ├── shared/           # Shared database client and date helpers
   └── migrations/       # Database migration SQL files
 
 frontend/

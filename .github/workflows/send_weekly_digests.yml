@@ -55,7 +55,7 @@ jobs:
           fi
           
           echo "Generating reports with args: $ARGS"
-          uv run python -m utils.process_weekly_reports $ARGS
+          uv run python -m cli.process_weekly_reports $ARGS
 
       - name: Queue Weekly Notifications
         env:
@@ -70,7 +70,7 @@ jobs:
           
           if [ "${{ github.event.inputs.dry_run }}" != "true" ]; then
              echo "Queuing notifications..."
-             uv run python -m notifications.weekly_notification_queue $ARGS
+             uv run python -m cli.weekly_notification_queue $ARGS
           else
              echo "Dry run: Skipping notification queuing"
           fi
@@ -94,4 +94,4 @@ jobs:
           fi
           
           echo "Sending emails with args: $ARGS"
-          uv run python -m notifications.process_notification_queue $ARGS
+          uv run python -m cli.process_notification_queue $ARGS

@@ -55,4 +55,4 @@ jobs:
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
-          uv run python -m notifications.process_notification_queue $ARGS
+          uv run python -m cli.process_notification_queue $ARGS
