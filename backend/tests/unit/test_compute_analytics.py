@@ -1,10 +1,7 @@
 """Unit tests for utils/compute_analytics.py orchestration (no database)."""
 
-import json
-import tempfile
 import unittest
 from datetime import date, datetime
-from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
 
@@ -17,7 +14,6 @@ from utils.compute_analytics import (
     analyze_archive,
     compute_outputs,
     compute_site_outputs,
-    write_outputs,
 )
 
 
@@ -223,14 +219,3 @@ class TestComputeSiteOutputs(unittest.TestCase):
             [report["month"] for report in outputs["monthly-reports"]["reports"]],
             ["2026-08"],
         )
-
-
-class TestWriteOutputs(unittest.TestCase):
-    def test_writes_compact_json_and_reports_sizes(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            output_dir = Path(directory) / "nested"
-            sizes = write_outputs({"metadata": {"a": 1}}, output_dir)
-            written = (output_dir / "metadata.json").read_text(encoding="utf-8")
-            self.assertEqual(written, '{"a":1}')
-            self.assertEqual(json.loads(written), {"a": 1})
-            self.assertEqual(sizes, {"metadata.json": len(written)})
