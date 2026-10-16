@@ -21,13 +21,10 @@ layers =
     notifications | processing
     analytics | config | models | prompts | shared
 # `|` also makes siblings independent: notifications never imports processing,
-# and no leaf package imports another. The one exception is the analytics
-# snapshot refresh, which reads the database.
-ignore_imports =
-    analytics.io.snapshot_refresh -> shared.db
+# and no leaf package imports another.
 
 [importlinter:contract:analytics-pure]
-name = analytics is pure: no database, network, or LLM clients (outside the snapshot refresh)
+name = analytics is pure: no database, network, or LLM clients
 type = forbidden
 source_modules =
     analytics
@@ -40,5 +37,3 @@ forbidden_modules =
     imap_tools
     dotenv
     shared
-ignore_imports =
-    analytics.io.snapshot_refresh -> shared.db

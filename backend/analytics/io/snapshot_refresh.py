@@ -20,7 +20,6 @@ from analytics.snapshot import (
     merge_newsletters,
     newest_created_at,
 )
-from shared.db import get_supabase_client
 
 # Small pages with a pause between them keep reads well under the database's
 # disk IO budget; repeated full reads of every plain_text exhausted it once.
@@ -104,14 +103,20 @@ def build_full_snapshot(
     return Snapshot(sources, newsletters, newest_created_at(rows) or now)
 
 
-def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapshot:
-    """Produce the snapshot to compute from, according to the chosen mode."""
+def load_or_refresh_snapshot(
+    args: argparse.Namespace, now: datetime, connect: Callable[[], Any]
+) -> Snapshot:
+    """Produce the snapshot to compute from, according to the chosen mode.
+
+    `connect` opens the database client; it is called only when a mode reads
+    the database, so an offline run never creates one.
+    """
     if args.full_refresh:
         print(
             "Full refresh: reading every newsletter from Supabase in pages of "
             f"{FETCH_PAGE_SIZE}, pausing {FETCH_PAUSE_SECONDS}s between pages..."
         )
-        snapshot = build_full_snapshot(get_supabase_client(), now)
+        snapshot = build_full_snapshot(connect(), now)
         save_snapshot(args.snapshot_dir, snapshot, now)
         print(f"Saved a snapshot of {len(snapshot.newsletters)} newsletters.")
         return snapshot
@@ -125,7 +130,7 @@ def load_or_refresh_snapshot(args: argparse.Namespace, now: datetime) -> Snapsho
         return snapshot
 
     print("Fetching sources and newsletters created since the snapshot...")
-    snapshot, fetched = refresh_snapshot(get_supabase_client(), snapshot)
+    snapshot, fetched = refresh_snapshot(connect(), snapshot)
     save_snapshot(args.snapshot_dir, snapshot, now)
     print(
         f"Fetched {fetched} recent newsletter rows; the snapshot now has "

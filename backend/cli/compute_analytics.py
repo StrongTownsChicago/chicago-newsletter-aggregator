@@ -76,6 +76,7 @@ from analytics.topic_reach import (
     select_broad_complete_months,
 )
 from analytics.ward_glance import WardGlanceSettings, build_ward_glances
+from shared.db import get_supabase_client
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "frontend" / "public" / "analytics-data"
@@ -405,7 +406,7 @@ def main() -> None:
     args = parse_args()
     now = datetime.now(CHICAGO_TIMEZONE)
     try:
-        snapshot = load_or_refresh_snapshot(args, now)
+        snapshot = load_or_refresh_snapshot(args, now, get_supabase_client)
     except SnapshotError as error:
         sys.exit(
             f"{error}\nRebuild it with --full-refresh (reads every newsletter, "
