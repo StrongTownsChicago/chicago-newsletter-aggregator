@@ -19,7 +19,8 @@
     1
    ],
    "ward_gain": 1.0,
-   "latest_newsletters": 2
+   "latest_newsletters": 2,
+   "seasonal": true
   }
  ]
 }

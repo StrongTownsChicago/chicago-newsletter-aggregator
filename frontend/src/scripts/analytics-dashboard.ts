@@ -7,7 +7,6 @@ import {
   classifyDateWindow,
   computeLensWardReach,
   countActiveWardsByMonth,
-  countBroadlyCoveredMonths,
   EMPTY_FILTERS,
   expandTermPostings,
   filterFacts,
@@ -20,13 +19,11 @@ import {
   listWindowMonths,
   MIN_ACTIVE_WARDS_FOR_REACH,
   MIN_MONTH_NEWSLETTERS_FOR_SHARES,
-  monthDateRange,
   monthOf,
   normalizeTermQuery,
   resolveIndexedTerm,
   searchScopeForFilters,
   suggestTerms,
-  summarizeFacts,
   summarizeWardCounts,
   summarizeWardCoverage,
   termMentionsByMonth,
@@ -41,6 +38,7 @@ import {
   type LensReachCell,
   type MonthWardActivity,
   type NewsletterFact,
+  type RisingTerm,
   type TermIndex,
 } from "../lib/analytics";
 import {
@@ -54,6 +52,7 @@ import {
   renderLensWardGrid,
   renderReachTrend,
   renderRisingTerms,
+  renderSparkline,
   renderTermTimeline,
   renderTermWards,
   renderWardCadence,
@@ -84,7 +83,20 @@ import {
   MIN_WARD_NEWSLETTERS_FOR_SHARES,
   type WardProfile,
 } from "../lib/analytics-ward-profile";
-import { downloadChartPng } from "../lib/chart-export";
+import {
+  describeSparkline,
+  findLargestChangeTopic,
+  findWidestReachTopic,
+  formatPointChange,
+  formatPoints,
+  isPartialMonth,
+  listFullMonths,
+  orderBySwing,
+  summarizeTopicTrends,
+  tightShareDomain,
+  type TopicTrend,
+} from "../lib/analytics-topic-trends";
+import { downloadChartPng, EXPORT_TEXT_ATTRIBUTE } from "../lib/chart-export";
 import { SITE_NAME } from "../lib/seo";
 
 const TERM_WARD_LIMIT = 15;
@@ -97,9 +109,6 @@ const COVERAGE_STATUS_LABELS: Record<CoverageStatus, string> = {
 };
 const RESIZE_DEBOUNCE_MS = 200;
 const EXPORT_FAILURE_MESSAGE_MS = 3000;
-/** Plot heights of the lens trend cards: small multiples, or one enlarged lens. */
-const LENS_TREND_HEIGHT = 140;
-const SELECTED_LENS_TREND_HEIGHT = 260;
 const numberFormat = new Intl.NumberFormat("en-US");
 
 interface DashboardState {
@@ -261,38 +270,94 @@ function renderDateWindowStatus(state: DashboardState, filters: AnalyticsFilters
 // ---------------------------------------------------------------------------
 // Panels
 
+/** City-wide views fade thin months; a ward selection is small by design. */
+function reachFadeThreshold(filters: AnalyticsFilters): number {
+  return filters.wards.length ? 0 : MIN_ACTIVE_WARDS_FOR_REACH;
+}
+
+function lensLabel(state: DashboardState, lensId: string): string {
+  return state.lensById.get(lensId)?.label ?? lensId;
+}
+
+/** Ward reach for every topic in the window, and each topic's trend over its full months. */
+interface TopicOverview {
+  cells: LensReachCell[];
+  /** In the lens file's order. */
+  trends: TopicTrend[];
+  fullMonths: string[];
+  threshold: number;
+}
+
+function buildTopicOverview(
+  state: DashboardState,
+  filters: AnalyticsFilters,
+  scopeFacts: NewsletterFact[],
+  months: string[],
+): TopicOverview {
+  const lensIds = state.data.lenses.lenses.map((lens) => lens.id);
+  const cells = computeLensWardReach(scopeFacts, lensIds, months);
+  const fullMonths = listFullMonths(months, state.data.metadata.last_date);
+  const threshold = reachFadeThreshold(filters);
+  return { cells, trends: summarizeTopicTrends(cells, lensIds, fullMonths, threshold), fullMonths, threshold };
+}
+
+/** "28 of 37": wards mentioning a topic in the last full month, of wards sending. */
+function formatLatestReach(trend: TopicTrend): string {
+  return trend.latest ? `${trend.latest.wardsMentioning} of ${trend.latest.activeWards}` : "–";
+}
+
+/** "28 of 37 wards". */
+function describeTopicReach(trend: TopicTrend): string {
+  return trend.latest ? `${formatLatestReach(trend)} wards` : "";
+}
+
 function renderSummary(
   state: DashboardState,
   filters: AnalyticsFilters,
   facts: NewsletterFact[],
   factsIgnoringLens: NewsletterFact[],
+  overview: TopicOverview,
 ): void {
-  const summary = summarizeFacts(facts);
   const wardCounts = summarizeWardCounts(
     wardsInScope(state.allWards, filters),
     factsIgnoringLens,
     state.data.newsletters,
   );
-  const windowMonths = listWindowMonths(filters, state.dataMonths);
-  const broadWindow = state.broadWindow;
+  const span = describeMonthSpan(listWindowMonths(filters, state.dataMonths));
+  const latestMonth = overview.fullMonths.at(-1);
+  const inLatestMonth = latestMonth ? `, ${formatMonth(latestMonth)}` : "";
+  const widest = findWidestReachTopic(overview.trends);
+  const largestChange = findLargestChangeTopic(overview.trends);
   const neverArchived = wardCounts.wardsNeverArchived;
-  const tiles: [string, string][] = [
-    [numberFormat.format(summary.newsletters), summary.firstDate ? `${summary.firstDate} to ${summary.lastDate}` : ""],
+  const tiles: [string, string, string][] = [
     [
+      "Newsletters",
+      numberFormat.format(facts.length),
+      filters.lens ? `${span} · mentioning ${lensLabel(state, filters.lens)}` : span,
+    ],
+    [
+      "Wards sending",
       `${wardCounts.wardsWithNewsletters} of ${wardCounts.scopeWards}`,
       neverArchived.length ? `None archived: ${neverArchived.join(", ")}` : "",
     ],
     [
-      describeMonthSpan(windowMonths),
-      broadWindow
-        ? `${pluralize(windowMonths.length, "month")}, ${countBroadlyCoveredMonths(windowMonths, state.wardActivity, broadWindow.minActiveWards)} with ${broadWindow.minActiveWards}+ wards sending`
-        : pluralize(windowMonths.length, "month"),
+      `Most mentioned topic${inLatestMonth}`,
+      widest ? lensLabel(state, widest.lens) : "–",
+      widest ? describeTopicReach(widest) : "",
     ],
-    [state.data.metadata.last_date ?? "–", ""],
+    [
+      `Biggest change${inLatestMonth}`,
+      largestChange ? lensLabel(state, largestChange.lens) : "–",
+      largestChange?.latestChange != null
+        ? `${describeTopicReach(largestChange)}, ${formatPointChange(largestChange.latestChange)} vs average`
+        : "",
+    ],
   ];
+  const labels = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-label]");
   const values = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-value]");
   const details = document.querySelectorAll<HTMLElement>("#summary-tiles [data-tile-detail]");
-  tiles.forEach(([value, detail], index) => {
+  tiles.forEach(([label, value, detail], index) => {
+    labels[index].textContent = label;
     values[index].textContent = value;
     details[index].textContent = detail;
   });
@@ -305,22 +370,26 @@ function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): 
   const coverage = summarizeWardCoverage(state.data.sources, wards);
   const wardsNeverArchived = coverage.filter((ward) => ward.newsletters === 0).map((ward) => ward.ward);
   const archivedWards = wards.length - wardsNeverArchived.length;
-  caption.textContent = `${archivedWards} of ${pluralize(wards.length, "ward")} with newsletters.`;
-  if (!chart) return;
+  caption.textContent =
+    `${archivedWards} of ${pluralize(wards.length, "ward")} have newsletters.` +
+    (wardsNeverArchived.length ? ` None yet: ${wardsNeverArchived.map(formatWard).join(", ")}.` : "");
   const cells = buildCoverageGrid(state.data.newsletters, wards, months);
-  replaceContent(
-    chart,
-    wards.length && months.length
-      ? renderCoverageGrid(
-          cells,
-          wards,
-          months,
-          wardsNeverArchived,
-          searchScopeForFilters(filters),
-          chartWidth(chart),
-        )
-      : emptyMessage("Nothing in these dates."),
-  );
+  // Drawn only while expanded, at the width it then has.
+  if (chart && requireElement<HTMLDetailsElement>("#coverage-details").open) {
+    replaceContent(
+      chart,
+      wards.length && months.length
+        ? renderCoverageGrid(
+            cells,
+            wards,
+            months,
+            wardsNeverArchived,
+            searchScopeForFilters(filters),
+            chartWidth(chart),
+          )
+        : emptyMessage("Nothing in these dates."),
+    );
+  }
   const wardTable = document.createElement("div");
   setTable(
     wardTable,
@@ -350,25 +419,28 @@ function renderCoveragePanel(state: DashboardState, filters: AnalyticsFilters): 
 function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): void {
   const { section, caption, table } = panel("term-explorer");
   const message = requireElement<HTMLElement>("#term-message", section);
+  const results = requireElement<HTMLElement>("#term-results", section);
   const timeline = requireElement<HTMLElement>("#term-timeline", section);
   const wardsChart = requireElement<HTMLElement>("#term-wards", section);
-  const wardsTitle = requireElement<HTMLElement>("#term-wards-title", section);
   const suggestions = requireElement<HTMLElement>("#term-suggestions", section);
+  const tableView = requireElement<HTMLElement>("[data-table-view]", section);
   const { metadata } = state.data;
   caption.textContent = `${numberFormat.format(metadata.term_count)} terms, each in ${metadata.min_term_newsletters}+ newsletters.`;
 
-  const clearResults = () => {
+  const showResults = (shown: boolean) => {
+    results.hidden = !shown;
+    tableView.hidden = !shown;
+    if (shown) return;
     timeline.replaceChildren();
     wardsChart.replaceChildren();
-    wardsTitle.classList.add("hidden");
-    replaceContent(table, emptyMessage("Search a term."));
+    table?.replaceChildren();
   };
 
   const term = normalizeTermQuery(state.term);
   const index = state.terms;
   if (!index) {
     suggestions.replaceChildren();
-    clearResults();
+    showResults(false);
     message.textContent = !term
       ? ""
       : state.termsError
@@ -390,13 +462,13 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
 
   if (!term) {
     message.textContent = "";
-    clearResults();
+    showResults(false);
     return;
   }
   const indexedTerm = resolveIndexedTerm(index, term);
   if (indexedTerm === null) {
     message.textContent = `"${term}" isn't indexed: too rare, too common, or longer than two words.`;
-    clearResults();
+    showResults(false);
     return;
   }
 
@@ -410,16 +482,16 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   message.textContent = `"${indexedTerm}" appears in ${numberFormat.format(totalMentions)} of ${pluralize(scopeFacts.length, "newsletter")}.`;
 
   if (totalMentions === 0) {
-    clearResults();
+    showResults(false);
     return;
   }
+  showResults(true);
   const timelinePoints = trimSparseEdges(months);
   timeline.replaceChildren(
     timelinePoints.length
       ? renderTermTimeline(timelinePoints, chartWidth(timeline))
       : emptyMessage(`No month has ${MIN_MONTH_NEWSLETTERS_FOR_SHARES}+ newsletters to chart. See the table.`),
   );
-  wardsTitle.classList.remove("hidden");
   wardsChart.replaceChildren(
     renderTermWards(
       wards.slice(0, TERM_WARD_LIMIT),
@@ -440,15 +512,6 @@ function renderTermExplorer(state: DashboardState, filters: AnalyticsFilters): v
   );
 }
 
-/** City-wide views fade thin months; a ward selection is small by design. */
-function reachFadeThreshold(filters: AnalyticsFilters): number {
-  return filters.wards.length ? 0 : MIN_ACTIVE_WARDS_FOR_REACH;
-}
-
-function lensLabel(state: DashboardState, lensId: string): string {
-  return state.lensById.get(lensId)?.label ?? lensId;
-}
-
 function reachColumns(state: DashboardState, minActiveWards: number): TableColumn<LensReachCell>[] {
   return [
     { label: "Topic", value: (cell) => lensLabel(state, cell.lens) },
@@ -460,39 +523,130 @@ function reachColumns(state: DashboardState, minActiveWards: number): TableColum
   ];
 }
 
-/** A note when the window ends in the archive's latest month and that month is not over in the data. */
-function describePartialLastMonth(lastDate: string | null, months: string[]): string {
-  const lastMonth = months.at(-1);
-  if (!lastDate || !lastMonth || monthOf(lastDate) !== lastMonth) return "";
-  return lastDate < monthDateRange(lastMonth).toDate
-    ? `${formatMonth(lastMonth)} is partial: newsletters through ${lastDate}.`
-    : "";
+function textCell(tag: "td" | "th", text: string, className: string): HTMLTableCellElement {
+  const cell = document.createElement(tag);
+  cell.className = className;
+  cell.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
+  cell.textContent = text;
+  return cell;
+}
+
+/** One row per topic: a button that selects it, a sparkline, the last full month and its change. */
+function buildTopicTrendTable(
+  state: DashboardState,
+  trends: TopicTrend[],
+  latestMonth: string | undefined,
+  selectedLens: string | null,
+): HTMLElement {
+  const tableElement = document.createElement("table");
+  tableElement.className = "text-sm";
+  const head = tableElement.createTHead().insertRow();
+  const headClass = "text-left text-xs font-semibold text-gray-600 pb-1 pr-4";
+  head.append(
+    textCell("th", "Topic", headClass),
+    textCell("th", "Trend", headClass),
+    textCell("th", latestMonth ? formatMonth(latestMonth) : "Latest", `${headClass} text-right`),
+    textCell("th", "vs average", `${headClass} text-right`),
+  );
+  const body = tableElement.createTBody();
+  for (const trend of trends) {
+    const label = lensLabel(state, trend.lens);
+    const row = body.insertRow();
+    row.className = trend.lens === selectedLens ? "bg-blue-50" : "";
+    const topicCell = row.insertCell();
+    topicCell.className = "pr-4 py-0.5";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.topic = trend.lens;
+    button.setAttribute("aria-pressed", String(trend.lens === selectedLens));
+    button.setAttribute(EXPORT_TEXT_ATTRIBUTE, "");
+    button.className = "text-left text-blue-700 hover:underline whitespace-nowrap";
+    button.textContent = label;
+    topicCell.append(button);
+    const sparkCell = row.insertCell();
+    sparkCell.className = "pr-4 py-0.5";
+    const shares = trend.points.flatMap((point) => (point.share === null ? [] : [point.share]));
+    sparkCell.append(renderSparkline(trend.points, tightShareDomain(shares), describeSparkline(label, trend.points)));
+    row.append(
+      textCell("td", formatLatestReach(trend), "pr-4 text-right tabular-nums whitespace-nowrap"),
+      textCell(
+        "td",
+        trend.latestChange === null ? "–" : formatPointChange(trend.latestChange),
+        "text-right tabular-nums whitespace-nowrap",
+      ),
+    );
+  }
+  return tableElement;
 }
 
 function renderCivicCalendarPanel(
   state: DashboardState,
   filters: AnalyticsFilters,
-  scopeFacts: NewsletterFact[],
+  overview: TopicOverview,
   months: string[],
+  selectTopic: (lensId: string) => void,
 ): void {
-  const { chart, caption, table } = panel("civic-calendar");
-  const lenses = state.data.lenses.lenses;
-  const cells = computeLensWardReach(scopeFacts, lenses.map((lens) => lens.id), months);
-  const threshold = reachFadeThreshold(filters);
-  caption.textContent = [
-    "Numbers are wards, shown where at least a quarter mentioned the topic.",
-    describePartialLastMonth(state.data.metadata.last_date, months),
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const { section, chart, caption, table } = panel("civic-calendar");
+  const { cells, fullMonths, threshold } = overview;
+  const trends = orderBySwing(overview.trends);
+  const lastDate = state.data.metadata.last_date;
+  const partialMonth = months.find((month) => isPartialMonth(month, lastDate)) ?? null;
+  const fadeReason = (cell: LensReachCell): string | null =>
+    isReachFaded(cell, threshold)
+      ? `Faded: fewer than ${threshold} wards sent newsletters`
+      : cell.month === partialMonth
+        ? `Faded: partial month, newsletters through ${lastDate}`
+        : null;
+  const hasFaded = cells.some((cell) => cell.share !== null && fadeReason(cell) !== null);
+  caption.textContent = hasFaded
+    ? `Faded: ${partialMonth ? "a partial month" : ""}${partialMonth && threshold ? " or " : ""}${threshold ? `fewer than ${threshold} wards sending` : ""}.`
+    : "";
   if (!chart) return;
+  const lenses = trends.map((trend) => ({ id: trend.lens, label: lensLabel(state, trend.lens) }));
   replaceContent(
     chart,
     months.length && lenses.length
-      ? renderCivicCalendar(cells, lenses, months, filters.lens, threshold, chartWidth(chart))
+      ? renderCivicCalendar(
+          cells,
+          {
+            lenses,
+            months,
+            averageByLens: new Map(trends.map((trend) => [trend.lens, trend.averageShare])),
+            selectedLens: filters.lens,
+            fadeReason,
+            onSelectTopic: selectTopic,
+          },
+          chartWidth(chart),
+        )
       : emptyMessage("Nothing in these dates."),
   );
-  setTable(table, reachColumns(state, threshold), cells);
+  replaceContent(
+    requireElement<HTMLElement>("#topic-trends", section),
+    fullMonths.length ? buildTopicTrendTable(state, trends, fullMonths.at(-1), filters.lens) : emptyMessage("No full month in these dates."),
+  );
+  const reachTable = document.createElement("div");
+  setTable(reachTable, reachColumns(state, threshold), cells);
+  const trendTable = document.createElement("div");
+  setTable(
+    trendTable,
+    [
+      { label: "Topic", value: (trend) => lensLabel(state, trend.lens) },
+      {
+        label: "Average",
+        value: (trend) => (trend.averageShare === null ? "–" : formatPercent(trend.averageShare)),
+        numeric: true,
+      },
+      { label: "Swing", value: (trend) => formatPoints(trend.swing), numeric: true },
+      { label: "Last full month", value: (trend) => describeTopicReach(trend) || "–", numeric: true },
+      {
+        label: "vs average",
+        value: (trend) => (trend.latestChange === null ? "–" : formatPointChange(trend.latestChange)),
+        numeric: true,
+      },
+    ],
+    trends,
+  );
+  replaceContent(table, tableHeading("By topic"), trendTable, tableHeading("By topic and month"), reachTable);
 }
 
 function renderLensDefinitions(state: DashboardState): void {
@@ -516,80 +670,65 @@ function renderLensDefinitions(state: DashboardState): void {
   container.replaceChildren(rules, list);
 }
 
-function renderLensTrendsPanel(
+/** The chosen topic's ward-reach trend and its ward × month grid; hidden without a topic. */
+function renderTopicDetailPanel(
   state: DashboardState,
   filters: AnalyticsFilters,
+  overview: TopicOverview,
   scopeFacts: NewsletterFact[],
   months: string[],
 ): void {
-  const { chart, caption, table } = panel("lens-trends");
-  if (!chart) return;
-  const lenses = filters.lens
-    ? state.data.lenses.lenses.filter((lens) => lens.id === filters.lens)
-    : state.data.lenses.lenses;
-  const cells = computeLensWardReach(scopeFacts, lenses.map((lens) => lens.id), months);
-  const threshold = reachFadeThreshold(filters);
-  // Thin months are gaps in the lines, as the calendar fades them.
-  const points = cells.map((cell) => (isReachFaded(cell, threshold) ? { ...cell, share: null } : cell));
-  caption.textContent = threshold
-    ? `Blank: fewer than ${threshold} wards sent newsletters.`
-    : "Out of the selected wards that sent newsletters.";
-  const maxShare = Math.max(0, ...points.map((point) => point.share ?? 0));
-  const single = lenses.length === 1;
-  chart.classList.toggle("md:grid-cols-2", !single);
-  const cardWidth = single ? chartWidth(chart) : Math.max(chartWidth(chart) / 2 - 12, 300);
-  replaceContent(
-    chart,
-    ...(points.some((point) => point.share !== null)
-      ? lenses.map((lens) => {
-          const figure = document.createElement("figure");
-          const title = document.createElement("figcaption");
-          title.className = "text-sm font-semibold text-gray-700";
-          title.textContent = lens.label;
-          figure.append(
-            title,
-            renderReachTrend(
-              points.filter((point) => point.lens === lens.id),
-              months,
-              maxShare,
-              single ? SELECTED_LENS_TREND_HEIGHT : LENS_TREND_HEIGHT,
-              cardWidth,
-            ),
-          );
-          return figure;
-        })
-      : [emptyMessage("Too few wards sent newsletters in these dates.")]),
-  );
-  setTable(table, reachColumns(state, threshold), cells);
-}
+  const { section, caption, table } = panel("topic-detail");
+  const lens = filters.lens;
+  section.hidden = !lens;
+  if (!lens) return;
+  const label = lensLabel(state, lens);
+  const trend = overview.trends.find((item) => item.lens === lens);
+  requireElement<HTMLElement>("#topic-detail-heading", section).textContent = label;
 
-function renderLensWardsPanel(
-  state: DashboardState,
-  filters: AnalyticsFilters,
-  scopeFacts: NewsletterFact[],
-  months: string[],
-): void {
-  const { chart, caption, table } = panel("lens-wards");
-  if (!chart) return;
-  if (!filters.lens) {
-    caption.textContent = "";
-    replaceContent(chart, emptyMessage("Choose a topic above."));
-    replaceContent(table, emptyMessage("Choose a topic above."));
-    return;
-  }
-  const label = lensLabel(state, filters.lens);
-  const wards = listWards(state.data.newsletters).filter((ward) => !filters.wards.length || filters.wards.includes(ward));
-  const cells = buildLensWardGrid(scopeFacts, filters.lens, wards, months);
-  const wardsMentioning = new Set(cells.filter((cell) => cell.status === "mentioned").map((cell) => cell.ward));
-  caption.textContent = `${label}: ${wardsMentioning.size} of ${pluralize(wards.length, "ward")} with newsletters mentioned it.`;
+  const fullMonths = new Set(overview.fullMonths);
+  const points = overview.cells
+    .filter((cell) => cell.lens === lens && fullMonths.has(cell.month))
+    .map((cell) => (isReachFaded(cell, overview.threshold) ? { ...cell, share: null } : cell));
+  const shares = points.flatMap((point) => (point.share === null ? [] : [point.share]));
+  const latestMonth = overview.fullMonths.at(-1);
+  caption.textContent =
+    trend?.latest && latestMonth && trend.latestChange !== null && trend.averageShare !== null
+      ? `${formatMonth(latestMonth)}: ${describeTopicReach(trend)}, ${formatPointChange(trend.latestChange)} vs its average (${formatPercent(trend.averageShare)}, dashed).`
+      : "";
+  const trendChart = requireElement<HTMLElement>("#topic-detail-trend", section);
   replaceContent(
-    chart,
+    trendChart,
+    shares.length
+      ? renderReachTrend(
+          points,
+          overview.fullMonths,
+          tightShareDomain(shares),
+          trend?.averageShare ?? null,
+          chartWidth(trendChart),
+        )
+      : emptyMessage("Too few wards sent newsletters in these dates."),
+  );
+
+  const wards = listWards(state.data.newsletters).filter((ward) => !filters.wards.length || filters.wards.includes(ward));
+  const wardCells = buildLensWardGrid(scopeFacts, lens, wards, months);
+  const wardChart = requireElement<HTMLElement>("#topic-detail-wards", section);
+  replaceContent(
+    wardChart,
     wards.length && months.length
-      ? renderLensWardGrid(cells, wards, months, label, chartWidth(chart))
+      ? renderLensWardGrid(wardCells, wards, months, label, chartWidth(wardChart))
       : emptyMessage("Nothing in these dates."),
   );
+
+  const reachTable = document.createElement("div");
   setTable(
-    table,
+    reachTable,
+    reachColumns(state, overview.threshold),
+    overview.cells.filter((cell) => cell.lens === lens),
+  );
+  const wardTable = document.createElement("div");
+  setTable(
+    wardTable,
     [
       { label: "Ward", value: (cell) => cell.ward },
       { label: "Month", value: (cell) => cell.month },
@@ -597,8 +736,9 @@ function renderLensWardsPanel(
       { label: "Newsletters mentioning", value: (cell) => cell.mentioning, numeric: true },
       { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
     ],
-    cells.filter((cell) => cell.status !== "no_newsletter"),
+    wardCells.filter((cell) => cell.status !== "no_newsletter"),
   );
+  replaceContent(table, tableHeading("Ward reach"), reachTable, tableHeading("Wards by month"), wardTable);
 }
 
 const medianFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
@@ -650,23 +790,21 @@ function wardProfileColumns(state: DashboardState): TableColumn<WardProfile["top
   ];
 }
 
-/** The chosen ward over the window's months; the ward and topic filters don't apply. */
-function renderWardProfilePanel(state: DashboardState, months: string[]): void {
+/** The chosen ward over the window's months, hidden without one; the ward and topic filters don't apply. */
+function renderWardProfilePanel(state: DashboardState, ward: string, months: string[]): void {
   const { section, caption, table } = panel("ward-profile");
-  const ward = requireElement<HTMLSelectElement>("#profile-ward", section).value;
   const message = requireElement<HTMLElement>("#profile-message", section);
   const content = requireElement<HTMLElement>("#profile-content", section);
+  const tableView = requireElement<HTMLElement>("[data-table-view]", section);
+  section.hidden = !ward;
+  if (!ward) return;
   const showMessage = (text: string) => {
     message.textContent = text;
     message.hidden = false;
     content.hidden = true;
+    tableView.hidden = true;
     caption.textContent = "";
-    replaceContent(table, emptyMessage("Choose a ward."));
   };
-  if (!ward) {
-    showMessage("Choose a ward.");
-    return;
-  }
   const lenses = state.data.lenses.lenses;
   const profile = buildWardProfile(
     state.data.newsletters,
@@ -682,6 +820,7 @@ function renderWardProfilePanel(state: DashboardState, months: string[]): void {
   }
   message.hidden = true;
   content.hidden = false;
+  tableView.hidden = false;
   const aldermen = profile.aldermen.join(", ");
   requireElement<HTMLElement>("#profile-heading", section).textContent = aldermen
     ? `${formatWard(ward)} · ${aldermen}`
@@ -731,6 +870,18 @@ function renderWardProfilePanel(state: DashboardState, months: string[]): void {
     ],
     profile.months,
   );
+  const topicMonthTable = document.createElement("div");
+  setTable(
+    topicMonthTable,
+    [
+      { label: "Topic", value: (cell) => lensLabel(state, cell.lens) },
+      { label: "Month", value: (cell) => cell.month },
+      { label: "Newsletters mentioning", value: (cell) => cell.mentioning, numeric: true },
+      { label: "Newsletters", value: (cell) => cell.newsletters, numeric: true },
+      { label: "Share", value: (cell) => (cell.share === null ? "–" : formatPercent(cell.share)), numeric: true },
+    ],
+    profile.topicCells.filter((cell) => cell.share !== null),
+  );
   const termTable = document.createElement("div");
   setTable(
     termTable,
@@ -748,6 +899,8 @@ function renderWardProfilePanel(state: DashboardState, months: string[]): void {
     topicTable,
     tableHeading("Newsletters by month"),
     monthTable,
+    tableHeading("Topics by month"),
+    topicMonthTable,
     tableHeading("Distinctive vocabulary (all dates)"),
     termTable,
   );
@@ -780,10 +933,14 @@ function renderRisingPanel(state: DashboardState): void {
         )
       : emptyMessage("No rising terms."),
   );
+  const hasSeasonalFlags = rising.terms.some((item) => item.seasonal !== undefined);
   setTable(
     table,
     [
       { label: "Term", value: (item) => item.term },
+      ...(hasSeasonalFlags
+        ? [{ label: "Seasonal", value: (item: RisingTerm) => (item.seasonal ? "Yes" : "") }]
+        : []),
       { label: `Wards in ${latest}`, value: (item) => `${item.latest_wards} of ${rising.latest_active_wards}`, numeric: true },
       { label: "Wards in a typical month (median)", value: (item) => item.baseline_wards, numeric: true },
       { label: "Wards by baseline month", value: (item) => item.baseline_month_wards.join(", "), numeric: true },
@@ -833,7 +990,7 @@ function describeExportScope(state: DashboardState, panelId: string, view: Dashb
 
 function describeExportTitle(state: DashboardState, panelId: string, title: string, view: DashboardViewState): string {
   const lens = view.filters.lens ? lensLabel(state, view.filters.lens) : null;
-  if ((panelId === "lens-wards" || panelId === "lens-trends") && lens) return `${title}: ${lens}`;
+  if (panelId === "topic-detail" && lens) return `${title}: ${lens}`;
   if (panelId === "term-explorer" && view.term) return `${title}: "${view.term}"`;
   if (panelId === "ward-profile" && view.profileWard) return `${title}: ${formatWard(view.profileWard)}`;
   return title;
@@ -848,11 +1005,13 @@ function exportRegion(section: HTMLElement): HTMLElement | null {
   return section.querySelector<HTMLElement>("[data-export-region]") ?? section.querySelector<HTMLElement>("[data-chart]");
 }
 
-/** Enable each export button only while its panel shows a chart. */
+/** Show each export button only while its panel shows a chart. */
 function refreshExportButtons(): void {
   document.querySelectorAll<HTMLButtonElement>("button[data-export-png]").forEach((button) => {
     const section = button.closest<HTMLElement>("section");
-    button.disabled = !section || !exportRegion(section)?.querySelector("svg");
+    const hasChart = Boolean(section && exportRegion(section)?.querySelector("svg"));
+    button.disabled = !hasChart;
+    button.hidden = !hasChart;
   });
 }
 
@@ -887,23 +1046,27 @@ async function exportPanel(state: DashboardState, button: HTMLButtonElement, vie
 // ---------------------------------------------------------------------------
 // Orchestration
 
-function renderDashboard(state: DashboardState, form: HTMLFormElement): void {
-  const filters = readFilters(form);
+function renderDashboard(
+  state: DashboardState,
+  controls: DashboardControls,
+  selectTopic: (lensId: string) => void,
+): void {
+  const filters = readFilters(controls.form);
   updateWardSummary(filters);
   const facts = filterFacts(state.data.newsletters, filters);
   const factsIgnoringLens = filterFacts(state.data.newsletters, filters, { ignoreLens: true });
   const months = listWindowMonths(filters, state.dataMonths);
+  const overview = buildTopicOverview(state, filters, factsIgnoringLens, months);
 
   renderDateWindowStatus(state, filters);
-  renderSummary(state, filters, facts, factsIgnoringLens);
-  renderCoveragePanel(state, filters);
-  renderCivicCalendarPanel(state, filters, factsIgnoringLens, months);
-  renderLensTrendsPanel(state, filters, factsIgnoringLens, months);
-  renderLensWardsPanel(state, filters, factsIgnoringLens, months);
+  renderSummary(state, filters, facts, factsIgnoringLens, overview);
   renderTermExplorer(state, filters);
-  renderWardProfilePanel(state, months);
+  renderCivicCalendarPanel(state, filters, overview, months, selectTopic);
+  renderTopicDetailPanel(state, filters, overview, factsIgnoringLens, months);
+  renderWardProfilePanel(state, controls.profileSelect.value, months);
   renderRisingPanel(state);
   renderCadencePanel(factsIgnoringLens);
+  renderCoveragePanel(state, filters);
   refreshExportButtons();
 }
 
@@ -1020,7 +1183,13 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   renderLensDefinitions(state);
 
   const filtersNow = () => readFilters(form);
-  const rerender = () => renderDashboard(state, form);
+  /** Choose a topic from the overview, then bring its detail into view. */
+  const selectTopic = (lensId: string) => {
+    requireElement<HTMLSelectElement>('select[name="lens"]', form).value = lensId;
+    commit();
+    requireElement<HTMLElement>("#topic-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const rerender = () => renderDashboard(state, controls, selectTopic);
   /** Render a change the reader made and record it in the history. */
   const commit = () => {
     rerender();
@@ -1032,6 +1201,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     rerender();
   };
 
+  // Covers the ward profile select too, which sits in the filter form.
   form.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
     // Follow a single selected ward in the ward profile.
@@ -1062,10 +1232,13 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     setDateWindow(form, showingFullArchive ? (state.broadWindow?.startMonth ?? null) : null);
     commit();
   });
-  profileSelect.addEventListener("change", () => {
-    renderWardProfilePanel(state, listWindowMonths(filtersNow(), state.dataMonths));
+  requireElement<HTMLElement>("#topic-trends").addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-topic]");
+    if (button?.dataset.topic) selectTopic(button.dataset.topic);
+  });
+  requireElement<HTMLDetailsElement>("#coverage-details").addEventListener("toggle", () => {
+    renderCoveragePanel(state, filtersNow());
     refreshExportButtons();
-    syncUrl(state, controls, "change");
   });
 
   const showTerm = (term: string) => {

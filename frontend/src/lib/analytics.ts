@@ -53,6 +53,8 @@ export interface RisingTerm {
   baseline_month_wards: number[];
   ward_gain: number;
   latest_newsletters: number;
+  /** Optional: true when the backend flags the rise as seasonal. */
+  seasonal?: boolean;
 }
 
 export interface RisingTerms {

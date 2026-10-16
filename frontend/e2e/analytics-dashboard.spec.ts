@@ -51,17 +51,47 @@ test('loads the dashboard from the fixture data', async ({ page }) => {
   await expect(page.locator('#analytics-data-as-of')).toContainText('from 26 newsletters');
   await expect(page.locator('#summary-tiles [data-tile-value]').first()).toHaveText(String(DEFAULT_WINDOW_NEWSLETTERS));
   await expect(page.locator('#civic-calendar svg').first()).toBeVisible();
+  await expect(page.locator('#topic-trends button[data-topic]')).toHaveCount(2);
+  // Panels that wait for a selection stay out of the way.
+  await expect(page.locator('#topic-detail')).toBeHidden();
+  await expect(page.locator('#ward-profile')).toBeHidden();
+  await expect(page.locator('#term-results')).toBeHidden();
+  // The rising terms chart tags a term the data marks as seasonal.
+  await expect(page.locator('#rising-terms svg text', { hasText: 'seasonal' })).toHaveCount(1);
   await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: 'Primary' }).locator('a[href="/analytics"]')).toHaveCount(1);
 });
 
+test('summary tiles name the widest-reaching topic of the last full month', async ({ page }) => {
+  // Selected wards are never faded, so the fixture's three wards count.
+  await openDashboard(page, '?wards=1,2,3');
+  const tiles = page.locator('#summary-tiles > div');
+  await expect(tiles.nth(1)).toContainText('3 of 3');
+  // April is partial (data through Apr 24), so March is the last full month.
+  await expect(tiles.nth(2)).toContainText('Most mentioned topic, Mar 2026');
+  await expect(tiles.nth(2)).toContainText('Public safety');
+  await expect(tiles.nth(2)).toContainText('3 of 3 wards');
+});
+
+test('choosing a topic in the overview opens its detail', async ({ page }) => {
+  await openDashboard(page, '?wards=1,2,3');
+  await page.locator('#topic-trends button[data-topic="budget_taxes"]').click();
+  await expect(page).toHaveURL(/[?&]topic=budget_taxes/);
+  await expect(page.locator('select[name="lens"]')).toHaveValue('budget_taxes');
+  await expect(page.locator('#topic-detail')).toBeVisible();
+  await expect(page.locator('#topic-detail-heading')).toHaveText('Budget & taxes');
+  await expect(page.locator('#topic-detail-trend svg')).toBeVisible();
+  await expect(page.locator('#topic-detail-wards svg')).toBeVisible();
+  await expect(page.locator('#topic-detail [data-caption]')).toContainText('Mar 2026: 2 of 3 wards');
+});
+
 test('filters change the panels and the URL', async ({ page }) => {
   await openDashboard(page);
-  await expect(page.locator('#lens-wards [data-caption]')).toHaveText('');
-
   await page.locator('select[name="lens"]').selectOption('public_safety');
-  await expect(page.locator('#lens-wards [data-caption]')).toContainText('Public safety: 3 of 3 wards');
+  await expect(page.locator('#topic-detail-heading')).toHaveText('Public safety');
   await expect(page).toHaveURL(/[?&]topic=public_safety/);
+  await page.locator('select[name="lens"]').selectOption('');
+  await expect(page.locator('#topic-detail')).toBeHidden();
 
   await page.locator('#ward-summary').click();
   await page.locator('input[name="ward"][value="2"]').check();
@@ -81,6 +111,7 @@ test('restores a shared view from the URL and supports back and forward', async 
   await expect(page.locator('#profile-ward')).toHaveValue('1');
   await expect(page.locator('#term-input')).toHaveValue('zoning');
   await expect(page.locator('#term-message')).toContainText('"zoning" appears in');
+  await expect(page.locator('#term-results svg').first()).toBeVisible();
 
   await page.reload();
   await expect(page.locator('select[name="lens"]')).toHaveValue('budget_taxes');
@@ -119,7 +150,7 @@ test('ignores invalid URL parameters', async ({ page }) => {
   await openDashboard(page, '?topic=nope&ward=99&from=2030-01&to=bad&wards=x');
   await expect(page.locator('select[name="lens"]')).toHaveValue('');
   await expect(page.locator('select[name="from"]')).toHaveValue('2026-02');
-  await expect(page.locator('#profile-message')).toHaveText('Choose a ward.');
+  await expect(page.locator('#ward-profile')).toBeHidden();
   await expect(page).toHaveURL(/\/analytics$/);
 });
 
@@ -127,6 +158,24 @@ test('shows a ward with no archived newsletters neutrally', async ({ page }) => 
   await openDashboard(page, '?ward=4');
   await expect(page.locator('#profile-message')).toHaveText('No Ward 4 newsletters in the archive yet.');
   await expect(page.locator('#profile-content')).toBeHidden();
+});
+
+test('opens a ward profile from the filter bar', async ({ page }) => {
+  await openDashboard(page);
+  await page.locator('#profile-ward').selectOption('3');
+  await expect(page.locator('#ward-profile')).toBeVisible();
+  await expect(page.locator('#profile-heading')).toHaveText('Ward 3 · Cy Example');
+  await expect(page.locator('#profile-topics svg').first()).toBeVisible();
+  await expect(page).toHaveURL(/[?&]ward=3(&|$)/);
+});
+
+test('names wards without newsletters and draws coverage on demand', async ({ page }) => {
+  await openDashboard(page);
+  await expect(page.locator('#coverage [data-caption]')).toContainText('None yet: Ward 4.');
+  await expect(page.locator('#coverage [data-chart] svg')).toHaveCount(0);
+  await page.locator('#coverage-details summary').click();
+  await expect(page.locator('#coverage [data-chart] svg').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download About the data as PNG' })).toBeEnabled();
 });
 
 test('downloads a chart as a PNG', async ({ page }) => {

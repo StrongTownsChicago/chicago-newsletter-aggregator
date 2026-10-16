@@ -6,7 +6,7 @@ export const prerender = false;
 // the header reflects the signed-in user.
 import Layout from '../layouts/Layout.astro';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel.astro';
-import { MIN_ACTIVE_WARDS_FOR_REACH, MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
+import { MIN_MONTH_NEWSLETTERS_FOR_SHARES } from '../lib/analytics';
 
 
 const controlClass =
@@ -45,7 +45,7 @@ const controlClass =
 
     <div id="analytics-dashboard" class="space-y-6" hidden>
       <form id="analytics-filters" class="bg-white rounded-lg shadow-md p-4 sm:p-6 border border-gray-200" aria-label="Dashboard filters">
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div class="col-span-2 lg:col-span-1">
             <span class="block text-sm font-semibold text-gray-700 mb-2" id="ward-picker-label">Wards</span>
             <details class="relative" id="ward-picker">
@@ -70,6 +70,12 @@ const controlClass =
             <span class="block text-sm font-semibold text-gray-700 mb-2">To</span>
             <select name="to" class={controlClass}><option value="">Latest</option></select>
           </label>
+          <label class="col-span-2 lg:col-span-1 block">
+            <span class="block text-sm font-semibold text-gray-700 mb-2">Ward profile</span>
+            <select id="profile-ward" class={controlClass}>
+              <option value="">None</option>
+            </select>
+          </label>
         </div>
         <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <p id="date-window-status" class="text-sm text-gray-700 flex-1" aria-live="polite"></p>
@@ -83,50 +89,14 @@ const controlClass =
       </form>
 
       <div id="summary-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-live="polite">
-        {['Newsletters', 'Wards with newsletters', 'Dates', 'Latest newsletter'].map((label) => (
+        {['Newsletters', 'Wards sending', 'Most mentioned topic', 'Biggest change'].map((label) => (
           <div class="bg-white rounded-lg shadow-md p-4 border border-gray-200">
-            <p class="text-sm text-gray-600">{label}</p>
+            <p class="text-sm text-gray-600" data-tile-label>{label}</p>
             <p class="text-xl sm:text-2xl font-semibold text-gray-900 mt-1" data-tile-value></p>
             <p class="text-xs text-gray-500 mt-1" data-tile-detail></p>
           </div>
         ))}
       </div>
-
-      <AnalyticsPanel
-        id="coverage"
-        title="What the archive covers"
-        description="Newsletters per ward per month. Every other panel only reflects what's here; a ward with none here may still publish a newsletter."
-      >
-        <div data-chart class="overflow-x-auto"></div>
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        id="civic-calendar"
-        title="Civic calendar"
-        description={`Wards mentioning each topic, by month, out of wards that sent newsletters. Faded: fewer than ${MIN_ACTIVE_WARDS_FOR_REACH} wards sent.`}
-      >
-        <div data-chart class="overflow-x-auto"></div>
-        <details class="mt-4 text-sm" id="lens-definitions">
-          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
-          <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
-        </details>
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        id="lens-trends"
-        title="Ward reach over time"
-        description="Share of wards sending newsletters that mentioned each topic. Choose a topic to enlarge it."
-      >
-        <div data-chart class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"></div>
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        id="lens-wards"
-        title="Which wards mentioned it"
-        description="Each ward's newsletters by month, for the chosen topic."
-      >
-        <div data-chart class="overflow-x-auto"></div>
-      </AnalyticsPanel>
 
       <AnalyticsPanel
         id="term-explorer"
@@ -138,12 +108,41 @@ const controlClass =
           <input id="term-input" type="search" autocomplete="off" placeholder="e.g. bike lanes, zoning, budget" class={controlClass} />
           <button type="submit" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Explore</button>
         </form>
-        <div id="term-suggestions" class="flex flex-wrap gap-2 mb-3"></div>
-        <p id="term-message" class="text-sm text-gray-700 mb-3" aria-live="polite"></p>
-        <div data-export-region>
-          <div id="term-timeline" class="overflow-x-auto"></div>
-          <h3 id="term-wards-title" class="text-sm font-semibold text-gray-700 mt-4 mb-2 hidden" data-export-text>Top wards using this term</h3>
+        <div id="term-suggestions" class="flex flex-wrap gap-2"></div>
+        <p id="term-message" class="text-sm text-gray-700 mt-3" aria-live="polite"></p>
+        <div id="term-results" data-export-region hidden>
+          <div id="term-timeline" class="overflow-x-auto mt-3"></div>
+          <h3 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Top wards using this term</h3>
           <div id="term-wards" class="overflow-x-auto"></div>
+        </div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="civic-calendar"
+        title="Civic calendar"
+        description="Wards mentioning each topic, by month. Click a topic for its detail."
+      >
+        <div data-export-region>
+          <p class="text-xs text-gray-600 mb-2" data-export-text>
+            Blue: more wards than the topic's average month. Red: fewer. Numbers are wards. Topics that swing most (highest minus lowest month) come first.
+          </p>
+          <div data-chart class="overflow-x-auto"></div>
+          <h3 class="text-sm font-semibold text-gray-700 mt-5 mb-2" data-export-text id="topic-trends-title">Ward reach by topic</h3>
+          <div id="topic-trends" class="overflow-x-auto"></div>
+        </div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="topic-detail"
+        title="Topic detail"
+        description="One topic's ward reach by month, and which wards mentioned it."
+        hidden
+      >
+        <div data-export-region>
+          <h3 id="topic-detail-heading" class="text-lg font-semibold text-gray-900" data-export-text></h3>
+          <div id="topic-detail-trend" class="overflow-x-auto"></div>
+          <h4 class="text-sm font-semibold text-gray-700 mt-4 mb-2" data-export-text>Wards by month</h4>
+          <div id="topic-detail-wards" class="overflow-x-auto"></div>
         </div>
       </AnalyticsPanel>
 
@@ -151,15 +150,10 @@ const controlClass =
         id="ward-profile"
         title="Ward profile"
         description="One ward's newsletters against its own history and all wards."
+        hidden
       >
-        <label class="block mb-3 max-w-xs">
-          <span class="block text-sm font-semibold text-gray-700 mb-2">Ward</span>
-          <select id="profile-ward" class={controlClass}>
-            <option value="">Choose a ward</option>
-          </select>
-        </label>
         <div data-export-region>
-          <p id="profile-message" class="text-sm text-gray-600" aria-live="polite"></p>
+          <p id="profile-message" class="text-sm text-gray-600" aria-live="polite" hidden></p>
           <div id="profile-content" class="space-y-5" hidden>
             <h3 id="profile-heading" class="text-lg font-semibold text-gray-900" data-export-text></h3>
             <dl id="profile-tiles" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -197,7 +191,7 @@ const controlClass =
       <AnalyticsPanel
         id="rising-terms"
         title="Rising terms"
-        description="Terms far more wards used in the latest full month than in a typical recent month. All wards and dates. With under a year of data, seasonal events look like trends."
+        description="Terms far more wards used in the latest full month than in a typical recent month. All wards and dates."
       >
         <div data-chart class="overflow-x-auto"></div>
       </AnalyticsPanel>
@@ -210,6 +204,21 @@ const controlClass =
         exportable={false}
       >
         <div id="cadence-gaps" class="overflow-x-auto"></div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        id="coverage"
+        title="About the data"
+        description="Every panel reflects only the newsletters archived here. A ward with none here may still publish one."
+      >
+        <details class="text-sm" id="coverage-details">
+          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Newsletters per ward per month</summary>
+          <div data-chart class="overflow-x-auto mt-2"></div>
+        </details>
+        <details class="mt-3 text-sm" id="lens-definitions">
+          <summary class="cursor-pointer text-blue-600 hover:text-blue-700 font-medium">Topic phrase lists</summary>
+          <div class="mt-2 space-y-3 text-gray-700" data-lens-definitions></div>
+        </details>
       </AnalyticsPanel>
     </div>
   </div>
