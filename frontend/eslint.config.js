@@ -62,7 +62,6 @@ export default defineConfig(
   // Ceilings for files already over: lower freely, never raise. Split the file instead.
   // src/tests/unit/lint-budgets.test.ts repeats them and checks each equals today's size.
   { files: ["src/scripts/analytics-dashboard.ts"], rules: maxLines(1170) },
-  { files: ["src/lib/analytics-charts.ts"], rules: maxLines(851) },
   { files: ["src/pages/preferences.astro"], rules: maxLines(785) },
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,
   // and `expect(obj.method)` assertions on mocked methods.

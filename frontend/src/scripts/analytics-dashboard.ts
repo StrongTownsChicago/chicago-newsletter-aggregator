@@ -52,20 +52,20 @@ import {
   formatPercent,
   formatWard,
   LENS_WARD_STATUS_LABELS,
-  renderCivicCalendar,
+  sourceLabel,
+} from "../lib/analytics-format";
+import { renderCivicCalendar, renderReachTrend, renderSparkline } from "../lib/charts/topic-reach";
+import {
   renderCoverageGrid,
-  renderDistinctiveTerms,
   renderLensWardGrid,
-  renderReachTrend,
-  renderRisingTerms,
-  renderSparkline,
-  renderTermTimeline,
-  renderTermWards,
+  renderWardTopicGrid,
+} from "../lib/charts/ward-grids";
+import {
+  renderDistinctiveTerms,
   renderWardCadence,
   renderWardTopicComparison,
-  renderWardTopicGrid,
-  sourceLabel,
-} from "../lib/analytics-charts";
+} from "../lib/charts/ward-profile";
+import { renderRisingTerms, renderTermTimeline, renderTermWards } from "../lib/charts/terms";
 import { createLazyLoader, fetchTermIndex } from "../lib/analytics-data";
 import { renderTable, type TableColumn } from "../lib/analytics-table";
 import {

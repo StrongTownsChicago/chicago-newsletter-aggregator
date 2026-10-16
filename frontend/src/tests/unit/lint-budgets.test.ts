@@ -11,7 +11,6 @@ const DEFAULT_MAX_LINES = 400;
 // two-place change on purpose; lower both when a file shrinks.
 const ADOPTED_CEILINGS: Record<string, number> = {
   "src/scripts/analytics-dashboard.ts": 1170,
-  "src/lib/analytics-charts.ts": 851,
   "src/pages/preferences.astro": 785,
 };
 
