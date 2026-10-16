@@ -6,7 +6,7 @@ for newsletter archive and individual newsletter pages.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from ingest.scraper.newsletter_scraper import NewsletterScraper
 
@@ -15,7 +15,7 @@ class TestFetchArchivePage(unittest.TestCase):
     """Tests for fetch_archive_page() method."""
 
     @patch("requests.Session.get")
-    def test_successful_fetch(self, mock_get):
+    def test_successful_fetch(self, mock_get: MagicMock) -> None:
         """Successful fetch returns HTML."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -31,7 +31,9 @@ class TestFetchArchivePage(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     @patch("requests.Session.get")
-    def test_retry_on_failure(self, mock_get, mock_sleep, mock_print):
+    def test_retry_on_failure(
+        self, mock_get: MagicMock, mock_sleep: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Failed call retries with exponential backoff."""
         # Fail twice, succeed third time
         mock_get.side_effect = [
@@ -51,7 +53,9 @@ class TestFetchArchivePage(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     @patch("requests.Session.get")
-    def test_max_retries_returns_none(self, mock_get, mock_sleep, mock_print):
+    def test_max_retries_returns_none(
+        self, mock_get: MagicMock, mock_sleep: MagicMock, mock_print: MagicMock
+    ) -> None:
         """All retries exhausted returns None."""
         mock_get.side_effect = Exception("Connection error")
 
@@ -62,7 +66,7 @@ class TestFetchArchivePage(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 3)
 
     @patch("requests.Session.get")
-    def test_timeout_handling(self, mock_get):
+    def test_timeout_handling(self, mock_get: MagicMock) -> None:
         """30s timeout configured."""
         mock_response = Mock(status_code=200, text="<html>Content</html>")
         mock_get.return_value = mock_response
@@ -74,7 +78,7 @@ class TestFetchArchivePage(unittest.TestCase):
         call_kwargs = mock_get.call_args[1]
         self.assertEqual(call_kwargs["timeout"], 30)
 
-    def test_user_agent_set(self):
+    def test_user_agent_set(self) -> None:
         """User-Agent header set in session."""
         scraper = NewsletterScraper()
 
@@ -84,7 +88,9 @@ class TestFetchArchivePage(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     @patch("requests.Session.get")
-    def test_http_error_handling(self, mock_get, mock_sleep, mock_print):
+    def test_http_error_handling(
+        self, mock_get: MagicMock, mock_sleep: MagicMock, mock_print: MagicMock
+    ) -> None:
         """HTTP errors (404, 500) handled."""
         mock_response = Mock()
         mock_response.status_code = 404
@@ -103,7 +109,9 @@ class TestExtractNewsletterLinks(unittest.TestCase):
     @patch("builtins.print")
     @patch("ingest.scraper.newsletter_scraper.get_strategy_for_url")
     @patch.object(NewsletterScraper, "fetch_archive_page")
-    def test_uses_correct_strategy(self, mock_fetch, mock_get_strategy, mock_print):
+    def test_uses_correct_strategy(
+        self, mock_fetch: MagicMock, mock_get_strategy: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Strategy selection logic called."""
         mock_fetch.return_value = "<html>Archive</html>"
         mock_strategy = Mock()
@@ -119,7 +127,9 @@ class TestExtractNewsletterLinks(unittest.TestCase):
     @patch("builtins.print")
     @patch("ingest.scraper.newsletter_scraper.get_strategy_for_url")
     @patch.object(NewsletterScraper, "fetch_archive_page")
-    def test_returns_newsletter_list(self, mock_fetch, mock_get_strategy, mock_print):
+    def test_returns_newsletter_list(
+        self, mock_fetch: MagicMock, mock_get_strategy: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Returns list of newsletter dicts."""
         mock_fetch.return_value = "<html>Archive</html>"
         mock_strategy = Mock()
@@ -136,7 +146,9 @@ class TestExtractNewsletterLinks(unittest.TestCase):
 
     @patch("builtins.print")
     @patch.object(NewsletterScraper, "fetch_archive_page")
-    def test_archive_fetch_failure_returns_empty(self, mock_fetch, mock_print):
+    def test_archive_fetch_failure_returns_empty(
+        self, mock_fetch: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Fetch failure returns empty list."""
         mock_fetch.return_value = None
 
@@ -148,7 +160,9 @@ class TestExtractNewsletterLinks(unittest.TestCase):
     @patch("builtins.print")
     @patch("ingest.scraper.newsletter_scraper.get_strategy_for_url")
     @patch.object(NewsletterScraper, "fetch_archive_page")
-    def test_prints_strategy_name(self, mock_fetch, mock_get_strategy, mock_print):
+    def test_prints_strategy_name(
+        self, mock_fetch: MagicMock, mock_get_strategy: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Console output includes strategy name."""
         mock_fetch.return_value = "<html>Archive</html>"
         mock_strategy = Mock()
@@ -167,7 +181,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
     """Tests for fetch_newsletter_content() method."""
 
     @patch("requests.Session.get")
-    def test_successful_fetch(self, mock_get):
+    def test_successful_fetch(self, mock_get: MagicMock) -> None:
         """Successful fetch returns content dict."""
         html = "<html><title>Newsletter Title</title><body>Content</body></html>"
         mock_response = Mock(status_code=200, text=html)
@@ -185,7 +199,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
         self.assertIn("subject", result)
 
     @patch("requests.Session.get")
-    def test_extracts_subject_from_title(self, mock_get):
+    def test_extracts_subject_from_title(self, mock_get: MagicMock) -> None:
         """Subject extracted from <title> tag."""
         html = "<html><title>Newsletter Subject</title><body>Content</body></html>"
         mock_response = Mock(status_code=200, text=html)
@@ -199,7 +213,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
         self.assertEqual(result["subject"], "Newsletter Subject")
 
     @patch("requests.Session.get")
-    def test_extracts_subject_from_h1(self, mock_get):
+    def test_extracts_subject_from_h1(self, mock_get: MagicMock) -> None:
         """Fallback to <h1> when no <title>."""
         html = "<html><body><h1>Newsletter Heading</h1><p>Content</p></body></html>"
         mock_response = Mock(status_code=200, text=html)
@@ -213,7 +227,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
         self.assertEqual(result["subject"], "Newsletter Heading")
 
     @patch("requests.Session.get")
-    def test_fallback_to_archive_title(self, mock_get):
+    def test_fallback_to_archive_title(self, mock_get: MagicMock) -> None:
         """Uses archive title when no <title> or <h1>."""
         html = "<html><body><p>Content</p></body></html>"
         mock_response = Mock(status_code=200, text=html)
@@ -229,7 +243,9 @@ class TestFetchNewsletterContent(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     @patch("requests.Session.get")
-    def test_retry_on_failure(self, mock_get, mock_sleep, mock_print):
+    def test_retry_on_failure(
+        self, mock_get: MagicMock, mock_sleep: MagicMock, mock_print: MagicMock
+    ) -> None:
         """Retries with exponential backoff on failure."""
         # Fail twice, succeed third time
         mock_get.side_effect = [
@@ -252,7 +268,9 @@ class TestFetchNewsletterContent(unittest.TestCase):
     @patch("builtins.print")
     @patch("time.sleep")
     @patch("requests.Session.get")
-    def test_max_retries_returns_none(self, mock_get, mock_sleep, mock_print):
+    def test_max_retries_returns_none(
+        self, mock_get: MagicMock, mock_sleep: MagicMock, mock_print: MagicMock
+    ) -> None:
         """All retries fail returns None."""
         mock_get.side_effect = Exception("Connection error")
 
@@ -264,7 +282,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch("requests.Session.get")
-    def test_returns_all_required_fields(self, mock_get):
+    def test_returns_all_required_fields(self, mock_get: MagicMock) -> None:
         """Result has all required fields."""
         html = "<html><title>Title</title><body>Content</body></html>"
         mock_response = Mock(status_code=200, text=html)

@@ -6,20 +6,22 @@ JSON extraction, and client lifecycle management.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from collections.abc import Iterator
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import processing.llm_client as llm_client
+from models.weekly_report import FactExtraction
 from processing.llm_client import (
-    parse_model_string,
-    call_llm,
+    _add_additional_properties_false,
     _call_ollama,
     _call_openai,
     _extract_json,
     _get_ollama_client,
     _get_openai_client,
-    _add_additional_properties_false,
+    call_llm,
+    parse_model_string,
 )
-from models.weekly_report import FactExtraction
 from tests.fixtures.mock_helpers import (
     create_mock_ollama_client,
     create_mock_openai_client,
@@ -29,36 +31,36 @@ from tests.fixtures.mock_helpers import (
 class TestParseModelString(unittest.TestCase):
     """Tests for parse_model_string() provider prefix parsing."""
 
-    def test_openai_prefix(self):
+    def test_openai_prefix(self) -> None:
         """'openai:gpt-5' parses to ('openai', 'gpt-5')"""
         self.assertEqual(parse_model_string("openai:gpt-5"), ("openai", "gpt-5"))
 
-    def test_ollama_prefix(self):
+    def test_ollama_prefix(self) -> None:
         """'ollama:gpt-oss:20b' parses to ('ollama', 'gpt-oss:20b')"""
         self.assertEqual(
             parse_model_string("ollama:gpt-oss:20b"), ("ollama", "gpt-oss:20b")
         )
 
-    def test_ollama_prefix_simple_model(self):
+    def test_ollama_prefix_simple_model(self) -> None:
         """'ollama:llama3' parses to ('ollama', 'llama3')"""
         self.assertEqual(parse_model_string("ollama:llama3"), ("ollama", "llama3"))
 
-    def test_bare_name_with_colon_defaults_to_ollama(self):
+    def test_bare_name_with_colon_defaults_to_ollama(self) -> None:
         """'gpt-oss:20b' defaults to ('ollama', 'gpt-oss:20b') for backward compatibility"""
         self.assertEqual(parse_model_string("gpt-oss:20b"), ("ollama", "gpt-oss:20b"))
 
-    def test_bare_name_without_colon_defaults_to_ollama(self):
+    def test_bare_name_without_colon_defaults_to_ollama(self) -> None:
         """'llama3' defaults to ('ollama', 'llama3')"""
         self.assertEqual(parse_model_string("llama3"), ("ollama", "llama3"))
 
-    def test_unknown_provider_raises_value_error(self):
+    def test_unknown_provider_raises_value_error(self) -> None:
         """Unknown provider prefix raises ValueError"""
         with self.assertRaises(ValueError) as ctx:
             parse_model_string("anthropic:claude")
         self.assertIn("anthropic", str(ctx.exception))
         self.assertIn("Unknown provider", str(ctx.exception))
 
-    def test_empty_string_defaults_to_ollama(self):
+    def test_empty_string_defaults_to_ollama(self) -> None:
         """Empty model string defaults to ollama provider"""
         provider, model = parse_model_string("")
         self.assertEqual(provider, "ollama")
@@ -69,28 +71,28 @@ class TestCallLLMDispatch(unittest.TestCase):
     """Tests that call_llm() routes to the correct provider adapter."""
 
     @patch("processing.llm_client._call_ollama")
-    def test_dispatches_to_ollama_with_prefix(self, mock_ollama):
+    def test_dispatches_to_ollama_with_prefix(self, mock_ollama: MagicMock) -> None:
         """'ollama:gpt-oss:20b' routes to _call_ollama with 'gpt-oss:20b'"""
         mock_ollama.return_value = '{"topics": []}'
         call_llm("ollama:gpt-oss:20b", "test prompt")
         mock_ollama.assert_called_once_with("gpt-oss:20b", "test prompt", None, 0, 6)
 
     @patch("processing.llm_client._call_openai")
-    def test_dispatches_to_openai_with_prefix(self, mock_openai):
+    def test_dispatches_to_openai_with_prefix(self, mock_openai: MagicMock) -> None:
         """'openai:gpt-5' routes to _call_openai with 'gpt-5'"""
         mock_openai.return_value = '{"topics": []}'
         call_llm("openai:gpt-5", "test prompt")
         mock_openai.assert_called_once_with("gpt-5", "test prompt", None, 6)
 
     @patch("processing.llm_client._call_ollama")
-    def test_dispatches_bare_name_to_ollama(self, mock_ollama):
+    def test_dispatches_bare_name_to_ollama(self, mock_ollama: MagicMock) -> None:
         """Bare model name 'gpt-oss:20b' routes to _call_ollama"""
         mock_ollama.return_value = '{"topics": []}'
         call_llm("gpt-oss:20b", "test prompt")
         mock_ollama.assert_called_once_with("gpt-oss:20b", "test prompt", None, 0, 6)
 
     @patch("processing.llm_client._call_ollama")
-    def test_passes_all_parameters_to_adapter(self, mock_ollama):
+    def test_passes_all_parameters_to_adapter(self, mock_ollama: MagicMock) -> None:
         """All parameters are forwarded correctly to the adapter."""
         mock_ollama.return_value = '{"result": "ok"}'
         schema = {"type": "object"}
@@ -99,7 +101,7 @@ class TestCallLLMDispatch(unittest.TestCase):
         )
         mock_ollama.assert_called_once_with("llama3", "my prompt", schema, 0.5, 3)
 
-    def test_unknown_provider_raises_before_calling_adapter(self):
+    def test_unknown_provider_raises_before_calling_adapter(self) -> None:
         """Unknown provider raises ValueError without calling any adapter."""
         with self.assertRaises(ValueError):
             call_llm("anthropic:claude", "test prompt")
@@ -108,12 +110,12 @@ class TestCallLLMDispatch(unittest.TestCase):
 class TestCallOllama(unittest.TestCase):
     """Tests for the Ollama provider adapter."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Reset global cached client before each test
         llm_client._ollama_client = None
 
     @patch("processing.llm_client._get_ollama_client")
-    def test_successful_call(self, mock_get_client):
+    def test_successful_call(self, mock_get_client: MagicMock) -> None:
         """Successful Ollama call returns response content."""
         mock_client = create_mock_ollama_client('{"topics": ["bike_lanes"]}')
         mock_get_client.return_value = mock_client
@@ -122,7 +124,7 @@ class TestCallOllama(unittest.TestCase):
         self.assertEqual(result, '{"topics": ["bike_lanes"]}')
 
     @patch("processing.llm_client._get_ollama_client")
-    def test_passes_temperature_in_options(self, mock_get_client):
+    def test_passes_temperature_in_options(self, mock_get_client: MagicMock) -> None:
         """Temperature is passed inside the options dict."""
         mock_client = create_mock_ollama_client('{"result": "ok"}')
         mock_get_client.return_value = mock_client
@@ -133,7 +135,9 @@ class TestCallOllama(unittest.TestCase):
         self.assertEqual(call_kwargs["options"]["temperature"], 0.7)
 
     @patch("processing.llm_client._get_ollama_client")
-    def test_native_format_for_non_gpt_oss_models(self, mock_get_client):
+    def test_native_format_for_non_gpt_oss_models(
+        self, mock_get_client: MagicMock
+    ) -> None:
         """Non-gpt-oss models use the native format parameter."""
         mock_client = create_mock_ollama_client('{"topics": []}')
         mock_get_client.return_value = mock_client
@@ -145,7 +149,7 @@ class TestCallOllama(unittest.TestCase):
         self.assertEqual(call_kwargs["format"], schema)
 
     @patch("processing.llm_client._get_ollama_client")
-    def test_gpt_oss_schema_in_prompt(self, mock_get_client):
+    def test_gpt_oss_schema_in_prompt(self, mock_get_client: MagicMock) -> None:
         """gpt-oss models embed schema in prompt and pass format=None."""
         mock_client = create_mock_ollama_client('{"topics": []}')
         mock_get_client.return_value = mock_client
@@ -160,7 +164,7 @@ class TestCallOllama(unittest.TestCase):
         self.assertIn("Respond with valid JSON matching this schema", message_content)
 
     @patch("processing.llm_client._get_ollama_client")
-    def test_gpt_oss_json_extraction(self, mock_get_client):
+    def test_gpt_oss_json_extraction(self, mock_get_client: MagicMock) -> None:
         """gpt-oss markdown-wrapped JSON is extracted correctly."""
         raw_response = 'Here is the JSON:\n```json\n{"topics": ["bike_lanes"]}\n```'
         mock_client = create_mock_ollama_client(raw_response)
@@ -173,7 +177,9 @@ class TestCallOllama(unittest.TestCase):
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_retry_on_failure(self, mock_print, mock_sleep, mock_get_client):
+    def test_retry_on_failure(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """Failed calls retry with exponential backoff."""
         success_response = Mock()
         success_response.message.content = '{"topics": []}'
@@ -195,7 +201,9 @@ class TestCallOllama(unittest.TestCase):
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_max_retries_raises(self, mock_print, mock_sleep, mock_get_client):
+    def test_max_retries_raises(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """All retries exhausted raises an exception."""
         mock_client = Mock()
         mock_client.chat.side_effect = Exception("Always fails")
@@ -209,8 +217,8 @@ class TestCallOllama(unittest.TestCase):
     @patch("time.sleep")
     @patch("builtins.print")
     def test_empty_response_triggers_retry(
-        self, mock_print, mock_sleep, mock_get_client
-    ):
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """Empty response triggers retry."""
         empty_response = Mock()
         empty_response.message.content = ""
@@ -226,8 +234,8 @@ class TestCallOllama(unittest.TestCase):
     @patch("time.sleep")
     @patch("builtins.print")
     def test_whitespace_response_triggers_retry(
-        self, mock_print, mock_sleep, mock_get_client
-    ):
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """Whitespace-only response triggers retry."""
         whitespace_response = Mock()
         whitespace_response.message.content = "   \n\t  "
@@ -243,11 +251,11 @@ class TestCallOllama(unittest.TestCase):
 class TestCallOpenAI(unittest.TestCase):
     """Tests for the OpenAI provider adapter."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         llm_client._openai_client = None
 
     @patch("processing.llm_client._get_openai_client")
-    def test_successful_call(self, mock_get_client):
+    def test_successful_call(self, mock_get_client: MagicMock) -> None:
         """Successful OpenAI call returns choices[0].message.content."""
         mock_client = create_mock_openai_client('{"topics": ["bike_lanes"]}')
         mock_get_client.return_value = mock_client
@@ -256,7 +264,7 @@ class TestCallOpenAI(unittest.TestCase):
         self.assertEqual(result, '{"topics": ["bike_lanes"]}')
 
     @patch("processing.llm_client._get_openai_client")
-    def test_never_sends_sampling_params(self, mock_get_client):
+    def test_never_sends_sampling_params(self, mock_get_client: MagicMock) -> None:
         """OpenAI reasoning models reject temperature with a 400, so it is never sent."""
         mock_client = create_mock_openai_client('{"result": "ok"}')
         mock_get_client.return_value = mock_client
@@ -268,7 +276,7 @@ class TestCallOpenAI(unittest.TestCase):
         self.assertNotIn("top_p", call_kwargs)
 
     @patch("processing.llm_client._get_openai_client")
-    def test_schema_passed_as_response_format(self, mock_get_client):
+    def test_schema_passed_as_response_format(self, mock_get_client: MagicMock) -> None:
         """Schema is wrapped in the json_schema response_format structure."""
         mock_client = create_mock_openai_client('{"topics": []}')
         mock_get_client.return_value = mock_client
@@ -285,7 +293,9 @@ class TestCallOpenAI(unittest.TestCase):
         self.assertTrue(rf["json_schema"]["strict"])
 
     @patch("processing.llm_client._get_openai_client")
-    def test_no_response_format_when_schema_is_none(self, mock_get_client):
+    def test_no_response_format_when_schema_is_none(
+        self, mock_get_client: MagicMock
+    ) -> None:
         """No response_format in kwargs when schema is None."""
         mock_client = create_mock_openai_client("plain text response")
         mock_get_client.return_value = mock_client
@@ -298,7 +308,9 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_retry_on_failure(self, mock_print, mock_sleep, mock_get_client):
+    def test_retry_on_failure(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """Failed OpenAI calls retry with exponential backoff."""
         success_mock = create_mock_openai_client('{"topics": []}')
         success_response = success_mock.chat.completions.create.return_value
@@ -318,7 +330,9 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_max_retries_raises(self, mock_print, mock_sleep, mock_get_client):
+    def test_max_retries_raises(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """All OpenAI retries exhausted raises exception."""
         mock_client = Mock()
         mock_client.chat.completions.create.side_effect = Exception("Always fails")
@@ -332,8 +346,8 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("time.sleep")
     @patch("builtins.print")
     def test_empty_response_triggers_retry(
-        self, mock_print, mock_sleep, mock_get_client
-    ):
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """Empty OpenAI response content triggers retry."""
         mock_client = create_mock_openai_client("")
         mock_get_client.return_value = mock_client
@@ -345,7 +359,9 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_refusal_treated_as_error(self, mock_print, mock_sleep, mock_get_client):
+    def test_refusal_treated_as_error(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """OpenAI content policy refusal is treated as an error and retried."""
         mock_client = Mock()
         mock_choice = Mock()
@@ -363,10 +379,12 @@ class TestCallOpenAI(unittest.TestCase):
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
     @patch("builtins.print")
-    def test_api_key_error_propagated(self, mock_print, mock_sleep, mock_get_client):
+    def test_api_key_error_propagated(
+        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         """AuthenticationError propagates after exhausting retries."""
-        from openai import AuthenticationError
         import httpx
+        from openai import AuthenticationError
 
         mock_client = Mock()
         auth_error = AuthenticationError(
@@ -379,14 +397,15 @@ class TestCallOpenAI(unittest.TestCase):
         mock_client.chat.completions.create.side_effect = auth_error
         mock_get_client.return_value = mock_client
 
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(Exception, "failed after 2 attempts") as ctx:
             _call_openai("gpt-5", "test prompt", None, 2)
+        self.assertIs(ctx.exception.__cause__, auth_error)
 
 
 class TestAddAdditionalPropertiesFalse(unittest.TestCase):
     """Tests for _add_additional_properties_false() and OpenAI strict-mode validity."""
 
-    def _collect_objects(self, node):
+    def _collect_objects(self, node: Any) -> Iterator[dict[str, Any]]:
         """Yield every object-type schema dict reachable from node."""
         if isinstance(node, dict):
             if node.get("type") == "object" and "properties" in node:
@@ -397,7 +416,7 @@ class TestAddAdditionalPropertiesFalse(unittest.TestCase):
             for value in node:
                 yield from self._collect_objects(value)
 
-    def test_sets_additional_properties_false_on_all_objects(self):
+    def test_sets_additional_properties_false_on_all_objects(self) -> None:
         """Every nested object gets additionalProperties: false."""
         schema = {
             "type": "object",
@@ -417,7 +436,7 @@ class TestAddAdditionalPropertiesFalse(unittest.TestCase):
         for obj in objects:
             self.assertIs(obj["additionalProperties"], False)
 
-    def test_does_not_mutate_input_schema(self):
+    def test_does_not_mutate_input_schema(self) -> None:
         """The input schema dict is not mutated in place."""
         schema = {
             "type": "object",
@@ -429,7 +448,7 @@ class TestAddAdditionalPropertiesFalse(unittest.TestCase):
 
         self.assertNotIn("additionalProperties", schema)
 
-    def test_real_fact_extraction_schema_is_strict_valid(self):
+    def test_real_fact_extraction_schema_is_strict_valid(self) -> None:
         """Regression: the schema sent to OpenAI must satisfy strict mode.
 
         OpenAI strict mode requires every object to set additionalProperties:false
@@ -455,16 +474,18 @@ class TestAddAdditionalPropertiesFalse(unittest.TestCase):
 class TestClientLifecycle(unittest.TestCase):
     """Tests for lazy client initialization and caching."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         llm_client._ollama_client = None
         llm_client._openai_client = None
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         llm_client._ollama_client = None
         llm_client._openai_client = None
 
     @patch("processing.llm_client.Client")
-    def test_ollama_client_created_on_first_use(self, mock_client_class):
+    def test_ollama_client_created_on_first_use(
+        self, mock_client_class: MagicMock
+    ) -> None:
         """Ollama client is constructed exactly once and cached."""
         mock_instance = Mock()
         mock_client_class.return_value = mock_instance
@@ -476,7 +497,9 @@ class TestClientLifecycle(unittest.TestCase):
         self.assertIs(result1, result2)
 
     @patch("processing.llm_client.OpenAI")
-    def test_openai_client_created_on_first_use(self, mock_openai_class):
+    def test_openai_client_created_on_first_use(
+        self, mock_openai_class: MagicMock
+    ) -> None:
         """OpenAI client is constructed exactly once and cached."""
         mock_instance = Mock()
         mock_openai_class.return_value = mock_instance
@@ -488,14 +511,14 @@ class TestClientLifecycle(unittest.TestCase):
         self.assertIs(result1, result2)
 
     @patch("processing.llm_client.Client")
-    def test_ollama_client_timeout_set(self, mock_client_class):
+    def test_ollama_client_timeout_set(self, mock_client_class: MagicMock) -> None:
         """Ollama client is created with 360s timeout."""
         mock_client_class.return_value = Mock()
         _get_ollama_client()
         mock_client_class.assert_called_once_with(timeout=360.0)
 
     @patch("processing.llm_client.OpenAI")
-    def test_openai_client_timeout_set(self, mock_openai_class):
+    def test_openai_client_timeout_set(self, mock_openai_class: MagicMock) -> None:
         """OpenAI client is created with 120s timeout."""
         mock_openai_class.return_value = Mock()
         _get_openai_client()
@@ -505,32 +528,32 @@ class TestClientLifecycle(unittest.TestCase):
 class TestExtractJson(unittest.TestCase):
     """Tests for _extract_json() utility function."""
 
-    def test_clean_json_passthrough(self):
+    def test_clean_json_passthrough(self) -> None:
         """Clean JSON passes through unchanged."""
         result = _extract_json('{"topics": []}')
         self.assertEqual(result, '{"topics": []}')
 
-    def test_markdown_json_block(self):
+    def test_markdown_json_block(self) -> None:
         """JSON inside ```json block is extracted."""
         result = _extract_json('```json\n{"topics": []}\n```')
         self.assertEqual(result, '{"topics": []}')
 
-    def test_generic_markdown_block(self):
+    def test_generic_markdown_block(self) -> None:
         """JSON inside generic ``` block is extracted."""
         result = _extract_json('```\n{"topics": []}\n```')
         self.assertEqual(result, '{"topics": []}')
 
-    def test_json_with_preamble(self):
+    def test_json_with_preamble(self) -> None:
         """JSON following preamble text is extracted."""
         result = _extract_json('Here is the result: {"topics": []}')
         self.assertEqual(result, '{"topics": []}')
 
-    def test_json_with_postamble(self):
+    def test_json_with_postamble(self) -> None:
         """JSON preceding trailing text is extracted."""
         result = _extract_json('{"topics": []} Hope this helps!')
         self.assertEqual(result, '{"topics": []}')
 
-    def test_nested_json(self):
+    def test_nested_json(self) -> None:
         """Nested JSON objects are preserved."""
         input_json = '{"outer": {"inner": "value"}}'
         result = _extract_json(input_json)

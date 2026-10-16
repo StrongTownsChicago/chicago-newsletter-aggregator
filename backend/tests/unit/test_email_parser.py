@@ -1,12 +1,12 @@
 """Unit tests for email parsing and source matching logic."""
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import (
     clean_html_content,
     email_matches_pattern,
-    extract_name_from_sender,
     lookup_source_by_email,
     parse_newsletter,
 )
@@ -15,18 +15,17 @@ from tests.fixtures.newsletter_factory import (
     create_test_email_mapping,
     create_test_source,
 )
-from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 
 
 class TestEmailMatchesPattern(unittest.TestCase):
     """Tests for email_matches_pattern() pure matching function."""
 
-    def test_exact_match(self):
+    def test_exact_match(self) -> None:
         self.assertTrue(
             email_matches_pattern("info@the1stward.com", "info@the1stward.com")
         )
 
-    def test_exact_pattern_rejects_substring_of_sender(self):
+    def test_exact_pattern_rejects_substring_of_sender(self) -> None:
         """Exact patterns must not match senders that merely contain them."""
         self.assertFalse(
             email_matches_pattern("info@the1stward.com.evil.io", "info@the1stward.com")
@@ -35,28 +34,28 @@ class TestEmailMatchesPattern(unittest.TestCase):
             email_matches_pattern("xinfo@the1stward.com", "info@the1stward.com")
         )
 
-    def test_exact_pattern_rejects_sender_that_is_substring_of_pattern(self):
+    def test_exact_pattern_rejects_sender_that_is_substring_of_pattern(self) -> None:
         self.assertFalse(email_matches_pattern("ward09", "ward09@cityofchicago.org"))
 
-    def test_leading_wildcard(self):
+    def test_leading_wildcard(self) -> None:
         self.assertTrue(
             email_matches_pattern("ward27@redburnett.com", "%@redburnett.com")
         )
 
-    def test_leading_wildcard_rejects_domain_suffix_overmatch(self):
+    def test_leading_wildcard_rejects_domain_suffix_overmatch(self) -> None:
         self.assertFalse(
             email_matches_pattern("x@redburnett.com.evil.io", "%@redburnett.com")
         )
 
-    def test_leading_wildcard_rejects_lookalike_domain(self):
+    def test_leading_wildcard_rejects_lookalike_domain(self) -> None:
         """'.' in the pattern is literal, not a regex any-character."""
         self.assertFalse(email_matches_pattern("x@redburnettxcom", "%@redburnett.com"))
 
-    def test_trailing_wildcard(self):
+    def test_trailing_wildcard(self) -> None:
         self.assertTrue(email_matches_pattern("ward23@cityofchicago.org", "ward23@%"))
         self.assertFalse(email_matches_pattern("xward23@cityofchicago.org", "ward23@%"))
 
-    def test_mid_pattern_wildcard(self):
+    def test_mid_pattern_wildcard(self) -> None:
         pattern = "nicolelee11thwardchi%@shared1.ccsend.com"
         self.assertTrue(
             email_matches_pattern(
@@ -69,7 +68,7 @@ class TestEmailMatchesPattern(unittest.TestCase):
             )
         )
 
-    def test_multiple_wildcards(self):
+    def test_multiple_wildcards(self) -> None:
         self.assertTrue(
             email_matches_pattern(
                 "nicolelee11thwardchi-gmail.com@ward11.ccsend.com",
@@ -77,12 +76,12 @@ class TestEmailMatchesPattern(unittest.TestCase):
             )
         )
 
-    def test_wildcard_matches_empty_run(self):
+    def test_wildcard_matches_empty_run(self) -> None:
         self.assertTrue(
             email_matches_pattern("ward@chicago14.com", "ward%@chicago14.com")
         )
 
-    def test_case_insensitive(self):
+    def test_case_insensitive(self) -> None:
         self.assertTrue(
             email_matches_pattern(
                 "Ward23@CityOfChicago.org", "ward23@cityofchicago.org"
@@ -90,12 +89,12 @@ class TestEmailMatchesPattern(unittest.TestCase):
         )
         self.assertTrue(email_matches_pattern("info@40thward.org", "%@40THWARD.ORG"))
 
-    def test_surrounding_whitespace_ignored(self):
+    def test_surrounding_whitespace_ignored(self) -> None:
         self.assertTrue(
             email_matches_pattern(" x@aldermanervin.com ", " %@aldermanervin.com")
         )
 
-    def test_regex_metacharacters_are_literal(self):
+    def test_regex_metacharacters_are_literal(self) -> None:
         pattern = "yourvoice+newsletter@ward43.org"
         self.assertTrue(
             email_matches_pattern("yourvoice+newsletter@ward43.org", pattern)
@@ -106,22 +105,22 @@ class TestEmailMatchesPattern(unittest.TestCase):
         self.assertFalse(email_matches_pattern("ward1@x.org", "ward[0-9]@x.org"))
         self.assertTrue(email_matches_pattern("ward[0-9]@x.org", "ward[0-9]@x.org"))
 
-    def test_underscore_is_literal_not_wildcard(self):
+    def test_underscore_is_literal_not_wildcard(self) -> None:
         self.assertTrue(email_matches_pattern("ward_1@x.org", "ward_1@x.org"))
         self.assertFalse(email_matches_pattern("wardA1@x.org", "ward_1@x.org"))
 
-    def test_empty_email_never_matches(self):
+    def test_empty_email_never_matches(self) -> None:
         self.assertFalse(email_matches_pattern("", "info@the1stward.com"))
         self.assertFalse(email_matches_pattern("", "%"))
 
-    def test_empty_pattern_never_matches(self):
+    def test_empty_pattern_never_matches(self) -> None:
         self.assertFalse(email_matches_pattern("info@the1stward.com", ""))
 
 
 class TestLookupSourceByEmail(unittest.TestCase):
     """Tests for lookup_source_by_email() function."""
 
-    def test_exact_match(self):
+    def test_exact_match(self) -> None:
         """Email exactly matches pattern."""
         source = create_test_source(source_id=1, name="Test Ward")
         mapping = create_test_email_mapping(
@@ -137,7 +136,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertEqual(result["id"], 1)
         self.assertEqual(result["name"], "Test Ward")
 
-    def test_wildcard_prefix_match(self):
+    def test_wildcard_prefix_match(self) -> None:
         """Email matches wildcard prefix pattern (%@ward1.org)."""
         source = create_test_source(source_id=1, name="Ward 1")
         mapping = create_test_email_mapping(email_pattern="%@ward1.org", source_id=1)
@@ -150,7 +149,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["id"], 1)
 
-    def test_wildcard_suffix_match(self):
+    def test_wildcard_suffix_match(self) -> None:
         """Email matches wildcard suffix pattern (%alderman@chicago.gov)."""
         source = create_test_source(source_id=2, name="Chicago Alderman")
         mapping = create_test_email_mapping(
@@ -165,7 +164,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["id"], 2)
 
-    def test_wildcard_contains_match(self):
+    def test_wildcard_contains_match(self) -> None:
         """Email matches wildcard contains pattern (%ward25%)."""
         source = create_test_source(source_id=25, name="Ward 25")
         mapping = create_test_email_mapping(email_pattern="%ward25%", source_id=25)
@@ -178,7 +177,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["id"], 25)
 
-    def test_no_match_returns_none(self):
+    def test_no_match_returns_none(self) -> None:
         """No pattern matches email."""
         mapping = create_test_email_mapping(email_pattern="%@ward1.org", source_id=1)
         mock_supabase = create_mock_supabase(return_data=[mapping])
@@ -187,7 +186,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_case_insensitive_matching(self):
+    def test_case_insensitive_matching(self) -> None:
         """Pattern matching is case-insensitive."""
         source = create_test_source(source_id=1)
         mapping = create_test_email_mapping(email_pattern="%@Ward1.ORG", source_id=1)
@@ -200,7 +199,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["id"], 1)
 
-    def test_multiple_patterns_first_match_wins(self):
+    def test_multiple_patterns_first_match_wins(self) -> None:
         """When multiple patterns match, first one wins."""
         source1 = create_test_source(source_id=1, name="First Match")
         source2 = create_test_source(source_id=2, name="Second Match")
@@ -218,7 +217,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["name"], "First Match")
 
-    def test_mid_pattern_wildcard_match(self):
+    def test_mid_pattern_wildcard_match(self) -> None:
         """Wildcard in the middle of a pattern resolves the source."""
         source = create_test_source(source_id=11, name="Ward 11")
         mapping = create_test_email_mapping(
@@ -234,7 +233,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["id"], 11)
 
-    def test_exact_pattern_does_not_substring_match(self):
+    def test_exact_pattern_does_not_substring_match(self) -> None:
         """Exact patterns no longer match senders that merely contain them."""
         mapping = create_test_email_mapping(
             email_pattern="info@the1stward.com", source_id=1
@@ -246,7 +245,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_empty_email_does_not_match_exact_pattern(self):
+    def test_empty_email_does_not_match_exact_pattern(self) -> None:
         """Empty sender must not match exact patterns (was a substring bug)."""
         mapping = create_test_email_mapping(
             email_pattern="info@the1stward.com", source_id=1
@@ -258,7 +257,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_empty_email_returns_none(self):
+    def test_empty_email_returns_none(self) -> None:
         """Empty string email returns None."""
         mapping = create_test_email_mapping(email_pattern="%@ward.org", source_id=1)
         mock_supabase = create_mock_supabase(return_data=[mapping])
@@ -267,7 +266,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_no_mappings_in_db_returns_none(self):
+    def test_no_mappings_in_db_returns_none(self) -> None:
         """Database with no email mappings returns None."""
         mock_supabase = create_mock_supabase(return_data=[])
 
@@ -276,77 +275,37 @@ class TestLookupSourceByEmail(unittest.TestCase):
         self.assertIsNone(result)
 
 
-class TestExtractNameFromSender(unittest.TestCase):
-    """Tests for extract_name_from_sender() function."""
-
-    def test_extract_name_with_angle_brackets(self):
-        """Standard format: Name <email@example.com>."""
-        result = extract_name_from_sender("John Smith <john@example.com>")
-
-        self.assertEqual(result, "John Smith")
-
-    def test_extract_name_with_quotes(self):
-        """Quoted name: "Ward Office" <email@example.com>."""
-        result = extract_name_from_sender('"Ward Office" <office@ward.org>')
-
-        self.assertEqual(result, "Ward Office")
-
-    def test_no_display_name_returns_none(self):
-        """Plain email address with no name."""
-        result = extract_name_from_sender("email@example.com")
-
-        self.assertIsNone(result)
-
-    def test_empty_string_returns_none(self):
-        """Empty string returns None."""
-        result = extract_name_from_sender("")
-
-        self.assertIsNone(result)
-
-    def test_complex_name_formats(self):
-        """Names with special characters and multiple words."""
-        result = extract_name_from_sender("María García-López <maria@example.com>")
-
-        self.assertEqual(result, "María García-López")
-
-    def test_single_quoted_name(self):
-        """Single quotes around name."""
-        result = extract_name_from_sender("'Office' <office@ward.org>")
-
-        self.assertEqual(result, "Office")
-
-
 class TestCleanHtmlContent(unittest.TestCase):
     """Tests for clean_html_content() function."""
 
-    def test_basic_html_conversion(self):
+    def test_basic_html_conversion(self) -> None:
         """Simple HTML converts to plain text."""
         result = clean_html_content("<p>Hello world</p>")
 
         self.assertIn("Hello world", result)
         self.assertNotIn("<p>", result)
 
-    def test_excessive_whitespace_removal(self):
+    def test_excessive_whitespace_removal(self) -> None:
         """Multiple newlines reduced to double newline."""
         result = clean_html_content("<p>Para 1</p>\n\n\n\n<p>Para 2</p>")
 
         # html2text adds newlines, but excessive ones should be reduced
         self.assertNotIn("\n\n\n\n", result)
 
-    def test_empty_html_returns_empty(self):
+    def test_empty_html_returns_empty(self) -> None:
         """Empty string returns empty string."""
         result = clean_html_content("")
 
         self.assertEqual(result, "")
 
-    def test_malformed_html_handled_gracefully(self):
+    def test_malformed_html_handled_gracefully(self) -> None:
         """Broken HTML doesn't crash."""
         result = clean_html_content("<div><p>Unclosed tags<div>")
 
         self.assertIsNotNone(result)
         self.assertIn("Unclosed tags", result)
 
-    def test_preserves_links_as_markdown(self):
+    def test_preserves_links_as_markdown(self) -> None:
         """Links converted to markdown format."""
         result = clean_html_content('<a href="http://example.com">Link</a>')
 
@@ -359,7 +318,7 @@ class TestParseNewsletter(unittest.TestCase):
     """Tests for parse_newsletter() main parsing function."""
 
     @patch("builtins.print")
-    def test_parse_with_matched_source(self, mock_print):
+    def test_parse_with_matched_source(self, mock_print: MagicMock) -> None:
         """Email with source match sets source_id."""
         source = create_test_source(source_id=1, name="Test Ward")
         mapping = create_test_email_mapping(email_pattern="%@ward1.org", source_id=1)
@@ -378,7 +337,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["subject"], "Test Subject")
 
     @patch("builtins.print")
-    def test_parse_includes_ward_number(self, mock_print):
+    def test_parse_includes_ward_number(self, mock_print: MagicMock) -> None:
         """Verify ward_number is included in parsed data from source."""
         source = create_test_source(source_id=1, name="Ward 10", ward_number="10")
         mapping = create_test_email_mapping(email_pattern="%@ward10.org", source_id=1)
@@ -393,7 +352,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["ward_number"], "10")
 
     @patch("builtins.print")
-    def test_parse_with_unmapped_source(self, mock_print):
+    def test_parse_with_unmapped_source(self, mock_print: MagicMock) -> None:
         """Email without source match sets source_id=None."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -405,7 +364,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertIsNone(result["source_id"])
 
     @patch("builtins.print")
-    def test_parse_with_html_only(self, mock_print):
+    def test_parse_with_html_only(self, mock_print: MagicMock) -> None:
         """Email with only HTML generates plain_text."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -418,7 +377,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertIn("<p>", result["raw_html"])
 
     @patch("builtins.print")
-    def test_parse_with_plain_text_only(self, mock_print):
+    def test_parse_with_plain_text_only(self, mock_print: MagicMock) -> None:
         """Email with only plain text preserves it."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(html="", text="Plain text content only")
@@ -429,7 +388,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["raw_html"], "")
 
     @patch("builtins.print")
-    def test_parse_with_both_html_and_text(self, mock_print):
+    def test_parse_with_both_html_and_text(self, mock_print: MagicMock) -> None:
         """Email with both formats preserves both."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -442,7 +401,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["plain_text"], "Text version")
 
     @patch("builtins.print")
-    def test_sanitization_applied(self, mock_print):
+    def test_sanitization_applied(self, mock_print: MagicMock) -> None:
         """Privacy sanitization removes unsubscribe links."""
         mock_supabase = create_mock_supabase(return_data=[])
         html_with_unsubscribe = """
@@ -457,7 +416,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertNotIn("list-manage.com/unsubscribe", result["raw_html"])
 
     @patch("builtins.print")
-    def test_missing_subject_defaults(self, mock_print):
+    def test_missing_subject_defaults(self, mock_print: MagicMock) -> None:
         """Email without subject gets default."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(subject=None)
@@ -467,7 +426,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["subject"], "(No subject)")
 
     @patch("builtins.print")
-    def test_missing_date_handled(self, mock_print):
+    def test_missing_date_handled(self, mock_print: MagicMock) -> None:
         """Email with no date doesn't crash."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message()

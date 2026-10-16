@@ -11,7 +11,6 @@ cursor in place and the next refresh simply re-fetches the gap.
 
 import gzip
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -98,7 +97,7 @@ def save_snapshot(directory: Path, snapshot: Snapshot, saved_at: datetime) -> No
             file.write(
                 json.dumps(newsletter_to_row(newsletter), ensure_ascii=False) + "\n"
             )
-    os.replace(newsletters_temp, directory / NEWSLETTERS_FILE)
+    newsletters_temp.replace(directory / NEWSLETTERS_FILE)
 
     _write_json_atomically(
         directory / SOURCES_FILE,
@@ -129,4 +128,4 @@ def _write_json_atomically(path: Path, payload: object) -> None:
     temp_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    os.replace(temp_path, path)
+    temp_path.replace(path)

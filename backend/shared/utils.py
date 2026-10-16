@@ -1,5 +1,10 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from dateutil import parser as date_parser
+
+# The app reasons in Chicago calendar days; console and log timestamps use it too.
+CHICAGO_TIMEZONE = ZoneInfo("America/Chicago")
 
 
 def parse_date_string(date_str: str) -> str | None:
@@ -16,7 +21,7 @@ def parse_date_string(date_str: str) -> str | None:
 def print_summary(processed: int, skipped: int, failed: int) -> None:
     """Print processing summary."""
     print(f"\n{'=' * 60}")
-    print(f"[{datetime.now()}] Processing Complete!")
+    print(f"[{datetime.now(CHICAGO_TIMEZONE)}] Processing Complete!")
     print(f"{'=' * 60}")
     print(f"✓ Processed & Stored: {processed}")
     print(f"⊘ Skipped (duplicates): {skipped}")

@@ -12,6 +12,8 @@ import { POST as updateRulePOST } from '../../pages/api/notifications/update-rul
 import { createMockContext } from '../helpers';
 import { notificationsEnabled } from '../../lib/supabase';
 
+const upload = () => new File(['x'], 'upload.txt');
+
 describe('Notifications API Routes', () => {
   let mockSupabase: {
     from: ReturnType<typeof vi.fn>;
@@ -180,6 +182,19 @@ describe('Notifications API Routes', () => {
       expect(response.headers.get('Location')).toContain('error=Rule name is required');
     });
 
+    it('treats an uploaded File name as a missing name', async () => {
+      const locals = { user: { id: 'user-123' }, supabase: mockSupabase };
+      const fields = { delivery_frequency: 'daily', search_term: 'test' };
+      const missing = await createRulePOST(createMockContext({ locals, formData: fields }));
+      const withFile = await createRulePOST(
+        createMockContext({ locals, formData: { ...fields, name: upload() } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('error=Rule name is required');
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
     it('redirects with error if daily rule has no search term and no topics', async () => {
       const context = createMockContext({
         locals: { user: { id: 'user-123' } },
@@ -217,6 +232,18 @@ describe('Notifications API Routes', () => {
       expect(mockSupabase.from).toHaveBeenCalledWith('notification_rules');
       expect(mockSupabase.delete).toHaveBeenCalled();
       expect(mockSupabase.eq).toHaveBeenCalledWith('id', 'rule-456');
+    });
+
+    it('treats an uploaded File rule_id as a missing rule_id', async () => {
+      const locals = { user: { id: 'user-123' }, supabase: mockSupabase };
+      const missing = await deleteRulePOST(createMockContext({ locals, formData: {} }));
+      const withFile = await deleteRulePOST(
+        createMockContext({ locals, formData: { rule_id: upload() } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('error=Rule ID is required');
+      expect(mockSupabase.from).not.toHaveBeenCalled();
     });
   });
 
@@ -266,6 +293,19 @@ describe('Notifications API Routes', () => {
         topics: ['Crime'],
         delivery_frequency: 'weekly'
       }));
+    });
+
+    it('treats an uploaded File rule_id as a missing rule_id', async () => {
+      const locals = { user: { id: 'user-123' }, supabase: mockSupabase };
+      const fields = { name: 'Rule', topics: ['Crime'] };
+      const missing = await updateRulePOST(createMockContext({ locals, formData: fields }));
+      const withFile = await updateRulePOST(
+        createMockContext({ locals, formData: { ...fields, rule_id: upload() } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('error=Rule ID and name are required');
+      expect(mockSupabase.from).not.toHaveBeenCalled();
     });
 
     it('updates a rule successfully', async () => {

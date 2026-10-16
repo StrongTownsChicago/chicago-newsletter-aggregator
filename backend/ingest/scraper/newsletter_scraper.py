@@ -2,10 +2,12 @@
 Main newsletter scraper - fetches newsletter archives and individual newsletters.
 """
 
-import requests
-from bs4 import BeautifulSoup
 import time
 from typing import cast
+
+import requests
+from bs4 import BeautifulSoup
+
 from ingest.email.email_parser import clean_html_content
 from ingest.scraper.scraper_strategies import get_strategy_for_url
 
@@ -29,7 +31,7 @@ class NewsletterScraper:
                 response = self.session.get(url, timeout=30)
                 response.raise_for_status()
                 return cast(str, response.text)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
                     print(f"  ⚠ Archive fetch failed (attempt {attempt + 1}): {e}")
                     time.sleep(2**attempt)
@@ -81,7 +83,7 @@ class NewsletterScraper:
                     "archive_date_str": date_str,
                 }
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
                     print(f"  ⚠ Newsletter fetch failed (attempt {attempt + 1}): {e}")
                     time.sleep(2**attempt)

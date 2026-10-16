@@ -2,6 +2,7 @@
 
 import unittest
 from datetime import date
+from typing import ClassVar
 
 from analytics.lenses import Lens
 from analytics.records import NewsletterRecord, SourceRecord
@@ -34,7 +35,7 @@ def item(
 
 
 class TestBuildTopicNewsletters(unittest.TestCase):
-    def test_attaches_ward_readability_and_only_mentioned_topics(self):
+    def test_attaches_ward_readability_and_only_mentioned_topics(self) -> None:
         newsletters = [
             NewsletterRecord("a", date(2026, 9, 1), 1, "  Hello  ", "text"),
             NewsletterRecord("b", date(2026, 9, 2), None, "No source", "text"),
@@ -59,14 +60,14 @@ class TestBuildTopicNewsletters(unittest.TestCase):
 
 
 class TestGrouping(unittest.TestCase):
-    items = [
+    items: ClassVar = [
         item("a", "1", date(2026, 8, 1), topics={"schools": 2}),
         item("b", "2", date(2026, 8, 2), readable=False),
         item("c", "2", date(2026, 9, 2), topics={"schools": 2}),
         item("d", None, date(2026, 9, 3), topics={"schools": 2}),
     ]
 
-    def test_sending_wards_count_unreadable_newsletters_unless_asked(self):
+    def test_sending_wards_count_unreadable_newsletters_unless_asked(self) -> None:
         self.assertEqual(
             group_sending_wards_by_month(self.items),
             {"2026-08": {"1", "2"}, "2026-09": {"2"}},
@@ -76,12 +77,12 @@ class TestGrouping(unittest.TestCase):
             {"2026-08": {"1"}, "2026-09": {"2"}},
         )
 
-    def test_topic_wards_ignore_newsletters_without_a_ward(self):
+    def test_topic_wards_ignore_newsletters_without_a_ward(self) -> None:
         self.assertEqual(group_topic_wards(self.items), {"schools": {"1", "2"}})
 
 
 class TestSelectBroadCompleteMonths(unittest.TestCase):
-    def test_keeps_complete_months_with_enough_sending_wards(self):
+    def test_keeps_complete_months_with_enough_sending_wards(self) -> None:
         items = [
             item("a", "1", date(2026, 7, 1)),
             item("b", "1", date(2026, 8, 1)),
@@ -98,12 +99,12 @@ class TestSelectBroadCompleteMonths(unittest.TestCase):
 
 
 class TestHelpers(unittest.TestCase):
-    def test_list_months_ending_crosses_years(self):
+    def test_list_months_ending_crosses_years(self) -> None:
         self.assertEqual(
             list_months_ending("2026-02", 3), ["2025-12", "2026-01", "2026-02"]
         )
 
-    def test_topic_labels_keep_display_order(self):
+    def test_topic_labels_keep_display_order(self) -> None:
         topics = [
             Lens("b", "Bee", "", ("bee",)),
             Lens("a", "Ay", "", ("ay",)),

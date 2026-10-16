@@ -1,0 +1,38 @@
+[importlinter]
+root_packages =
+    analytics
+    config
+    ingest
+    models
+    notifications
+    processing
+    prompts
+    shared
+    utils
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = CLI scripts sit above ingestion, which sits above the services, which sit above the leaf packages
+type = layers
+layers =
+    utils
+    ingest
+    notifications | processing
+    analytics | config | models | prompts | shared
+# `|` also makes siblings independent: notifications never imports processing,
+# and no leaf package imports another.
+
+[importlinter:contract:analytics-pure]
+name = analytics is pure: no database, network, or LLM clients
+type = forbidden
+source_modules =
+    analytics
+forbidden_modules =
+    supabase
+    requests
+    openai
+    ollama
+    resend
+    imap_tools
+    dotenv
+    shared

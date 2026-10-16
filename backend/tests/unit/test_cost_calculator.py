@@ -5,9 +5,9 @@ Tests pricing data loading, cost calculation accuracy, and model lookup logic.
 """
 
 import json
-import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from utils.cost_calculator import (
     PricingData,
@@ -18,10 +18,12 @@ from utils.cost_calculator import (
 class TestCostCalculator(unittest.TestCase):
     """Test cost calculation functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Create temporary pricing file for tests."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.pricing_file = os.path.join(self.temp_dir, "test_pricing.json")
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        self.temp_dir = Path(temp_dir.name)
+        self.pricing_file = str(self.temp_dir / "test_pricing.json")
 
         # Create valid test pricing data
         test_pricing = {
@@ -49,40 +51,30 @@ class TestCostCalculator(unittest.TestCase):
             ],
         }
 
-        with open(self.pricing_file, "w") as f:
-            json.dump(test_pricing, f)
+        Path(self.pricing_file).write_text(json.dumps(test_pricing))
 
-    def tearDown(self):
-        """Clean up temporary files."""
-        if os.path.exists(self.pricing_file):
-            os.remove(self.pricing_file)
-        os.rmdir(self.temp_dir)
-
-    def test_load_pricing_data_valid(self):
+    def test_load_pricing_data_valid(self) -> None:
         """Test loading valid pricing file."""
         pricing = PricingData(self.pricing_file)
         self.assertEqual(pricing.version, "test-1.0")
         self.assertEqual(len(pricing.models), 2)
 
-    def test_load_pricing_data_invalid_json(self):
+    def test_load_pricing_data_invalid_json(self) -> None:
         """Test invalid JSON handling."""
-        invalid_file = os.path.join(self.temp_dir, "invalid.json")
-        with open(invalid_file, "w") as f:
-            f.write("{invalid json")
+        invalid_file = self.temp_dir / "invalid.json"
+        invalid_file.write_text("{invalid json")
 
         with self.assertRaises(json.JSONDecodeError):
-            PricingData(invalid_file)
+            PricingData(str(invalid_file))
 
-        os.remove(invalid_file)
-
-    def test_load_pricing_data_missing_file(self):
+    def test_load_pricing_data_missing_file(self) -> None:
         """Test missing pricing file."""
         with self.assertRaises(FileNotFoundError) as cm:
             PricingData("/nonexistent/path/pricing.json")
 
         self.assertIn("not found", str(cm.exception))
 
-    def test_get_model_pricing_exists(self):
+    def test_get_model_pricing_exists(self) -> None:
         """Test retrieving pricing for known model."""
         pricing_data = PricingData(self.pricing_file)
         model_pricing = pricing_data.get_model_pricing("gpt-5")
@@ -91,7 +83,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertEqual(model_pricing.input_cost_per_1m, 1.25)
         self.assertEqual(model_pricing.output_cost_per_1m, 10.00)
 
-    def test_get_model_pricing_not_found(self):
+    def test_get_model_pricing_not_found(self) -> None:
         """Test unknown model handling."""
         pricing_data = PricingData(self.pricing_file)
 
@@ -101,7 +93,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertIn("not found", str(cm.exception))
         self.assertIn("Available models", str(cm.exception))
 
-    def test_calculate_cost_basic(self):
+    def test_calculate_cost_basic(self) -> None:
         """Test simple cost calculation."""
         pricing_data = PricingData(self.pricing_file)
         model_pricing = pricing_data.get_model_pricing("gpt-5")
@@ -116,7 +108,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertAlmostEqual(result["output_cost"], 5.00, places=2)
         self.assertAlmostEqual(result["total_cost"], 6.25, places=2)
 
-    def test_calculate_cost_zero_tokens(self):
+    def test_calculate_cost_zero_tokens(self) -> None:
         """Test zero token handling."""
         pricing_data = PricingData(self.pricing_file)
         model_pricing = pricing_data.get_model_pricing("gpt-5")
@@ -127,7 +119,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertEqual(result["output_cost"], 0.0)
         self.assertEqual(result["total_cost"], 0.0)
 
-    def test_calculate_cost_precision(self):
+    def test_calculate_cost_precision(self) -> None:
         """Test floating point precision handling."""
         pricing_data = PricingData(self.pricing_file)
         model_pricing = pricing_data.get_model_pricing("gpt-5")
@@ -147,7 +139,7 @@ class TestCostCalculator(unittest.TestCase):
             places=6,
         )
 
-    def test_calculate_cost_negative_tokens(self):
+    def test_calculate_cost_negative_tokens(self) -> None:
         """Test invalid negative tokens."""
         pricing_data = PricingData(self.pricing_file)
         model_pricing = pricing_data.get_model_pricing("gpt-5")
@@ -157,7 +149,7 @@ class TestCostCalculator(unittest.TestCase):
 
         self.assertIn("cannot be negative", str(cm.exception))
 
-    def test_list_models_all(self):
+    def test_list_models_all(self) -> None:
         """Test listing all available models."""
         pricing_data = PricingData(self.pricing_file)
         models = pricing_data.list_models()
@@ -166,7 +158,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertIn("gpt-5", models)
         self.assertIn("claude-sonnet-4.5", models)
 
-    def test_list_models_by_provider(self):
+    def test_list_models_by_provider(self) -> None:
         """Test filtering models by provider."""
         pricing_data = PricingData(self.pricing_file)
 
@@ -178,7 +170,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertEqual(len(anthropic_models), 1)
         self.assertIn("claude-sonnet-4.5", anthropic_models)
 
-    def test_list_providers(self):
+    def test_list_providers(self) -> None:
         """Test listing all providers."""
         pricing_data = PricingData(self.pricing_file)
         providers = pricing_data.list_providers()
@@ -187,7 +179,7 @@ class TestCostCalculator(unittest.TestCase):
         self.assertIn("openai", providers)
         self.assertIn("anthropic", providers)
 
-    def test_load_pricing_data_missing_fields(self):
+    def test_load_pricing_data_missing_fields(self) -> None:
         """Test pricing data with missing required fields."""
         invalid_data = {
             "version": "test",
@@ -200,16 +192,13 @@ class TestCostCalculator(unittest.TestCase):
             ],
         }
 
-        invalid_file = os.path.join(self.temp_dir, "invalid_schema.json")
-        with open(invalid_file, "w") as f:
-            json.dump(invalid_data, f)
+        invalid_file = self.temp_dir / "invalid_schema.json"
+        invalid_file.write_text(json.dumps(invalid_data))
 
         with self.assertRaises(ValueError) as cm:
-            PricingData(invalid_file)
+            PricingData(str(invalid_file))
 
         self.assertIn("Missing required field", str(cm.exception))
-
-        os.remove(invalid_file)
 
 
 if __name__ == "__main__":

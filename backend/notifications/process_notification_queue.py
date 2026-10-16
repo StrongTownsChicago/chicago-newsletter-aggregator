@@ -14,14 +14,17 @@ Usage:
 
 import argparse
 import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from typing import Any, cast, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from shared.db import get_supabase_client
-from notifications.rule_matcher import get_pending_notifications_by_user
-from notifications.email_sender import send_digest, DigestType
+from datetime import datetime, timedelta
+from typing import Any, cast
+from zoneinfo import ZoneInfo
+
+from notifications.digest_config import DigestType
+from notifications.email_sender import send_digest
 from notifications.error_logger import log_notification_error
+from notifications.rule_matcher import get_pending_notifications_by_user
+from shared.db import get_supabase_client
 
 
 @dataclass
@@ -86,7 +89,7 @@ def _fetch_weekly_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]
 
         return notifications_by_user
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no notifications
         print(f"Error fetching weekly notifications: {e}")
         return {}
 
@@ -204,7 +207,7 @@ def process_digests(
                 # Record in history
                 # Extract content IDs (works for both newsletter_id and report_id)
                 content_ids = _extract_content_ids(notifications)
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
 
                 supabase.table("notification_history").insert(
                     {
@@ -227,7 +230,7 @@ def process_digests(
 
                 # Record skip in history (as failure, but with specific reason)
                 content_ids = _extract_content_ids(notifications)
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
                 supabase.table("notification_history").insert(
                     {
                         "user_id": user_id,
@@ -263,7 +266,7 @@ def process_digests(
                 _mark_notifications_failed(supabase, notifications, error_msg)
 
                 # Record failure in history
-                rule_ids = list(set([n["rule_id"] for n in notifications]))
+                rule_ids = list({n["rule_id"] for n in notifications})
 
                 supabase.table("notification_history").insert(
                     {

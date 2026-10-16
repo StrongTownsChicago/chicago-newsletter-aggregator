@@ -204,7 +204,9 @@ def _call_ollama(
                 )
                 time.sleep(wait_time)
             else:
-                raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
+                raise Exception(
+                    f"LLM call failed after {max_retries} attempts: {e}"
+                ) from e
 
     raise Exception("Unreachable code: all retry attempts exhausted")
 
@@ -308,6 +310,8 @@ def _call_openai(
                 )
                 time.sleep(wait_time)
             else:
-                raise Exception(f"LLM call failed after {max_retries} attempts: {e}")
+                raise Exception(
+                    f"LLM call failed after {max_retries} attempts: {e}"
+                ) from e
 
     raise Exception("Unreachable code: all retry attempts exhausted")

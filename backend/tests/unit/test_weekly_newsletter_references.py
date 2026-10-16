@@ -5,19 +5,19 @@ Unit tests for referenced newsletters in weekly digest emails.
 import unittest
 from unittest.mock import MagicMock, patch
 
-from notifications.email_sender import (
-    _fetch_newsletter_details,
-    _prepare_weekly_report_data,
-    _render_weekly_content_html,
-    _render_weekly_content_text,
+from notifications.digest_data import (
+    fetch_newsletter_details,
+    prepare_weekly_report_data,
 )
+from notifications.digest_html import _render_weekly_content_html
+from notifications.digest_text import _render_weekly_content_text
 
 
 class TestFetchNewsletterDetails(unittest.TestCase):
-    """Tests for _fetch_newsletter_details() function."""
+    """Tests for fetch_newsletter_details() function."""
 
-    @patch("notifications.email_sender.get_supabase_client")
-    def test_fetches_and_sorts_by_ward(self, mock_get_client):
+    @patch("notifications.digest_data.get_supabase_client")
+    def test_fetches_and_sorts_by_ward(self, mock_get_client: MagicMock) -> None:
         """Fetches newsletter details and sorts by ward number."""
         # Arrange
         mock_supabase = MagicMock()
@@ -48,7 +48,7 @@ class TestFetchNewsletterDetails(unittest.TestCase):
         mock_supabase.table.return_value.select.return_value.in_.return_value.execute.return_value = mock_response
 
         # Act
-        result = _fetch_newsletter_details(["nl-1", "nl-2", "nl-3"])
+        result = fetch_newsletter_details(["nl-1", "nl-2", "nl-3"])
 
         # Assert
         self.assertEqual(len(result), 3)
@@ -57,18 +57,18 @@ class TestFetchNewsletterDetails(unittest.TestCase):
         self.assertEqual(result[1]["ward_number"], 43)
         self.assertEqual(result[2]["ward_number"], 48)
 
-    @patch("notifications.email_sender.get_supabase_client")
-    def test_handles_empty_list(self, mock_get_client):
+    @patch("notifications.digest_data.get_supabase_client")
+    def test_handles_empty_list(self, mock_get_client: MagicMock) -> None:
         """Returns empty list for empty input."""
-        result = _fetch_newsletter_details([])
+        result = fetch_newsletter_details([])
         self.assertEqual(result, [])
 
 
 class TestPrepareWeeklyReportData(unittest.TestCase):
-    """Tests for _prepare_weekly_report_data() with newsletter references."""
+    """Tests for prepare_weekly_report_data() with newsletter references."""
 
-    @patch("notifications.email_sender._fetch_newsletter_details")
-    def test_includes_referenced_newsletters(self, mock_fetch):
+    @patch("notifications.digest_data.fetch_newsletter_details")
+    def test_includes_referenced_newsletters(self, mock_fetch: MagicMock) -> None:
         """Prepared data includes referenced newsletters."""
         # Arrange
         mock_fetch.return_value = [
@@ -93,7 +93,7 @@ class TestPrepareWeeklyReportData(unittest.TestCase):
         ]
 
         # Act
-        result = _prepare_weekly_report_data(notifications)
+        result = prepare_weekly_report_data(notifications)
 
         # Assert
         self.assertEqual(len(result), 1)
@@ -105,7 +105,7 @@ class TestPrepareWeeklyReportData(unittest.TestCase):
 class TestRenderWeeklyContentWithReferences(unittest.TestCase):
     """Tests for weekly content rendering with newsletter references."""
 
-    def test_html_includes_referenced_section(self):
+    def test_html_includes_referenced_section(self) -> None:
         """HTML output includes referenced newsletters section."""
         # Arrange
         prepared = [
@@ -137,7 +137,7 @@ class TestRenderWeeklyContentWithReferences(unittest.TestCase):
         self.assertIn("Ward 40 Updates", html)
         self.assertIn("/newsletter/nl-1", html)
 
-    def test_text_includes_referenced_section(self):
+    def test_text_includes_referenced_section(self) -> None:
         """Plain text output includes referenced newsletters section."""
         # Arrange
         prepared = [

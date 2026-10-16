@@ -8,7 +8,7 @@ def create_test_user(
     user_id: str | None = None,
     email: str = "test@example.com",
     notifications_enabled: bool = True,
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """Factory for creating test user profile data."""
     user = {
@@ -30,7 +30,7 @@ def create_test_rule(
     search_term: str | None = None,
     ward_numbers: list[int] | None = None,
     is_active: bool = True,
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """Factory for creating test notification rule data."""
     rule = {
@@ -53,7 +53,7 @@ def create_test_notification(
     rule_id: str | None = None,
     status: str = "pending",
     digest_batch_id: str = "2026-01-24",
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """Factory for creating test notification queue entry."""
     notification = {

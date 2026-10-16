@@ -30,7 +30,7 @@ def make_newsletter(
 
 
 class TestBuildNewsletterFact(unittest.TestCase):
-    def test_shapes_fact_without_body_text(self):
+    def test_shapes_fact_without_body_text(self) -> None:
         fact = build_newsletter_fact(
             make_newsletter("n1", date(2026, 1, 2)), ALDER, ["transportation"]
         )
@@ -51,7 +51,7 @@ class TestBuildNewsletterFact(unittest.TestCase):
         self.assertNotIn("relevance", fact)
         self.assertNotIn("topics", fact)
 
-    def test_missing_source_yields_null_ward_and_alder(self):
+    def test_missing_source_yields_null_ward_and_alder(self) -> None:
         fact = build_newsletter_fact(
             make_newsletter("n1", date(2026, 1, 2), None), None, []
         )
@@ -60,16 +60,16 @@ class TestBuildNewsletterFact(unittest.TestCase):
 
 
 class TestIsTextUnavailable(unittest.TestCase):
-    def test_flags_bodies_shorter_than_the_minimum(self):
+    def test_flags_bodies_shorter_than_the_minimum(self) -> None:
         self.assertTrue(is_text_unavailable(""))
         self.assertTrue(is_text_unavailable("word " * (MIN_EXTRACTED_WORDS - 1)))
 
-    def test_bodies_at_the_minimum_are_available(self):
+    def test_bodies_at_the_minimum_are_available(self) -> None:
         self.assertFalse(is_text_unavailable("word " * MIN_EXTRACTED_WORDS))
 
 
 class TestBuildNewsletterFacts(unittest.TestCase):
-    def test_orders_by_date_and_joins_sources(self):
+    def test_orders_by_date_and_joins_sources(self) -> None:
         facts = build_newsletter_facts(
             [
                 make_newsletter("late", date(2026, 2, 1)),
@@ -86,7 +86,7 @@ class TestBuildNewsletterFacts(unittest.TestCase):
 
 
 class TestBuildSourceCoverage(unittest.TestCase):
-    def test_reports_span_and_count_including_sources_without_newsletters(self):
+    def test_reports_span_and_count_including_sources_without_newsletters(self) -> None:
         coverage = build_source_coverage(
             [QUIET, ALDER],
             [
@@ -111,7 +111,7 @@ class TestBuildSourceCoverage(unittest.TestCase):
 
 
 class TestBuildMetadata(unittest.TestCase):
-    def test_summarizes_counts_and_span(self):
+    def test_summarizes_counts_and_span(self) -> None:
         generated_at = datetime(2026, 10, 11, 9, 0)
         metadata = build_metadata(
             [
@@ -130,7 +130,7 @@ class TestBuildMetadata(unittest.TestCase):
         self.assertEqual(metadata["term_count"], 42)
         self.assertEqual(metadata["generated_at"], generated_at.isoformat())
 
-    def test_empty_dataset_has_null_span(self):
+    def test_empty_dataset_has_null_span(self) -> None:
         metadata = build_metadata([], [], 0, 20, datetime(2026, 1, 1))
         self.assertIsNone(metadata["first_date"])
         self.assertIsNone(metadata["last_date"])

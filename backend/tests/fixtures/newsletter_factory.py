@@ -16,7 +16,7 @@ def create_test_newsletter(
     summary: str | None = None,
     from_email: str | None = None,
     to_email: str | None = None,
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """
     Factory for creating test newsletter data.
@@ -64,7 +64,7 @@ def create_test_source(
     ward_number: int | None = 1,
     source_type: str = "alderman",
     newsletter_archive_url: str | None = None,
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """Factory for creating test source data."""
     source = {
@@ -81,7 +81,7 @@ def create_test_source(
 def create_test_email_mapping(
     email_pattern: str = "%@testward.org",
     source_id: int = 1,
-    **overrides,
+    **overrides: Any,
 ) -> dict[str, Any]:
     """Factory for creating test email source mapping."""
     mapping = {

@@ -5,6 +5,7 @@ Tests token analysis for newsletter processing and weekly report workflows.
 """
 
 import unittest
+
 from utils.newsletter_token_analyzer import (
     analyze_newsletter_tokens,
     analyze_weekly_report_tokens,
@@ -14,7 +15,7 @@ from utils.newsletter_token_analyzer import (
 class TestNewsletterTokenAnalyzer(unittest.TestCase):
     """Test newsletter token analysis functionality."""
 
-    def test_analyze_newsletter_tokens_basic(self):
+    def test_analyze_newsletter_tokens_basic(self) -> None:
         """Test basic newsletter analysis."""
         newsletter = {
             "id": "test-123",
@@ -41,7 +42,7 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
         )
         self.assertEqual(analysis.total_tokens, expected_total)
 
-    def test_analyze_newsletter_tokens_truncation(self):
+    def test_analyze_newsletter_tokens_truncation(self) -> None:
         """Test content truncation handling."""
         # Create newsletter with >100k chars
         long_text = "a" * 150000
@@ -55,7 +56,7 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
         analysis = analyze_newsletter_tokens(newsletter, "gpt-5", max_chars=100000)
         self.assertIsNotNone(analysis)
 
-    def test_analyze_newsletter_tokens_empty_content(self):
+    def test_analyze_newsletter_tokens_empty_content(self) -> None:
         """Test newsletter with no plain_text."""
         newsletter = {
             "subject": "Empty Newsletter",
@@ -68,7 +69,7 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
         self.assertIsNotNone(analysis)
         self.assertGreater(analysis.total_tokens, 0)
 
-    def test_analyze_newsletter_tokens_schema_overhead(self):
+    def test_analyze_newsletter_tokens_schema_overhead(self) -> None:
         """Test schema overhead for gpt-oss models."""
         newsletter = {
             "subject": "Test",
@@ -86,7 +87,7 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
             analysis_gpt_oss.total_input_tokens, analysis_gpt4o.total_input_tokens
         )
 
-    def test_analyze_weekly_report_tokens_basic(self):
+    def test_analyze_weekly_report_tokens_basic(self) -> None:
         """Test basic weekly report analysis."""
         newsletters = [
             {
@@ -129,7 +130,7 @@ class TestNewsletterTokenAnalyzer(unittest.TestCase):
         # Newsletter count should match
         self.assertEqual(analysis.newsletter_count, 2)
 
-    def test_analyze_weekly_report_tokens_totals(self):
+    def test_analyze_weekly_report_tokens_totals(self) -> None:
         """Test weekly report token totals calculation."""
         newsletters = [
             {

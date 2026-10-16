@@ -33,7 +33,7 @@ def item(
 
 
 class TestPickTopicExamples(unittest.TestCase):
-    def test_prefers_most_mentions_and_one_newsletter_per_ward(self):
+    def test_prefers_most_mentions_and_one_newsletter_per_ward(self) -> None:
         items = [
             item("a", "1", date(2026, 9, 5), {"schools": 2}),
             item("b", "1", date(2026, 9, 6), {"schools": 9}),
@@ -46,7 +46,7 @@ class TestPickTopicExamples(unittest.TestCase):
         # Ties on mentions go to the earlier newsletter.
         self.assertEqual([example.id for example in examples], ["b", "d", "c"])
 
-    def test_prefers_newsletters_not_shown_for_another_topic(self):
+    def test_prefers_newsletters_not_shown_for_another_topic(self) -> None:
         items = [
             item("roundup", "1", date(2026, 9, 1), {"schools": 9}),
             item("short", "2", date(2026, 9, 2), {"schools": 2}),
@@ -63,7 +63,7 @@ class TestPickTopicExamples(unittest.TestCase):
 
 
 class TestSummarizeMonthTopics(unittest.TestCase):
-    def test_orders_topics_by_ward_reach_then_display_order(self):
+    def test_orders_topics_by_ward_reach_then_display_order(self) -> None:
         items = [
             item("a", "1", date(2026, 9, 1), {"parks": 2, "schools": 2}),
             item("b", "2", date(2026, 9, 1), {"schools": 2}),
@@ -84,7 +84,7 @@ class TestSummarizeMonthTopics(unittest.TestCase):
 
 
 class TestBuildMonthlyReport(unittest.TestCase):
-    def test_counts_sending_and_readable_wards(self):
+    def test_counts_sending_and_readable_wards(self) -> None:
         items = [
             item("a", "1", date(2026, 9, 1), {"schools": 2}),
             item("b", "10", date(2026, 9, 2), readable=False),
@@ -99,7 +99,7 @@ class TestBuildMonthlyReport(unittest.TestCase):
         self.assertEqual(report["topics"][0]["wards"], 1)
         self.assertNotIn("rising", report)
 
-    def test_builds_newest_month_first(self):
+    def test_builds_newest_month_first(self) -> None:
         items = [
             item("a", "1", date(2026, 8, 1)),
             item("b", "1", date(2026, 9, 1)),

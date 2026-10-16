@@ -70,7 +70,7 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
 
         return users_rules
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and return no rules
         print(f"⚠ Error querying weekly rules: {e}")
         return {}
 
@@ -133,7 +133,7 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
             f"✓ Found {len(topic_to_report)} reports: {', '.join(topic_to_report.keys())}\n"
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  database boundary: log and queue nothing
         print(f"✗ Error fetching reports: {e}")
         return {"queued": 0, "skipped": 0, "users": 0}
 
@@ -175,7 +175,7 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
                     stats["queued"] += 1
                     user_queued += 1
 
-                except Exception:
+                except Exception:  # noqa: BLE001  per-notification boundary: duplicates are expected
                     # Likely unique constraint violation (already queued)
                     # This is fine - just skip
                     stats["skipped"] += 1

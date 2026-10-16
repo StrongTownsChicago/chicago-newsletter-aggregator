@@ -1,6 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
+import { formText } from "../../../lib/form-data";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -14,7 +15,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   const formData = await request.formData();
-  const ruleId = formData.get("rule_id")?.toString();
+  const ruleId = formText(formData, "rule_id");
 
   if (!ruleId) {
     return redirect("/preferences?error=Rule ID is required");

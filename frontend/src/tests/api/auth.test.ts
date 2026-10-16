@@ -1,10 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Session, AuthError } from '@supabase/supabase-js';
+import { AuthError } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
-type MockAuthResponse = Promise<{
-  data: { session: Partial<Session> | null; user: unknown | null };
-  error: Partial<AuthError> | null;
-}>;
+const mockUser: User = {
+  id: '123',
+  app_metadata: {},
+  user_metadata: {},
+  aud: 'authenticated',
+  created_at: '2026-01-01T00:00:00Z',
+};
+
+const mockSession: Session = {
+  access_token: 'access',
+  refresh_token: 'refresh',
+  expires_in: 3600,
+  token_type: 'bearer',
+  user: mockUser,
+};
+
+const failedSignIn = {
+  data: { session: null, user: null },
+  error: new AuthError('Invalid credentials'),
+};
 
 // Mock Supabase
 vi.mock('../../lib/supabase', () => ({
@@ -25,11 +42,13 @@ import { createMockContext } from '../helpers';
 import { supabase, notificationsEnabled } from '../../lib/supabase';
 import { WELCOME_PATH } from '../../lib/onboarding';
 
+const upload = () => new File(['x'], 'upload.txt');
+
 const successfulSignIn = () =>
   vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-    data: { session: { access_token: 'access', refresh_token: 'refresh' }, user: {} },
+    data: { session: mockSession, user: mockUser },
     error: null,
-  } as MockAuthResponse);
+  });
 
 describe('Auth API Routes', () => {
   beforeEach(() => {
@@ -40,9 +59,9 @@ describe('Auth API Routes', () => {
   describe('POST /api/auth/signin', () => {
     it('redirects to / on successful signin', async () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { session: { access_token: 'access', refresh_token: 'refresh' }, user: {} },
+        data: { session: mockSession, user: mockUser },
         error: null,
-      } as MockAuthResponse);
+      });
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'password123' },
@@ -84,10 +103,7 @@ describe('Auth API Routes', () => {
     );
 
     it('preserves next when signin fails so the user can retry', async () => {
-      vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { session: null, user: null },
-        error: { message: 'Invalid credentials' },
-      } as MockAuthResponse);
+      vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue(failedSignIn);
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'wrong', next: WELCOME_PATH },
@@ -102,10 +118,7 @@ describe('Auth API Routes', () => {
     });
 
     it('redirects to /login with error on failure', async () => {
-      vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { session: null, user: null },
-        error: { message: 'Invalid credentials' },
-      } as MockAuthResponse);
+      vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue(failedSignIn);
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'wrong' },
@@ -119,6 +132,17 @@ describe('Auth API Routes', () => {
     });
 
 
+
+    it('treats an uploaded File as a missing field', async () => {
+      const missing = await signinPOST(createMockContext({ formData: { password: 'password123' } }));
+      const withFile = await signinPOST(
+        createMockContext({ formData: { email: upload(), password: 'password123' } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('/login?');
+      expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    });
 
     it("returns 404 if notifications are disabled", async () => {
       vi.mocked(notificationsEnabled).mockReturnValue(false);
@@ -135,12 +159,9 @@ describe('Auth API Routes', () => {
   describe('POST /api/auth/signup', () => {
     it('redirects to the welcome page on successful signup with immediate session', async () => {
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
-        data: { 
-          user: { id: '123' },
-          session: { access_token: 'access', refresh_token: 'refresh' } 
-        },
+        data: { user: mockUser, session: mockSession },
         error: null,
-      } as MockAuthResponse);
+      });
 
       const context = createMockContext({
         formData: { email: 'test@example.com', password: 'password123' },
@@ -155,12 +176,9 @@ describe('Auth API Routes', () => {
 
     it('redirects with message when email confirmation is required', async () => {
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
-        data: { 
-          user: { id: '123' },
-          session: null 
-        },
+        data: { user: mockUser, session: null },
         error: null,
-      } as MockAuthResponse);
+      });
 
       const context = createMockContext({
         formData: { email: "test@example.com", password: "password123" },
@@ -176,9 +194,9 @@ describe('Auth API Routes', () => {
 
     it("asks Supabase to send confirmed users to login with the welcome page as next", async () => {
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
-        data: { user: { id: '123' }, session: null },
+        data: { user: mockUser, session: null },
         error: null,
-      } as MockAuthResponse);
+      });
 
       const context = createMockContext({
         formData: { email: "test@example.com", password: "password123" },
@@ -193,6 +211,17 @@ describe('Auth API Routes', () => {
       expect(redirectTo.origin).toBe("http://localhost:4321");
       expect(redirectTo.pathname).toBe("/login");
       expect(redirectTo.searchParams.get("next")).toBe(WELCOME_PATH);
+    });
+
+    it('treats an uploaded File as a missing field', async () => {
+      const missing = await signupPOST(createMockContext({ formData: { email: 'test@example.com' } }));
+      const withFile = await signupPOST(
+        createMockContext({ formData: { email: 'test@example.com', password: upload() } }),
+      );
+
+      expect(withFile.headers.get('Location')).toBe(missing.headers.get('Location'));
+      expect(withFile.headers.get('Location')).toContain('error=Email and password are required');
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
     });
 
     it("redirects to /signup with error on validation failure (short password)", async () => {

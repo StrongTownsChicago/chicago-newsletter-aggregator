@@ -2,6 +2,7 @@
 
 import unittest
 from datetime import UTC, date, datetime
+from typing import Any
 
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.snapshot import (
@@ -15,7 +16,9 @@ from analytics.snapshot import (
 )
 
 
-def make_newsletter(newsletter_id: str, day: date, subject: str = "Update"):
+def make_newsletter(
+    newsletter_id: str, day: date, subject: str = "Update"
+) -> NewsletterRecord:
     return NewsletterRecord(
         id=newsletter_id,
         received_date=day,
@@ -26,7 +29,7 @@ def make_newsletter(newsletter_id: str, day: date, subject: str = "Update"):
 
 
 class TestRowRoundTrip(unittest.TestCase):
-    def test_newsletter_round_trips_without_shifting_the_date(self):
+    def test_newsletter_round_trips_without_shifting_the_date(self) -> None:
         newsletter = NewsletterRecord(
             id="abc",
             received_date=date(2026, 9, 30),
@@ -38,7 +41,7 @@ class TestRowRoundTrip(unittest.TestCase):
         self.assertEqual(row["received_date"], "2026-09-30")
         self.assertEqual(newsletter_from_row(row), newsletter)
 
-    def test_newsletter_from_row_tolerates_missing_optional_fields(self):
+    def test_newsletter_from_row_tolerates_missing_optional_fields(self) -> None:
         newsletter = newsletter_from_row(
             {"id": 5, "received_date": "2026-01-02", "source_id": None}
         )
@@ -47,14 +50,14 @@ class TestRowRoundTrip(unittest.TestCase):
         self.assertEqual(newsletter.subject, "")
         self.assertEqual(newsletter.plain_text, "")
 
-    def test_newsletter_from_row_ignores_topics_saved_by_older_snapshots(self):
+    def test_newsletter_from_row_ignores_topics_saved_by_older_snapshots(self) -> None:
         newsletter = newsletter_from_row(
             {"id": "a", "received_date": "2026-01-02", "topics": ["bike_lanes"]}
         )
         self.assertEqual(newsletter.id, "a")
         self.assertNotIn("topics", newsletter_to_row(newsletter))
 
-    def test_source_round_trips(self):
+    def test_source_round_trips(self) -> None:
         for source in (
             SourceRecord(1, "Ada", "1", "alderman"),
             SourceRecord(51, "CTA", None, "agency"),
@@ -63,13 +66,13 @@ class TestRowRoundTrip(unittest.TestCase):
 
 
 class TestMergeNewsletters(unittest.TestCase):
-    def test_fetched_rows_replace_existing_rows_with_the_same_id(self):
+    def test_fetched_rows_replace_existing_rows_with_the_same_id(self) -> None:
         existing = [make_newsletter("a", date(2026, 1, 1), "Old subject")]
         updates = [make_newsletter("a", date(2026, 1, 1), "New subject")]
         merged = merge_newsletters(existing, updates)
         self.assertEqual([item.subject for item in merged], ["New subject"])
 
-    def test_keeps_existing_rows_and_sorts_by_date_then_id(self):
+    def test_keeps_existing_rows_and_sorts_by_date_then_id(self) -> None:
         existing = [
             make_newsletter("b", date(2026, 2, 1)),
             make_newsletter("z", date(2026, 1, 1)),
@@ -80,26 +83,26 @@ class TestMergeNewsletters(unittest.TestCase):
 
 
 class TestCursor(unittest.TestCase):
-    def test_newest_created_at_parses_supabase_timestamps(self):
-        rows = [
+    def test_newest_created_at_parses_supabase_timestamps(self) -> None:
+        rows: list[dict[str, Any]] = [
             {"created_at": "2026-10-12T01:02:03.12345+00:00"},
             {"created_at": "2026-10-13T00:00:00+00:00"},
             {"created_at": None},
         ]
         self.assertEqual(newest_created_at(rows), datetime(2026, 10, 13, tzinfo=UTC))
 
-    def test_newest_created_at_is_none_without_timestamps(self):
+    def test_newest_created_at_is_none_without_timestamps(self) -> None:
         self.assertIsNone(newest_created_at([]))
         self.assertIsNone(newest_created_at([{"id": 1}]))
 
-    def test_advance_cursor_moves_forward(self):
+    def test_advance_cursor_moves_forward(self) -> None:
         current = datetime(2026, 10, 11, tzinfo=UTC)
         rows = [{"created_at": "2026-10-12T00:00:00+00:00"}]
         self.assertEqual(
             advance_cursor(current, rows), datetime(2026, 10, 12, tzinfo=UTC)
         )
 
-    def test_advance_cursor_never_moves_backwards(self):
+    def test_advance_cursor_never_moves_backwards(self) -> None:
         current = datetime(2026, 10, 11, tzinfo=UTC)
         # Rows from the overlap window are older than the cursor.
         rows = [{"created_at": "2026-10-10T12:00:00+00:00"}]

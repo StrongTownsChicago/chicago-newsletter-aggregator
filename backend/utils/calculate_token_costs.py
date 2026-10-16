@@ -23,22 +23,23 @@ Usage:
 
 import argparse
 import sys
-from typing import Any
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from shared.db import get_supabase_client
 from utils.cost_calculator import PricingData
+from utils.cost_report_generator import (
+    generate_combined_text_report,
+    generate_comparison_report,
+    generate_csv_report,
+    generate_json_report,
+    generate_text_report,
+)
 from utils.newsletter_token_analyzer import (
     analyze_newsletter_tokens,
     analyze_weekly_report_tokens,
-)
-from utils.cost_report_generator import (
-    generate_text_report,
-    generate_json_report,
-    generate_csv_report,
-    generate_comparison_report,
-    generate_combined_text_report,
 )
 
 
@@ -99,7 +100,7 @@ def fetch_newsletters(
         if not isinstance(nl, dict):
             continue
         nl_dict: dict[str, Any] = dict(nl)
-        if "sources" in nl_dict and nl_dict["sources"]:
+        if nl_dict.get("sources"):
             source = nl_dict["sources"]
             # Type narrow: source should be a dict from the join
             if isinstance(source, dict):
@@ -122,7 +123,7 @@ def get_iso_week_id(date_str: str) -> str:
     Returns:
         Week ID string (e.g., "2026-W05")
     """
-    date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    date = datetime.fromisoformat(date_str)
     year, week, _ = date.isocalendar()
     return f"{year}-W{week:02d}"
 
@@ -232,7 +233,7 @@ Examples:
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001  CLI: report any load error and exit
         print(f"Error loading pricing data: {e}")
         sys.exit(1)
 
@@ -387,7 +388,7 @@ Examples:
 
             report_data = generate_json_report(analyses, model_pricing)
             # TODO: Add weekly data to JSON report
-            with open(args.output_json, "w") as f:
+            with Path(args.output_json).open("w") as f:
                 json.dump(report_data, f, indent=2)
             print(f"\nJSON report saved to: {args.output_json}")
 
@@ -395,7 +396,7 @@ Examples:
         if args.output_csv:
             csv_data = generate_csv_report(analyses, model_pricing)
             # TODO: Add weekly data to CSV report
-            with open(args.output_csv, "w") as f:
+            with Path(args.output_csv).open("w") as f:
                 f.write(csv_data)
             print(f"CSV report saved to: {args.output_csv}")
 

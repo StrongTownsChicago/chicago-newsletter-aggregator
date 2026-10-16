@@ -5,7 +5,7 @@ from typing import Any
 from unittest.mock import Mock
 
 
-def create_mock_supabase(return_data: list[dict[str, Any]] | None = None):
+def create_mock_supabase(return_data: list[dict[str, Any]] | None = None) -> Mock:
     """
     Create a mocked Supabase client with chainable query builder.
 
@@ -40,7 +40,7 @@ def create_mock_supabase(return_data: list[dict[str, Any]] | None = None):
     return mock
 
 
-def create_mock_ollama_client(response_content: str = '{"topics": []}'):
+def create_mock_ollama_client(response_content: str = '{"topics": []}') -> Mock:
     """
     Create a mocked Ollama client.
 
@@ -57,7 +57,7 @@ def create_mock_ollama_client(response_content: str = '{"topics": []}'):
     return mock_client
 
 
-def create_mock_openai_client(response_content: str = '{"topics": []}'):
+def create_mock_openai_client(response_content: str = '{"topics": []}') -> Mock:
     """
     Create a mocked OpenAI client.
 
@@ -81,11 +81,11 @@ def create_mock_mail_message(
     uid: str = "test_123",
     from_: str = "alderman@ward1.org",
     subject: str = "Test Newsletter",
-    date=None,
+    date: datetime | None = None,
     html: str = "<html><body>Test content</body></html>",
     text: str = "Test content",
     to: list[str] | None = None,
-):
+) -> Mock:
     """Create a mocked imap_tools MailMessage object."""
     msg = Mock()
     msg.uid = uid
@@ -102,7 +102,7 @@ def create_mock_requests_response(
     status_code: int = 200,
     text: str = "<html>Content</html>",
     raise_error: Exception | None = None,
-):
+) -> Mock:
     """Create a mocked requests Response object."""
     mock_response = Mock()
     mock_response.status_code = status_code

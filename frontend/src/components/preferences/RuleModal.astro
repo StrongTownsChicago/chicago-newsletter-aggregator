@@ -1,0 +1,296 @@
+---
+/** The add/edit rule modal. Its behaviour is wired by scripts/rule-modal.ts. */
+import { STARTER_RULE } from '../../lib/onboarding';
+import { TOPIC_CATEGORIES } from '../../lib/topics';
+import { humanizeIdentifier } from '../../lib/format';
+
+interface Props {
+  /** Opens the modal in its onboarding (starter rule) state. */
+  isWelcome: boolean;
+  availableWards: string[];
+}
+
+const { isWelcome, availableWards } = Astro.props;
+---
+
+<div
+  id="ruleModal"
+  data-starter-rule={isWelcome ? JSON.stringify(STARTER_RULE) : undefined}
+  class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <!-- Modal Header -->
+    <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+      <h3 id="modalTitle" class="text-2xl font-bold text-gray-900">Add Notification Rule</h3>
+      <p id="modalSubtitle" class="text-sm text-gray-600 mt-1">Configure when you want to receive email notifications</p>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="overflow-y-auto flex-1 px-6 py-5">
+      <form id="ruleForm" method="POST" enctype="application/x-www-form-urlencoded" class="space-y-6">
+        <input type="hidden" id="ruleId" name="rule_id" />
+
+        <div>
+          <label for="ruleName" class="block text-sm font-semibold text-gray-900 mb-2">
+            Rule Name
+          </label>
+          <input
+            type="text"
+            id="ruleName"
+            name="name"
+            required
+            placeholder="e.g., Housing and Zoning Updates"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+          />
+        </div>
+
+        <!-- Notification Type Selection -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-900 mb-3">
+            Notification Type
+          </label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Daily Digest Card -->
+            <label class="relative flex flex-col p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:bg-blue-50 hover:border-blue-300 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
+              <input
+                type="radio"
+                name="notification_type"
+                value="daily"
+                checked
+                class="sr-only peer"
+              />
+              <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span class="text-base font-semibold text-gray-900">Daily Digest</span>
+              </div>
+              <p class="text-sm text-gray-600 mb-2">
+                Get notified when newsletters match your interests
+              </p>
+              <ul class="text-xs text-gray-500 space-y-1">
+                <li>✓ Filter by topics, keywords, or wards</li>
+                <li>✓ Receive emails as newsletters arrive</li>
+              </ul>
+            </label>
+
+            <!-- Weekly Summary Card -->
+            <label class="relative flex flex-col p-4 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:bg-purple-50 hover:border-purple-300 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
+              <input
+                type="radio"
+                name="notification_type"
+                value="weekly"
+                class="sr-only peer"
+              />
+              <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span class="text-base font-semibold text-gray-900">Weekly Summary</span>
+              </div>
+              <p class="text-sm text-gray-600 mb-2">
+                Get weekly topic reports with citywide activity
+              </p>
+              <ul class="text-xs text-gray-500 space-y-1">
+                <li>✓ Select topics to track</li>
+                <li>✓ Receive summaries every Monday</li>
+              </ul>
+            </label>
+          </div>
+        </div>
+
+        <!-- Daily Options Section -->
+        <div id="dailyOptionsSection">
+          <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-3">
+              Match newsletters by (choose one or both)
+            </label>
+
+            <!-- Search Term Input -->
+            <div class="mb-4">
+              <label for="searchTerm" class="block text-sm font-medium text-gray-700 mb-2">
+                Search Phrase (optional)
+              </label>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  id="searchTerm"
+                  name="search_term"
+                  placeholder="e.g., CTA, housing, zoning"
+                  maxlength="100"
+                  class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                />
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                Notify if newsletter contains this exact phrase (case-insensitive)
+              </p>
+            </div>
+
+            <!-- Topics (optional for daily) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">
+                Topics (optional)
+              </label>
+              <div class="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+                {Object.entries(TOPIC_CATEGORIES).map(([category, topics]) => (
+                  <div class="bg-white rounded-lg p-4 border border-gray-200">
+                    <p class="font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
+                      <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                      </svg>
+                      {category}
+                    </p>
+                    <div class="space-y-2 ml-1">
+                      {topics.map((topic) => (
+                        <label class="flex items-center hover:bg-blue-50 p-2 rounded-md cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            name="topics"
+                            value={topic}
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Options Section -->
+        <div id="weeklyOptionsSection" class="hidden">
+          <div>
+            <label class="block text-sm font-semibold text-gray-900 mb-3">
+              Select Topics (at least one required)
+            </label>
+            <div class="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+              {Object.entries(TOPIC_CATEGORIES).map(([category, topics]) => (
+                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                  <p class="font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    {category}
+                  </p>
+                  <div class="space-y-2 ml-1">
+                    {topics.map((topic) => (
+                      <label class="flex items-center hover:bg-purple-50 p-2 rounded-md cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          name="topics"
+                          value={topic}
+                          class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        />
+                        <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <!-- Informational callout -->
+          <div class="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+              </svg>
+              <div>
+                <p class="text-sm font-semibold text-purple-900 mb-1">
+                  About Weekly Summaries
+                </p>
+                <p class="text-sm text-purple-800">
+                  Weekly summaries provide citywide overviews of activity for your selected topics.
+                  They include newsletters from all wards and are delivered every Monday morning.
+                </p>
+                <p class="text-xs text-purple-700 mt-2">
+                  💡 Want ward-specific updates? Use Daily Digest with a ward filter instead.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ward Filter (Daily Only) -->
+        <div id="wardFilterSection" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-semibold text-gray-900">
+              Filter by Ward (Optional)
+            </label>
+            <button
+              type="button"
+              id="toggleWardsBtn"
+              class="text-sm text-blue-600 hover:text-blue-800 font-medium focus:outline-none"
+            >
+              Show Wards
+            </button>
+          </div>
+
+          <div id="wardSelectionContainer" class="hidden mt-3">
+            <p class="text-xs text-gray-500 mb-3">
+              Only receive notifications for newsletters from specific wards. If none selected, all wards are included.
+            </p>
+            <div class="grid grid-cols-5 sm:grid-cols-8 gap-2">
+              {availableWards.map((ward) => (
+                <label class="flex items-center justify-center p-2 rounded border border-gray-200 bg-white hover:bg-blue-50 cursor-pointer transition-colors text-sm">
+                  <input
+                    type="checkbox"
+                    name="wards"
+                    value={ward}
+                    class="sr-only peer"
+                  />
+                  <span class="text-gray-700 peer-checked:text-blue-600 peer-checked:font-bold">
+                    {ward}
+                  </span>
+                  <div class="absolute inset-0 border-2 border-transparent peer-checked:border-blue-500 rounded pointer-events-none"></div>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id="isActive"
+              name="is_active"
+              checked
+              class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-0.5"
+            />
+            <div>
+              <span class="text-sm font-semibold text-gray-900 block">Enable this rule</span>
+              <span class="text-xs text-gray-600">Receive notifications when newsletters match this rule</span>
+            </div>
+          </label>
+        </div>
+      </form>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+      <button
+        type="button"
+        id="cancelBtn"
+        class="flex-1 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-2.5 px-4 rounded-lg transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        form="ruleForm"
+        class="flex-1 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors shadow-sm"
+      >
+        Save Rule
+      </button>
+    </div>
+  </div>
+</div>

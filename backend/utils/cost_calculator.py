@@ -6,7 +6,6 @@ Supports cost comparisons across multiple models.
 """
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,13 +44,13 @@ class PricingData:
             backend_dir = Path(__file__).parent.parent
             pricing_file = str(backend_dir / "config" / "llm_pricing.json")
 
-        if not os.path.exists(pricing_file):
+        if not Path(pricing_file).exists():
             raise FileNotFoundError(
                 f"Pricing file not found: {pricing_file}\n"
                 f"Please create backend/config/llm_pricing.json with model pricing data."
             )
 
-        with open(pricing_file) as f:
+        with Path(pricing_file).open() as f:
             data = json.load(f)
 
         self.version = data.get("version", "unknown")
@@ -72,7 +71,7 @@ class PricingData:
                 )
                 self.models[pricing.model] = pricing
             except KeyError as e:
-                raise ValueError(f"Missing required field in pricing data: {e}")
+                raise ValueError(f"Missing required field in pricing data: {e}") from e
 
     def get_model_pricing(self, model_name: str) -> ModelPricing:
         """

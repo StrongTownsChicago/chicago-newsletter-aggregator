@@ -8,8 +8,8 @@ archive page formats (MailChimp, generic).
 import unittest
 
 from ingest.scraper.scraper_strategies import (
-    MailChimpArchiveStrategy,
     GenericListStrategy,
+    MailChimpArchiveStrategy,
     get_strategy_for_url,
 )
 
@@ -17,7 +17,7 @@ from ingest.scraper.scraper_strategies import (
 class TestMailChimpArchiveStrategy(unittest.TestCase):
     """Tests for MailChimpArchiveStrategy."""
 
-    def test_extract_newsletters_basic(self):
+    def test_extract_newsletters_basic(self) -> None:
         """Extracts title, url, date from MailChimp archive HTML."""
         html = """
         <ul id="archive-list">
@@ -36,7 +36,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
         self.assertEqual(result[0]["title"], "January Update")
         self.assertIn("mailchi.mp", result[0]["url"])
 
-    def test_extract_date_from_context(self):
+    def test_extract_date_from_context(self) -> None:
         """Parses date from '12/23/2025 - Title' format."""
         html = """
         <ul id="archive-list">
@@ -52,7 +52,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["date_str"], "12/23/2025")
 
-    def test_skips_non_campaign_items(self):
+    def test_skips_non_campaign_items(self) -> None:
         """Only extracts links within li.campaign elements."""
         html = """
         <ul id="archive-list">
@@ -72,7 +72,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["title"], "Newsletter 1")
 
-    def test_handles_missing_date(self):
+    def test_handles_missing_date(self) -> None:
         """Date extraction fails gracefully, returns empty string."""
         html = """
         <ul id="archive-list">
@@ -87,7 +87,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
 
         self.assertEqual(result[0]["date_str"], "")
 
-    def test_handles_missing_title(self):
+    def test_handles_missing_title(self) -> None:
         """Uses link text when title attribute missing."""
         html = """
         <ul id="archive-list">
@@ -102,7 +102,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
 
         self.assertEqual(result[0]["title"], "Link Text")
 
-    def test_empty_archive_returns_empty(self):
+    def test_empty_archive_returns_empty(self) -> None:
         """No newsletters found returns empty list."""
         html = """
         <ul id="archive-list">
@@ -114,7 +114,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
 
         self.assertEqual(result, [])
 
-    def test_malformed_html_handled(self):
+    def test_malformed_html_handled(self) -> None:
         """Broken HTML doesn't crash."""
         html = "<ul id='archive-list'><li class='campaign'><a href='test'>Unclosed"
 
@@ -128,7 +128,7 @@ class TestMailChimpArchiveStrategy(unittest.TestCase):
 class TestGenericListStrategy(unittest.TestCase):
     """Tests for GenericListStrategy fallback."""
 
-    def test_extracts_newsletter_like_urls(self):
+    def test_extracts_newsletter_like_urls(self) -> None:
         """Finds links with 'newsletter', 'archive', 'campaign' keywords."""
         html = """
         <a href="https://example.com/newsletter-january">January Newsletter</a>
@@ -144,7 +144,7 @@ class TestGenericListStrategy(unittest.TestCase):
         self.assertTrue(any("newsletter" in r["url"].lower() for r in result))
         self.assertTrue(any("archive" in r["url"].lower() for r in result))
 
-    def test_converts_relative_to_absolute(self):
+    def test_converts_relative_to_absolute(self) -> None:
         """Relative URLs converted to absolute using urljoin."""
         html = """
         <a href="/newsletter/january">January</a>
@@ -155,7 +155,7 @@ class TestGenericListStrategy(unittest.TestCase):
 
         self.assertEqual(result[0]["url"], "https://example.com/newsletter/january")
 
-    def test_skips_internal_links(self):
+    def test_skips_internal_links(self) -> None:
         """Skips #, javascript:, mailto: links."""
         html = """
         <a href="#top">Top</a>
@@ -171,7 +171,7 @@ class TestGenericListStrategy(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertIn("newsletter", result[0]["url"])
 
-    def test_handles_no_matching_links(self):
+    def test_handles_no_matching_links(self) -> None:
         """Returns empty list when no newsletter-like links found."""
         html = """
         <a href="/about">About</a>
@@ -183,7 +183,7 @@ class TestGenericListStrategy(unittest.TestCase):
 
         self.assertEqual(result, [])
 
-    def test_uses_untitled_fallback(self):
+    def test_uses_untitled_fallback(self) -> None:
         """No link text uses 'Untitled Newsletter' fallback."""
         html = """
         <a href="https://example.com/newsletter"></a>
@@ -199,13 +199,13 @@ class TestGenericListStrategy(unittest.TestCase):
 class TestGetStrategyForUrl(unittest.TestCase):
     """Tests for get_strategy_for_url() selection logic."""
 
-    def test_returns_mailchimp_for_mailchimp_urls(self):
+    def test_returns_mailchimp_for_mailchimp_urls(self) -> None:
         """mailchi.mp URLs return MailChimpArchiveStrategy."""
         strategy = get_strategy_for_url("https://mailchi.mp/example/archive")
 
         self.assertIsInstance(strategy, MailChimpArchiveStrategy)
 
-    def test_returns_mailchimp_for_campaign_archive(self):
+    def test_returns_mailchimp_for_campaign_archive(self) -> None:
         """campaign-archive.com URLs return MailChimpArchiveStrategy."""
         strategy = get_strategy_for_url(
             "https://us20.campaign-archive.com/home/?u=123&id=456"
@@ -213,13 +213,13 @@ class TestGetStrategyForUrl(unittest.TestCase):
 
         self.assertIsInstance(strategy, MailChimpArchiveStrategy)
 
-    def test_returns_generic_for_other_urls(self):
+    def test_returns_generic_for_other_urls(self) -> None:
         """Other URLs return GenericListStrategy."""
         strategy = get_strategy_for_url("https://example.com/newsletters")
 
         self.assertIsInstance(strategy, GenericListStrategy)
 
-    def test_case_insensitive_matching(self):
+    def test_case_insensitive_matching(self) -> None:
         """URL matching is case-insensitive."""
         strategy = get_strategy_for_url("https://MAILCHI.MP/example/archive")
 

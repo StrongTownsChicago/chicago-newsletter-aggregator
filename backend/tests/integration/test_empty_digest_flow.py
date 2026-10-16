@@ -6,7 +6,8 @@ the system correctly skips sending the email and marks the notification as faile
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from notifications.process_notification_queue import process_daily_digests
 
 
@@ -19,8 +20,13 @@ class TestEmptyDigestFlow(unittest.TestCase):
     @patch("notifications.email_sender.resend.Emails.send")
     @patch("notifications.email_sender._build_unsubscribe_url")
     def test_empty_daily_digest_flow(
-        self, mock_unsub, mock_resend, mock_sb_matcher, mock_sb_process, mock_print
-    ):
+        self,
+        mock_unsub: MagicMock,
+        mock_resend: MagicMock,
+        mock_sb_matcher: MagicMock,
+        mock_sb_process: MagicMock,
+        mock_print: MagicMock,
+    ) -> None:
         """
         Test flow where a notification in the queue references a missing newsletter.
         Expected: No email sent, status updated to failed with 'Empty digest content'.
@@ -67,7 +73,7 @@ class TestEmptyDigestFlow(unittest.TestCase):
         # 3. Mock updates and inserts
         mock_history_table = MagicMock()
 
-        def table_router(name):
+        def table_router(name: str) -> MagicMock:
             if name == "notification_queue":
                 return mock_queue_table
             if name == "user_profiles":

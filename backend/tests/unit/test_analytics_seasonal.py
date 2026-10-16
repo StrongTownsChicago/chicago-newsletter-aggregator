@@ -8,7 +8,7 @@ from analytics.text import extract_terms
 
 
 class TestIsSeasonalTerm(unittest.TestCase):
-    def test_holidays_heritage_months_and_programs(self):
+    def test_holidays_heritage_months_and_programs(self) -> None:
         for term in (
             "labor day",
             "heritage month",
@@ -19,12 +19,12 @@ class TestIsSeasonalTerm(unittest.TestCase):
         ):
             self.assertTrue(is_seasonal_term(term), term)
 
-    def test_matches_a_phrase_inside_a_longer_term_with_plurals_folded(self):
+    def test_matches_a_phrase_inside_a_longer_term_with_plurals_folded(self) -> None:
         self.assertTrue(is_seasonal_term("day parade labor day"))
         self.assertTrue(is_seasonal_term("flu shots"))
         self.assertTrue(is_seasonal_term("cooling centers"))
 
-    def test_news_is_not_seasonal(self):
+    def test_news_is_not_seasonal(self) -> None:
         for term in (
             "property tax",
             "tenant ordinance",
@@ -34,12 +34,12 @@ class TestIsSeasonalTerm(unittest.TestCase):
         ):
             self.assertFalse(is_seasonal_term(term), term)
 
-    def test_matches_whole_words_only(self):
+    def test_matches_whole_words_only(self) -> None:
         self.assertFalse(is_seasonal_term("fallen officers"))
 
 
 class TestSeasonalPhrases(unittest.TestCase):
-    def test_phrases_are_written_as_the_tokenizer_produces_them(self):
+    def test_phrases_are_written_as_the_tokenizer_produces_them(self) -> None:
         # A phrase with a stopword or possessive could never match a term.
         unreachable = [
             phrase

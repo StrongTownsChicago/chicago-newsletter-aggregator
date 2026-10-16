@@ -25,9 +25,9 @@ import argparse
 import difflib
 from typing import Any, cast
 
-from shared.db import get_supabase_client
-from ingest.email.email_parser import sanitize_content
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_content
+from shared.db import get_supabase_client
 
 
 def fetch_newsletter(supabase: Any, newsletter_id: str) -> dict[str, Any] | None:

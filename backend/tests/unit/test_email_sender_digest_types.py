@@ -5,21 +5,23 @@ Tests DigestType enum, unified send_digest function, and template rendering.
 """
 
 import unittest
-from unittest.mock import patch
-from notifications.email_sender import (
-    DigestType,
-    send_digest,
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+from notifications.digest_config import DigestType
+from notifications.digest_html import (
     _render_daily_content_html,
     _render_weekly_content_html,
-    _build_digest_html,
-    _build_digest_text,
+    build_digest_html,
 )
+from notifications.digest_text import build_digest_text
+from notifications.email_sender import send_digest
 
 
 class TestDigestType(unittest.TestCase):
     """Tests for DigestType enum."""
 
-    def test_has_daily_and_weekly_types(self):
+    def test_has_daily_and_weekly_types(self) -> None:
         """Enum contains DAILY and WEEKLY."""
         self.assertEqual(DigestType.DAILY.value, "daily")
         self.assertEqual(DigestType.WEEKLY.value, "weekly")
@@ -29,9 +31,11 @@ class TestSendDigest(unittest.TestCase):
     """Tests for unified send_digest() function."""
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
-    def test_sends_daily_digest(self, mock_token, mock_prepare, mock_resend):
+    def test_sends_daily_digest(
+        self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
+    ) -> None:
         """Daily digest sent with correct type."""
         # Arrange
         mock_token.return_value = "test-token"
@@ -49,7 +53,7 @@ class TestSendDigest(unittest.TestCase):
         ]
         mock_resend.return_value = {"id": "email-123"}
 
-        notifications = [{"newsletter": {}, "rule": {}}]
+        notifications: list[dict[str, Any]] = [{"newsletter": {}, "rule": {}}]
 
         # Act
         result = send_digest(
@@ -70,9 +74,11 @@ class TestSendDigest(unittest.TestCase):
         self.assertIn("Daily", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_weekly_report_data")
+    @patch("notifications.email_sender.prepare_weekly_report_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
-    def test_sends_weekly_digest(self, mock_token, mock_prepare, mock_resend):
+    def test_sends_weekly_digest(
+        self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
+    ) -> None:
         """Weekly digest sent with correct type."""
         # Arrange
         mock_token.return_value = "test-token"
@@ -89,7 +95,7 @@ class TestSendDigest(unittest.TestCase):
         ]
         mock_resend.return_value = {"id": "email-456"}
 
-        notifications = [{"report": {}, "rule": {}}]
+        notifications: list[dict[str, Any]] = [{"report": {}, "rule": {}}]
 
         # Act
         result = send_digest(
@@ -110,9 +116,11 @@ class TestSendDigest(unittest.TestCase):
         self.assertIn("Topic", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
-    def test_handles_sending_failure(self, mock_token, mock_prepare, mock_resend):
+    def test_handles_sending_failure(
+        self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
+    ) -> None:
         """Returns error on Resend failure."""
         # Arrange
         mock_token.return_value = "test-token"
@@ -130,7 +138,7 @@ class TestSendDigest(unittest.TestCase):
         ]
         mock_resend.side_effect = Exception("Resend API error")
 
-        notifications = [{"newsletter": {}, "rule": {}}]
+        notifications: list[dict[str, Any]] = [{"newsletter": {}, "rule": {}}]
 
         # Act
         result = send_digest(
@@ -146,7 +154,7 @@ class TestSendDigest(unittest.TestCase):
 class TestRenderDailyContentHtml(unittest.TestCase):
     """Tests for _render_daily_content_html() function."""
 
-    def test_renders_newsletter_cards(self):
+    def test_renders_newsletter_cards(self) -> None:
         """Newsletter data rendered as HTML cards."""
         # Arrange
         prepared = [
@@ -173,7 +181,7 @@ class TestRenderDailyContentHtml(unittest.TestCase):
         self.assertIn("bike_lanes", html)
         self.assertIn("Rule 1", html)
 
-    def test_limits_topics_to_five(self):
+    def test_limits_topics_to_five(self) -> None:
         """Only first 5 topics rendered."""
         # Arrange
         prepared = [
@@ -200,7 +208,7 @@ class TestRenderDailyContentHtml(unittest.TestCase):
 class TestRenderWeeklyContentHtml(unittest.TestCase):
     """Tests for _render_weekly_content_html() function."""
 
-    def test_renders_topic_reports(self):
+    def test_renders_topic_reports(self) -> None:
         """Topic report data rendered as HTML."""
         # Arrange
         prepared = [
@@ -225,7 +233,7 @@ class TestRenderWeeklyContentHtml(unittest.TestCase):
         self.assertIn("progress on bike lanes", html)
         self.assertIn("My Bike Rule", html)
 
-    def test_includes_search_link(self):
+    def test_includes_search_link(self) -> None:
         """Search link for topic included."""
         # Arrange
         prepared = [
@@ -248,9 +256,9 @@ class TestRenderWeeklyContentHtml(unittest.TestCase):
 
 
 class TestBuildDigestHtml(unittest.TestCase):
-    """Tests for unified _build_digest_html() function."""
+    """Tests for unified build_digest_html() function."""
 
-    def test_uses_daily_template_for_daily_type(self):
+    def test_uses_daily_template_for_daily_type(self) -> None:
         """Daily digest type uses daily template."""
         # Arrange
         prepared = [
@@ -267,7 +275,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://prefs.com",
@@ -278,7 +286,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("Daily Chicago Aldermen Newsletter Digest", html)
         self.assertIn('class="newsletter"', html)
 
-    def test_uses_weekly_template_for_weekly_type(self):
+    def test_uses_weekly_template_for_weekly_type(self) -> None:
         """Weekly digest type uses weekly template."""
         # Arrange
         prepared = [
@@ -294,7 +302,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.WEEKLY,
             "http://prefs.com",
@@ -305,13 +313,13 @@ class TestBuildDigestHtml(unittest.TestCase):
         self.assertIn("Weekly Topic Digest", html)
         self.assertIn('class="topic-report"', html)
 
-    def test_includes_preferences_and_unsubscribe_links(self):
+    def test_includes_preferences_and_unsubscribe_links(self) -> None:
         """Footer includes both links."""
         # Arrange
-        prepared = []
+        prepared: list[dict[str, Any]] = []
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://my-prefs.com",
@@ -324,9 +332,9 @@ class TestBuildDigestHtml(unittest.TestCase):
 
 
 class TestBuildDigestText(unittest.TestCase):
-    """Tests for unified _build_digest_text() function."""
+    """Tests for unified build_digest_text() function."""
 
-    def test_uses_daily_format_for_daily_type(self):
+    def test_uses_daily_format_for_daily_type(self) -> None:
         """Daily digest type uses daily text format."""
         # Arrange
         prepared = [
@@ -343,7 +351,7 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         # Act
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://prefs.com",
@@ -355,7 +363,7 @@ class TestBuildDigestText(unittest.TestCase):
         self.assertIn("1. Test Newsletter", text)
         self.assertIn("Rule 1", text)
 
-    def test_uses_weekly_format_for_weekly_type(self):
+    def test_uses_weekly_format_for_weekly_type(self) -> None:
         """Weekly digest type uses weekly text format."""
         # Arrange
         prepared = [
@@ -371,7 +379,7 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         # Act
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.WEEKLY,
             "http://prefs.com",

@@ -2,20 +2,20 @@
 // described against its own history and against all active wards. Nothing here
 // ranks wards; the city figures are reference points, not a leaderboard.
 import {
-  buildCoverageGrid,
-  buildLensWardGrid,
-  computeLensWardReach,
   daysBetween,
   groupBy,
-  isReadable,
   median,
   monthOf,
-  summarizeWardCoverage,
-  type CoverageCell,
-  type LensWardStatus,
   type NewsletterFact,
   type SourceCoverage,
 } from "./analytics";
+import { buildCoverageGrid, summarizeWardCoverage, type CoverageCell } from "./analytics-coverage";
+import {
+  buildLensWardGrid,
+  computeLensWardReach,
+  isReadable,
+  type LensWardStatus,
+} from "./analytics-reach";
 
 /** A ward needs at least this many newsletters in the window before its topic shares are shown. */
 export const MIN_WARD_NEWSLETTERS_FOR_SHARES = 20;

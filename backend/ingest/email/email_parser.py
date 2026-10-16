@@ -1,8 +1,9 @@
-import re
 import os
+import re
+from typing import Any, cast
+
 from bs4 import BeautifulSoup
 from html2text import html2text
-from typing import Any, cast
 
 
 def sanitize_content(
@@ -62,7 +63,7 @@ def sanitize_content(
 
             result = str(soup)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
             print(f"  ⚠️  HTML Sanitization failed: {e}")
             result = content
 
@@ -166,24 +167,6 @@ def lookup_source_by_email(
         pattern = cast(str, mapping_dict["email_pattern"])
         if email_matches_pattern(from_email, pattern):
             return cast(dict[str, Any], mapping_dict["sources"])
-
-    return None
-
-
-def extract_name_from_sender(from_address: str) -> str | None:
-    """
-    Extract display name from email sender field.
-
-    Example: "Alderman John Smith <ward01@example.com>" -> "John Smith"
-    Returns None if no display name present.
-    """
-    # Try parsing display name from email header
-    match = re.match(r"^(.+?)\s*<", from_address)
-    if match:
-        name = match.group(1).strip()
-        # Remove quotes if present
-        name = name.strip('"').strip("'")
-        return name if name else None
 
     return None
 

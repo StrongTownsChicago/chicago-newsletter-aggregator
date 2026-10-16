@@ -5,19 +5,20 @@ Tests token counting accuracy, encoder selection, and schema overhead calculatio
 """
 
 import unittest
+
 from utils.token_counter import (
-    count_tokens,
     count_schema_tokens,
+    count_tokens,
     estimate_llm_call_tokens,
-    get_encoding_for_model,
     get_encoder_for_model,
+    get_encoding_for_model,
 )
 
 
 class TestTokenCounter(unittest.TestCase):
     """Test token counting functionality."""
 
-    def test_count_tokens_basic(self):
+    def test_count_tokens_basic(self) -> None:
         """Test basic token counting with known text."""
         text = "hello world"
         # For GPT-5 (o200k_base), this should be ~2 tokens
@@ -25,19 +26,19 @@ class TestTokenCounter(unittest.TestCase):
         self.assertGreater(count, 0)
         self.assertLess(count, 10)  # Sanity check
 
-    def test_count_tokens_empty_string(self):
+    def test_count_tokens_empty_string(self) -> None:
         """Test empty string handling."""
         count = count_tokens("", "gpt-5")
         self.assertEqual(count, 0)
 
-    def test_count_tokens_unicode(self):
+    def test_count_tokens_unicode(self) -> None:
         """Test Unicode and special characters."""
         text = "Hello 世界 🌍"
         count = count_tokens(text, "gpt-5")
         # Unicode chars typically use multiple tokens
         self.assertGreater(count, 3)
 
-    def test_count_tokens_very_long_text(self):
+    def test_count_tokens_very_long_text(self) -> None:
         """Test performance with large text."""
         import time
 
@@ -51,34 +52,34 @@ class TestTokenCounter(unittest.TestCase):
         # Should return reasonable count
         self.assertGreater(count, 10000)
 
-    def test_get_encoding_for_model_gpt5(self):
+    def test_get_encoding_for_model_gpt5(self) -> None:
         """Test model name to encoding mapping for GPT-5."""
         encoding = get_encoding_for_model("gpt-5")
         self.assertEqual(encoding, "o200k_base")
 
-    def test_get_encoding_for_model_gpt5_mini(self):
+    def test_get_encoding_for_model_gpt5_mini(self) -> None:
         """Test GPT-5 variant encoding."""
         encoding = get_encoding_for_model("gpt-5-mini")
         self.assertEqual(encoding, "o200k_base")
 
-    def test_get_encoding_for_model_claude(self):
+    def test_get_encoding_for_model_claude(self) -> None:
         """Test non-OpenAI model encoding."""
         encoding = get_encoding_for_model("claude-sonnet-4.5")
         self.assertEqual(encoding, "cl100k_base")
 
-    def test_get_encoding_for_model_fallback(self):
+    def test_get_encoding_for_model_fallback(self) -> None:
         """Test unknown model falls back to cl100k_base."""
         encoding = get_encoding_for_model("unknown-model-xyz")
         self.assertEqual(encoding, "cl100k_base")
 
-    def test_get_encoder_for_model_caching(self):
+    def test_get_encoder_for_model_caching(self) -> None:
         """Test encoder caching works."""
         encoder1 = get_encoder_for_model("gpt-5")
         encoder2 = get_encoder_for_model("gpt-5")
         # Should return same cached instance
         self.assertIs(encoder1, encoder2)
 
-    def test_estimate_llm_call_tokens_no_schema(self):
+    def test_estimate_llm_call_tokens_no_schema(self) -> None:
         """Test token estimation without schema."""
         prompt = "Summarize this text"
         response = "This is a summary"
@@ -94,7 +95,7 @@ class TestTokenCounter(unittest.TestCase):
             result["total_tokens"], result["input_tokens"] + result["output_tokens"]
         )
 
-    def test_estimate_llm_call_tokens_with_schema(self):
+    def test_estimate_llm_call_tokens_with_schema(self) -> None:
         """Test token estimation with schema overhead."""
         prompt = "Extract topics from this text"
         response = '{"topics": ["bike_lanes"]}'
@@ -122,7 +123,7 @@ class TestTokenCounter(unittest.TestCase):
             result_with_schema["output_tokens"], result_no_schema["output_tokens"]
         )
 
-    def test_count_schema_tokens(self):
+    def test_count_schema_tokens(self) -> None:
         """Test schema token counting."""
         schema = {
             "type": "object",

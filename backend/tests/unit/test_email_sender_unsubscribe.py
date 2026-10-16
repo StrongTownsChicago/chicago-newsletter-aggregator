@@ -4,18 +4,17 @@ Unit tests for email sender unsubscribe functionality.
 
 import os
 import unittest
-from unittest.mock import patch
-from notifications.email_sender import (
-    send_daily_digest,
-    _build_unsubscribe_url,
-)
-from notifications.unsubscribe_tokens import validate_unsubscribe_token
+from unittest.mock import MagicMock, patch
+
+from notifications.digest_config import DigestType
+from notifications.email_sender import _build_unsubscribe_url, send_digest
+from tests.fixtures.unsubscribe_token_validation import validate_unsubscribe_token
 
 
 class TestEmailSenderUnsubscribe(unittest.TestCase):
     """Test email sending with unsubscribe functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test environment."""
         self.original_secret = os.environ.get("UNSUBSCRIBE_SECRET_KEY")
         os.environ["UNSUBSCRIBE_SECRET_KEY"] = (
@@ -24,7 +23,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.original_base_url = os.environ.get("FRONTEND_BASE_URL")
         os.environ["FRONTEND_BASE_URL"] = "https://test.example.com"
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Restore original environment."""
         if self.original_secret:
             os.environ["UNSUBSCRIBE_SECRET_KEY"] = self.original_secret
@@ -36,7 +35,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         else:
             os.environ.pop("FRONTEND_BASE_URL", None)
 
-    def test_build_unsubscribe_url_includes_valid_token(self):
+    def test_build_unsubscribe_url_includes_valid_token(self) -> None:
         """Test that URL contains properly formatted token."""
         user_id = "test-user-123"
         url = _build_unsubscribe_url(user_id)
@@ -57,7 +56,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.assertEqual(validated_user_id, user_id)
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_requires_user_id_parameter(self, mock_resend):
+    def test_daily_digest_requires_user_id_parameter(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that function signature includes user_id."""
         # Create test notification data
         notifications = [
@@ -75,12 +76,16 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
 
         # Attempt to call without user_id should fail
         with self.assertRaises(TypeError):
-            send_daily_digest(
-                user_email="test@example.com", notifications=notifications
+            send_digest(  # type: ignore[call-arg]  # deliberately missing user_id
+                user_email="test@example.com",
+                notifications=notifications,
+                digest_type=DigestType.DAILY,
             )
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_includes_list_unsubscribe_header(self, mock_resend):
+    def test_daily_digest_includes_list_unsubscribe_header(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that email includes List-Unsubscribe header."""
         # Mock Resend response
         mock_resend.Emails.send.return_value = {"id": "email-123"}
@@ -100,10 +105,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         ]
 
         # Send digest
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-456",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         # Verify email was sent
@@ -124,7 +130,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.assertIn("/unsubscribe?token=", list_unsub)
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_includes_list_unsubscribe_post_header(self, mock_resend):
+    def test_daily_digest_includes_list_unsubscribe_post_header(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that email includes List-Unsubscribe-Post header."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -141,10 +149,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-789",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         self.assertTrue(result["success"])
@@ -160,9 +169,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         )
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_includes_unsubscribe_link_in_html_body(
-        self, mock_resend
-    ):
+    def test_daily_digest_includes_unsubscribe_link_in_html_body(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that HTML body contains clickable unsubscribe link."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -179,10 +188,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-html",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         self.assertTrue(result["success"])
@@ -197,9 +207,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.assertIn("Unsubscribe</a>", html_body)
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_includes_unsubscribe_link_in_text_body(
-        self, mock_resend
-    ):
+    def test_daily_digest_includes_unsubscribe_link_in_text_body(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that plain text body contains unsubscribe URL."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -216,10 +226,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-text",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         self.assertTrue(result["success"])
@@ -233,9 +244,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.assertIn("/unsubscribe?token=", text_body)
 
     @patch("notifications.email_sender.resend")
-    def test_send_daily_digest_unsubscribe_url_uses_frontend_base_url(
-        self, mock_resend
-    ):
+    def test_daily_digest_unsubscribe_url_uses_frontend_base_url(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that URL respects FRONTEND_BASE_URL env var."""
         # Set custom base URL
         os.environ["FRONTEND_BASE_URL"] = "https://custom.domain.com"
@@ -255,10 +266,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-baseurl",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         self.assertTrue(result["success"])
@@ -270,7 +282,7 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         # Verify custom base URL used
         self.assertIn("https://custom.domain.com", list_unsub)
 
-    def test_send_daily_digest_token_generation_failure_propagates_error(self):
+    def test_daily_digest_token_generation_failure_propagates_error(self) -> None:
         """Test that token generation failure causes email sending to fail."""
         # Remove secret key to trigger failure
         os.environ.pop("UNSUBSCRIBE_SECRET_KEY", None)
@@ -288,10 +300,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-fail",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         # Email sending should fail
@@ -301,7 +314,9 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
         self.assertIn("UNSUBSCRIBE_SECRET_KEY", result["error"])
 
     @patch("notifications.email_sender.resend")
-    def test_html_footer_format_matches_existing_style(self, mock_resend):
+    def test_html_footer_format_matches_existing_style(
+        self, mock_resend: MagicMock
+    ) -> None:
         """Test that unsubscribe link matches existing email design."""
         mock_resend.Emails.send.return_value = {"id": "email-123"}
 
@@ -318,10 +333,11 @@ class TestEmailSenderUnsubscribe(unittest.TestCase):
             }
         ]
 
-        result = send_daily_digest(
+        result = send_digest(
             user_id="test-user-style",
             user_email="test@example.com",
             notifications=notifications,
+            digest_type=DigestType.DAILY,
         )
 
         self.assertTrue(result["success"])
