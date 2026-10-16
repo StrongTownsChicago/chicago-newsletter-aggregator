@@ -61,6 +61,11 @@ jobs:
           cd backend
           uv run --locked python -m tools.lint.check_module_size
 
+      - name: Run Symbol Reachability
+        run: |
+          cd backend
+          uv run --locked python -m tools.lint.check_symbol_reachability
+
       - name: Run Tests
         run: |
           cd backend
