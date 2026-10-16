@@ -46,6 +46,11 @@ jobs:
           cd backend
           uv run --locked mypy .
 
+      - name: Run Import Contracts
+        run: |
+          cd backend
+          uv run --locked lint-imports
+
       - name: Run Tests
         run: |
           cd backend
