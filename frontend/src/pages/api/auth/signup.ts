@@ -2,6 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase, notificationsEnabled } from "../../../lib/supabase";
 import { WELCOME_PATH, buildEmailConfirmationRedirect } from "../../../lib/onboarding";
+import { formText } from "../../../lib/form-data";
 
 export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (!notificationsEnabled()) {
@@ -9,8 +10,8 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   }
 
   const formData = await request.formData();
-  const email = formData.get("email")?.toString();
-  const password = formData.get("password")?.toString();
+  const email = formText(formData, "email");
+  const password = formText(formData, "password");
 
   if (!email || !password) {
     return redirect("/signup?error=Email and password are required");

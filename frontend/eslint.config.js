@@ -79,17 +79,4 @@ export default defineConfig(
       "@typescript-eslint/unbound-method": "off",
     },
   },
-  // FormDataEntryValue.toString() turns a File into "[object File]". These routes only
-  // receive text fields from their own forms; narrowing to strings would change how a
-  // forged File is handled, so it waits for a deliberate change. Remove files as they are fixed.
-  {
-    files: [
-      "src/pages/api/auth/signin.ts",
-      "src/pages/api/auth/signup.ts",
-      "src/pages/api/notifications/create-rule.ts",
-      "src/pages/api/notifications/delete-rule.ts",
-      "src/pages/api/notifications/update-rule.ts",
-    ],
-    rules: { "@typescript-eslint/no-base-to-string": "off" },
-  },
 );

@@ -1,6 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
+import { formText, formTexts } from "../../../lib/form-data";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -14,16 +15,15 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   const formData = await request.formData();
-  const name = formData.get("name")?.toString();
-  const topics = formData.getAll("topics").map((t) => t.toString());
-  let searchTerm = formData.get("search_term")?.toString().trim();
-  let wards = formData
-    .getAll("wards")
-    .map((w) => w.toString().trim())
+  const name = formText(formData, "name");
+  const topics = formTexts(formData, "topics");
+  let searchTerm = formText(formData, "search_term")?.trim();
+  let wards = formTexts(formData, "wards")
+    .map((w) => w.trim())
     .filter((w) => w.length > 0);
   const isActive = formData.get("is_active") === "on";
   let deliveryFrequency =
-    formData.get("delivery_frequency")?.toString() || "daily";
+    formText(formData, "delivery_frequency") || "daily";
 
   if (!name) {
     return redirect("/preferences?error=Rule name is required");

@@ -2,6 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { supabase, notificationsEnabled } from "../../../lib/supabase";
 import { buildLoginUrl, getSafeRedirectPath } from "../../../lib/redirects";
+import { formText } from "../../../lib/form-data";
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   if (!notificationsEnabled()) {
@@ -9,9 +10,9 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   }
 
   const formData = await request.formData();
-  const email = formData.get("email")?.toString();
-  const password = formData.get("password")?.toString();
-  const next = getSafeRedirectPath(formData.get("next")?.toString(), "/");
+  const email = formText(formData, "email");
+  const password = formText(formData, "password");
+  const next = getSafeRedirectPath(formText(formData, "next"), "/");
   const preservedNext = next === "/" ? null : next;
 
   if (!email || !password) {

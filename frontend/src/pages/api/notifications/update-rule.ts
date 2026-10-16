@@ -1,6 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
+import { formText, formTexts } from "../../../lib/form-data";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -14,15 +15,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   const formData = await request.formData();
-  const ruleId = formData.get("rule_id")?.toString();
-  const name = formData.get("name")?.toString();
+  const ruleId = formText(formData, "rule_id");
+  const name = formText(formData, "name");
   const deliveryFrequency =
-    formData.get("delivery_frequency")?.toString() || "daily";
-  const topics = formData.getAll("topics").map((t) => t.toString());
-  let searchTerm = formData.get("search_term")?.toString().trim();
-  let wards = formData
-    .getAll("wards")
-    .map((w) => w.toString().trim())
+    formText(formData, "delivery_frequency") || "daily";
+  const topics = formTexts(formData, "topics");
+  let searchTerm = formText(formData, "search_term")?.trim();
+  let wards = formTexts(formData, "wards")
+    .map((w) => w.trim())
     .filter((w) => w.length > 0);
   const isActive = formData.get("is_active") === "on";
 

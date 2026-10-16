@@ -25,7 +25,7 @@ export const createMockCookies = () => {
 };
 
 export const createMockRequest = (options: {
-  formData?: Record<string, string | string[]>;
+  formData?: Record<string, FormDataEntryValue | FormDataEntryValue[]>;
   json?: unknown;
   method?: string;
 } = {}) => {
@@ -77,7 +77,7 @@ export const mockRedirect = vi.fn((url: string, status = 302) => {
 });
 
 export const createMockContext = (options: {
-  formData?: Record<string, string | string[]>;
+  formData?: Record<string, FormDataEntryValue | FormDataEntryValue[]>;
   json?: unknown;
   method?: string;
   locals?: Record<string, unknown>;
