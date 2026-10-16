@@ -4,8 +4,8 @@ With under a year of data, "labor day" rising in September looks exactly like
 a new trend; only knowing the calendar tells them apart. This curated list
 names holidays, heritage months, and annual programs aldermen announce every
 year. A term is seasonal when it contains one of these phrases as a run of
-words (plurals folded), so "labor day" matches "labor day parade" and "flu"
-matches "flu shots".
+words (plurals folded), so "labor day" matches "labor day parade" and
+"flu shot" matches "free flu shots".
 
 Phrases are written as the term tokenizer produces them: lowercase, with
 stopwords and possessives dropped ("mother's day" becomes "mother day").
@@ -64,7 +64,11 @@ SEASONAL_PROGRAMS: frozenset[str] = frozenset(
         "autumn",
         "winter",
         "spring break",
-        "flu",
+        # Not "flu" alone: "bird flu" is news, not the season.
+        "flu shot",
+        "flu vaccine",
+        "flu clinic",
+        "free flu",
         "school supplies",
         "school bash",
         "school giveaway",

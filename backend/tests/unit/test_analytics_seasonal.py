@@ -25,7 +25,13 @@ class TestIsSeasonalTerm(unittest.TestCase):
         self.assertTrue(is_seasonal_term("cooling centers"))
 
     def test_news_is_not_seasonal(self):
-        for term in ("property tax", "tenant ordinance", "election day", "heritage"):
+        for term in (
+            "property tax",
+            "tenant ordinance",
+            "election day",
+            "heritage",
+            "bird flu",
+        ):
             self.assertFalse(is_seasonal_term(term), term)
 
     def test_matches_whole_words_only(self):

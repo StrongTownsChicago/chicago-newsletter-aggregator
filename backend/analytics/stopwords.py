@@ -59,10 +59,10 @@ EXCLUDED_TERMS: frozenset[str] = (
 )
 
 # Generic words that say how, when, or for whom rather than what. They stay in
-# the term index, but a rising phrase built with one ("accessible throughout",
-# "next week", "chicago residents", "help shape") is a turn of phrase many
-# unrelated stories share, not a subject. Written in singular form: rising
-# terms compare them with plurals folded.
+# the term index, but a rising or distinctive term built with one ("accessible
+# throughout", "next week", "chicago residents", "stay informed") is a turn of
+# phrase many unrelated stories share, not a subject. Written in singular form:
+# terms are compared with plurals folded.
 TREND_FILLER_WORDS: frozenset[str] = frozenset(
     """
     across additional concern event help info information largest member

@@ -239,20 +239,41 @@ def build_word_specificity(
     return specificity
 
 
+def contains_filler_word(term: str) -> bool:
+    """True if any word of the term is in TREND_FILLER_WORDS, plurals folded."""
+    return not folded_words(term).isdisjoint(TREND_FILLER_WORDS)
+
+
+def folded_words(term: str) -> frozenset[str]:
+    """The words of a term with plurals folded."""
+    return frozenset(fold_plural(word) for word in term.split(" "))
+
+
+def are_nested_terms(first: str, second: str) -> bool:
+    """True if every word of one term is a word of the other ("truman" and
+    "truman college"), plurals folded."""
+    first_words, second_words = folded_words(first), folded_words(second)
+    return first_words <= second_words or second_words <= first_words
+
+
 def choose_representative_term(
     group: list[DistinctiveTerm], specificity: Callable[[str], float]
 ) -> DistinctiveTerm:
     """Pick the entry that names a group of terms from the same newsletters.
 
     A phrase says more than a lone word ("houseless neighbors" over
-    "houseless"), so multi-word terms come first; then the most specific
-    words (see `build_word_specificity`), the highest score, and alphabetical
-    order.
+    "houseless"), so multi-word terms come first. Then the phrase whose words
+    recur most across the group: a block's fragments repeat its subject
+    ("attorney hiring", "hiring senior", "hiring mid"), while one-off
+    fragments ("shakman exempt") do not. Ties go to the most specific words
+    (see `build_word_specificity`), the highest score, and alphabetical order.
     """
+    word_counts = Counter(word for item in group for word in folded_words(item.term))
     return min(
         group,
         key=lambda item: (
             " " not in item.term,
+            -sum(word_counts[word] for word in folded_words(item.term)),
             -specificity(item.term),
             -item.score,
             item.term,
@@ -263,37 +284,47 @@ def choose_representative_term(
 def collapse_terms_sharing_newsletters(
     ranked: list[DistinctiveTerm],
     newsletters_by_term: Mapping[str, Set[int]],
-    min_similarity: float,
+    min_nested_similarity: float,
     limit: int,
     specificity: Callable[[str], float],
 ) -> list[DistinctiveTerm]:
-    """Merge terms found in (nearly) the same newsletters into one entry each.
+    """Merge the fragments of one repeated block or phrase into one entry each.
 
-    A standing block just under the boilerplate threshold yields a dozen
+    A standing block just under the boilerplate threshold yields dozens of
     fragments ("procurement news", "certified vendor", "website provides"),
     all in exactly the same newsletters, which would fill a ward's list with
-    one block. Walking the ranking, a term joins the first group whose
-    highest-ranked term's newsletters have at least min_similarity Jaccard
-    similarity with its own; otherwise it starts a group, up to limit groups.
-    Each group is reported by `choose_representative_term`, with the number of
-    other terms it stands for, ranked by its representative's score.
+    one block. Walking the ranking, a term joins a group when its newsletters
+    are exactly the group's first term's, or when it nests with a member
+    (`are_nested_terms`) and its newsletters have at least
+    min_nested_similarity Jaccard similarity with the first term's;
+    otherwise it starts a group, up to limit groups.
+
+    Near-identical sets alone are not enough: a long weekly digest carries
+    several standing sections in nearly the same issues, and comparing
+    newsletter sets loosely merges them all. Each group is reported by
+    `choose_representative_term`, with the number of other terms it stands
+    for, ranked by its representative's score.
     """
     groups: list[list[DistinctiveTerm]] = []
+    groups_by_newsletters: dict[frozenset[int], list[DistinctiveTerm]] = {}
     for item in ranked:
-        newsletters = newsletters_by_term[item.term]
-        group = next(
+        newsletters = frozenset(newsletters_by_term[item.term])
+        group = groups_by_newsletters.get(newsletters) or next(
             (
                 group
                 for group in groups
                 if jaccard_similarity(newsletters, newsletters_by_term[group[0].term])
-                >= min_similarity
+                >= min_nested_similarity
+                and any(are_nested_terms(item.term, member.term) for member in group)
             ),
             None,
         )
         if group is not None:
             group.append(item)
         elif len(groups) < limit:
-            groups.append([item])
+            group = [item]
+            groups.append(group)
+            groups_by_newsletters[newsletters] = group
     representatives = [
         replace(
             choose_representative_term(group, specificity),
@@ -323,15 +354,15 @@ def compute_distinctive_terms(
     min_ward_newsletters: int,
     min_term_newsletters_in_ward: int,
     max_ward_share: float,
-    min_shared_newsletter_similarity: float,
+    min_nested_term_similarity: float,
 ) -> dict[str, list[dict[str, Any]]]:
     """Find the top terms each ward uses far more often than the rest of the city.
 
     Skipped as uninformative: terms below min_term_newsletters_in_ward, terms in
     more than max_ward_share of a ward's newsletters (signatures and footers),
-    and terms containing the ward's own source names (alderman self-references).
-    Terms whose ward newsletters overlap by at least
-    min_shared_newsletter_similarity are reported as one entry (see
+    terms containing the ward's own source names (alderman self-references),
+    and terms with filler words (`contains_filler_word`). Fragments of one
+    repeated block or phrase are reported as one entry (see
     `collapse_terms_sharing_newsletters`). Wards with fewer than
     min_ward_newsletters newsletters are omitted.
     """
@@ -364,6 +395,7 @@ def compute_distinctive_terms(
             if len(newsletters) >= min_term_newsletters_in_ward
             and len(newsletters) / ward_total <= max_ward_share
             and not term_mentions_name(term, name_tokens)
+            and not contains_filler_word(term)
         ]
         ranked = sorted(
             (item for item in scored if item.lift > 1),
@@ -374,7 +406,7 @@ def compute_distinctive_terms(
             for item in collapse_terms_sharing_newsletters(
                 ranked,
                 newsletters_by_term,
-                min_shared_newsletter_similarity,
+                min_nested_term_similarity,
                 top_n,
                 specificity,
             )
@@ -413,15 +445,12 @@ def group_wards_by_month(documents: Iterable[NewsletterTerms]) -> dict[str, set[
 
 def is_rising_candidate(term: str, min_phrase_words: int) -> bool:
     """True if a term can be a rising term: a phrase of at least
-    min_phrase_words words, none of them in TREND_FILLER_WORDS.
+    min_phrase_words words without filler words (`contains_filler_word`).
 
     Single words rise for unrelated reasons each month ("fall", "moving",
     "pro"); a phrase names a subject.
     """
-    words = term.split(" ")
-    return len(words) >= min_phrase_words and not any(
-        fold_plural(word) in TREND_FILLER_WORDS for word in words
-    )
+    return len(term.split(" ")) >= min_phrase_words and not contains_filler_word(term)
 
 
 def compute_rising_terms(

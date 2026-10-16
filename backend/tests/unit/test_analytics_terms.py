@@ -15,6 +15,7 @@ from analytics.terms import (
     collapse_terms_sharing_newsletters,
     compute_distinctive_terms,
     compute_rising_terms,
+    contains_filler_word,
     count_newsletters_per_term,
     drop_overlapping_terms,
     is_rising_candidate,
@@ -153,7 +154,7 @@ class TestDistinctiveTerms(unittest.TestCase):
             "min_ward_newsletters": 2,
             "min_term_newsletters_in_ward": 2,
             "max_ward_share": 0.9,
-            "min_shared_newsletter_similarity": 0.8,
+            "min_nested_term_similarity": 0.8,
         }
         params.update(overrides)
         return compute_distinctive_terms(self.documents, self.vocabulary, **params)
@@ -179,13 +180,34 @@ class TestDistinctiveTerms(unittest.TestCase):
         self.assertNotIn("1", self.compute(min_ward_newsletters=6))
 
     def test_terms_from_the_same_newsletters_are_one_entry(self):
-        # "signature" (4 newsletters) and "wicker" (3 of those 4) overlap with
-        # Jaccard 0.75: merged at 0.7, separate at the default 0.8.
-        merged = self.compute(min_shared_newsletter_similarity=0.7)["1"]
-        self.assertEqual(len(merged), 1)
-        self.assertEqual(merged[0]["related_terms"], 1)
-        separate = self.compute()["1"]
-        self.assertEqual([item["related_terms"] for item in separate], [0, 0])
+        # "wicker park" is in exactly the newsletters "wicker" is in.
+        self.documents = [
+            doc(item.terms | {"wicker park"}, ward=item.ward)
+            if "wicker" in item.terms
+            else item
+            for item in self.documents
+        ]
+        self.vocabulary.add("wicker park")
+        related = {item["term"]: item["related_terms"] for item in self.compute()["1"]}
+        self.assertEqual(related, {"signature": 0, "wicker park": 1})
+
+    def test_overlapping_unrelated_terms_stay_apart(self):
+        # "signature" (4 newsletters) and "wicker" (3 of those 4): Jaccard 0.75
+        # but not one phrase, so they stay apart even at a lower threshold.
+        result = self.compute(min_nested_term_similarity=0.5)["1"]
+        self.assertEqual([item["related_terms"] for item in result], [0, 0])
+
+    def test_skips_terms_with_filler_words(self):
+        self.documents = [
+            doc(item.terms | {"stay informed"}, ward=item.ward)
+            if "wicker" in item.terms
+            else item
+            for item in self.documents
+        ]
+        self.vocabulary.add("stay informed")
+        terms = [item["term"] for item in self.compute()["1"]]
+        self.assertNotIn("stay informed", terms)
+        self.assertIn("wicker", terms)
 
     def test_score_fields(self):
         item = score_distinctive_term("wicker", 4, 5, 0, 5)
@@ -326,6 +348,13 @@ class TestRisingTerms(unittest.TestCase):
         self.assertEqual(fest["ward_gain"], 3)
 
 
+class TestContainsFillerWord(unittest.TestCase):
+    def test_any_word_in_any_plural_form(self):
+        self.assertTrue(contains_filler_word("chicago residents"))
+        self.assertTrue(contains_filler_word("next weeks"))
+        self.assertFalse(contains_filler_word("tenant ordinance"))
+
+
 class TestIsRisingCandidate(unittest.TestCase):
     def test_requires_min_phrase_words(self):
         self.assertFalse(is_rising_candidate("fall", min_phrase_words=2))
@@ -394,6 +423,20 @@ class TestChooseRepresentativeTerm(unittest.TestCase):
         chosen = choose_representative_term(group, specificity.__getitem__)
         self.assertEqual(chosen.term, "gunshot detection")
 
+    def test_prefers_the_phrase_whose_words_recur_in_the_group(self):
+        group = [
+            distinctive("shakman exempt", 3.0),
+            distinctive("attorney hiring", 1.0),
+            distinctive("hiring senior", 1.0),
+            distinctive("hiring mid", 1.0),
+            distinctive("attorney", 1.0),
+        ]
+        specificity = {"shakman exempt": 9.0}
+        chosen = choose_representative_term(
+            group, lambda term: specificity.get(term, 0.0)
+        )
+        self.assertEqual(chosen.term, "attorney hiring")
+
     def test_ties_go_to_the_higher_score(self):
         group = [distinctive("award range", 1.0), distinctive("procurement news", 2.0)]
         chosen = choose_representative_term(group, no_specificity)
@@ -406,17 +449,21 @@ class TestCollapseTermsSharingNewsletters(unittest.TestCase):
         self.newsletters_by_term = {
             "procurement news": block,
             "certified vendor": block,
-            # Shares 23 of the block's 24 newsletters: Jaccard 0.958.
-            "website provides": set(range(23)),
-            "bike lane": {30, 31, 32},
-            "speed hump": {30, 40, 41},
+            # Another standing section, in 23 of the block's 24 newsletters
+            # (Jaccard 0.958): nearly the same issues, different content.
+            "attorney hiring": set(range(23)),
+            "truman college": {30, 31, 32, 33, 34},
+            # Nests with "truman college" (Jaccard 0.83).
+            "truman": {30, 31, 32, 33, 34, 35},
+            "bike lane": {30, 40, 41},
         }
         self.ranked = [
             distinctive("procurement news", 3.0),
+            distinctive("truman", 2.8),
             distinctive("bike lane", 2.5),
             distinctive("certified vendor", 2.0),
-            distinctive("website provides", 1.5),
-            distinctive("speed hump", 1.0),
+            distinctive("attorney hiring", 1.5),
+            distinctive("truman college", 1.0),
         ]
 
     def collapse(self, min_similarity=0.8, limit=10, specificity=no_specificity):
@@ -424,32 +471,50 @@ class TestCollapseTermsSharingNewsletters(unittest.TestCase):
             self.ranked, self.newsletters_by_term, min_similarity, limit, specificity
         )
 
-    def test_identical_and_nearly_identical_sets_become_one_entry(self):
+    def test_identical_sets_and_nested_terms_become_one_entry(self):
         result = self.collapse()
         self.assertEqual(
             [(item.term, item.related_terms) for item in result],
-            [("procurement news", 2), ("bike lane", 0), ("speed hump", 0)],
+            [
+                ("procurement news", 1),
+                ("bike lane", 0),
+                ("attorney hiring", 0),
+                ("truman college", 1),
+            ],
         )
 
-    def test_threshold_keeps_partly_overlapping_terms_apart(self):
-        result = self.collapse(min_similarity=0.97)
-        self.assertIn("website provides", [item.term for item in result])
+    def test_nearly_identical_sets_of_unrelated_terms_stay_apart(self):
+        result = self.collapse(min_similarity=0.5)
+        self.assertIn("attorney hiring", [item.term for item in result])
+
+    def test_threshold_keeps_loosely_overlapping_nested_terms_apart(self):
+        result = self.collapse(min_similarity=0.9)
+        self.assertIn("truman", [item.term for item in result])
+        self.assertIn("truman college", [item.term for item in result])
+
+    def test_nested_terms_join_only_near_the_first_term(self):
+        # "truman" is in 6 newsletters; "truman square" shares only 3 with it,
+        # so it does not join even though it nests with "truman".
+        self.newsletters_by_term["truman square"] = {33, 34, 35}
+        self.ranked.append(distinctive("truman square", 0.5))
+        result = self.collapse()
+        self.assertIn("truman square", [item.term for item in result])
 
     def test_limit_counts_entries_not_terms(self):
         result = self.collapse(limit=2)
         self.assertEqual(
-            [item.term for item in result], ["procurement news", "bike lane"]
+            [(item.term, item.related_terms) for item in result],
+            [("procurement news", 1), ("truman college", 1)],
         )
-        self.assertEqual(result[0].related_terms, 2)
 
     def test_entries_are_ranked_by_their_representative_score(self):
-        specificity = {"website provides": 9.0}
+        specificity = {"certified vendor": 9.0}
         result = self.collapse(
             specificity=lambda term: specificity.get(term, 0.0),
         )
         self.assertEqual(
             [item.term for item in result],
-            ["bike lane", "website provides", "speed hump"],
+            ["bike lane", "certified vendor", "attorney hiring", "truman college"],
         )
 
 

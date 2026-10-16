@@ -123,13 +123,13 @@ DISTINCTIVE_TOP_N = 20
 DISTINCTIVE_MIN_WARD_NEWSLETTERS = 5
 DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD = 3
 DISTINCTIVE_MAX_WARD_SHARE = 0.6
-# Terms found in nearly the same newsletters of a ward (Jaccard similarity of
-# their newsletter sets at or above this) are fragments of one block or story
-# and are listed as one entry. Below the boilerplate threshold, a standing
-# block can still produce a dozen terms in exactly the same newsletters (ward
-# 46: 13 terms in the same 24 of 81 issues); 0.8 also merges a phrase with
-# the word it nearly always appears in ("houseless" and "houseless neighbors").
-DISTINCTIVE_MIN_SHARED_NEWSLETTER_SIMILARITY = 0.8
+# Distinctive terms in exactly the same newsletters of a ward are fragments of
+# one standing block and are listed as one entry (ward 46: 30 terms in the same
+# 24 of 81 issues). A word and a phrase containing it ("truman" and "truman
+# college") are merged when the Jaccard similarity of their newsletter sets is
+# at least this. Looser matching of unrelated terms merged whole digests: ward
+# 46 runs several standing sections in nearly the same issues.
+DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY = 0.8
 # Keyword lenses match on boilerplate-cleaned text. Lenses feed ward reach
 # ("did this ward write about X this month"), and a standing block such as a
 # resource directory repeated in every issue would answer yes every month
@@ -408,9 +408,7 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
                 min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
                 min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
                 max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
-                min_shared_newsletter_similarity=(
-                    DISTINCTIVE_MIN_SHARED_NEWSLETTER_SIMILARITY
-                ),
+                min_nested_term_similarity=DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY,
             )
         },
         "rising": rising,
