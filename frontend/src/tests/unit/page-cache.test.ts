@@ -12,6 +12,7 @@ import {
   buildPageCacheKey,
   buildStoredPageCopy,
   findPageCacheMaxAge,
+  hasTrackingParams,
   isStorablePageResponse,
   resolvePageCacheVersion,
   respondWithPageCache,
@@ -110,6 +111,11 @@ describe("buildPageCacheKey", () => {
       VERSION,
     );
     expect(tracked.url).toBe(buildPageCacheKey(new URL(`${ORIGIN}/newsletter/7`), VERSION).url);
+  });
+
+  it("detects link-tracking parameters", () => {
+    expect(hasTrackingParams(new URL(`${ORIGIN}/search?q=x&UTM_Campaign=a`))).toBe(true);
+    expect(hasTrackingParams(new URL(`${ORIGIN}/search?q=utm_source`))).toBe(false);
   });
 
   it("does not change the request URL it was given", () => {
@@ -285,6 +291,23 @@ describe("respondWithPageCache", () => {
     expect(response.headers.get(PAGE_CACHE_HEADER)).toBeNull();
     expect(readCookie).not.toHaveBeenCalled();
     expect(memory.cache.match).not.toHaveBeenCalled();
+  });
+
+  it("serves a tracked visit from the cache but never stores its render", async () => {
+    const trackedPath = "/search?q=bike&utm_source=newsletter&mc_eid=subscriber42";
+    const render = vi.fn(async () => htmlResponse(`<a href="${trackedPath}">All months</a>`));
+
+    const trackedMiss = await respondWithPageCache(pageRequest(trackedPath), dependencies(), render);
+    expect(trackedMiss.headers.get(PAGE_CACHE_HEADER)).toBe("miss");
+    expect(memory.cache.put).not.toHaveBeenCalled();
+
+    await respondWithPageCache(pageRequest("/search?q=bike"), dependencies(), async () =>
+      htmlResponse("<p>clean</p>"),
+    );
+    const trackedHit = await respondWithPageCache(pageRequest(trackedPath), dependencies(), render);
+    expect(trackedHit.headers.get(PAGE_CACHE_HEADER)).toBe("hit");
+    expect(await trackedHit.text()).toBe("<p>clean</p>");
+    expect(render).toHaveBeenCalledTimes(1);
   });
 
   it("does not store a redirect", async () => {

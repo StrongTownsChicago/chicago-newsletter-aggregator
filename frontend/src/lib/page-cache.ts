@@ -74,9 +74,17 @@ export function resolvePageCacheVersion(buildVersion: string | undefined): strin
   return buildVersion?.trim() || UNVERSIONED_PAGE_CACHE_VERSION;
 }
 
+/** Whether the URL carries link-tracking parameters (see `buildPageCacheKey`). */
+export function hasTrackingParams(url: URL): boolean {
+  return [...url.searchParams.keys()].some((name) => TRACKING_PARAM_PATTERN.test(name));
+}
+
 /**
  * Cache key for a page: the full request URL (so host and query are part of
- * it) without tracking parameters, plus the build version.
+ * it) without tracking parameters, plus the build version. A tracked visit
+ * can be served the untracked page, but its own render is never stored:
+ * pages echo the query into links, which would hand one visitor's tracking
+ * ids (e.g. Mailchimp's per-subscriber `mc_eid`) to everyone.
  */
 export function buildPageCacheKey(url: URL, version: string): Request {
   const keyUrl = new URL(url);
@@ -158,7 +166,8 @@ export async function respondWithPageCache(
   if (cachedResponse) return buildBrowserPageResponse(cachedResponse, "hit");
 
   const response = await render();
-  if (cache && isStorablePageResponse(response, setsCookies())) {
+  const canStore = cache !== null && !hasTrackingParams(request.url);
+  if (canStore && isStorablePageResponse(response, setsCookies())) {
     const store = putEdgeCache(cache, cacheKey, buildStoredPageCopy(response, edgeMaxAgeSeconds));
     if (waitUntil) {
       waitUntil(store);
