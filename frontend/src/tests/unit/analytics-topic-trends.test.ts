@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LensReachCell } from "../../lib/analytics";
 import {
   describeSparkline,
+  findAsOfMonth,
   findLargestChangeTopic,
   findWidestReachTopic,
   formatPointChange,
@@ -22,18 +23,26 @@ function cell(lens: string, month: string, wardsMentioning: number, activeWards 
 const months = ["2026-01", "2026-02", "2026-03"];
 
 describe("partial months", () => {
-  it("treats the archive's last month as partial until its last day", () => {
-    expect(isPartialMonth("2026-03", "2026-03-14")).toBe(true);
-    expect(isPartialMonth("2026-03", "2026-03-31")).toBe(false);
-    expect(isPartialMonth("2026-02", "2026-03-14")).toBe(false);
+  it("reads the month the data was generated in", () => {
+    expect(findAsOfMonth("2026-10-15T18:12:27.974176-05:00")).toBe("2026-10");
+    expect(findAsOfMonth("")).toBeNull();
+  });
+
+  it("treats the generation month as partial, even after its last newsletter", () => {
+    expect(isPartialMonth("2026-03", "2026-03")).toBe(true);
+    expect(isPartialMonth("2026-02", "2026-03")).toBe(false);
     expect(isPartialMonth("2026-03", null)).toBe(false);
   });
 
-  it("drops only a trailing partial month", () => {
-    expect(listFullMonths(months, "2026-03-14")).toEqual(["2026-01", "2026-02"]);
-    expect(listFullMonths(months, "2026-03-31")).toEqual(months);
-    expect(listFullMonths(["2026-01", "2026-02"], "2026-03-14")).toEqual(["2026-01", "2026-02"]);
-    expect(listFullMonths([], "2026-03-14")).toEqual([]);
+  it("keeps a month whose last newsletter came before its end once the month is over", () => {
+    // Data through Mar 24, generated in April: March is complete.
+    expect(listFullMonths(months, "2026-04")).toEqual(months);
+  });
+
+  it("drops the in-progress month and keeps windows that end earlier", () => {
+    expect(listFullMonths(months, "2026-03")).toEqual(["2026-01", "2026-02"]);
+    expect(listFullMonths(["2026-01", "2026-02"], "2026-03")).toEqual(["2026-01", "2026-02"]);
+    expect(listFullMonths([], "2026-03")).toEqual([]);
   });
 });
 

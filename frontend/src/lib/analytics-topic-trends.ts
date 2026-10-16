@@ -1,7 +1,7 @@
 // Pure logic for the /analytics topic overview: each topic's ward reach
 // against its own average, the civic calendar's row order, and the headline
 // topics for the summary tiles.
-import { formatMonth, isReachFaded, monthDateRange, monthOf, type LensReachCell } from "./analytics";
+import { formatMonth, isReachFaded, type LensReachCell } from "./analytics";
 
 /**
  * Sparklines and the topic trend use a y scale spanning at least this share
@@ -9,15 +9,25 @@ import { formatMonth, isReachFaded, monthDateRange, monthOf, type LensReachCell 
  */
 export const MIN_TREND_SPAN = 0.05;
 
-/** Whether the archive stops before the end of `month`, so its counts are still growing. */
-export function isPartialMonth(month: string, lastDate: string | null): boolean {
-  return lastDate !== null && monthOf(lastDate) === month && lastDate < monthDateRange(month).toDate;
+const MONTH_PREFIX = /^(\d{4}-\d{2})-\d{2}/;
+
+/**
+ * The month the data was generated in (from `generated_at`, written in
+ * Chicago time), or null when unreadable. Like the backend's rising terms,
+ * months from this one on are still in progress.
+ */
+export function findAsOfMonth(generatedAt: string): string | null {
+  return MONTH_PREFIX.exec(generatedAt)?.[1] ?? null;
 }
 
-/** The window's months without a trailing partial month. */
-export function listFullMonths(months: string[], lastDate: string | null): string[] {
-  const last = months.at(-1);
-  return last !== undefined && isPartialMonth(last, lastDate) ? months.slice(0, -1) : months;
+/** Whether `month` was still in progress when the data was generated, so its counts are incomplete. */
+export function isPartialMonth(month: string, asOfMonth: string | null): boolean {
+  return asOfMonth !== null && month >= asOfMonth;
+}
+
+/** The window's months that had ended when the data was generated. */
+export function listFullMonths(months: string[], asOfMonth: string | null): string[] {
+  return months.filter((month) => !isPartialMonth(month, asOfMonth));
 }
 
 export interface TopicTrendPoint {

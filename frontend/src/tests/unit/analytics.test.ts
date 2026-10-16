@@ -8,7 +8,6 @@ import {
   compareWards,
   computeLensWardReach,
   countActiveWardsByMonth,
-  countBroadlyCoveredMonths,
   countNewslettersByWardMonth,
   daysBetween,
   describeDataAsOf,
@@ -35,7 +34,6 @@ import {
   wardsInScope,
   trimSparseEdges,
   suggestTerms,
-  summarizeFacts,
   termMentionsByMonth,
   termMentionsByWard,
   type AnalyticsFilters,
@@ -138,21 +136,6 @@ describe("trimSparseEdges", () => {
     const points = [null, 0.1, null, 0.2, null].map((share, index) => ({ index, share }));
     expect(trimSparseEdges(points).map((point) => point.index)).toEqual([1, 2, 3]);
     expect(trimSparseEdges([{ share: null }])).toEqual([]);
-  });
-});
-
-describe("summarizeFacts", () => {
-  it("summarizes the newsletter count and date span", () => {
-    const summary = summarizeFacts([
-      fact({ date: "2026-02-01" }),
-      fact({ date: "2026-01-01" }),
-      fact({ date: "2026-03-01" }),
-    ]);
-    expect(summary).toEqual({ newsletters: 3, firstDate: "2026-01-01", lastDate: "2026-03-01" });
-  });
-
-  it("handles no newsletters", () => {
-    expect(summarizeFacts([])).toEqual({ newsletters: 0, firstDate: null, lastDate: null });
   });
 });
 
@@ -270,12 +253,6 @@ describe("date windows", () => {
     const crowded = monthTickLabeler(lateStart, lateStart.length * 10);
     expect(crowded("2023-11")).toBe("");
     expect(crowded("2024-01")).toBe("2024");
-  });
-
-  it("counts broadly covered months within a window", () => {
-    const activity = countActiveWardsByMonth(coverageFacts);
-    expect(countBroadlyCoveredMonths(["2025-11", "2025-12", "2026-01", "2026-02", "2026-03"], activity, 9)).toBe(2);
-    expect(countBroadlyCoveredMonths(["2026-04"], activity, 9)).toBe(0);
   });
 
   it("classifies the date filters as the broad window, the full archive, or custom", () => {

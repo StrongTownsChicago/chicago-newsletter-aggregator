@@ -58,7 +58,7 @@ const CALENDAR_DARK_CELL_FRACTION = 0.55;
 const MIN_CALENDAR_DEVIATION = 0.1;
 /** Opacity of calendar cells resting on too few wards or a partial month. */
 const FADED_OPACITY = 0.35;
-/** Coverage grid rows, compact: the grid is reference, not a headline. */
+/** Ward × month grids (coverage, topic detail), compact: reference, not a headline. */
 const COVERAGE_ROW_HEIGHT = 11;
 const COVERAGE_FONT_SIZE = "10px";
 const SPARKLINE_WIDTH = 120;
@@ -352,14 +352,19 @@ export function renderCivicCalendar(cells: LensReachCell[], options: CivicCalend
         : []),
     ],
   });
-  makeTopicsClickable(plot, lenses, onSelectTopic);
+  makeTopicsClickable(plot, lenses, selectedLens, onSelectTopic);
   return withColorLegend(plot);
 }
 
-/** Row labels and cells select their topic; `plot.value` is the cell under the pointer. */
+/**
+ * Row labels and cells select their topic; `plot.value` is the cell under the
+ * pointer. Row labels are also keyboard buttons, so every topic is reachable
+ * without a pointer.
+ */
 function makeTopicsClickable(
   plot: ReturnType<typeof Plot.plot>,
-  lenses: { id: string }[],
+  lenses: { id: string; label: string }[],
+  selectedLens: string | null,
   onSelectTopic: (lensId: string) => void,
 ): void {
   plot.querySelectorAll<SVGElement>('[aria-label="cell"]').forEach((cells) => {
@@ -373,8 +378,17 @@ function makeTopicsClickable(
     const lens = lenses[index];
     if (!lens) return;
     label.style.cursor = "pointer";
+    label.setAttribute("tabindex", "0");
+    label.setAttribute("role", "button");
+    label.setAttribute("aria-label", `Show ${lens.label} detail`);
+    label.setAttribute("aria-pressed", String(lens.id === selectedLens));
     label.addEventListener("click", (event) => {
       event.stopPropagation();
+      onSelectTopic(lens.id);
+    });
+    label.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
       onSelectTopic(lens.id);
     });
   });
@@ -402,6 +416,9 @@ interface MentionGridOptions<T extends Pick<LensWardCell, "month" | "status" | "
   /** What a mention is of, for the tooltip: "Public safety". */
   subjectLabel: (cell: T) => string;
   marginLeft: number;
+  /** Row height in pixels; defaults to ROW_HEIGHT. */
+  rowHeight?: number;
+  fontSize?: string;
 }
 
 /** Row × month grid of mention statuses: mentioned, sent newsletters without mentioning, or no newsletter. */
@@ -415,8 +432,8 @@ function renderMentionGrid<T extends Pick<LensWardCell, "month" | "status" | "me
   const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + options.marginLeft + marginRight);
   const statuses = Object.keys(LENS_WARD_COLORS) as LensWardCell["status"][];
   const plot = Plot.plot({
-    ...baseOptions(plotWidth),
-    height: options.rows.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
+    ...baseOptions(plotWidth, options.fontSize),
+    height: options.rows.length * (options.rowHeight ?? ROW_HEIGHT) + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
     marginLeft: options.marginLeft,
     marginRight,
@@ -474,7 +491,9 @@ export function renderLensWardGrid(
       rowLabel: formatWard,
       describeCell: (cell) => `${formatWard(cell.ward)} · ${formatMonth(cell.month)}`,
       subjectLabel: () => lensLabel,
-      marginLeft: 70,
+      marginLeft: 60,
+      rowHeight: COVERAGE_ROW_HEIGHT,
+      fontSize: COVERAGE_FONT_SIZE,
     },
     width,
   );

@@ -258,21 +258,6 @@ export function filterFacts(
   );
 }
 
-export interface FactSummary {
-  newsletters: number;
-  firstDate: string | null;
-  lastDate: string | null;
-}
-
-export function summarizeFacts(facts: NewsletterFact[]): FactSummary {
-  const dates = facts.map((fact) => fact.date).sort();
-  return {
-    newsletters: facts.length,
-    firstDate: dates[0] ?? null,
-    lastDate: dates.at(-1) ?? null,
-  };
-}
-
 /** Every ward with a source in the database, including wards with no newsletters yet. */
 export function listSourceWards(sources: SourceCoverage[]): string[] {
   return [...new Set(sources.flatMap((source) => (source.ward ? [source.ward] : [])))].sort(compareWards);
@@ -390,16 +375,6 @@ export function findBroadCoverageWindow(
     maxActiveWardsBefore: Math.max(...activity.slice(0, startIndex).map((month) => month.activeWards)),
     months: activity.length - startIndex,
   };
-}
-
-/** How many of the listed months had at least `minActiveWards` wards sending. */
-export function countBroadlyCoveredMonths(
-  months: string[],
-  activity: MonthWardActivity[],
-  minActiveWards: number,
-): number {
-  const activeWardsByMonth = new Map(activity.map((month) => [month.month, month.activeWards]));
-  return months.filter((month) => (activeWardsByMonth.get(month) ?? 0) >= minActiveWards).length;
 }
 
 export type DateWindowKind = "broad" | "full" | "custom";

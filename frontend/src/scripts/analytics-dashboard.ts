@@ -6,7 +6,6 @@ import {
   buildLensWardGrid,
   classifyDateWindow,
   computeLensWardReach,
-  countActiveWardsByMonth,
   EMPTY_FILTERS,
   expandTermPostings,
   filterFacts,
@@ -36,7 +35,6 @@ import {
   type CoverageStatus,
   type LensDefinition,
   type LensReachCell,
-  type MonthWardActivity,
   type NewsletterFact,
   type RisingTerm,
   type TermIndex,
@@ -85,6 +83,7 @@ import {
 } from "../lib/analytics-ward-profile";
 import {
   describeSparkline,
+  findAsOfMonth,
   findLargestChangeTopic,
   findWidestReachTopic,
   formatPointChange,
@@ -119,7 +118,8 @@ interface DashboardState {
   allWards: string[];
   /** Every month from the first to the latest newsletter. */
   dataMonths: string[];
-  wardActivity: MonthWardActivity[];
+  /** The month the data was generated in; it and later months are partial. */
+  asOfMonth: string | null;
   broadWindow: BroadCoverageWindow | null;
   /** The values a shared URL may choose from. */
   urlContext: DashboardUrlContext;
@@ -296,7 +296,7 @@ function buildTopicOverview(
 ): TopicOverview {
   const lensIds = state.data.lenses.lenses.map((lens) => lens.id);
   const cells = computeLensWardReach(scopeFacts, lensIds, months);
-  const fullMonths = listFullMonths(months, state.data.metadata.last_date);
+  const fullMonths = listFullMonths(months, state.asOfMonth);
   const threshold = reachFadeThreshold(filters);
   return { cells, trends: summarizeTopicTrends(cells, lensIds, fullMonths, threshold), fullMonths, threshold };
 }
@@ -590,17 +590,19 @@ function renderCivicCalendarPanel(
   const { cells, fullMonths, threshold } = overview;
   const trends = orderBySwing(overview.trends);
   const lastDate = state.data.metadata.last_date;
-  const partialMonth = months.find((month) => isPartialMonth(month, lastDate)) ?? null;
+  const isPartial = (month: string) => isPartialMonth(month, state.asOfMonth);
   const fadeReason = (cell: LensReachCell): string | null =>
     isReachFaded(cell, threshold)
       ? `Faded: fewer than ${threshold} wards sent newsletters`
-      : cell.month === partialMonth
-        ? `Faded: partial month, newsletters through ${lastDate}`
+      : isPartial(cell.month)
+        ? `Faded: month in progress, newsletters through ${lastDate}`
         : null;
-  const hasFaded = cells.some((cell) => cell.share !== null && fadeReason(cell) !== null);
-  caption.textContent = hasFaded
-    ? `Faded: ${partialMonth ? "a partial month" : ""}${partialMonth && threshold ? " or " : ""}${threshold ? `fewer than ${threshold} wards sending` : ""}.`
-    : "";
+  const shownCells = cells.filter((cell) => cell.share !== null);
+  const fadedReasons = [
+    ...(shownCells.some((cell) => isPartial(cell.month)) ? ["month in progress"] : []),
+    ...(shownCells.some((cell) => isReachFaded(cell, threshold)) ? [`fewer than ${threshold} wards sending`] : []),
+  ];
+  caption.textContent = fadedReasons.length ? `Faded: ${fadedReasons.join(" or ")}.` : "";
   if (!chart) return;
   const lenses = trends.map((trend) => ({ id: trend.lens, label: lensLabel(state, trend.lens) }));
   replaceContent(
@@ -1098,7 +1100,7 @@ function buildDashboardState(data: AnalyticsDataset): DashboardState {
     lensById: new Map(data.lenses.lenses.map((lens) => [lens.id, lens])),
     allWards,
     dataMonths,
-    wardActivity: countActiveWardsByMonth(data.newsletters),
+    asOfMonth: findAsOfMonth(data.metadata.generated_at),
     broadWindow,
     urlContext: {
       filterWards: listWards(data.newsletters),
@@ -1188,6 +1190,8 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     requireElement<HTMLSelectElement>('select[name="lens"]', form).value = lensId;
     commit();
     requireElement<HTMLElement>("#topic-detail").scrollIntoView({ behavior: "smooth", block: "start" });
+    // The clicked control was redrawn; move focus to where the reader now is.
+    requireElement<HTMLElement>("#topic-detail-heading").focus({ preventScroll: true });
   };
   const rerender = () => renderDashboard(state, controls, selectTopic);
   /** Render a change the reader made and record it in the history. */
