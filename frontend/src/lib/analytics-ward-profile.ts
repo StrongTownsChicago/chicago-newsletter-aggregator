@@ -30,6 +30,8 @@ export interface WardTopicMonthCell {
   mentioning: number;
   /** All of the ward's newsletters that month. */
   newsletters: number;
+  /** mentioning / newsletters, or null with no newsletters. */
+  share: number | null;
 }
 
 export interface WardTopicSummary {
@@ -165,6 +167,7 @@ export function buildWardProfile(
       status,
       mentioning,
       newsletters,
+      share: newsletters ? mentioning / newsletters : null,
     })),
   );
   const readableFacts = windowFacts.filter(isReadable);

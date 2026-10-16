@@ -114,6 +114,9 @@ describe("buildWardProfile", () => {
     expect(profile.cadence.monthsWithNewsletters).toBe(2);
     const budget = profile.topicCells.filter((cell) => cell.lens === "budget").map((cell) => cell.status);
     expect(budget).toEqual(["no_newsletter", "mentioned", "no_newsletter", "not_mentioned"]);
+    // Shaded by the share of that month's newsletters mentioning the topic.
+    const budgetShares = profile.topicCells.filter((cell) => cell.lens === "budget").map((cell) => cell.share);
+    expect(budgetShares).toEqual([null, 1, null, 0]);
     expect(profile.topics.find((topic) => topic.lens === "budget")).toMatchObject({
       monthsMentioning: 1,
       monthsChecked: 2,
