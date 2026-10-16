@@ -141,16 +141,15 @@ ollama pull gpt-oss:20b
 
 - Backend CI (`.github/workflows/backend_tests.yml`) - Runs ruff, mypy, and tests on backend changes
 - Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and unit tests on frontend changes
-- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, queues notifications
+- Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
 All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
-**Local LLM Processing:**
+**LLM Processing:** Email ingestion in GitHub Actions summarizes each newsletter as it is stored, so new newsletters have their summary and topics from the start. Run `process_llm_metadata` locally only to backfill or reprocess (e.g. newsletters stored without metadata, prompt changes):
 
 ```bash
-# Process newsletters with Ollama (runs locally, not in GitHub Actions)
-uv run python -m utils.process_llm_metadata --latest 50
+uv run python -m utils.process_llm_metadata --missing-metadata --latest 50
 ```
 
 See `backend/docs/LOCAL_LLM_PROCESSING.md` for full guide.
@@ -258,6 +257,7 @@ frontend/src/
     ├── chart-export.ts           # Chart → PNG with title, window, caption, data date, caveat
     ├── analytics-charts.ts       # Observable Plot chart builders
     ├── analytics-data.ts         # Fetches the static analytics JSON (missing/failed states, lazy term index)
+    ├── page-cache.ts             # Edge cache rules for public SSR pages (used by middleware.ts)
     ├── site.ts                   # Site-wide strings/URLs, primary nav items, active-nav matching
     ├── supabase.ts               # Supabase client + TypeScript interfaces + notificationsEnabled() helper
     ├── wards.ts                  # Pure ward helpers (param validation, directory grouping, contact links)
@@ -284,6 +284,8 @@ frontend/src/
 **Search Filters** (`frontend/src/lib/search-filters.ts`): The search page parses URL params into a validated `SearchFilters` object (invalid values are dropped, never thrown), then `applySearchFilters()` is applied to both the count and data queries so they always filter identically. `buildSearchBaseUrl()` serializes filters back for pagination. Date filters are inclusive Chicago calendar days (`chicago-dates.ts`). Topic options come from `lib/topics.ts`, not from the database.
 
 **Search Timeline** (`lib/search-timeline.ts`, `components/SearchTimeline.astro`): For a search with results, `/search` shows a month strip above the results: newsletters per Chicago month for the query, over the search's dates (from `TIMELINE_DEFAULT_START_MONTH` when none are set). Ward, source and topic filters don't apply to it. Each month links to the search narrowed to that month, which keeps the full strip and highlights the month. Counts come from the `search_term_timeline` RPC (`backend/migrations/007_search_term_timeline.sql`, same `websearch_to_tsquery` matching as search) via `/api/search-timeline`, cached per query with the Workers Cache API; date ranges are applied in the browser so they don't change the cache key. If the RPC is missing or fails, the card is removed.
+
+**Page Cache** (`lib/page-cache.ts`, wired in `middleware.ts`): Anonymous GETs of allowlisted SSR pages are stored with the Workers Cache API (Pages Functions skip Cloudflare's CDN cache, so `Cache-Control` alone does nothing); the lookup runs before session work, so a hit makes no database call. Signed-in visitors (Supabase auth cookies) bypass it. Lifetimes and the allowlist are in `PAGE_CACHE_RULES`; account pages, `/api/*` and sitemaps are never cached. Only 200 responses that set no cookies are stored, and never from a URL with tracking params (pages echo the query into links); a page keeps a failed load out by setting `UNCACHEABLE_PAGE_CACHE_CONTROL`. Browsers get `Cache-Control: no-cache`, and `X-Page-Cache` reports hit, miss or bypass. The key includes a per-build id (`BUILD_ID` in `astro.config.mjs`), so each deploy starts empty. Privacy fixes and deletions stay visible on newsletter pages until the next deploy or the 30-day lifetime: push a commit or redeploy to clear them.
 
 **Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup.
 

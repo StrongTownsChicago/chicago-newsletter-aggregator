@@ -5,6 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import { supabase } from '../lib/supabase';
+import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/page-cache';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/newsletter-queries';
 
@@ -15,7 +16,7 @@ const start = (page - 1) * PAGE_SIZE;
 const end = start + PAGE_SIZE - 1;
 
 // Get total count
-const { count } = await supabase
+const { count, error: countError } = await supabase
   .from('newsletters')
   .select(buildNewsletterCountSelect({ filtersOnSource: false }), { count: 'exact', head: true });
 
@@ -31,6 +32,10 @@ const newsletters = data as NewsletterCardRow[] | null;
 
 if (error) {
   console.error('Error fetching newsletters:', error);
+}
+if (error || countError) {
+  // Keep a failed load out of the edge page cache.
+  Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
 ---
 

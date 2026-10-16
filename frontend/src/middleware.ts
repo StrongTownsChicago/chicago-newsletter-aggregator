@@ -1,11 +1,18 @@
 import { defineMiddleware } from "astro:middleware";
+import type { APIContext, MiddlewareNext } from "astro";
 import { createClient } from "@supabase/supabase-js";
 import { isNonProductionHost } from "./lib/seo";
+import { getDefaultEdgeCache } from "./lib/edge-cache";
+import { respondWithPageCache, resolvePageCacheVersion } from "./lib/page-cache";
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-export const onRequest = defineMiddleware(async (context, next) => {
+// Inlined at build time (astro.config.mjs), so each deploy has its own page cache.
+const pageCacheVersion = resolvePageCacheVersion(import.meta.env.BUILD_ID);
+
+/** Restores the visitor's session into locals, then renders the page. */
+async function renderWithSession(context: APIContext, next: MiddlewareNext): Promise<Response> {
   // Create a Supabase client for this request
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -41,7 +48,27 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.session = session;
   context.locals.user = session?.user ?? null;
 
-  const response = await next();
+  return next();
+}
+
+export const onRequest = defineMiddleware(async (context, next) => {
+  // Anonymous views of public pages are served from the edge cache before any session work.
+  const executionContext = context.locals.runtime?.ctx;
+  const response = await respondWithPageCache(
+    {
+      method: context.request.method,
+      url: context.url,
+      isPrerendered: context.isPrerendered,
+      readCookie: (name) => context.cookies.get(name)?.value,
+    },
+    {
+      cache: getDefaultEdgeCache(),
+      version: pageCacheVersion,
+      waitUntil: executionContext && ((promise) => executionContext.waitUntil(promise)),
+      setsCookies: () => !context.cookies.headers().next().done,
+    },
+    () => renderWithSession(context, next),
+  );
 
   // Cloudflare Pages also serves *.pages.dev and preview hosts; keep them out of search indexes.
   if (isNonProductionHost(context.url.host, context.site)) {
