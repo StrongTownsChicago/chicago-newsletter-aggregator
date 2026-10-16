@@ -59,9 +59,8 @@ export default defineConfig(
   },
   // New files stay under the cap; one that outgrows it is split.
   { files: ["src/**/*.{ts,astro}", "e2e/**/*.ts"], rules: maxLines(400) },
-  // Ceilings for files already over: lower freely, never raise. Split the file instead.
-  // src/tests/unit/lint-budgets.test.ts repeats them and checks each equals today's size.
-  { files: ["src/pages/preferences.astro"], rules: maxLines(785) },
+  // No file has its own ceiling: one over the cap is split, not exempted.
+  // src/tests/unit/lint-budgets.test.ts fails if a per-file ceiling is added.
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,
   // and `expect(obj.method)` assertions on mocked methods.
   {

@@ -7,11 +7,9 @@ import eslintConfig from "../../../eslint.config.js";
 const FRONTEND_ROOT = path.resolve(__dirname, "../../..");
 const DEFAULT_MAX_LINES = 400;
 
-// Same numbers as the max-lines ceilings in eslint.config.js. Raising one is a
-// two-place change on purpose; lower both when a file shrinks.
-const ADOPTED_CEILINGS: Record<string, number> = {
-  "src/pages/preferences.astro": 785,
-};
+// Per-file max-lines ceilings in eslint.config.js, repeated here. Every file is
+// under the default cap, so there are none; adding one is a two-place change on purpose.
+const ADOPTED_CEILINGS: Record<string, number> = {};
 
 interface MaxLinesBlock {
   files: string[];
@@ -46,7 +44,7 @@ describe("max-lines budgets", () => {
     }
   });
 
-  it("has no slack: each ceiling equals the file's measured size", async () => {
+  it.runIf(Object.keys(ADOPTED_CEILINGS).length > 0)("has no slack: each ceiling equals the file's measured size", async () => {
     const eslint = new ESLint({
       cwd: FRONTEND_ROOT,
       ruleFilter: ({ ruleId }) => ruleId === "max-lines",
