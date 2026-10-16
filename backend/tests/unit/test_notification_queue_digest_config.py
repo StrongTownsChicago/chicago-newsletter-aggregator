@@ -11,7 +11,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
 from zoneinfo import ZoneInfo
 
-from notifications.email_sender import DigestType
+from notifications.digest_config import DigestType
 from notifications.process_notification_queue import (
     DIGEST_CONFIGS,
     _calculate_daily_batch_id,

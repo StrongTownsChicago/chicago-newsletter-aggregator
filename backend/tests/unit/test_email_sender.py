@@ -9,18 +9,16 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from notifications.email_sender import (
-    DigestType,
-    _build_digest_html,
-    _build_digest_text,
-    _prepare_newsletter_data,
-    send_digest,
-)
+from notifications.digest_config import DigestType
+from notifications.digest_data import prepare_newsletter_data
+from notifications.digest_html import build_digest_html
+from notifications.digest_text import build_digest_text
+from notifications.email_sender import send_digest
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 
 
 class TestPrepareNewsletterData(unittest.TestCase):
-    """Tests for _prepare_newsletter_data() function."""
+    """Tests for prepare_newsletter_data() function."""
 
     def test_groups_by_newsletter(self) -> None:
         """Multiple rules matching same newsletter are grouped."""
@@ -37,7 +35,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
             },
         ]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertEqual(len(result), 1)
         self.assertEqual(len(result[0]["matched_rules"]), 2)
@@ -52,7 +50,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertEqual(result[0]["source_name"], "Test Alderman")
         self.assertEqual(result[0]["ward_text"], " (Ward 25)")
@@ -63,7 +61,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertEqual(result[0]["date_formatted"], "January 24, 2026")
 
@@ -75,7 +73,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertEqual(result[0]["date_formatted"], "Unknown date")
 
@@ -86,7 +84,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertEqual(result[0]["source_name"], "Unknown Source")
         self.assertEqual(result[0]["ward_text"], "")
@@ -97,7 +95,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
 
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertIn("nl_abc123", result[0]["newsletter_url"])
 
@@ -115,7 +113,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
             {"newsletter": newsletter2, "rule": {"name": "Rule 1"}},
         ]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         # Most recent should be first
         self.assertIn("nl_2", result[0]["newsletter_url"])
@@ -130,14 +128,14 @@ class TestPrepareNewsletterData(unittest.TestCase):
             {"newsletter": newsletter, "rule": {"name": "Bike Lanes"}},
         ]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
 
         self.assertIn("Zoning Updates", result[0]["matched_rules"])
         self.assertIn("Bike Lanes", result[0]["matched_rules"])
 
     def test_empty_notifications_returns_empty(self) -> None:
         """Empty notifications list returns empty result."""
-        result = _prepare_newsletter_data([])
+        result = prepare_newsletter_data([])
 
         self.assertEqual(result, [])
 
@@ -148,7 +146,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
             {"newsletter": {"id": None}},  # Missing ID
             {"something": "else"},  # Totally wrong structure
         ]
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
         self.assertEqual(result, [])
 
     def test_handles_invalid_date_format(self) -> None:
@@ -156,7 +154,7 @@ class TestPrepareNewsletterData(unittest.TestCase):
         newsletter = create_test_newsletter(received_date="2026-01-24-INVALID")
         notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
 
-        result = _prepare_newsletter_data(notifications)
+        result = prepare_newsletter_data(notifications)
         # Should take first 10 chars as fallback
         self.assertEqual(result[0]["date_formatted"], "2026-01-24")
 
@@ -290,7 +288,7 @@ class TestSendDailyDigest(unittest.TestCase):
 
 
 class TestBuildDigestHtml(unittest.TestCase):
-    """Tests for _build_digest_html() template generation."""
+    """Tests for build_digest_html() template generation."""
 
     def test_includes_all_newsletters(self) -> None:
         """All newsletters included in HTML."""
@@ -317,7 +315,7 @@ class TestBuildDigestHtml(unittest.TestCase):
             },
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -342,7 +340,7 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -367,7 +365,7 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -393,7 +391,7 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -418,7 +416,7 @@ class TestBuildDigestHtml(unittest.TestCase):
             }
         ]
 
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://example.com/preferences",
@@ -429,7 +427,7 @@ class TestBuildDigestHtml(unittest.TestCase):
 
 
 class TestBuildDigestText(unittest.TestCase):
-    """Tests for _build_digest_text() plain text template."""
+    """Tests for build_digest_text() plain text template."""
 
     def test_plain_text_structure(self) -> None:
         """Plain text has header, numbered list, footer."""
@@ -446,7 +444,7 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -482,7 +480,7 @@ class TestBuildDigestText(unittest.TestCase):
             },
         ]
 
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -507,7 +505,7 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -531,7 +529,7 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",
@@ -556,7 +554,7 @@ class TestBuildDigestText(unittest.TestCase):
             }
         ]
 
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://example.com/prefs",

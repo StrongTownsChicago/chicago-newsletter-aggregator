@@ -8,14 +8,14 @@ import unittest
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from notifications.email_sender import (
-    DigestType,
-    _build_digest_html,
-    _build_digest_text,
+from notifications.digest_config import DigestType
+from notifications.digest_html import (
     _render_daily_content_html,
     _render_weekly_content_html,
-    send_digest,
+    build_digest_html,
 )
+from notifications.digest_text import build_digest_text
+from notifications.email_sender import send_digest
 
 
 class TestDigestType(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestSendDigest(unittest.TestCase):
     """Tests for unified send_digest() function."""
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_sends_daily_digest(
         self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
@@ -74,7 +74,7 @@ class TestSendDigest(unittest.TestCase):
         self.assertIn("Daily", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_weekly_report_data")
+    @patch("notifications.email_sender.prepare_weekly_report_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_sends_weekly_digest(
         self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
@@ -116,7 +116,7 @@ class TestSendDigest(unittest.TestCase):
         self.assertIn("Topic", call_args["subject"])
 
     @patch("notifications.email_sender.resend.Emails.send")
-    @patch("notifications.email_sender._prepare_newsletter_data")
+    @patch("notifications.email_sender.prepare_newsletter_data")
     @patch("notifications.email_sender.generate_unsubscribe_token")
     def test_handles_sending_failure(
         self, mock_token: MagicMock, mock_prepare: MagicMock, mock_resend: MagicMock
@@ -256,7 +256,7 @@ class TestRenderWeeklyContentHtml(unittest.TestCase):
 
 
 class TestBuildDigestHtml(unittest.TestCase):
-    """Tests for unified _build_digest_html() function."""
+    """Tests for unified build_digest_html() function."""
 
     def test_uses_daily_template_for_daily_type(self) -> None:
         """Daily digest type uses daily template."""
@@ -275,7 +275,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://prefs.com",
@@ -302,7 +302,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         ]
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.WEEKLY,
             "http://prefs.com",
@@ -319,7 +319,7 @@ class TestBuildDigestHtml(unittest.TestCase):
         prepared: list[dict[str, Any]] = []
 
         # Act
-        html = _build_digest_html(
+        html = build_digest_html(
             prepared,
             DigestType.DAILY,
             "http://my-prefs.com",
@@ -332,7 +332,7 @@ class TestBuildDigestHtml(unittest.TestCase):
 
 
 class TestBuildDigestText(unittest.TestCase):
-    """Tests for unified _build_digest_text() function."""
+    """Tests for unified build_digest_text() function."""
 
     def test_uses_daily_format_for_daily_type(self) -> None:
         """Daily digest type uses daily text format."""
@@ -351,7 +351,7 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         # Act
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.DAILY,
             "http://prefs.com",
@@ -379,7 +379,7 @@ class TestBuildDigestText(unittest.TestCase):
         ]
 
         # Act
-        text = _build_digest_text(
+        text = build_digest_text(
             prepared,
             DigestType.WEEKLY,
             "http://prefs.com",

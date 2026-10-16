@@ -183,6 +183,8 @@ backend/
 ├── notifications/
 │   ├── rule_matcher.py           # Match newsletters to user notification rules
 │   ├── email_sender.py           # Send digest emails via Resend API
+│   ├── digest_data.py            # Group, fetch and format digest content
+│   ├── digest_html.py            # HTML digest bodies (digest_text.py: plain text)
 │   ├── process_notification_queue.py  # Daily digest orchestration
 │   ├── test_matcher.py           # Testing utility for rule matching
 │   └── error_logger.py           # Timestamped error logging
@@ -294,7 +296,7 @@ frontend/src/
 **Notification System** (`notifications/`):
 
 - `rule_matcher.py` - Matches newsletters against user rules (topics, search terms, wards). All filters AND-ed, within categories OR-ed. **Ward filters only apply to daily digest notifications.**
-- `email_sender.py` - Sends daily and weekly digests via Resend API with HTML/plain text templates
+- `email_sender.py` - Sends daily and weekly digests via Resend API; `digest_data.py` prepares their content and `digest_html.py`/`digest_text.py` render it
 - `process_notification_queue.py` - Orchestrates digest sending, groups by user, updates queue status, records in history
 - `weekly_notification_queue.py` - Queues weekly topic report notifications (topic-based only, no ward filtering)
 - Integration: Email ingestion queues notifications when `ENABLE_NOTIFICATIONS=true`. Web scraping does NOT trigger notifications (intentional). Failures don't break ingestion.

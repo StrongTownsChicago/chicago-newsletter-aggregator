@@ -79,7 +79,7 @@ external = ["DS"]
 # Library modules that use print as logging. This list only shrinks: moving one to `logging` removes its line.
 "ingest/email/email_parser.py" = ["T20"]
 "ingest/scraper/newsletter_scraper.py" = ["T20"]
-"notifications/email_sender.py" = ["T20"]
+"notifications/digest_data.py" = ["T20"]
 "notifications/rule_matcher.py" = ["T20"]
 "processing/llm_client.py" = ["T20"]
 "processing/llm_processor.py" = ["T20"]

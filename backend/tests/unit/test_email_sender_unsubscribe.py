@@ -6,11 +6,8 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from notifications.email_sender import (
-    DigestType,
-    _build_unsubscribe_url,
-    send_digest,
-)
+from notifications.digest_config import DigestType
+from notifications.email_sender import _build_unsubscribe_url, send_digest
 from tests.fixtures.unsubscribe_token_validation import validate_unsubscribe_token
 
 

@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import jwt
 
-from notifications.email_sender import DigestType, send_digest
+from notifications.digest_config import DigestType
+from notifications.email_sender import send_digest
 from notifications.unsubscribe_tokens import (
     ALGORITHM,
     generate_unsubscribe_token,

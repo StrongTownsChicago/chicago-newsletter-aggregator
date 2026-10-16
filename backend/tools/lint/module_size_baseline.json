@@ -4,9 +4,6 @@
     "analytics/lenses.py": {
       "lines": 594
     },
-    "notifications/email_sender.py": {
-      "lines": 643
-    },
     "tests/unit/test_analytics_terms.py": {
       "lines": 435
     },
