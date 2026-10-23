@@ -15,7 +15,6 @@ import {
   clearViewSelection,
   DASHBOARD_PANEL_IDS,
   describeDashboardView,
-  focusedWard,
   selectDashboardView,
   VIEW_PANELS,
   type DashboardPanelId,
@@ -37,6 +36,7 @@ import {
   setDateWindow,
   setWardSelection,
   updateWardSummary,
+  wireWardPickerDismissal,
 } from "./filters";
 import { renderCivicCalendarPanel } from "./panels/civic-calendar";
 import { renderCoveragePanel } from "./panels/coverage";
@@ -93,7 +93,6 @@ function renderDashboard(
   const filters = readFilters(controls.form);
   const view = selectDashboardView(filters);
   updateWardSummary(filters);
-  controls.profileSelect.value = focusedWard(filters) ?? "";
   // Moving panels drops focus inside them, so reorder only when the view changes.
   if (view !== state.view) {
     applyViewLayout(view);
@@ -110,7 +109,6 @@ function renderDashboard(
 /** The dashboard's controls, looked up once. */
 interface DashboardControls {
   form: HTMLFormElement;
-  profileSelect: HTMLSelectElement;
   termInput: HTMLInputElement;
 }
 
@@ -158,10 +156,9 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const state = buildDashboardState(data);
   const controls: DashboardControls = {
     form: requireElement<HTMLFormElement>("#analytics-filters"),
-    profileSelect: requireElement<HTMLSelectElement>("#profile-ward"),
     termInput: requireElement<HTMLInputElement>("#term-input"),
   };
-  const { form, profileSelect, termInput } = controls;
+  const { form, termInput } = controls;
   populateFilterOptions(
     form,
     state.urlContext.wards,
@@ -169,7 +166,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
     data.lenses.lenses,
     state.urlContext.defaultFromMonth,
   );
-  profileSelect.append(...state.allWards.map((ward) => new Option(formatWard(ward), ward)));
+  wireWardPickerDismissal(requireElement<HTMLDetailsElement>("#ward-picker"));
   renderLensDefinitions(state);
 
   const filtersNow = () => readFilters(form);
@@ -195,8 +192,6 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
 
   form.addEventListener("change", (event) => {
     const target = event.target as HTMLInputElement;
-    // The ward profile select is a shortcut to selecting just that ward.
-    if (event.target === profileSelect) setWardSelection(form, profileSelect.value ? [profileSelect.value] : []);
     if (target.name === "from" || target.name === "to") {
       const { fromMonth, toMonth } = reconcileDateWindow(readFilters(form), target.name);
       requireElement<HTMLSelectElement>('select[name="from"]', form).value = fromMonth ?? "";

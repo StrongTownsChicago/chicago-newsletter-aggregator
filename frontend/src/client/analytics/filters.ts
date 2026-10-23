@@ -102,3 +102,32 @@ export function setWardSelection(form: HTMLFormElement, wards: string[]): void {
     input.checked = wards.includes(input.value);
   });
 }
+
+/** How long the mouse can be outside the ward picker before it closes, so crossing the gap to its panel doesn't. */
+const WARD_PICKER_LEAVE_DELAY_MS = 300;
+
+/**
+ * Close the ward picker when the mouse leaves it, a click or focus lands outside it, or Escape is pressed.
+ * Mouse-leave ignores touch and pen, which have no hover.
+ */
+export function wireWardPickerDismissal(picker: HTMLDetailsElement): void {
+  let leaveTimer: ReturnType<typeof setTimeout> | undefined;
+  const close = () => {
+    clearTimeout(leaveTimer);
+    picker.open = false;
+  };
+  picker.addEventListener("pointerleave", (event) => {
+    if (picker.open && event.pointerType === "mouse") leaveTimer = setTimeout(close, WARD_PICKER_LEAVE_DELAY_MS);
+  });
+  picker.addEventListener("pointerenter", () => clearTimeout(leaveTimer));
+  const closeIfOutside = (event: Event) => {
+    if (picker.open && !picker.contains(event.target as Node)) close();
+  };
+  document.addEventListener("pointerdown", closeIfOutside);
+  document.addEventListener("focusin", closeIfOutside);
+  picker.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !picker.open) return;
+    close();
+    requireElement<HTMLElement>("summary", picker).focus();
+  });
+}
