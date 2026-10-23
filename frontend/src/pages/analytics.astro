@@ -232,9 +232,7 @@ const controlClass =
     const result = await loadCoreAnalyticsData();
     // Details go to the console; visitors get one plain message.
     if (result.status === 'missing') {
-      console.error(
-        `Analytics data missing: ${result.missingFiles.join(', ')}. Generate it with cli.compute_analytics in backend/.`,
-      );
+      console.error(`Analytics data missing: ${result.missingFiles.join(', ')}`);
       showSection('analytics-unavailable');
       return;
     }
