@@ -154,10 +154,8 @@ test('filters change the panels and the URL', async ({ page }) => {
   await expect(page).toHaveURL(/[?&]wards=2(&|$)/);
   // A single selected ward opens its profile.
   await expect(page.locator('#profile-heading')).toHaveText('Ward 2 · Bo Example');
-  await expect(page.locator('#profile-ward')).toHaveValue('2');
   await page.locator('input[name="ward"][value="3"]').check();
   await expect(page.locator('#ward-profile')).toBeHidden();
-  await expect(page.locator('#profile-ward')).toHaveValue('');
 });
 
 test('the ward view swaps city-wide panels for the ward profile', async ({ page }) => {
@@ -197,7 +195,6 @@ test('a former ward profile link opens that ward', async ({ page }) => {
   await expect(page).toHaveURL(/\/analytics\?wards=1&topic=budget_taxes$/);
   await expect(page.locator('#profile-heading')).toHaveText('Ward 1 · Ada Example');
   await expect(page.locator('input[name="ward"][value="3"]')).not.toBeChecked();
-  await expect(page.locator('#profile-ward')).toHaveValue('1');
 });
 
 test('Back to overview clears the ward and topic but keeps the dates', async ({ page }) => {
@@ -282,18 +279,39 @@ test('shows a ward with no archived newsletters neutrally', async ({ page }) => 
   await expect(page).toHaveURL(/\/analytics\?wards=4$/);
 });
 
-test('opens a ward profile from the filter bar', async ({ page }) => {
+test('opens a ward profile from the ward picker', async ({ page }) => {
   await openDashboard(page);
-  await page.locator('#profile-ward').selectOption('3');
+  await page.locator('#ward-summary').click();
+  await page.locator('input[name="ward"][value="3"]').check();
   await expect(page.locator('#ward-profile')).toBeVisible();
   await expect(page.locator('#profile-heading')).toHaveText('Ward 3 · Cy Example');
   await expect(page.locator('#profile-topics svg').first()).toBeVisible();
   await expect(page).toHaveURL(/[?&]wards=3(&|$)/);
-  await expect(page.locator('input[name="ward"][value="3"]')).toBeChecked();
   await page.getByRole('button', { name: 'Reset filters' }).click();
   await expect(page.locator('#ward-profile')).toBeHidden();
   await expect(page.locator('#dashboard-view-heading')).toHaveText('Overview');
   await expect(page).toHaveURL(/\/analytics$/);
+});
+
+test('the ward picker closes when the mouse leaves, on an outside click and on Escape', async ({ page }) => {
+  await openDashboard(page);
+  const picker = page.locator('#ward-picker');
+  const summary = page.locator('#ward-summary');
+
+  await summary.click();
+  await page.locator('input[name="ward"][value="2"]').check();
+  await expect(picker).toHaveAttribute('open', '');
+  await page.mouse.move(0, 0);
+  await expect(picker).not.toHaveAttribute('open');
+
+  await summary.click();
+  await page.locator('#dashboard-view-heading').click();
+  await expect(picker).not.toHaveAttribute('open');
+
+  await summary.click();
+  await page.keyboard.press('Escape');
+  await expect(picker).not.toHaveAttribute('open');
+  await expect(summary).toBeFocused();
 });
 
 test('names wards without newsletters and draws coverage on demand', async ({ page }) => {
