@@ -1,0 +1,29 @@
+---
+/** A notice in place of a list that is empty or failed to load: a title, one line of explanation, optional links. */
+interface Props {
+  title: string;
+  message: string;
+  links?: readonly { label: string; href: string }[];
+  /** Announce the notice to screen readers, for load failures. */
+  alert?: boolean;
+  testId?: string;
+}
+
+const { title, message, links = [], alert = false, testId } = Astro.props;
+---
+
+<div
+  class="bg-white rounded-lg border border-gray-200 px-6 py-12 text-center"
+  role={alert ? 'alert' : undefined}
+  data-testid={testId}
+>
+  <h2 class="text-lg font-semibold text-gray-900 mb-2">{title}</h2>
+  <p class="text-gray-600 max-w-md mx-auto">{message}</p>
+  {links.length > 0 && (
+    <div class="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2">
+      {links.map((link) => (
+        <a href={link.href} class="text-blue-600 hover:text-blue-800 font-medium">{link.label}</a>
+      ))}
+    </div>
+  )}
+</div>

@@ -114,3 +114,18 @@ export const NEWSLETTER_DETAIL_SELECT = `*, sources(${SOURCE_DETAIL_COLUMNS.join
 export type NewsletterDetailRow = Omit<Newsletter, "sources"> & {
   sources: Pick<Source, (typeof SOURCE_DETAIL_COLUMNS)[number]> | null;
 };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether `id` can be a newsletter id, so a malformed URL is a 404 without a database query. */
+export function isNewsletterId(id: string | undefined): id is string {
+  return id !== undefined && UUID_PATTERN.test(id);
+}
+
+/** PostgREST's error code when `.single()` matches no row. */
+const NO_ROWS_ERROR_CODE = "PGRST116";
+
+/** Whether a detail lookup failed because the newsletter doesn't exist, rather than a database error. */
+export function isNewsletterMissing(error: { code?: string } | null, row: unknown): boolean {
+  return error ? error.code === NO_ROWS_ERROR_CODE : row === null;
+}

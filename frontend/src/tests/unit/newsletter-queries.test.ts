@@ -5,6 +5,8 @@ import {
   NEWSLETTER_DETAIL_SELECT,
   SOURCE_WARD_DIRECTORY_SELECT,
   SOURCE_WARD_PROFILE_SELECT,
+  isNewsletterId,
+  isNewsletterMissing,
 } from '../../lib/server/newsletter-queries';
 
 /** Split a PostgREST select string into top-level columns and the sources embed. */
@@ -112,5 +114,35 @@ describe('SOURCE_WARD_DIRECTORY_SELECT', () => {
     for (const field of SOURCE_CONTACT_FIELDS) {
       expect(columns).not.toContain(field);
     }
+  });
+});
+
+describe('isNewsletterId', () => {
+  it('accepts UUIDs in either case', () => {
+    expect(isNewsletterId('0f8fad5b-d9cb-469f-a165-70867728950e')).toBe(true);
+    expect(isNewsletterId('0F8FAD5B-D9CB-469F-A165-70867728950E')).toBe(true);
+  });
+
+  it.each([undefined, '', '123', 'not-a-newsletter', '0f8fad5b-d9cb-469f-a165-70867728950e/extra'])(
+    'rejects %j',
+    (id) => {
+      expect(isNewsletterId(id)).toBe(false);
+    },
+  );
+});
+
+describe('isNewsletterMissing', () => {
+  it('treats a no-rows error as missing', () => {
+    expect(isNewsletterMissing({ code: 'PGRST116' }, null)).toBe(true);
+  });
+
+  it('treats other errors as failures, not missing', () => {
+    expect(isNewsletterMissing({ code: '57014' }, null)).toBe(false);
+    expect(isNewsletterMissing({}, null)).toBe(false);
+  });
+
+  it('treats an empty result without an error as missing', () => {
+    expect(isNewsletterMissing(null, null)).toBe(true);
+    expect(isNewsletterMissing(null, { id: 'x' })).toBe(false);
   });
 });

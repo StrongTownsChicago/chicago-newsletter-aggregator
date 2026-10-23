@@ -4,23 +4,29 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
+import StatusMessage from '../components/StatusMessage.astro';
 import { supabase } from '../lib/supabase';
 import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/server/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
+import { countPages, getPageRange, parsePageParam } from '../lib/pagination';
+import { HOME_PATH } from '../lib/site';
+import {
+  LOAD_FAILED_MESSAGE,
+  LOAD_FAILED_TITLE,
+  PAGE_OUT_OF_RANGE_MESSAGE,
+  PAGE_OUT_OF_RANGE_TITLE,
+} from '../lib/load-messages';
 
-// Pagination setup
-const page = parseInt(Astro.url.searchParams.get('page') || '1');
-const PAGE_SIZE = 20;
-const start = (page - 1) * PAGE_SIZE;
-const end = start + PAGE_SIZE - 1;
+const page = parsePageParam(Astro.url.searchParams.get('page'));
+const { from: start, to: end } = getPageRange(page);
 
 // Get total count
 const { count, error: countError } = await supabase
   .from('newsletters')
   .select(buildNewsletterCountSelect({ filtersOnSource: false }), { count: 'exact', head: true });
 
-const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
+const totalPages = countPages(count ?? 0);
 
 // Get paginated newsletters
 const { data, error } = await supabase
@@ -30,10 +36,10 @@ const { data, error } = await supabase
   .range(start, end);
 const newsletters = data as NewsletterCardRow[] | null;
 
-if (error) {
-  console.error('Error fetching newsletters:', error);
-}
-if (error || countError) {
+const loadFailed = Boolean(error || countError);
+if (loadFailed) {
+  console.error('Error fetching newsletters:', error ?? countError);
+  Astro.response.status = 503;
   // Keep a failed load out of the edge page cache.
   Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
@@ -46,7 +52,7 @@ if (error || countError) {
 >
   <div class="container mx-auto px-4 py-8 max-w-6xl">
     <header class="mb-6">
-      {count !== null && (
+      {!loadFailed && count !== null && (
         <p class="text-base sm:text-lg text-gray-600" data-testid="newsletter-count">
           Browse {count} newsletter{count !== 1 ? 's' : ''} that aldermen sent to their wards, newest first.
         </p>
@@ -54,16 +60,30 @@ if (error || countError) {
     </header>
 
     <section>
-      <div class="space-y-4">
-        {newsletters?.length === 0 && (
-          <p class="text-gray-600 text-center py-12">No newsletters found.</p>
-        )}
-        {newsletters?.map((newsletter) => (
-          <NewsletterCard newsletter={newsletter} />
-        ))}
-      </div>
+      {loadFailed ? (
+        <StatusMessage title={LOAD_FAILED_TITLE} message={LOAD_FAILED_MESSAGE} alert testId="newsletters-load-error" />
+      ) : count === 0 ? (
+        <StatusMessage
+          title="No newsletters yet"
+          message="Newsletters will appear here as aldermen send them."
+          testId="newsletters-empty"
+        />
+      ) : newsletters?.length === 0 ? (
+        <StatusMessage
+          title={PAGE_OUT_OF_RANGE_TITLE}
+          message={PAGE_OUT_OF_RANGE_MESSAGE}
+          links={[{ label: 'Go to the newest newsletters', href: HOME_PATH }]}
+          testId="newsletters-page-empty"
+        />
+      ) : (
+        <div class="space-y-4">
+          {newsletters?.map((newsletter) => (
+            <NewsletterCard newsletter={newsletter} />
+          ))}
+        </div>
+      )}
 
-      <Pagination currentPage={page} totalPages={totalPages} baseUrl="/" />
+      {!loadFailed && <Pagination currentPage={page} totalPages={totalPages} baseUrl={HOME_PATH} />}
     </section>
   </div>
 </Layout>
