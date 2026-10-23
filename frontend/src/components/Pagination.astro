@@ -51,7 +51,8 @@ const generatePageNumbersToDisplay = () => {
 const pageNumbers = generatePageNumbersToDisplay();
 ---
 
-{totalPages > 1 && (
+{/* A page past the end shows its own message instead. */}
+{totalPages > 1 && currentPage <= totalPages && (
   <nav class="flex items-center justify-center gap-2 mt-8" aria-label="Pagination" data-testid="pagination">
     <!-- Previous Button -->
     {currentPage > 1 ? (
@@ -68,12 +69,15 @@ const pageNumbers = generatePageNumbersToDisplay();
       </span>
     )}
 
-    <!-- Page Numbers -->
-    <div class="flex gap-1">
+    <!-- Phones show the position; wider screens show page links. -->
+    <span class="sm:hidden px-2 text-sm text-gray-700 whitespace-nowrap" data-testid="pagination-position">
+      Page {currentPage} of {totalPages}
+    </span>
+    <div class="hidden sm:flex gap-1">
       {pageNumbers.map((page) => (
         typeof page === 'number' ? (
           page === currentPage ? (
-            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold" data-testid="pagination-current">
+            <span class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold" aria-current="page" data-testid="pagination-current">
               {page}
             </span>
           ) : (
@@ -86,7 +90,7 @@ const pageNumbers = generatePageNumbersToDisplay();
             </a>
           )
         ) : (
-          <span class="px-4 py-2 text-gray-400">...</span>
+          <span class="px-4 py-2 text-gray-400" aria-hidden="true">…</span>
         )
       ))}
     </div>

@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import NotFound from '../components/NotFound.astro';
+import { SITE_NAME } from '../lib/seo';
+---
+
+<Layout title={`Page not found - ${SITE_NAME}`} description="This page doesn't exist or has moved.">
+  <NotFound />
+</Layout>

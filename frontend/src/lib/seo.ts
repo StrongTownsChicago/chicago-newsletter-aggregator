@@ -1,5 +1,13 @@
 export const SITE_NAME = "Chicago Alderman Newsletter Tracker";
 
+/** Link-preview card (public/og-image.png) used when a page doesn't pass its own image. */
+export const DEFAULT_SOCIAL_IMAGE = {
+  path: "/og-image.png",
+  width: 1200,
+  height: 630,
+  alt: `${SITE_NAME}: search what Chicago aldermen tell their wards`,
+} as const;
+
 /** Search engines typically display roughly this many characters of a meta description. */
 export const META_DESCRIPTION_MAX_LENGTH = 155;
 

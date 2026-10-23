@@ -5,6 +5,13 @@ import Layout from '../layouts/Layout.astro';
 import NewsletterCard from '../components/NewsletterCard.astro';
 import Pagination from '../components/Pagination.astro';
 import SearchTimeline from '../components/SearchTimeline.astro';
+import StatusMessage from '../components/StatusMessage.astro';
+import {
+  LOAD_FAILED_MESSAGE,
+  LOAD_FAILED_TITLE,
+  PAGE_OUT_OF_RANGE_MESSAGE,
+  PAGE_OUT_OF_RANGE_TITLE,
+} from '../lib/load-messages';
 import { supabase } from '../lib/supabase';
 import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/server/newsletter-queries';
@@ -64,14 +71,17 @@ const [
   { data: sourceData, error: sourcesError },
 ] = await Promise.all([countQuery, dataQuery.range(start, end), sourcesQuery]);
 
+const newsletters = data as NewsletterCardRow[] | null;
+// Results that loaded still show when only the count failed; an empty page without a count reads as a failure.
+const resultsFailed = Boolean(dataError) || (Boolean(countError) && newsletters?.length === 0);
 if (countError || dataError || sourcesError) {
   console.error('Error loading search results:', countError ?? dataError ?? sourcesError);
-  // Keep a failed load out of the edge page cache.
+  if (resultsFailed) Astro.response.status = 503;
+  // Keep a failed or partial load out of the edge page cache.
   Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
 
 const totalPages = Math.ceil((count || 0) / SEARCH_PAGE_SIZE);
-const newsletters = data as NewsletterCardRow[] | null;
 
 const sources = sourceData ?? [];
 const sourceOptions = buildSourceOptions(sources);
@@ -80,7 +90,7 @@ const sourceTypes = extractSourceTypes(sources);
 const showSourceTypeFilter = sourceTypes.length > 1;
 
 const baseUrl = buildSearchBaseUrl(filters, sort);
-const timelineQuery = (count ?? 0) > 0 ? normalizeTimelineQuery(filters.query) : null;
+const timelineQuery = !resultsFailed && (count ?? 0) > 0 ? normalizeTimelineQuery(filters.query) : null;
 const timelineRange = timelineRangeForSearch(filters.fromDate, filters.toDate);
 const timelineSelectedMonth = selectedTimelineMonth(filters.fromDate, filters.toDate);
 const timelineHasOtherFilters = Boolean(
@@ -235,13 +245,9 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
     </form>
 
     <!-- Results count -->
-    <div class="mb-4 text-gray-600">
-      {newsletters?.length === 0 ? (
-        <p>No newsletters found matching your criteria.</p>
-      ) : count !== null && (
-        <p>Found {count} newsletter{count !== 1 ? 's' : ''}</p>
-      )}
-    </div>
+    {!resultsFailed && count !== null && count > 0 && (
+      <p class="mb-4 text-gray-600">Found {count} newsletter{count !== 1 ? 's' : ''}</p>
+    )}
 
     {timelineQuery && (
       <SearchTimeline
@@ -253,14 +259,30 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
       />
     )}
 
-    <div class="space-y-4">
-      {newsletters?.map((newsletter) => (
-        <NewsletterCard newsletter={newsletter} />
-      ))}
-    </div>
+    {resultsFailed ? (
+      <StatusMessage title={LOAD_FAILED_TITLE} message={LOAD_FAILED_MESSAGE} alert testId="search-load-error" />
+    ) : count === 0 ? (
+      <StatusMessage
+        title="No newsletters match your search"
+        message="Try fewer or different words, a wider date range, or fewer filters."
+        testId="search-empty"
+      />
+    ) : newsletters?.length === 0 ? (
+      <StatusMessage
+        title={PAGE_OUT_OF_RANGE_TITLE}
+        message={PAGE_OUT_OF_RANGE_MESSAGE}
+        links={[{ label: 'Go to the first page', href: baseUrl }]}
+        testId="search-page-empty"
+      />
+    ) : (
+      <div class="space-y-4">
+        {newsletters?.map((newsletter) => (
+          <NewsletterCard newsletter={newsletter} />
+        ))}
+      </div>
+    )}
 
-    <!-- Pagination -->
-    <Pagination currentPage={page} totalPages={totalPages} baseUrl={baseUrl} />
+    {!resultsFailed && <Pagination currentPage={page} totalPages={totalPages} baseUrl={baseUrl} />}
 
   </div>
 </Layout>

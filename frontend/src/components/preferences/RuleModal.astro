@@ -240,7 +240,7 @@ const { isWelcome, availableWards } = Astro.props;
             </p>
             <div class="grid grid-cols-5 sm:grid-cols-8 gap-2">
               {availableWards.map((ward) => (
-                <label class="flex items-center justify-center p-2 rounded border border-gray-200 bg-white hover:bg-blue-50 cursor-pointer transition-colors text-sm">
+                <label class="relative flex items-center justify-center p-2 rounded border border-gray-200 bg-white hover:bg-blue-50 cursor-pointer transition-colors text-sm">
                   <input
                     type="checkbox"
                     name="wards"
