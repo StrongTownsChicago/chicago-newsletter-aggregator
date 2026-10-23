@@ -1,9 +1,7 @@
 ---
-import { HOME_PATH } from '../lib/site';
 import { SEARCH_PARAM_NAMES, SEARCH_PATH } from '../lib/search-filters';
-import { WARD_DIRECTORY_PATH } from '../lib/wards';
 
-/** The body of a "not found" page: the page's one heading, a short explanation, and ways back in. */
+/** The body of a "not found" page: the page's one heading, a short explanation, and a search box. */
 interface Props {
   title?: string;
   message?: string;
@@ -15,18 +13,13 @@ const {
   message = "This page doesn't exist or has moved.",
   testId = 'not-found',
 } = Astro.props;
-
-const WAYS_BACK = [
-  { label: 'Recent newsletters', href: HOME_PATH },
-  { label: 'Find your ward', href: WARD_DIRECTORY_PATH },
-] as const;
 ---
 
 <section class="container mx-auto px-4 py-16 sm:py-24 max-w-xl text-center" data-testid={testId}>
   <p class="text-sm font-semibold uppercase tracking-wide text-blue-700 mb-2">404</p>
   <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">{title}</h1>
   <p class="text-gray-600 mb-8">{message}</p>
-  <form action={SEARCH_PATH} method="get" role="search" class="flex gap-2 mb-8">
+  <form action={SEARCH_PATH} method="get" role="search" class="flex gap-2">
     <label for="not-found-search" class="sr-only">Search newsletters</label>
     <input
       id="not-found-search"
@@ -39,9 +32,4 @@ const WAYS_BACK = [
       Search
     </button>
   </form>
-  <nav aria-label="Ways back" class="flex flex-wrap justify-center gap-x-6 gap-y-2">
-    {WAYS_BACK.map((link) => (
-      <a href={link.href} class="text-blue-600 hover:text-blue-800 font-medium">{link.label}</a>
-    ))}
-  </nav>
 </section>

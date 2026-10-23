@@ -25,7 +25,6 @@ import {
   type WardNewsletterPage,
 } from '../../lib/server/ward-queries';
 import {
-  WARD_DIRECTORY_PATH,
   buildWardContactLinks,
   buildWardPath,
   buildWardSearchPath,
@@ -151,8 +150,7 @@ const description = wardNumber === null
           ) : totalCount === 0 ? (
             <StatusMessage
               title={`No newsletters from Ward ${wardNumber} yet`}
-              message="Newsletters will appear here once this ward's alderman sends one we archive."
-              links={[{ label: 'Browse all wards', href: WARD_DIRECTORY_PATH }]}
+              message="Newsletters will appear here once we archive one from this ward."
               testId="ward-empty"
             />
           ) : (
@@ -163,6 +161,7 @@ const description = wardNumber === null
                     title={PAGE_OUT_OF_RANGE_TITLE}
                     message={PAGE_OUT_OF_RANGE_MESSAGE}
                     links={[{ label: 'Go to the newest newsletters', href: buildWardPath(wardNumber) }]}
+                    testId="ward-page-empty"
                   />
                 )}
                 {newsletters.map((newsletter) => (

@@ -36,11 +36,12 @@ const { data, error } = await supabase
   .range(start, end);
 const newsletters = data as NewsletterCardRow[] | null;
 
-const loadFailed = Boolean(error || countError);
-if (loadFailed) {
+// Cards that loaded still show when only the count failed; an empty page without a count reads as a failure.
+const loadFailed = Boolean(error) || (Boolean(countError) && newsletters?.length === 0);
+if (error || countError) {
   console.error('Error fetching newsletters:', error ?? countError);
-  Astro.response.status = 503;
-  // Keep a failed load out of the edge page cache.
+  if (loadFailed) Astro.response.status = 503;
+  // Keep a failed or partial load out of the edge page cache.
   Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
 ---
@@ -72,7 +73,6 @@ if (loadFailed) {
         <StatusMessage
           title={PAGE_OUT_OF_RANGE_TITLE}
           message={PAGE_OUT_OF_RANGE_MESSAGE}
-          links={[{ label: 'Go to the newest newsletters', href: HOME_PATH }]}
           testId="newsletters-page-empty"
         />
       ) : (

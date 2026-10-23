@@ -71,16 +71,17 @@ const [
   { data: sourceData, error: sourcesError },
 ] = await Promise.all([countQuery, dataQuery.range(start, end), sourcesQuery]);
 
-const resultsFailed = Boolean(countError || dataError);
+const newsletters = data as NewsletterCardRow[] | null;
+// Results that loaded still show when only the count failed; an empty page without a count reads as a failure.
+const resultsFailed = Boolean(dataError) || (Boolean(countError) && newsletters?.length === 0);
 if (countError || dataError || sourcesError) {
   console.error('Error loading search results:', countError ?? dataError ?? sourcesError);
   if (resultsFailed) Astro.response.status = 503;
-  // Keep a failed load out of the edge page cache.
+  // Keep a failed or partial load out of the edge page cache.
   Astro.response.headers.set('Cache-Control', UNCACHEABLE_PAGE_CACHE_CONTROL);
 }
 
 const totalPages = Math.ceil((count || 0) / SEARCH_PAGE_SIZE);
-const newsletters = data as NewsletterCardRow[] | null;
 
 const sources = sourceData ?? [];
 const sourceOptions = buildSourceOptions(sources);
@@ -89,7 +90,7 @@ const sourceTypes = extractSourceTypes(sources);
 const showSourceTypeFilter = sourceTypes.length > 1;
 
 const baseUrl = buildSearchBaseUrl(filters, sort);
-const timelineQuery = (count ?? 0) > 0 ? normalizeTimelineQuery(filters.query) : null;
+const timelineQuery = !resultsFailed && (count ?? 0) > 0 ? normalizeTimelineQuery(filters.query) : null;
 const timelineRange = timelineRangeForSearch(filters.fromDate, filters.toDate);
 const timelineSelectedMonth = selectedTimelineMonth(filters.fromDate, filters.toDate);
 const timelineHasOtherFilters = Boolean(
