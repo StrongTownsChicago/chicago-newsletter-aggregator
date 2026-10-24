@@ -84,6 +84,9 @@ uv run python -m unittest discover -s tests
 # Run tests with performance timing
 uv run python -m tools.time_test_suite
 
+# Mutation testing (dev-only, not in CI; minutes per module; targets in the tool)
+uv run --group mutation python -m tools.run_mutation_tests [rule_matcher ...]
+
 # Code quality checks (run before committing Python changes)
 uv run ruff check --fix
 uv run ruff format
@@ -255,7 +258,7 @@ Subjects come from **keyword lenses** (reviewed phrase lists in `analytics/lense
 
 **Ward Summaries and Monthly Reports** (public, indexed): built by `analytics/ward_glance.py` and `monthly_reports.py` into `frontend/src/generated/`. `ward-glance.json` is bundled into the worker (`components/WardGlance.astro`), so keep it small. `pages/reports/` are prerendered from `monthly-reports.json` (no DB) and excluded from the worker in `astro.config.mjs`. Reports cover only complete months. Distinctive and rising terms stay on the dashboard: they surface personal names and filler words.
 
-**Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. See `backend/tests/test_sanitization*.py` for test coverage.
+**Privacy Sanitization** (`email_parser.py:sanitize_content()`): Config-driven filtering using `backend/config/privacy_patterns.py` (URL patterns, text patterns, CSS selectors defined as Python constants). Pure function receives patterns as parameter for testability. Links with images unwrapped; text-only privacy links removed. `PRIVACY_STRIP_PHRASES` are redacted in text and attribute values only (never markup), and sanitizing already sanitized content changes nothing, since `reprocess_newsletters_privacy` reapplies it to stored rows. See `backend/tests/unit/test_sanitization*.py`, including Hypothesis properties.
 
 **Newsletter Content Storage** (`newsletters` table): Both `plain_text` and `raw_html` columns serve distinct, critical purposes:
 
@@ -321,7 +324,7 @@ UNSUBSCRIBE_SECRET_KEY=         # Must match backend key
 
 ## Testing
 
-**Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section).
+**Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section). Property-based tests (`test_*_properties.py`) use Hypothesis with the shared settings in `tests/fixtures/property_settings.py`.
 
 **Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section).
 

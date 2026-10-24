@@ -26,3 +26,6 @@ htmlcov/
 
 # Hypothesis example database (property-based tests)
 .hypothesis/
+
+# Mutation testing sessions (backend/tools/run_mutation_tests.py)
+backend/.mutation/
