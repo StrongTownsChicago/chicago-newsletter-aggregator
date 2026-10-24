@@ -1,9 +1,7 @@
-// /analytics on small committed fixture data.
-// Run with `npm run test:e2e:analytics` (playwright.analytics.config.ts), which
-// starts its own dev server with placeholder Supabase settings. The analytics
-// pages never query Supabase; as a guard, every request that leaves the dev
-// server is aborted and fails the test, and every data file is served from
-// e2e/fixtures/analytics/ instead of public/analytics-data/ (offline-guard.ts).
+// /analytics on small committed fixture data. The analytics pages never query
+// Supabase; as a guard, every request that leaves the dev server is aborted and
+// fails the test, and every data file is served from e2e/fixtures/analytics/
+// instead of public/analytics-data/ (offline-guard.ts).
 import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { useOfflineFixtures } from './offline-guard';

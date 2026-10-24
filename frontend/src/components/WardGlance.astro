@@ -109,7 +109,7 @@ const topics = glance && glance.topic_newsletters > 0 ? glance.topics : [];
 
     <p class="mt-6 text-xs text-gray-500" data-testid="ward-glance-note">
       {file.data_through && <>Data through {formatLongDate(file.data_through)} · </>}
-      <a href={REPORTS_INDEX_PATH} class="text-blue-600 hover:text-blue-800 hover:underline">Monthly reports</a>
+      <a href={REPORTS_INDEX_PATH} class="text-blue-600 underline hover:text-blue-800">Monthly reports</a>
     </p>
   </section>
 )}

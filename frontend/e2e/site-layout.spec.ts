@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { FEATURED_NEWSLETTER } from './fixtures/db/facts';
 
 async function expectSiteHeaderAndFooter(page: Page) {
   const header = page.getByRole('banner');
@@ -28,18 +29,6 @@ async function expectSiteHeaderAndFooter(page: Page) {
   );
 }
 
-async function openFirstNewsletter(page: Page): Promise<string | null> {
-  await page.goto('/');
-  const firstCardTitle = page.getByTestId('newsletter-title').first();
-  if ((await firstCardTitle.count()) === 0) {
-    return null;
-  }
-  const subject = await firstCardTitle.innerText();
-  await firstCardTitle.locator('a').click();
-  await expect(page).toHaveURL(/\/newsletter\/.+/);
-  return subject;
-}
-
 for (const path of ['/', '/search', '/wards', '/ward/1']) {
   test(`renders the site header and footer on ${path}`, async ({ page }) => {
     await page.goto(path);
@@ -56,20 +45,18 @@ for (const path of ['/', '/search', '/wards', '/ward/1']) {
 }
 
 test('renders the site header and footer on a newsletter detail page', async ({ page }) => {
-  const subject = await openFirstNewsletter(page);
-  test.skip(subject === null, 'No newsletters to open');
+  await page.goto(`/newsletter/${FEATURED_NEWSLETTER.id}`);
   await expectSiteHeaderAndFooter(page);
 });
 
-// The archived newsletter body (raw_html) may contain its own <h1> elements, so the
-// assertion covers every h1 the site itself renders, i.e. those outside that body.
+// The archived newsletter body (raw_html) may contain its own <h1> elements, as the
+// seeded one does, so the assertion covers every h1 the site itself renders, i.e. those outside that body.
 test('newsletter detail page renders exactly one site h1 and it is the subject', async ({ page }) => {
-  const subject = await openFirstNewsletter(page);
-  test.skip(subject === null, 'No newsletters to open');
+  await page.goto(`/newsletter/${FEATURED_NEWSLETTER.id}`);
   const siteHeadings = page.locator('h1:not([data-testid="newsletter-detail-content"] h1)');
   await expect(siteHeadings).toHaveCount(1);
-  await expect(siteHeadings).toHaveText(subject ?? '');
-  await expect(page.getByRole('main').getByTestId('newsletter-detail-title')).toHaveText(subject ?? '');
+  await expect(siteHeadings).toHaveText(FEATURED_NEWSLETTER.subject);
+  await expect(page.getByRole('main').getByTestId('newsletter-detail-title')).toHaveText(FEATURED_NEWSLETTER.subject);
 });
 
 test.describe('on a phone', () => {

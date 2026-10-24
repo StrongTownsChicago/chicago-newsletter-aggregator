@@ -111,11 +111,13 @@ function buildMonthColumn(
     `mt-1 text-xs ${isSelected ? "font-semibold text-gray-900" : "text-gray-600"}`,
     formatShortMonth(entry.month),
   );
-  target.append(count, track, monthLabel);
+  target.append(track, monthLabel);
+  // Outside the link, whose label already gives the count, so the link's visible text is just the month.
+  count.setAttribute("aria-hidden", "true");
 
-  const year = element("span", "text-[0.65rem] leading-3 h-3 text-gray-400", yearLabelForBar(entry.month, index) ?? "");
+  const year = element("span", "text-[0.65rem] leading-3 h-3 text-gray-500", yearLabelForBar(entry.month, index) ?? "");
   year.setAttribute("aria-hidden", "true");
-  column.append(target, year);
+  column.append(count, target, year);
   return column;
 }
 

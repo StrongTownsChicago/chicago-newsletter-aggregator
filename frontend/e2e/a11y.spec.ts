@@ -1,10 +1,10 @@
-// Automated WCAG 2.1 A/AA checks (axe-core) on the pages that render without
-// the database. Run with `npm run test:e2e:analytics`: its dev server has
-// placeholder Supabase settings, so database-backed pages render their
-// load-failure state, which still covers the shared header, nav, forms and footer.
+// Automated WCAG 2.1 A/AA checks (axe-core) on every page, populated from the
+// local database's seed, at desktop and phone widths.
 import AxeBuilder from '@axe-core/playwright';
 import { test, expect, type Page } from '@playwright/test';
 import monthlyReports from '../src/generated/monthly-reports.json' with { type: 'json' };
+import { FEATURED_NEWSLETTER, READER_RULES, RULES_READER, SEARCH_WORD, WARD_40, type SeedUser } from './fixtures/db/facts';
+import { signIn } from './support/auth';
 import { useOfflineFixtures } from './offline-guard';
 
 const WCAG_AA_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -14,6 +14,8 @@ const reportMonth = monthlyReports.reports[0]?.month;
 interface ScannedPage {
   name: string;
   path: string;
+  /** Signed in as this user before the page is opened. */
+  user?: SeedUser;
   /** Brings the page into the state to scan once it has loaded. */
   prepare?: (page: Page) => Promise<void>;
 }
@@ -21,11 +23,28 @@ interface ScannedPage {
 const SCANNED_PAGES: ScannedPage[] = [
   { name: 'home', path: '/' },
   {
+    name: 'search results with the timeline',
+    path: `/search?q=${SEARCH_WORD}`,
+    prepare: (page) => expect(page.getByTestId('search-timeline').getByRole('link').first()).toBeVisible(),
+  },
+  {
     name: 'search with filters open',
-    path: '/search?q=zoning&ward=1&topic=bike_lanes',
+    path: `/search?q=${SEARCH_WORD}&ward=1&topic=bike_lanes`,
     prepare: (page) => page.getByTestId('search-filters-toggle').click(),
   },
   { name: 'ward directory', path: '/wards' },
+  { name: 'ward page', path: `/ward/${WARD_40.ward}` },
+  { name: 'newsletter', path: `/newsletter/${FEATURED_NEWSLETTER.id}` },
+  { name: 'preferences', path: '/preferences', user: RULES_READER },
+  {
+    name: 'preferences with the rule modal open',
+    path: '/preferences',
+    user: RULES_READER,
+    prepare: async (page) => {
+      await page.getByTestId('notification-rule').filter({ hasText: READER_RULES[0].name }).getByRole('button', { name: 'Edit' }).click();
+      await expect(page.locator('#ruleModal')).toBeVisible();
+    },
+  },
   {
     name: 'analytics',
     path: '/analytics',
@@ -61,8 +80,9 @@ for (const viewport of VIEWPORTS) {
   test.describe(`${viewport.name} accessibility`, () => {
     test.use({ viewport: viewport.size });
 
-    for (const { name, path, prepare } of SCANNED_PAGES) {
+    for (const { name, path, user, prepare } of SCANNED_PAGES) {
       test(`${name} has no WCAG A/AA violations`, async ({ page }) => {
+        if (user) await signIn(page, user);
         await page.goto(path);
         // A redirect (e.g. sign-in pages with notifications off) would scan the wrong page.
         expect(new URL(page.url()).pathname).toBe(new URL(path, page.url()).pathname);

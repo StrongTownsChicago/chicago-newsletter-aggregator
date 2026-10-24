@@ -71,7 +71,7 @@ const { notificationRules, maxRules, canCreateRule } = Astro.props;
   ) : (
     <div class="space-y-4">
       {notificationRules.map((rule) => (
-        <div class="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white">
+        <div class="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white" data-testid="notification-rule">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-3">

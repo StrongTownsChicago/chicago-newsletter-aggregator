@@ -1,54 +1,48 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readLocalSupabaseEnv } from './e2e/support/local-supabase-env';
+import { E2E_UNSUBSCRIBE_SECRET_KEY } from './e2e/support/unsubscribe-token';
 
 /**
- * See https://playwright.dev/docs/test-configuration.
+ * The end-to-end specs (`npm run test:e2e`), run against the local Supabase
+ * stack reset to supabase/seed.sql (e2e/support/global-setup.ts).
+ *
+ * The Supabase URL and keys come from `supabase status` and pass the
+ * local-only guard before the dev server gets them; values set here take
+ * precedence over frontend/.env, which points at production, and the global
+ * setup proves the server uses them. The server always starts on its own
+ * port, never reusing one.
  */
+const PORT = 4358;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
+
+const supabase = readLocalSupabaseEnv();
+
 export default defineConfig({
   testDir: './e2e',
-  /* Run without the database on their own server: npm run test:e2e:analytics (playwright.analytics.config.ts). */
-  testIgnore: ['analytics-dashboard.spec.ts', 'a11y.spec.ts'],
-  /* Run tests in files in parallel */
-  fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
+  globalSetup: './e2e/support/global-setup.ts',
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  workers: process.env.CI ? 2 : undefined,
+  reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:4321',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
   },
-
-  /* Configure projects for major browsers */
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-  ],
-
-  /* Run your local dev server before starting the tests */
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:4321',
-    reuseExistingServer: !process.env.CI,
+    command: `npx astro dev --port ${PORT} --host 127.0.0.1`,
+    url: `${BASE_URL}/login`,
+    reuseExistingServer: false,
     timeout: 120 * 1000,
+    env: {
+      PUBLIC_SUPABASE_URL: supabase.apiUrl,
+      PUBLIC_SUPABASE_ANON_KEY: supabase.anonKey,
+      SUPABASE_SERVICE_KEY: supabase.serviceRoleKey,
+      PUBLIC_ENABLE_NOTIFICATIONS: 'true',
+      UNSUBSCRIBE_SECRET_KEY: E2E_UNSUBSCRIBE_SECRET_KEY,
+      // Otherwise the Cloudflare adapter's dev runtime loads frontend/.env into
+      // locals.runtime.env, whose secrets win over these (lib/server/server-env.ts).
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
+    },
   },
 });

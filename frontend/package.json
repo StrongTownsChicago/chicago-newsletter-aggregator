@@ -11,7 +11,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:analytics": "playwright test --config playwright.analytics.config.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "astro check",
     "test:mutation": "stryker run"

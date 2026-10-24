@@ -53,6 +53,9 @@ describe("renderTimeline", () => {
       "/search?q=snow&from=2026-03-01&to=2026-03-31",
     ]);
     expect(links[1].getAttribute("aria-label")).toBe("Mar 2026 so far: 4 newsletters, 3 wards");
+    // The label contains the link's visible text (WCAG 2.5.3); the count beside it is hidden from screen readers.
+    expect(links[1].textContent).toBe("Mar");
+    expect(columns[2].querySelector('[aria-hidden="true"]')?.textContent).toBe("4");
     expect(root.querySelector("[data-timeline-bars]")?.hasAttribute("aria-busy")).toBe(false);
   });
 

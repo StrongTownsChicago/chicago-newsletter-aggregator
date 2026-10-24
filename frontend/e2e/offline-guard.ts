@@ -1,7 +1,7 @@
-// Shared by the fixture-data specs run with playwright.analytics.config.ts:
-// every request that leaves the dev server is aborted and recorded, and the
-// analytics data files are served from e2e/fixtures/analytics/ instead of
-// public/analytics-data/.
+// For specs that must not leave the dev server: every browser request to another
+// origin is aborted and recorded, and the analytics data files are served from
+// e2e/fixtures/analytics/ instead of public/analytics-data/. Server-side
+// database reads go to the local stack and aren't seen here.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
