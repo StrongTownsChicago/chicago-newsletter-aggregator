@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
 import { buildNewsletterCardSelect, buildNewsletterCountSelect } from '../lib/server/newsletter-queries';
 import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
-import { TOPIC_CATEGORIES } from '../lib/topics';
+import { TOPIC_CATEGORIES, formatTopicLabel } from '../lib/topics';
 import { humanizeIdentifier } from '../lib/format';
 import {
   SEARCH_PAGE_SIZE,
@@ -141,7 +141,7 @@ const labelClass = 'block text-sm font-semibold text-gray-700 mb-2';
               <optgroup label={category}>
                 {topics.map((topic) => (
                   <option value={topic} selected={filters.topic === topic}>
-                    {humanizeIdentifier(topic)}
+                    {formatTopicLabel(topic)}
                   </option>
                 ))}
               </optgroup>

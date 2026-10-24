@@ -1,8 +1,7 @@
 ---
 /** The add/edit rule modal. Its behaviour is wired by client/rule-modal.ts. */
 import { STARTER_RULE } from '../../lib/onboarding';
-import { TOPIC_CATEGORIES } from '../../lib/topics';
-import { humanizeIdentifier } from '../../lib/format';
+import { TOPIC_CATEGORIES, formatTopicLabel } from '../../lib/topics';
 
 interface Props {
   /** Opens the modal in its onboarding (starter rule) state. */
@@ -153,7 +152,7 @@ const { isWelcome, availableWards } = Astro.props;
                             value={topic}
                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
-                          <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
+                          <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopicLabel(topic)}</span>
                         </label>
                       ))}
                     </div>
@@ -188,7 +187,7 @@ const { isWelcome, availableWards } = Astro.props;
                           value={topic}
                           class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                         />
-                        <span class="ml-3 text-sm text-gray-700 font-medium">{humanizeIdentifier(topic)}</span>
+                        <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopicLabel(topic)}</span>
                       </label>
                     ))}
                   </div>

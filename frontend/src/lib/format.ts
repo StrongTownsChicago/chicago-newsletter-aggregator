@@ -1,6 +1,7 @@
 /**
- * Turns a snake_case identifier (topic slug, source type) into a
- * human-readable Title Case label, e.g. "bike_lanes" -> "Bike Lanes".
+ * Turns a snake_case identifier (e.g. a source type) into a human-readable
+ * Title Case label, e.g. "alderman" -> "Alderman". Topics use
+ * `formatTopicLabel` in `topics.ts` instead.
  */
 export function humanizeIdentifier(identifier: string): string {
   return identifier
