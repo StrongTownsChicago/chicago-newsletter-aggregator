@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * The /analytics end-to-end spec on fixture data (`npm run test:e2e:analytics`).
+ * The end-to-end specs that need no database (`npm run test:e2e:analytics`):
+ * /analytics on fixture data, and the accessibility scans.
  *
  * It always starts its own dev server on a dedicated port, never reusing one,
  * with placeholder Supabase settings that take precedence over any .env file,
@@ -14,7 +15,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'analytics-dashboard.spec.ts',
+  testMatch: ['analytics-dashboard.spec.ts', 'a11y.spec.ts'],
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
@@ -31,7 +32,8 @@ export default defineConfig({
     env: {
       PUBLIC_SUPABASE_URL: 'http://127.0.0.1:9',
       PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key',
-      PUBLIC_ENABLE_NOTIFICATIONS: 'false',
+      // Enabled so the sign-in and sign-up pages and header links render for the accessibility scans.
+      PUBLIC_ENABLE_NOTIFICATIONS: 'true',
       SUPABASE_SERVICE_KEY: 'placeholder-service-key',
     },
   },

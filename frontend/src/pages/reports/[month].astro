@@ -77,7 +77,7 @@ const linkClass = 'text-blue-600 hover:text-blue-800 hover:underline';
               <ul class="mt-3 space-y-1 text-sm" aria-label={`Example newsletters: ${topicLabel(file.topics, topic.id)}`}>
                 {topic.examples.map((example) => (
                   <li class="min-w-0">
-                    <a href={`/newsletter/${example.id}`} class={`${linkClass} break-words`}>
+                    <a href={`/newsletter/${example.id}`} class={`${linkClass} underline break-words`}>
                       {example.subject || 'Untitled newsletter'}
                     </a>
                     <span class="text-gray-500">

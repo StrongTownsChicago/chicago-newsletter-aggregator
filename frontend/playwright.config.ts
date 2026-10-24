@@ -5,8 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
-  /* Runs on fixture data with its own server: npm run test:e2e:analytics (playwright.analytics.config.ts). */
-  testIgnore: 'analytics-dashboard.spec.ts',
+  /* Run without the database on their own server: npm run test:e2e:analytics (playwright.analytics.config.ts). */
+  testIgnore: ['analytics-dashboard.spec.ts', 'a11y.spec.ts'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

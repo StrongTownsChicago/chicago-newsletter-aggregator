@@ -3,33 +3,16 @@
 // starts its own dev server with placeholder Supabase settings. The analytics
 // pages never query Supabase; as a guard, every request that leaves the dev
 // server is aborted and fails the test, and every data file is served from
-// e2e/fixtures/analytics/ instead of public/analytics-data/.
+// e2e/fixtures/analytics/ instead of public/analytics-data/ (offline-guard.ts).
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+import { useOfflineFixtures } from './offline-guard';
 
-const FIXTURE_DIRECTORY = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'analytics');
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 /** Newsletters in the fixture's default window (Feb–Apr 2026): ward 1 sends 3 a month, wards 2 and 3 send 2. */
 const DEFAULT_WINDOW_NEWSLETTERS = 21;
 
-let externalRequests: string[] = [];
-
-async function serveFixtures(page: Page, baseURL: string): Promise<void> {
-  const origin = new URL(baseURL).origin;
-  await page.route(
-    (url) => url.origin !== origin,
-    (route) => {
-      externalRequests.push(route.request().url());
-      return route.abort();
-    },
-  );
-  await page.route('**/analytics-data/*.json', (route) => {
-    const fileName = path.basename(new URL(route.request().url()).pathname);
-    return route.fulfill({ path: path.join(FIXTURE_DIRECTORY, fileName), contentType: 'application/json' });
-  });
-}
+useOfflineFixtures();
 
 async function openDashboard(page: Page, query = ''): Promise<void> {
   await page.goto(`/analytics${query}`);
@@ -45,14 +28,6 @@ function visiblePanelIds(page: Page): Promise<string[]> {
 
 const OVERVIEW_PANELS = ['term-explorer', 'civic-calendar', 'rising-terms', 'sending-cadence', 'coverage'];
 
-test.beforeEach(async ({ page, baseURL }) => {
-  externalRequests = [];
-  await serveFixtures(page, baseURL ?? '');
-});
-
-test.afterEach(() => {
-  expect(externalRequests, 'requests that left the dev server').toEqual([]);
-});
 
 test('loads the dashboard from the fixture data', async ({ page }) => {
   await openDashboard(page);
@@ -320,12 +295,12 @@ test('names wards without newsletters and draws coverage on demand', async ({ pa
   await expect(page.locator('#coverage [data-chart] svg')).toHaveCount(0);
   await page.locator('#coverage-details summary').click();
   await expect(page.locator('#coverage [data-chart] svg').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Download About the data as PNG' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Download PNG of About the data' })).toBeEnabled();
 });
 
 test('downloads a chart as a PNG', async ({ page }) => {
   await openDashboard(page);
-  const button = page.getByRole('button', { name: 'Download Civic calendar as PNG' });
+  const button = page.getByRole('button', { name: 'Download PNG of Civic calendar' });
   await expect(button).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
   expect(download.suggestedFilename()).toMatch(/^civic-calendar-\d{4}-\d{2}-\d{2}\.png$/);
