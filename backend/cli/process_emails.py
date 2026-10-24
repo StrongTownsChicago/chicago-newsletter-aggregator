@@ -26,12 +26,19 @@ Output:
 """
 
 import os
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
 from dotenv import load_dotenv
-from imap_tools import AND, MailBox, MailMessageFlags  # type: ignore[attr-defined]
+from imap_tools import (  # type: ignore[attr-defined]
+    AND,
+    BaseMailBox,
+    MailBox,
+    MailMessage,
+    MailMessageFlags,
+)
 
 from cli.ingest_summary import print_summary
 from cli.logging_setup import configure_cli_logging
@@ -79,6 +86,109 @@ def save_unmapped_report(unmapped_emails: list[dict[str, str]]) -> None:
     print(f"\n  Report saved to: {filename}")
 
 
+@dataclass
+class IngestTally:
+    """Running counts for one ingestion run."""
+
+    processed: int = 0
+    skipped: int = 0
+    unmapped_emails: list[dict[str, str]] = field(default_factory=list)
+
+
+def describe_unmapped(msg: MailMessage) -> dict[str, str]:
+    """The sender, subject and date recorded for an email with no matching source."""
+    return {
+        "from": msg.from_,
+        "subject": msg.subject,
+        "date": msg.date.isoformat() if msg.date else "Unknown",
+    }
+
+
+def add_llm_metadata(newsletter: dict[str, Any]) -> None:
+    """Merge LLM topics and summary into the newsletter; a failure only warns."""
+    try:
+        from processing.llm_processor import extract_newsletter_metadata
+
+        llm_model = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
+        llm_result = extract_newsletter_metadata(newsletter, llm_model)
+        newsletter.update(llm_result)
+        print("  LLM processing complete")
+    except ImportError:
+        print("  Warning: LLM enabled but llm_processor not found")
+    except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
+        print(f"  Warning: LLM processing failed: {e}")
+
+
+def queue_newsletter_notifications(
+    newsletter_id: str, newsletter: dict[str, Any], ward_number: int | None
+) -> None:
+    """Queue notifications for the rules a stored newsletter matches; a failure only warns."""
+    try:
+        from notifications.rule_matcher import (
+            match_newsletter_to_rules,
+            queue_notifications,
+        )
+
+        newsletter_data = {
+            "topics": newsletter.get("topics", []),
+            "plain_text": newsletter.get("plain_text", ""),
+            "source_id": newsletter.get("source_id"),
+            "ward_number": ward_number,
+        }
+
+        matched = match_newsletter_to_rules(newsletter_id, newsletter_data)
+        if matched:
+            queued = queue_notifications(newsletter_id, matched)
+            print(f"  ✓ Queued {queued} notification(s)")
+    except Exception as e:  # noqa: BLE001  notification queuing must not fail ingestion
+        print(f"  ⚠️  Notification queuing failed: {e}")
+
+
+def store_newsletter(newsletter: dict[str, Any]) -> None:
+    """Insert a parsed newsletter, then queue its notifications when enabled."""
+    # ward_number feeds notification matching but is not a newsletters column.
+    ward_number = newsletter.pop("ward_number", None)
+
+    insert_response = supabase.table("newsletters").insert(newsletter).execute()
+
+    if ENABLE_NOTIFICATIONS and insert_response.data and len(insert_response.data) > 0:
+        response_data = cast(list[dict[str, Any]], insert_response.data)
+        newsletter_id = cast(str, response_data[0]["id"])
+        queue_newsletter_notifications(newsletter_id, newsletter, ward_number)
+
+
+def ingest_message(mailbox: BaseMailBox, msg: MailMessage, tally: IngestTally) -> None:
+    """
+    Store one email and mark it read, or skip it as a duplicate or unmapped.
+
+    Duplicates stay unread. Unmapped emails are marked read so they are not
+    fetched again, and recorded in the tally for the report.
+    """
+    uid = cast(str, msg.uid)  # every fetched message has a UID
+    if newsletter_exists(uid):
+        print(f"⊘ Duplicate: {msg.subject[:50]}...")
+        tally.skipped += 1
+        return
+
+    print(f"Processing: {msg.subject}")
+    newsletter = parse_newsletter(msg, supabase, PRIVACY_PATTERNS_DICT)
+
+    if newsletter["source_id"] is None:
+        tally.unmapped_emails.append(describe_unmapped(msg))
+        print(f"✗ Unmapped: {msg.subject[:50]}... (from: {msg.from_})")
+        mailbox.flag(uid, MailMessageFlags.SEEN, True)
+        return
+
+    if ENABLE_LLM:
+        add_llm_metadata(newsletter)
+
+    store_newsletter(newsletter)
+
+    mailbox.flag(uid, MailMessageFlags.SEEN, True)
+    tally.processed += 1
+    print("  ✓ Stored in database")
+
+
 def process_new_newsletters() -> None:
     """
     Ingest unread Gmail newsletters: match sources, optionally run the LLM, store.
@@ -91,121 +201,24 @@ def process_new_newsletters() -> None:
 
     print(f"[{datetime.now(CHICAGO_TIMEZONE)}] Starting newsletter ingestion...")
 
-    # Validate credentials
     if not GMAIL_ADDRESS or not GMAIL_PASSWORD:
         raise ValueError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set")
 
-    # Connect to Gmail
     with MailBox("imap.gmail.com").login(GMAIL_ADDRESS, GMAIL_PASSWORD) as mailbox:  # type: ignore[no-untyped-call]
-        # Fetch unread emails
-        messages = mailbox.fetch(AND(seen=False))
         # To process every email when testing, call mailbox.fetch() with no criteria.
-
-        processed_count = 0
-        skipped_count = 0
-        unmapped_count = 0
-        unmapped_emails = []  # Track unmapped emails for summary
+        messages = mailbox.fetch(AND(seen=False))
+        tally = IngestTally()
 
         for msg in messages:
             try:
-                # Skip if already processed
-                if newsletter_exists(msg.uid):
-                    print(f"⊘ Duplicate: {msg.subject[:50]}...")
-                    skipped_count += 1
-                    continue
-
-                # Parse email
-                print(f"Processing: {msg.subject}")
-                newsletter = parse_newsletter(msg, supabase, PRIVACY_PATTERNS_DICT)
-
-                # Check if source was matched
-                if newsletter["source_id"] is None:
-                    unmapped_count += 1
-                    unmapped_info = {
-                        "from": msg.from_,
-                        "subject": msg.subject,
-                        "date": msg.date.isoformat() if msg.date else "Unknown",
-                    }
-                    unmapped_emails.append(unmapped_info)
-
-                    print(f"✗ Unmapped: {msg.subject[:50]}... (from: {msg.from_})")
-
-                    # Mark as read anyway so we don't keep processing it
-                    mailbox.flag(msg.uid, MailMessageFlags.SEEN, True)
-                    continue
-
-                # Optional: Process with LLM if enabled
-                if ENABLE_LLM:
-                    try:
-                        from processing.llm_processor import extract_newsletter_metadata
-
-                        llm_model = os.getenv(
-                            "LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b")
-                        )
-                        llm_result = extract_newsletter_metadata(newsletter, llm_model)
-                        newsletter.update(llm_result)
-                        print("  LLM processing complete")
-                    except ImportError:
-                        print("  Warning: LLM enabled but llm_processor not found")
-                    except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
-                        print(f"  Warning: LLM processing failed: {e}")
-
-                # Extract ward_number for notifications, but remove from dict for DB insertion
-                ward_number = newsletter.pop("ward_number", None)
-
-                # Insert into Supabase
-                insert_response = (
-                    supabase.table("newsletters").insert(newsletter).execute()
-                )
-
-                # Queue notifications for matched rules
-                if (
-                    ENABLE_NOTIFICATIONS
-                    and insert_response.data
-                    and len(insert_response.data) > 0
-                ):
-                    response_data = cast(list[dict[str, Any]], insert_response.data)
-                    newsletter_id = cast(str, response_data[0]["id"])
-
-                    try:
-                        from notifications.rule_matcher import (
-                            match_newsletter_to_rules,
-                            queue_notifications,
-                        )
-
-                        # Prepare newsletter data for matching
-                        newsletter_data = {
-                            "topics": newsletter.get("topics", []),
-                            "plain_text": newsletter.get("plain_text", ""),
-                            "source_id": newsletter.get("source_id"),
-                            "ward_number": ward_number,
-                        }
-
-                        # Match and queue
-                        matched = match_newsletter_to_rules(
-                            newsletter_id, newsletter_data
-                        )
-                        if matched:
-                            queued = queue_notifications(newsletter_id, matched)
-                            print(f"  ✓ Queued {queued} notification(s)")
-                    except Exception as e:  # noqa: BLE001  notification queuing must not fail ingestion
-                        # Don't fail newsletter ingestion if notification queuing fails
-                        print(f"  ⚠️  Notification queuing failed: {e}")
-
-                # Mark as read
-                mailbox.flag(msg.uid, MailMessageFlags.SEEN, True)
-
-                processed_count += 1
-                print("  ✓ Stored in database")
-
+                ingest_message(mailbox, msg, tally)
             except Exception as e:  # noqa: BLE001  per-email boundary: log and continue
                 print(f"✗ Error processing {msg.uid}: {e}")
-                continue
 
-        if unmapped_emails:
-            save_unmapped_report(unmapped_emails)
+        if tally.unmapped_emails:
+            save_unmapped_report(tally.unmapped_emails)
 
-        print_summary(processed_count, skipped_count, unmapped_count)
+        print_summary(tally.processed, tally.skipped, len(tally.unmapped_emails))
 
 
 if __name__ == "__main__":

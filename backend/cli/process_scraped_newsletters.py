@@ -5,8 +5,9 @@ Scrape newsletters from alderman websites and save to database.
 import os
 import random
 import time
+from collections import Counter
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from dotenv import load_dotenv
 
@@ -25,6 +26,14 @@ OLLAMA_MODEL = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
 # Initialize clients
 supabase = get_supabase_client()
 scraper = NewsletterScraper()
+
+ScrapeOutcome = Literal["processed", "skipped", "failed"]
+
+# Random pause ranges (seconds) between archive requests, so runs look less bot-like.
+# Duplicates pause too, so a run of them doesn't hammer the archive; the LLM call
+# already spaces stored newsletters out, so they pause only when it is off.
+DUPLICATE_PAUSE_SECONDS = (1.0, 7.0)
+STORE_PAUSE_SECONDS = (1.0, 3.0)
 
 
 def newsletter_exists(source_id: int, subject: str) -> bool:
@@ -61,10 +70,74 @@ def get_source_archive_url(source_id: int) -> tuple[str, str]:
     return cast(str, source["name"]), cast(str, source["newsletter_archive_url"])
 
 
+def build_newsletter_record(source_id: int, content: dict[str, str]) -> dict[str, Any]:
+    """The newsletters row for scraped content; received_date falls back to now."""
+    received_date = parse_date_string(content.get("archive_date_str", ""))
+    return {
+        "source_id": source_id,
+        "received_date": received_date or datetime.now(UTC).isoformat(),
+        "subject": content["subject"],
+        "from_email": None,
+        "to_email": None,
+        "email_uid": None,
+        "raw_html": content["html_content"],
+        "plain_text": content["plain_text"],
+    }
+
+
+def add_llm_metadata(newsletter_data: dict[str, Any]) -> None:
+    """Merge LLM topics and summary into the row; a failure only warns."""
+    try:
+        from processing.llm_processor import extract_newsletter_metadata
+
+        print("  LLM processing...")
+        llm_result = extract_newsletter_metadata(newsletter_data, OLLAMA_MODEL)
+        newsletter_data.update(llm_result)
+        print("  ✓ LLM complete")
+
+    except ImportError:
+        print("  ⚠ LLM enabled but llm_processor not found")
+    except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
+        print(f"  ⚠ LLM processing failed: {e}")
+
+
+def pause_politely(pause_range: tuple[float, float]) -> None:
+    """Sleep a random interval within pause_range (seconds)."""
+    time.sleep(random.uniform(*pause_range))
+
+
+def scrape_newsletter(source_id: int, link_info: dict[str, str]) -> ScrapeOutcome:
+    """Fetch one archived newsletter and store it unless it is already stored."""
+    content = scraper.fetch_newsletter_content(
+        link_info["url"], link_info["title"], link_info["date_str"]
+    )
+
+    if not content:
+        print("  ✗ Failed to fetch content")
+        return "failed"
+
+    print(f"  ✓ Retrieved {len(content['plain_text'])} chars")
+
+    if newsletter_exists(source_id, content["subject"]):
+        print("  ⊘ Duplicate")
+        pause_politely(DUPLICATE_PAUSE_SECONDS)
+        return "skipped"
+
+    newsletter_data = build_newsletter_record(source_id, content)
+
+    if ENABLE_LLM:
+        add_llm_metadata(newsletter_data)
+    else:
+        pause_politely(STORE_PAUSE_SECONDS)
+
+    supabase.table("newsletters").insert(newsletter_data).execute()
+    print("  ✓ Stored in database")
+    return "processed"
+
+
 def process_scraped_newsletters(source_id: int, limit: int | None = None) -> None:
     """Scrape and process newsletters for a specific source"""
 
-    # Fetch archive URL from database
     source_name, archive_url = get_source_archive_url(source_id)
 
     print(f"\n{'=' * 60}")
@@ -75,89 +148,26 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
     print(f"Archive URL: {archive_url}")
     print(f"{'=' * 60}\n")
 
-    # Get list of newsletter links
     newsletter_links = scraper.extract_newsletter_links(archive_url)
 
     if limit:
         newsletter_links = newsletter_links[:limit]
 
     total = len(newsletter_links)
-    processed_count = 0
-    skipped_count = 0
-    failed_count = 0
+    outcomes: Counter[ScrapeOutcome] = Counter()
 
-    # Process each newsletter: fetch content + process
     for i, link_info in enumerate(newsletter_links, 1):
         print(f"\n[{i}/{total}] {link_info['date_str']} - {link_info['title'][:60]}")
         print(f"  URL: {link_info['url']}")
 
         try:
-            # Fetch content
-            content = scraper.fetch_newsletter_content(
-                link_info["url"], link_info["title"], link_info["date_str"]
-            )
-
-            if not content:
-                print("  ✗ Failed to fetch content")
-                failed_count += 1
-                continue
-
-            print(f"  ✓ Retrieved {len(content['plain_text'])} chars")
-
-            # Skip if duplicate
-            if newsletter_exists(source_id, content["subject"]):
-                print("  ⊘ Duplicate")
-                skipped_count += 1
-                # Add delay to avoid overly aggressive scraping if we are seeing many duplicates
-                delay = random.uniform(1.0, 7.0)
-                time.sleep(delay)
-                continue
-
-            # Build newsletter record
-            received_date = parse_date_string(content.get("archive_date_str", ""))
-            newsletter_data: dict[str, Any] = {
-                "source_id": source_id,
-                "received_date": received_date or datetime.now(UTC).isoformat(),
-                "subject": content["subject"],
-                "from_email": None,
-                "to_email": None,
-                "email_uid": None,
-                "raw_html": content["html_content"],
-                "plain_text": content["plain_text"],
-            }
-
-            # LLM processing or delay
-            if ENABLE_LLM:
-                try:
-                    from processing.llm_processor import extract_newsletter_metadata
-
-                    print("  LLM processing...")
-                    llm_result = extract_newsletter_metadata(
-                        newsletter_data, OLLAMA_MODEL
-                    )
-                    newsletter_data.update(llm_result)
-                    print("  ✓ LLM complete")
-
-                except ImportError:
-                    print("  ⚠ LLM enabled but llm_processor not found")
-                except Exception as e:  # noqa: BLE001  optional LLM step must not fail ingestion
-                    print(f"  ⚠ LLM processing failed: {e}")
-            else:
-                # Add delay when LLM disabled to avoid bot-like behavior
-                delay = random.uniform(1.0, 3.0)
-                time.sleep(delay)
-
-            # Insert into database
-            supabase.table("newsletters").insert(newsletter_data).execute()
-            processed_count += 1
-            print("  ✓ Stored in database")
-
+            outcome = scrape_newsletter(source_id, link_info)
         except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
             print(f"  ✗ Error: {e}")
-            failed_count += 1
-            continue
+            outcome = "failed"
+        outcomes[outcome] += 1
 
-    print_summary(processed_count, skipped_count, failed_count)
+    print_summary(outcomes["processed"], outcomes["skipped"], outcomes["failed"])
 
 
 def scrape_all_sources() -> None:
