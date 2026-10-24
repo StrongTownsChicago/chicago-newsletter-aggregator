@@ -46,7 +46,7 @@ def supabase_with(
 ) -> MagicMock:
     supabase = create_mock_supabase(rows)
     supabase.gte.return_value = supabase
-    supabase.lte.return_value = supabase
+    supabase.lt.return_value = supabase
     supabase.rpc.return_value.execute.return_value.data = week_range
     return supabase
 
@@ -84,6 +84,21 @@ class TestGenerateWeeklyTopicReport(unittest.TestCase):
         self.assertIsNone(newsletters[1]["ward_number"])
         self.assertEqual(newsletters[1]["plain_text"], "")
         synthesize.assert_called_once_with(TOPIC, FACTS, WEEK_ID, "test-model")
+
+    def test_the_week_is_bounded_by_chicago_midnights(
+        self, get_client: MagicMock, extract: MagicMock, synthesize: MagicMock
+    ) -> None:
+        supabase = supabase_with(WEEK_RANGE, [])
+        get_client.return_value = supabase
+
+        generate_weekly_topic_report(TOPIC, WEEK_ID)
+
+        supabase.gte.assert_called_once_with(
+            "received_date", "2026-10-12T00:00:00-05:00"
+        )
+        supabase.lt.assert_called_once_with(
+            "received_date", "2026-10-19T00:00:00-05:00"
+        )
 
     def test_rejects_unknown_topic_and_malformed_week_without_querying(
         self, get_client: MagicMock, extract: MagicMock, synthesize: MagicMock
