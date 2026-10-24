@@ -37,14 +37,9 @@ CEILINGS = {
 
 SIZE_CODES = frozenset(code for _, code in CEILINGS.values())
 
-# Paths allowed to switch a size rule off: test factories and one one-shot
-# maintenance script. Adding a path here is a loosening a reviewer should see.
-EXEMPT_PATHS = frozenset(
-    {
-        "tests/*",
-        "cli/calculate_token_costs.py",
-    }
-)
+# Paths allowed to switch a size rule off: test factories only. Adding a path
+# here is a loosening a reviewer should see.
+EXEMPT_PATHS = frozenset({"tests/*"})
 
 # Well over every ceiling at once: 13 arguments, 26 returns, 25 branches,
 # 151 statements, complexity 26.

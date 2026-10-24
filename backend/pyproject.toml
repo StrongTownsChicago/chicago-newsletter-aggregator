@@ -83,8 +83,6 @@ external = ["DS"]
 # Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
 # which Pydantic turns into a named schema reference instead of the plain type.
 "models/types.py" = ["UP040"]
-# One-shot maintenance scripts, ratcheted separately from the product.
-"cli/calculate_token_costs.py" = ["C901", "PLR0912", "PLR0915"]
 
 # Budget ceilings, not contracts: lower them freely, never raise them.
 # Each sits at today's worst function, named in its comment; walk them down by
