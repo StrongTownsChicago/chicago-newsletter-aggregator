@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "test:e2e:analytics": "playwright test --config playwright.analytics.config.ts",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "test:mutation": "stryker run"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.8",
@@ -27,6 +28,8 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@playwright/test": "^1.58.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.53.1",
     "@vitest/coverage-v8": "^4.1.11",

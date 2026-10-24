@@ -23,3 +23,7 @@ backend/data/
 # Coverage output
 .coverage
 htmlcov/
+
+# StrykerJS mutation testing output (frontend: npm run test:mutation)
+frontend/reports/
+frontend/.stryker-tmp/
