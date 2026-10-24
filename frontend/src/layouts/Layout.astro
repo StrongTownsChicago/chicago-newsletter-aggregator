@@ -50,6 +50,7 @@ const twitterCard = 'summary_large_image';
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={metaDescription} />
     <meta name="twitter:image" content={imageUrl} />
+    <slot name="head" />
   </head>
   <body class="bg-gray-50 min-h-screen flex flex-col">
     <a

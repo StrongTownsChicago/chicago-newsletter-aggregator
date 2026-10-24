@@ -226,7 +226,7 @@ frontend/
 
 **Page Cache** (`lib/server/page-cache.ts`, wired in `middleware.ts`): anonymous GETs of allowlisted SSR pages are cached with the Workers Cache API (Pages Functions skip the CDN cache, so `Cache-Control` alone does nothing), checked before any session or database work. Signed-in visitors bypass it. The allowlist and lifetimes are `PAGE_CACHE_RULES`; a page keeps a failed load out with `UNCACHEABLE_PAGE_CACHE_CONTROL`. The key includes the build id, so each deploy starts empty: privacy fixes and deletions stay visible on cached pages until the next deploy or the lifetime expires.
 
-**Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup.
+**Site Layout** (`frontend/src/layouts/Layout.astro`): Pages render only their own content; the layout supplies the shared header, nav, and footer and wraps the page in the single `<main>`. Each page owns exactly one `<h1>` (the site name in the header is a link, not a heading). Add nav sections in `lib/site.ts`, not in page markup. Page-specific `<head>` tags (e.g. JSON-LD on ward pages, built by `lib/seo.ts`) go in the layout's `head` slot.
 
 **Newsletter Deduplication**: Both ingest paths check for existing `email_uid` (email) or URL+subject combination (scraping) before inserting.
 

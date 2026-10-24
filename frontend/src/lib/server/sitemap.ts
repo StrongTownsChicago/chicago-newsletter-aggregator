@@ -84,12 +84,19 @@ export function buildNewsletterSitemapXml(
 
 /**
  * Pages for the ward sitemap: one page per ward. Every ward is listed because
- * ward numbers are fixed, so the set needs no database query. The ward
+ * ward numbers are fixed, so the set needs no database query. `lastmod` is the
+ * ward's latest newsletter date from the precomputed ward summaries, keyed by
+ * ward number, so it is only as fresh as the last analytics refresh. The ward
  * directory (`/wards`) is a non-dynamic route, so @astrojs/sitemap already
  * lists it in the static-route sitemap.
  */
-export function buildWardSitemapPages(): SitemapPage[] {
-  return ALL_WARD_NUMBERS.map((wardNumber) => ({ path: buildWardPath(wardNumber) }));
+export function buildWardSitemapPages(
+  latestDateByWard: Readonly<Record<string, { last_date: string }>> = {},
+): SitemapPage[] {
+  return ALL_WARD_NUMBERS.map((wardNumber) => ({
+    path: buildWardPath(wardNumber),
+    lastmod: latestDateByWard[String(wardNumber)]?.last_date ?? null,
+  }));
 }
 
 /**

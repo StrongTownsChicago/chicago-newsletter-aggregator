@@ -57,6 +57,47 @@ export function formatAlderNames(names: readonly string[]): string | null {
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
+/** The city's official "find your ward and alderman by address" page. */
+export const CITY_WARD_LOOKUP_URL =
+  "https://www.chicago.gov/city/en/depts/mayor/provdrs/your_ward_and_alderman/svcs/find_my_alderman.html";
+
+const ORDINAL_SUFFIXES: Record<Intl.LDMLPluralRule, string> = {
+  zero: "th",
+  one: "st",
+  two: "nd",
+  few: "rd",
+  many: "th",
+  other: "th",
+};
+const ordinalRules = new Intl.PluralRules("en-US", { type: "ordinal" });
+
+/** English ordinal for a positive integer: 1st, 2nd, 3rd, 11th, 22nd. */
+export function formatOrdinal(value: number): string {
+  return `${value}${ORDINAL_SUFFIXES[ordinalRules.select(value)]}`;
+}
+
+/** Ward name as people search for it: "38th Ward". */
+export function formatWardName(wardNumber: number): string {
+  return `${formatOrdinal(wardNumber)} Ward`;
+}
+
+/**
+ * Ward page heading: "38th Ward Alderman Nicholas Sposato", "38th Ward
+ * Aldermen A and B", or "38th Ward" when no alderman is on file.
+ */
+export function formatWardAldermanHeading(
+  wardNumber: number,
+  alderNames: readonly string[],
+): string {
+  const wardName = formatWardName(wardNumber);
+  const names = formatAlderNames(alderNames);
+  if (!names) {
+    return wardName;
+  }
+  const role = alderNames.length === 1 ? "Alderman" : "Aldermen";
+  return `${wardName} ${role} ${names}`;
+}
+
 export interface WardDirectoryEntry<TSource> {
   wardNumber: number;
   sources: TSource[];

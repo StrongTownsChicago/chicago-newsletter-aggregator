@@ -23,6 +23,17 @@ test('ward page shows the alderman header and links to filtered search', async (
   }
 });
 
+test('ward page names the ward the way people search and carries breadcrumb structured data', async ({ page }) => {
+  await page.goto('/ward/1');
+
+  await expect(page).toHaveTitle(/^1st Ward/);
+  await expect(page.getByTestId('ward-title')).toContainText('1st Ward');
+  const structuredData = JSON.parse(
+    (await page.locator('head script[type="application/ld+json"]').textContent()) ?? '{}',
+  ) as { '@graph'?: { '@type': string }[] };
+  expect(structuredData['@graph']?.[0]['@type']).toBe('BreadcrumbList');
+});
+
 test('newsletter card ward badge links to the ward page', async ({ page }) => {
   await page.goto('/');
 

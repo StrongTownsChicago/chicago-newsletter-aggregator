@@ -1,3 +1,14 @@
+import {
+  WARD_DIRECTORY_PATH,
+  buildWardContactLinks,
+  buildWardPath,
+  formatAlderNames,
+  formatWardAldermanHeading,
+  formatWardName,
+  type WardContactLink,
+  type WardContactSource,
+} from "./wards";
+
 export const SITE_NAME = "Chicago Alderman Newsletter Tracker";
 
 /** Link-preview card (public/og-image.png) used when a page doesn't pass its own image. */
@@ -79,23 +90,124 @@ export function buildNewsletterDescription(
   );
 }
 
-/** Page title for a ward page, e.g. "Ward 1 - Daniel La Spata Newsletters - <site>". */
-export function buildWardTitle(wardNumber: number, alderNames: string | null): string {
-  const alderSegment = alderNames ? ` - ${alderNames}` : "";
-  return `Ward ${wardNumber}${alderSegment} Newsletters - ${SITE_NAME}`;
+/** Ward page title, e.g. "38th Ward Alderman Nicholas Sposato: Newsletters & Updates". */
+export function buildWardTitle(wardNumber: number, alderNames: readonly string[]): string {
+  if (alderNames.length === 0) {
+    return `${formatWardName(wardNumber)}, Chicago: Alderman Newsletters & Updates`;
+  }
+  return `${formatWardAldermanHeading(wardNumber, alderNames)}: Newsletters & Updates`;
 }
 
-/** Meta description for a ward page. */
+/** The ward's newest newsletter, used to keep the ward page description current. */
+export interface WardLatestNewsletter {
+  subject: string;
+  received_date: string;
+}
+
+/** Formats a newsletter date as e.g. "Oct 22" in Chicago time, or null if invalid. */
+export function formatShortReceivedDate(receivedDate: string): string | null {
+  const date = new Date(receivedDate);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Chicago",
+  });
+}
+
+/**
+ * Meta description for a ward page. Leads with the latest newsletter when
+ * there is one, e.g. "What Ald. Nicholas Sposato told 38th Ward residents.
+ * Latest (Oct 22): <subject>"; otherwise describes what the page offers.
+ */
 export function buildWardDescription(
   wardNumber: number,
-  alderNames: string | null,
+  alderNames: readonly string[],
+  latestNewsletter: WardLatestNewsletter | null,
 ): string {
-  const sender = alderNames
-    ? `${alderNames}, alderman for Chicago's Ward ${wardNumber}`
-    : `the alderman for Chicago's Ward ${wardNumber}`;
+  const wardName = formatWardName(wardNumber);
+  const names = formatAlderNames(alderNames);
+  const latestSubject = latestNewsletter?.subject.trim();
+
+  if (names && latestNewsletter && latestSubject) {
+    const intro =
+      alderNames.length === 1
+        ? `What Ald. ${names} told ${wardName} residents.`
+        : `What the ${wardName} aldermen, ${names}, told residents.`;
+    const latestDate = formatShortReceivedDate(latestNewsletter.received_date);
+    const latestLabel = latestDate ? `Latest (${latestDate})` : "Latest";
+    return truncateDescription(`${intro} ${latestLabel}: ${latestSubject}`);
+  }
+
+  const sender = names
+    ? `${names}, ${alderNames.length === 1 ? "alderman" : "aldermen"} for Chicago's ${wardName}`
+    : `the alderman for Chicago's ${wardName}`;
   return truncateDescription(
     `Read newsletters from ${sender}, along with ward office contact information.`,
   );
+}
+
+/** A ward alderman as described in the ward page's structured data. */
+export interface WardStructuredDataSource extends WardContactSource {
+  name: string;
+}
+
+/**
+ * Schema.org JSON-LD for a ward page: the breadcrumb path (Home > Wards >
+ * 38th Ward) and a Person for each alderman with their public contact details.
+ */
+export function buildWardStructuredData(
+  wardNumber: number,
+  sources: readonly WardStructuredDataSource[],
+  site: URL | string,
+): Record<string, unknown> {
+  const wardName = formatWardName(wardNumber);
+  const breadcrumbs = [
+    { name: "Home", path: "/" },
+    { name: "Wards", path: WARD_DIRECTORY_PATH },
+    { name: wardName, path: buildWardPath(wardNumber) },
+  ];
+
+  const people = sources.map((source) => {
+    const contact = Object.fromEntries(
+      buildWardContactLinks(source).map((link) => [link.kind, link]),
+    ) as Partial<Record<WardContactLink["kind"], WardContactLink>>;
+    return {
+      "@type": "Person",
+      name: source.name,
+      jobTitle: `Alderman, ${wardName}`,
+      worksFor: { "@type": "GovernmentOrganization", name: "Chicago City Council" },
+      ...(contact.phone ? { telephone: contact.phone.label } : {}),
+      ...(contact.email ? { email: contact.email.label } : {}),
+      ...(contact.website ? { url: contact.website.href } : {}),
+    };
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: breadcrumbs.map((crumb, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: crumb.name,
+          item: new URL(crumb.path, site).href,
+        })),
+      },
+      ...people,
+    ],
+  };
+}
+
+/**
+ * Serializes JSON-LD for an inline `<script type="application/ld+json">`.
+ * `<` is escaped so stored text such as a name can't close the script tag.
+ */
+export function serializeJsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
 /**

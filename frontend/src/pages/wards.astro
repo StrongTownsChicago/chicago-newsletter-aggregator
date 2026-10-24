@@ -7,7 +7,7 @@ import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../lib/server/page-cache';
 import type { WardDirectorySource } from '../lib/server/newsletter-queries';
 import { SITE_NAME } from '../lib/seo';
 import { fetchWardDirectorySources } from '../lib/server/ward-queries';
-import { buildWardDirectory, buildWardPath, formatAlderNames } from '../lib/wards';
+import { buildWardDirectory, buildWardPath, formatAlderNames, formatWardName } from '../lib/wards';
 
 let sources: WardDirectorySource[] = [];
 let loadFailed = false;
@@ -55,7 +55,7 @@ const wardDirectory = buildWardDirectory(sources);
                 {wardNumber}
               </span>
               <span class="min-w-0">
-                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Ward {wardNumber}</span>
+                <span class="block text-xs font-semibold uppercase tracking-wide text-gray-500">{formatWardName(wardNumber)}</span>
                 <span class="block font-medium text-gray-900">
                   {formatAlderNames(wardSources.map((source) => source.name)) ?? 'No alderman on file'}
                 </span>

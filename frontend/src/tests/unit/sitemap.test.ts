@@ -132,6 +132,18 @@ describe('buildWardSitemapPages', () => {
     expect(paths).toEqual(Array.from({ length: 50 }, (_, index) => `/ward/${index + 1}`));
   });
 
+  it('dates each ward by its latest newsletter in the ward summaries', () => {
+    const pages = buildWardSitemapPages({ '38': { last_date: '2026-10-13' } });
+    expect(pages.find((page) => page.path === '/ward/38')?.lastmod).toBe('2026-10-13');
+    expect(pages.find((page) => page.path === '/ward/1')?.lastmod).toBeNull();
+  });
+
+  it('emits lastmod for dated wards only', () => {
+    const xml = buildSitemapXml(buildWardSitemapPages({ '38': { last_date: '2026-10-13' } }), SITE);
+    expect(xml).toContain(`<loc>${SITE}/ward/38</loc><lastmod>2026-10-13T00:00:00.000Z</lastmod>`);
+    expect(xml).toContain(`<loc>${SITE}/ward/1</loc></url>`);
+  });
+
   it('omits the ward directory, which the static-route sitemap already lists', () => {
     const paths = buildWardSitemapPages().map((page) => page.path);
     expect(paths).not.toContain('/wards');

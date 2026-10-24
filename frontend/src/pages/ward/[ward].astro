@@ -17,7 +17,14 @@ import { supabase } from '../../lib/supabase';
 import { UNCACHEABLE_PAGE_CACHE_CONTROL } from '../../lib/server/page-cache';
 import type { WardProfileSource } from '../../lib/server/newsletter-queries';
 import { countPages, parsePageParam } from '../../lib/pagination';
-import { SITE_NAME, buildWardDescription, buildWardTitle, formatReceivedDate } from '../../lib/seo';
+import {
+  SITE_NAME,
+  buildWardDescription,
+  buildWardStructuredData,
+  buildWardTitle,
+  formatReceivedDate,
+  serializeJsonLd,
+} from '../../lib/seo';
 import {
   EMPTY_WARD_NEWSLETTER_PAGE,
   fetchWardNewsletterPage,
@@ -25,10 +32,12 @@ import {
   type WardNewsletterPage,
 } from '../../lib/server/ward-queries';
 import {
+  CITY_WARD_LOOKUP_URL,
   buildWardContactLinks,
   buildWardPath,
   buildWardSearchPath,
-  formatAlderNames,
+  formatWardAldermanHeading,
+  formatWardName,
   parseWardParam,
 } from '../../lib/wards';
 
@@ -58,8 +67,10 @@ if (wardNumber === null) {
   }
 }
 
-const alderNames = formatAlderNames(sources.map((source) => source.name));
+const alderNames = sources.map((source) => source.name);
 const { newsletters, totalCount, latestReceivedDate } = newsletterPage;
+// Listings are newest first, so page 1 starts with the ward's latest newsletter.
+const latestNewsletter = page === 1 ? (newsletters[0] ?? null) : null;
 const totalPages = countPages(totalCount);
 const latestDateLabel = latestReceivedDate ? formatReceivedDate(latestReceivedDate) : null;
 
@@ -68,10 +79,18 @@ const title = wardNumber === null
   : buildWardTitle(wardNumber, alderNames);
 const description = wardNumber === null
   ? 'Chicago has 50 wards. Browse the ward directory to find newsletters from your alderman.'
-  : buildWardDescription(wardNumber, alderNames);
+  : buildWardDescription(wardNumber, alderNames, latestNewsletter);
+const structuredData = wardNumber === null || loadFailed
+  ? null
+  : buildWardStructuredData(wardNumber, sources, Astro.site ?? Astro.url.origin);
+const wardName = wardNumber === null ? null : formatWardName(wardNumber);
 ---
 
 <Layout title={title} description={description} canonicalPage={page}>
+  {structuredData && (
+    /* eslint-disable-next-line astro/no-set-html-directive -- JSON-LD built from our own data; serializeJsonLd escapes "<" */
+    <script slot="head" type="application/ld+json" set:html={serializeJsonLd(structuredData)} />
+  )}
   {wardNumber === null ? (
     <NotFound
       title="Ward not found"
@@ -82,11 +101,8 @@ const description = wardNumber === null
   <div class="container mx-auto px-4 py-8 max-w-6xl">
         <!-- Ward Header -->
         <header class="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6" data-testid="ward-header">
-          <p class="text-sm font-semibold uppercase tracking-wide text-blue-700 mb-1">
-            Ward {wardNumber}
-          </p>
           <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" data-testid="ward-title">
-            {alderNames ? alderNames : `Ward ${wardNumber}`}
+            {formatWardAldermanHeading(wardNumber, alderNames)}
           </h1>
 
           {sources.length > 0 && (
@@ -137,11 +153,23 @@ const description = wardNumber === null
                 class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800"
                 data-testid="ward-search-link"
               >
-                Search and filter Ward {wardNumber} newsletters →
+                Search and filter {wardName} newsletters →
               </a>
             </>
           )}
+
+          <p class="mt-4 text-sm text-gray-600" data-testid="ward-lookup">
+            Not sure this is your ward?
+            <a
+              href={CITY_WARD_LOOKUP_URL}
+              class="text-blue-600 hover:text-blue-800 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >Look up your address</a>
+          </p>
         </header>
+
+        {page === 1 && <WardGlance wardNumber={wardNumber} />}
 
         <!-- Newsletter List -->
         <section>
@@ -149,7 +177,7 @@ const description = wardNumber === null
             <StatusMessage title={LOAD_FAILED_TITLE} message={LOAD_FAILED_MESSAGE} alert testId="ward-load-error" />
           ) : totalCount === 0 ? (
             <StatusMessage
-              title={`No newsletters from Ward ${wardNumber} yet`}
+              title={`No newsletters from the ${wardName} yet`}
               message="Newsletters will appear here once we archive one from this ward."
               testId="ward-empty"
             />
@@ -172,8 +200,6 @@ const description = wardNumber === null
             </>
           )}
         </section>
-
-        {page === 1 && <WardGlance wardNumber={wardNumber} />}
   </div>
   )}
 </Layout>

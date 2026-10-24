@@ -6,6 +6,7 @@
 import wardGlanceData from '../generated/ward-glance.json';
 import { formatLongDate, formatLongMonth, formatShortMonthName, monthOfDate } from '../lib/archive-months';
 import { REPORTS_INDEX_PATH } from '../lib/site';
+import { formatWardName } from '../lib/wards';
 import {
   describeCadence,
   describeCityReach,
@@ -33,12 +34,12 @@ const topics = glance && glance.topic_newsletters > 0 ? glance.topics : [];
 
 {glance && cadence && (
   <section
-    class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+    class="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6"
     aria-labelledby="ward-glance-heading"
     data-testid="ward-glance"
   >
     <h2 id="ward-glance-heading" class="text-xl font-bold text-gray-900">
-      Ward {wardNumber} at a glance
+      {formatWardName(wardNumber)} at a glance
     </h2>
     <p class="text-sm text-gray-600 mt-1">
       In the archive since {formatLongMonth(monthOfDate(glance.first_date))}
@@ -76,7 +77,7 @@ const topics = glance && glance.topic_newsletters > 0 ? glance.topics : [];
 
       {topics.length > 0 && (
         <div data-testid="ward-glance-topics">
-          <h3 class="text-sm font-semibold text-gray-700">Top topics</h3>
+          <h3 class="text-sm font-semibold text-gray-700">Topics this ward's newsletters cover most</h3>
           <p class="text-xs text-gray-500 mb-3">
             Share of newsletters{trackedPeriod && <> from {trackedPeriod}</>} that mention each
           </p>

@@ -6,6 +6,9 @@ import {
   buildWardPath,
   buildWardSearchPath,
   formatAlderNames,
+  formatOrdinal,
+  formatWardAldermanHeading,
+  formatWardName,
   parseWardParam,
   type WardContactSource,
 } from '../../lib/wards';
@@ -136,5 +139,45 @@ describe('buildWardContactLinks', () => {
   it('trims whitespace from the email address', () => {
     const links = buildWardContactLinks({ ...fullSource, email_address: ' ward@example.org ' });
     expect(links.find((link) => link.kind === 'email')?.href).toBe('mailto:ward@example.org');
+  });
+});
+
+describe('formatOrdinal', () => {
+  it.each([
+    [1, '1st'],
+    [2, '2nd'],
+    [3, '3rd'],
+    [4, '4th'],
+    [11, '11th'],
+    [12, '12th'],
+    [13, '13th'],
+    [21, '21st'],
+    [22, '22nd'],
+    [23, '23rd'],
+    [50, '50th'],
+  ])('formats %i as %s', (value, expected) => {
+    expect(formatOrdinal(value)).toBe(expected);
+  });
+});
+
+describe('formatWardName', () => {
+  it('uses the ordinal ward name people search for', () => {
+    expect(formatWardName(38)).toBe('38th Ward');
+  });
+});
+
+describe('formatWardAldermanHeading', () => {
+  it('names a single alderman', () => {
+    expect(formatWardAldermanHeading(38, ['Nicholas Sposato'])).toBe(
+      '38th Ward Alderman Nicholas Sposato',
+    );
+  });
+
+  it('uses the plural for several aldermen', () => {
+    expect(formatWardAldermanHeading(1, ['A', 'B', 'C'])).toBe('1st Ward Aldermen A, B, and C');
+  });
+
+  it('is just the ward name when no alderman is on file', () => {
+    expect(formatWardAldermanHeading(12, [])).toBe('12th Ward');
   });
 });

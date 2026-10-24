@@ -4,8 +4,11 @@ import {
   buildCanonicalUrl,
   buildNewsletterDescription,
   buildWardDescription,
+  buildWardStructuredData,
   buildWardTitle,
+  formatShortReceivedDate,
   isNonProductionHost,
+  serializeJsonLd,
   truncateDescription,
 } from '../../lib/seo';
 
@@ -151,25 +154,129 @@ describe('isNonProductionHost', () => {
 });
 
 describe('buildWardTitle', () => {
-  it('includes the ward number and alderman name', () => {
-    expect(buildWardTitle(1, 'Daniel La Spata')).toBe(
-      'Ward 1 - Daniel La Spata Newsletters - Chicago Alderman Newsletter Tracker',
+  it('leads with the ordinal ward and the alderman', () => {
+    expect(buildWardTitle(38, ['Nicholas Sposato'])).toBe(
+      '38th Ward Alderman Nicholas Sposato: Newsletters & Updates',
     );
   });
 
-  it('omits the alderman when none is on file', () => {
-    expect(buildWardTitle(12, null)).toBe('Ward 12 Newsletters - Chicago Alderman Newsletter Tracker');
+  it('names every alderman when a ward has several', () => {
+    expect(buildWardTitle(1, ['Ann Lee', 'Bo Park'])).toBe(
+      '1st Ward Aldermen Ann Lee and Bo Park: Newsletters & Updates',
+    );
+  });
+
+  it('describes the ward when no alderman is on file', () => {
+    expect(buildWardTitle(12, [])).toBe('12th Ward, Chicago: Alderman Newsletters & Updates');
+  });
+});
+
+describe('formatShortReceivedDate', () => {
+  it('uses the Chicago calendar day', () => {
+    // 03:00 UTC on Oct 23 is still Oct 22 in Chicago.
+    expect(formatShortReceivedDate('2026-10-23T03:00:00Z')).toBe('Oct 22');
+  });
+
+  it('returns null for an invalid date', () => {
+    expect(formatShortReceivedDate('not a date')).toBeNull();
   });
 });
 
 describe('buildWardDescription', () => {
-  it('names the alderman and ward', () => {
-    const description = buildWardDescription(49, 'Maria Hadden');
-    expect(description).toContain("Maria Hadden, alderman for Chicago's Ward 49");
+  const latest = { subject: 'Leaf collection starts Monday', received_date: '2026-10-22T15:00:00Z' };
+
+  it('leads with what the alderman told the ward and the latest newsletter', () => {
+    expect(buildWardDescription(38, ['Nicholas Sposato'], latest)).toBe(
+      'What Ald. Nicholas Sposato told 38th Ward residents. Latest (Oct 22): Leaf collection starts Monday',
+    );
+  });
+
+  it('names several aldermen together', () => {
+    expect(buildWardDescription(2, ['Ann Lee', 'Bo Park'], latest)).toBe(
+      'What the 2nd Ward aldermen, Ann Lee and Bo Park, told residents. Latest (Oct 22): Leaf collection starts Monday',
+    );
+  });
+
+  it('caps long subjects at the meta description length', () => {
+    const description = buildWardDescription(38, ['Nicholas Sposato'], {
+      ...latest,
+      subject: 'word '.repeat(60),
+    });
     expect(description.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX_LENGTH);
+    expect(description.endsWith('…')).toBe(true);
+  });
+
+  it('falls back to the page summary without a latest newsletter', () => {
+    expect(buildWardDescription(49, ['Maria Hadden'], null)).toBe(
+      "Read newsletters from Maria Hadden, alderman for Chicago's 49th Ward, along with ward office contact information.",
+    );
+  });
+
+  it('falls back when the latest subject is blank', () => {
+    expect(buildWardDescription(49, ['Maria Hadden'], { ...latest, subject: '  ' })).toContain(
+      'Read newsletters from Maria Hadden',
+    );
   });
 
   it('falls back to a generic sender when no alderman is on file', () => {
-    expect(buildWardDescription(12, null)).toContain("the alderman for Chicago's Ward 12");
+    expect(buildWardDescription(12, [], null)).toContain("the alderman for Chicago's 12th Ward");
+  });
+});
+
+describe('buildWardStructuredData', () => {
+  const source = {
+    name: 'Nicholas Sposato',
+    website: 'https://www.38thward.com',
+    phone: '(773) 555-0138',
+    email_address: 'ward38@cityofchicago.org',
+  };
+
+  it('describes the breadcrumb path to the ward page', () => {
+    const [breadcrumbs] = buildWardStructuredData(38, [source], SITE)['@graph'] as unknown[];
+    expect(breadcrumbs).toEqual({
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Wards', item: `${SITE}/wards` },
+        { '@type': 'ListItem', position: 3, name: '38th Ward', item: `${SITE}/ward/38` },
+      ],
+    });
+  });
+
+  it('describes each alderman with their public contact details', () => {
+    const [, person] = buildWardStructuredData(38, [source], SITE)['@graph'] as unknown[];
+    expect(person).toEqual({
+      '@type': 'Person',
+      name: 'Nicholas Sposato',
+      jobTitle: 'Alderman, 38th Ward',
+      worksFor: { '@type': 'GovernmentOrganization', name: 'Chicago City Council' },
+      telephone: '(773) 555-0138',
+      email: 'ward38@cityofchicago.org',
+      url: 'https://www.38thward.com',
+    });
+  });
+
+  it('omits missing or unsafe contact details', () => {
+    const unsafeSource = { name: 'A', website: 'javascript:alert(1)', phone: null, email_address: ' ' };
+    const [, person] = buildWardStructuredData(5, [unsafeSource], SITE)['@graph'] as unknown[];
+    expect(person).toEqual({
+      '@type': 'Person',
+      name: 'A',
+      jobTitle: 'Alderman, 5th Ward',
+      worksFor: { '@type': 'GovernmentOrganization', name: 'Chicago City Council' },
+    });
+  });
+
+  it('lists only the breadcrumbs when no alderman is on file', () => {
+    expect(buildWardStructuredData(5, [], SITE)['@graph']).toHaveLength(1);
+  });
+});
+
+describe('serializeJsonLd', () => {
+  it('escapes "<" so stored text cannot close the script tag', () => {
+    const name = '</script><script>alert(1)</script>';
+    const json = serializeJsonLd({ name });
+    expect(json).not.toContain('<');
+    expect(JSON.parse(json)).toEqual({ name });
   });
 });
