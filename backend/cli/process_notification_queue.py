@@ -183,11 +183,12 @@ def _process_user_digest(
         run.supabase.table("user_profiles")
         .select("email, notification_preferences")
         .eq("id", user_id)
-        .single()
+        .maybe_single()
         .execute()
     )
 
-    if not user_response.data:
+    # maybe_single gives None, not an error, when there is no profile
+    if user_response is None or not user_response.data:
         print("  ⚠️  User profile not found, skipping")
         run.stats["skipped"] += 1
         return False
