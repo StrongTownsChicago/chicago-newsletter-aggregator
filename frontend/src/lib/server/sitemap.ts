@@ -29,9 +29,18 @@ function escapeXml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => XML_ESCAPES[character]);
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * W3C datetime for `<lastmod>`. Date-only values stay date-only so a Chicago
+ * calendar day isn't shifted to the previous evening by a UTC midnight.
+ */
 function toLastmod(receivedDate: string | null): string | null {
   if (!receivedDate) {
     return null;
+  }
+  if (DATE_ONLY_PATTERN.test(receivedDate)) {
+    return Number.isNaN(Date.parse(receivedDate)) ? null : receivedDate;
   }
   const date = new Date(receivedDate);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();

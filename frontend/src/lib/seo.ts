@@ -104,15 +104,25 @@ export interface WardLatestNewsletter {
   received_date: string;
 }
 
-/** Formats a newsletter date as e.g. "Oct 22" in Chicago time, or null if invalid. */
-export function formatShortReceivedDate(receivedDate: string): string | null {
+const chicagoYearFormat = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  timeZone: "America/Chicago",
+});
+
+/**
+ * Formats a newsletter date as e.g. "Oct 22" in Chicago time, adding the year
+ * ("Feb 4, 2025") when it isn't the current Chicago year. Null if invalid.
+ */
+export function formatShortReceivedDate(receivedDate: string, now: Date): string | null {
   const date = new Date(receivedDate);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
+  const isCurrentYear = chicagoYearFormat.format(date) === chicagoYearFormat.format(now);
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    ...(isCurrentYear ? {} : { year: "numeric" }),
     timeZone: "America/Chicago",
   });
 }
@@ -126,6 +136,7 @@ export function buildWardDescription(
   wardNumber: number,
   alderNames: readonly string[],
   latestNewsletter: WardLatestNewsletter | null,
+  now: Date = new Date(),
 ): string {
   const wardName = formatWardName(wardNumber);
   const names = formatAlderNames(alderNames);
@@ -136,7 +147,7 @@ export function buildWardDescription(
       alderNames.length === 1
         ? `What Ald. ${names} told ${wardName} residents.`
         : `What the ${wardName} aldermen, ${names}, told residents.`;
-    const latestDate = formatShortReceivedDate(latestNewsletter.received_date);
+    const latestDate = formatShortReceivedDate(latestNewsletter.received_date, now);
     const latestLabel = latestDate ? `Latest (${latestDate})` : "Latest";
     return truncateDescription(`${intro} ${latestLabel}: ${latestSubject}`);
   }

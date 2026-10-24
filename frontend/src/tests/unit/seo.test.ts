@@ -172,29 +172,44 @@ describe('buildWardTitle', () => {
 });
 
 describe('formatShortReceivedDate', () => {
+  const now = new Date('2026-10-23T17:00:00Z');
+
   it('uses the Chicago calendar day', () => {
     // 03:00 UTC on Oct 23 is still Oct 22 in Chicago.
-    expect(formatShortReceivedDate('2026-10-23T03:00:00Z')).toBe('Oct 22');
+    expect(formatShortReceivedDate('2026-10-23T03:00:00Z', now)).toBe('Oct 22');
+  });
+
+  it('adds the year for dates outside the current Chicago year', () => {
+    expect(formatShortReceivedDate('2025-02-04T15:00:00Z', now)).toBe('Feb 4, 2025');
+    // 03:00 UTC on Jan 1 is still Dec 31 of the previous year in Chicago.
+    expect(formatShortReceivedDate('2026-01-01T03:00:00Z', now)).toBe('Dec 31, 2025');
   });
 
   it('returns null for an invalid date', () => {
-    expect(formatShortReceivedDate('not a date')).toBeNull();
+    expect(formatShortReceivedDate('not a date', now)).toBeNull();
   });
 });
 
 describe('buildWardDescription', () => {
   const latest = { subject: 'Leaf collection starts Monday', received_date: '2026-10-22T15:00:00Z' };
+  const now = new Date('2026-10-23T17:00:00Z');
 
   it('leads with what the alderman told the ward and the latest newsletter', () => {
-    expect(buildWardDescription(38, ['Nicholas Sposato'], latest)).toBe(
+    expect(buildWardDescription(38, ['Nicholas Sposato'], latest, now)).toBe(
       'What Ald. Nicholas Sposato told 38th Ward residents. Latest (Oct 22): Leaf collection starts Monday',
     );
   });
 
   it('names several aldermen together', () => {
-    expect(buildWardDescription(2, ['Ann Lee', 'Bo Park'], latest)).toBe(
+    expect(buildWardDescription(2, ['Ann Lee', 'Bo Park'], latest, now)).toBe(
       'What the 2nd Ward aldermen, Ann Lee and Bo Park, told residents. Latest (Oct 22): Leaf collection starts Monday',
     );
+  });
+
+  it('dates a stale latest newsletter with its year', () => {
+    expect(
+      buildWardDescription(14, ['Ann Lee'], { ...latest, received_date: '2025-02-04T15:00:00Z' }, now),
+    ).toContain('Latest (Feb 4, 2025):');
   });
 
   it('caps long subjects at the meta description length', () => {

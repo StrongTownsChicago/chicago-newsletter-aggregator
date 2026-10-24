@@ -6,6 +6,7 @@ import {
   describeTopicShare,
   describeTrackedPeriod,
   findWardGlance,
+  listTopTopicLabels,
   listTrackedMonths,
   listWardMonthCounts,
   type WardGlance,
@@ -120,5 +121,25 @@ describe('committed ward-glance.json', () => {
         expect(file.topics[topic.id]).toBeTruthy();
       }
     }
+  });
+});
+
+describe('listTopTopicLabels', () => {
+  const topics = [
+    { id: 'schools', newsletters: 3, city_wards: 25 },
+    { id: 'parks', newsletters: 2, city_wards: 20 },
+    { id: 'unlabeled', newsletters: 1, city_wards: 5 },
+  ];
+
+  it('labels the top topics in order, up to the limit', () => {
+    const glance = makeGlance({ topics });
+    const file = { ...makeFile(glance), topics: { schools: 'Schools', parks: 'Parks' } };
+    expect(listTopTopicLabels(file, glance, 2)).toEqual(['Schools', 'Parks']);
+    expect(listTopTopicLabels(file, glance, 5)).toEqual(['Schools', 'Parks', 'unlabeled']);
+  });
+
+  it('lists nothing when the ward had no readable newsletters in the window', () => {
+    const glance = makeGlance({ topics, topic_newsletters: 0 });
+    expect(listTopTopicLabels(makeFile(glance), glance, 3)).toEqual([]);
   });
 });

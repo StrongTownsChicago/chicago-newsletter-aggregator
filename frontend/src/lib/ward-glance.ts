@@ -109,3 +109,11 @@ export function describeCityReach(file: WardGlanceFile, topic: WardGlanceTopic):
   const wards = file.city_readable_wards === 1 ? "ward" : "wards";
   return `Citywide: ${topic.city_wards} of ${file.city_readable_wards} ${wards} in ${formatLongMonth(file.latest_month)}`;
 }
+
+/** Labels of the ward's top topics, most mentioned first, at most `limit`. */
+export function listTopTopicLabels(file: WardGlanceFile, glance: WardGlance, limit: number): string[] {
+  if (glance.topic_newsletters === 0) {
+    return [];
+  }
+  return glance.topics.slice(0, limit).map((topic) => file.topics[topic.id] ?? topic.id);
+}

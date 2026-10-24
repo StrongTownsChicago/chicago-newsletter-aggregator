@@ -96,7 +96,9 @@ def prepare_newsletter_data(
                 "ward_text": ward_text,
                 "date_formatted": date_formatted,
                 "summary": newsletter.get("summary", ""),
-                "topics": newsletter.get("topics", []),
+                "topics": [
+                    format_topic_name(topic) for topic in newsletter.get("topics") or []
+                ],
                 "newsletter_url": newsletter_url,
                 "matched_rules": item["matched_rules"],
             }
@@ -275,28 +277,30 @@ def format_week_range(week_id: str) -> str:
         return week_id
 
 
+# Display labels for processing/llm_processor.py:TOPICS.
+# Must match frontend/src/lib/topics.ts:TOPIC_LABELS so emails and the site agree.
+TOPIC_LABELS: dict[str, str] = {
+    "4_flats_legalization": "4-flats legalization",
+    "missing_middle_housing": "Missing middle housing",
+    "accessory_dwelling_units": "Accessory dwelling units (ADUs)",
+    "single_stair_reform": "Single-stair reform",
+    "bike_lanes": "Bike lanes",
+    "street_redesign": "Street redesign",
+    "street_safety_or_traffic_calming": "Street safety & traffic calming",
+    "transit_funding": "Transit funding",
+    "city_budget": "City budget",
+    "tax_policy": "Tax policy",
+    "zoning_or_development_meeting_or_approval": "Zoning & development approvals",
+    "city_charter": "City charter",
+}
+
+
 def format_topic_name(topic: str) -> str:
-    """
-    Convert topic identifier to friendly display name.
+    """Display label for a topic id, e.g. "bike_lanes" -> "Bike lanes".
 
-    Args:
-        topic: Topic identifier (e.g., "bike_lanes")
-
-    Returns:
-        Formatted string (e.g., "Bike Lanes and Cycling Infrastructure")
+    Unknown ids get spaces for underscores and a capitalized first letter.
     """
-    topic_names = {
-        "4_flats_legalization": "4-Flats and Small-Scale Housing",
-        "missing_middle_housing": "Missing Middle Housing",
-        "accessory_dwelling_units": "Accessory Dwelling Units (ADUs)",
-        "single_stair_reform": "Single-Stair Building Reform",
-        "bike_lanes": "Bike Lanes and Cycling Infrastructure",
-        "street_redesign": "Street Redesign and Reconstruction",
-        "street_safety_or_traffic_calming": "Street Safety and Traffic Calming",
-        "transit_funding": "Public Transit Funding and Service",
-        "city_budget": "City Budget and Fiscal Policy",
-        "tax_policy": "Tax Policy and Revenue",
-        "zoning_or_development_meeting_or_approval": "Zoning and Development Approvals",
-        "city_charter": "City Charter and Governance Reform",
-    }
-    return topic_names.get(topic, topic.replace("_", " ").title())
+    if topic in TOPIC_LABELS:
+        return TOPIC_LABELS[topic]
+    spaced = " ".join(part for part in topic.split("_") if part)
+    return spaced[:1].upper() + spaced[1:]

@@ -52,5 +52,6 @@ for (const invalidWard of ['0', '51', 'abc', '05']) {
     const response = await page.goto(`/ward/${invalidWard}`);
     expect(response?.status()).toBe(404);
     await expect(page.getByTestId('ward-not-found')).toBeVisible();
+    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
   });
 }

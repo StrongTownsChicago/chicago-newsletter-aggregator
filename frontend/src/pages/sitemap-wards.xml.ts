@@ -9,11 +9,11 @@ import {
   buildWardSitemapPages,
 } from "../lib/server/sitemap";
 
+const wardGlance = wardGlanceData as WardGlanceFile;
+
 // Ward pages are server-rendered, so @astrojs/sitemap cannot discover them.
 export const GET: APIRoute = ({ site, url }) =>
-  new Response(buildSitemapXml(
-    buildWardSitemapPages((wardGlanceData as WardGlanceFile).wards),
-    site ?? url.origin), {
+  new Response(buildSitemapXml(buildWardSitemapPages(wardGlance.wards), site ?? url.origin), {
     status: 200,
     headers: SITEMAP_RESPONSE_HEADERS,
   });

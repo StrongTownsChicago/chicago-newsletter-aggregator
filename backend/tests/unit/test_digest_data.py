@@ -3,7 +3,12 @@
 import unittest
 from typing import Any
 
-from notifications.digest_data import prepare_newsletter_data
+from notifications.digest_data import (
+    TOPIC_LABELS,
+    format_topic_name,
+    prepare_newsletter_data,
+)
+from processing.llm_processor import TOPICS
 from tests.fixtures.newsletter_factory import create_test_newsletter, create_test_source
 
 
@@ -123,6 +128,19 @@ class TestPrepareNewsletterData(unittest.TestCase):
         self.assertIn("Zoning Updates", result[0]["matched_rules"])
         self.assertIn("Bike Lanes", result[0]["matched_rules"])
 
+    def test_shows_topic_labels_not_ids(self) -> None:
+        """Topic ids are shown as their display labels."""
+        newsletter = create_test_newsletter(
+            topics=["street_safety_or_traffic_calming", "bike_lanes"]
+        )
+        notifications = [{"newsletter": newsletter, "rule": {"name": "Rule 1"}}]
+
+        result = prepare_newsletter_data(notifications)
+
+        self.assertEqual(
+            result[0]["topics"], ["Street safety & traffic calming", "Bike lanes"]
+        )
+
     def test_empty_notifications_returns_empty(self) -> None:
         """Empty notifications list returns empty result."""
         result = prepare_newsletter_data([])
@@ -147,3 +165,17 @@ class TestPrepareNewsletterData(unittest.TestCase):
         result = prepare_newsletter_data(notifications)
         # Should take first 10 chars as fallback
         self.assertEqual(result[0]["date_formatted"], "2026-01-24")
+
+
+class TestFormatTopicName(unittest.TestCase):
+    """Tests for format_topic_name() and TOPIC_LABELS."""
+
+    def test_labels_every_llm_topic(self) -> None:
+        """Every topic the LLM can assign has a label, and no others do."""
+        self.assertEqual(set(TOPIC_LABELS), set(TOPICS))
+
+    def test_known_topic_uses_its_label(self) -> None:
+        self.assertEqual(format_topic_name("bike_lanes"), "Bike lanes")
+
+    def test_unknown_topic_is_humanized(self) -> None:
+        self.assertEqual(format_topic_name("new_topic_id"), "New topic id")

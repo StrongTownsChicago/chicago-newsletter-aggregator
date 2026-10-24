@@ -25,7 +25,7 @@ describe('buildNewsletterSitemapXml', () => {
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         `<url><loc>${SITE}/newsletter/aaa</loc><lastmod>2026-03-15T15:00:00.000Z</lastmod></url>`,
-        `<url><loc>${SITE}/newsletter/bbb</loc><lastmod>2026-03-16T00:00:00.000Z</lastmod></url>`,
+        `<url><loc>${SITE}/newsletter/bbb</loc><lastmod>2026-03-16</lastmod></url>`,
         '</urlset>',
       ].join('\n'),
     );
@@ -122,7 +122,7 @@ describe('buildSitemapXml', () => {
       SITE,
     );
     expect(xml).toContain(`<url><loc>${SITE}/wards</loc></url>`);
-    expect(xml).toContain(`<url><loc>${SITE}/ward/1</loc><lastmod>2026-03-16T00:00:00.000Z</lastmod></url>`);
+    expect(xml).toContain(`<url><loc>${SITE}/ward/1</loc><lastmod>2026-03-16</lastmod></url>`);
   });
 });
 
@@ -140,7 +140,7 @@ describe('buildWardSitemapPages', () => {
 
   it('emits lastmod for dated wards only', () => {
     const xml = buildSitemapXml(buildWardSitemapPages({ '38': { last_date: '2026-10-13' } }), SITE);
-    expect(xml).toContain(`<loc>${SITE}/ward/38</loc><lastmod>2026-10-13T00:00:00.000Z</lastmod>`);
+    expect(xml).toContain(`<loc>${SITE}/ward/38</loc><lastmod>2026-10-13</lastmod>`);
     expect(xml).toContain(`<loc>${SITE}/ward/1</loc></url>`);
   });
 

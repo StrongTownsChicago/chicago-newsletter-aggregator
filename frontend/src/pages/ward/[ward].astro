@@ -5,6 +5,7 @@ import Layout from '../../layouts/Layout.astro';
 import NewsletterCard from '../../components/NewsletterCard.astro';
 import Pagination from '../../components/Pagination.astro';
 import WardGlance from '../../components/WardGlance.astro';
+import WardGlanceSummary from '../../components/WardGlanceSummary.astro';
 import NotFound from '../../components/NotFound.astro';
 import StatusMessage from '../../components/StatusMessage.astro';
 import {
@@ -148,6 +149,7 @@ const wardName = wardNumber === null ? null : formatWardName(wardNumber);
                 {totalCount} newsletter{totalCount !== 1 ? 's' : ''}
                 {latestDateLabel && <> · Latest {latestDateLabel}</>}
               </p>
+              {page === 1 && <WardGlanceSummary wardNumber={wardNumber} />}
               <a
                 href={buildWardSearchPath(wardNumber)}
                 class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800"
@@ -168,8 +170,6 @@ const wardName = wardNumber === null ? null : formatWardName(wardNumber);
             >Look up your address</a>
           </p>
         </header>
-
-        {page === 1 && <WardGlance wardNumber={wardNumber} />}
 
         <!-- Newsletter List -->
         <section>
@@ -200,6 +200,8 @@ const wardName = wardNumber === null ? null : formatWardName(wardNumber);
             </>
           )}
         </section>
+
+        {page === 1 && <WardGlance wardNumber={wardNumber} />}
   </div>
   )}
 </Layout>
