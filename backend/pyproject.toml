@@ -108,5 +108,5 @@ branch = true
 [tool.coverage.report]
 precision = 1
 # Erosion backstop, not a target: raise it as coverage rises, keep ~2 pts under.
-fail_under = 59
+fail_under = 83
 exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:", "raise NotImplementedError"]
