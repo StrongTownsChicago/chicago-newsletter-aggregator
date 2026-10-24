@@ -143,3 +143,28 @@ class TestBuildDigestHtml(unittest.TestCase):
         )
 
         self.assertIn("http://example.com/preferences", html)
+
+    def test_newsletter_and_rule_text_is_escaped(self) -> None:
+        """Subjects, summaries and rule names render as text, never as markup."""
+        prepared = [
+            {
+                "title": "Parks & Rec <Updates>",
+                "source_name": "Ward 1",
+                "ward_text": "",
+                "date_formatted": "January 24, 2026",
+                "summary": '<a href="https://evil.example">Click</a>',
+                "topics": [],
+                "newsletter_url": 'http://example.com/nl?a=1&b="2"',
+                "matched_rules": ["<b>Bike lanes</b>"],
+            }
+        ]
+
+        html = build_digest_html(
+            prepared, DigestType.DAILY, "http://example.com/p", "http://example.com/u"
+        )
+
+        self.assertIn("Parks &amp; Rec &lt;Updates&gt;", html)
+        self.assertIn("&lt;a href=&quot;https://evil.example&quot;&gt;", html)
+        self.assertIn("&lt;b&gt;Bike lanes&lt;/b&gt;", html)
+        self.assertIn('href="http://example.com/nl?a=1&amp;b=&quot;2&quot;"', html)
+        self.assertNotIn('evil.example"', html)
