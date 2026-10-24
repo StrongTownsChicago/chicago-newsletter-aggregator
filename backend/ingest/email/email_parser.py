@@ -3,7 +3,10 @@ import re
 from typing import Any, cast
 
 from bs4 import BeautifulSoup
+from bs4.element import AttributeValueList
 from html2text import html2text
+
+REDACTION_MARKER = "[REDACTED]"
 
 
 def sanitize_content(
@@ -26,6 +29,7 @@ def sanitize_content(
     if not content:
         return ""
 
+    redaction_pattern = build_redaction_pattern(read_strip_phrases())
     url_patterns = privacy_patterns.get("url_patterns", [])
     text_patterns = privacy_patterns.get("text_patterns", [])
     selectors = privacy_patterns.get("selectors", [])
@@ -61,7 +65,10 @@ def sanitize_content(
                 elif url_matched:
                     a.unwrap()
 
-            result = str(soup)
+            # 3. Redact sensitive phrases in text and attribute values, not in markup
+            if redaction_pattern:
+                redact_html(soup, redaction_pattern)
+            return str(soup)
 
         except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
             print(f"  ⚠️  HTML Sanitization failed: {e}")
@@ -94,17 +101,48 @@ def sanitize_content(
     else:
         result = content
 
-    # 3. Strip sensitive phrases (names, emails, etc.) from environment variable
-    phrases_to_strip = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
-    phrases_to_strip = [p.strip() for p in phrases_to_strip if p.strip()]
-
-    if phrases_to_strip:
-        for phrase in phrases_to_strip:
-            # Use escape to ensure any special regex characters don't break things
-            pattern = re.escape(phrase)
-            result = re.sub(pattern, "[REDACTED]", result, flags=re.IGNORECASE)
-
+    # 3. Redact sensitive phrases (names, emails, etc.)
+    if redaction_pattern:
+        result = redaction_pattern.sub(REDACTION_MARKER, result)
     return result
+
+
+def read_strip_phrases() -> list[str]:
+    """Return the phrases to redact, from the PRIVACY_STRIP_PHRASES env var."""
+    phrases = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
+    return [phrase.strip() for phrase in phrases if phrase.strip()]
+
+
+def build_redaction_pattern(phrases: list[str]) -> re.Pattern[str] | None:
+    """
+    Compile one case-insensitive pattern matching any phrase to redact.
+
+    The marker itself is the first alternative, so already redacted text is
+    replaced with itself: a phrase such as "Ted" never rewrites the "TED" in an
+    earlier marker, and sanitizing stored content again changes nothing.
+    Longer phrases come first, so "Jane Roe" is redacted whole before "Jane".
+    """
+    if not phrases:
+        return None
+    alternatives = [REDACTION_MARKER, *sorted(phrases, key=len, reverse=True)]
+    return re.compile("|".join(map(re.escape, alternatives)), re.IGNORECASE)
+
+
+def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
+    """Redact text nodes and attribute values in place; tag and attribute names stay intact."""
+    for string in soup.find_all(string=True):
+        redacted = pattern.sub(REDACTION_MARKER, string)
+        if redacted != string:
+            # Same class, so comments and CDATA stay comments and CDATA.
+            string.replace_with(type(string)(redacted))
+    for tag in soup.find_all(True):
+        for name, value in list(tag.attrs.items()):
+            if isinstance(value, str):
+                tag[name] = pattern.sub(REDACTION_MARKER, value)
+            else:
+                tag[name] = AttributeValueList(
+                    pattern.sub(REDACTION_MARKER, item) for item in value
+                )
 
 
 SQL_ANY_CHARACTERS_WILDCARD = "%"

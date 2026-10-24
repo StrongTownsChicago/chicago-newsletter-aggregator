@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import sanitize_content
@@ -274,3 +275,24 @@ Keep this sentence: I will not unsubscribe from your great news.
             self.assertNotIn("John Doe", sanitized_text)
             self.assertIn("[REDACTED]", sanitized_text)
             self.assertEqual(sanitized_text.count("[REDACTED]"), 2)
+
+    def test_redaction_never_rewrites_an_earlier_marker(self) -> None:
+        """A phrase found inside "[REDACTED]" ("Ted", "Act") leaves markers whole, even on a second pass."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane,Ted,Act"}):
+            once = sanitize_content("Jane met Ted", "text", PRIVACY_PATTERNS_DICT)
+            twice = sanitize_content(once, "text", PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(once, "[REDACTED] met [REDACTED]")
+        self.assertEqual(twice, once)
+
+    def test_html_redaction_leaves_markup_intact(self) -> None:
+        """Phrases are redacted in text and attribute values, never in tag or attribute names."""
+        html = '<p align="center" title="From Al"><!-- Al -->Al wrote</p>'
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Al"}):
+            sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(
+            sanitized,
+            '<p align="center" title="From [REDACTED]"><!-- [REDACTED] -->'
+            "[REDACTED] wrote</p>",
+        )
