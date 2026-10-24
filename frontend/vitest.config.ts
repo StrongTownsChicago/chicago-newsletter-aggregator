@@ -16,7 +16,7 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/tests/**'],
       // Erosion backstop, ~2 pts under the measured values; raise as coverage rises.
-      thresholds: { statements: 56, branches: 62, functions: 52, lines: 56 },
+      thresholds: { statements: 60, branches: 66, functions: 56, lines: 60 },
     },
   },
 });
