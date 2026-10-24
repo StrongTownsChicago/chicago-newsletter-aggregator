@@ -334,6 +334,49 @@ Keep this sentence: I will not unsubscribe from your great news.
                     self.assertNotIn("jane", sanitized.lower())
                     self.assertIn("[REDACTED]", sanitized)
 
+    def test_phrase_split_by_inline_tags_is_redacted(self) -> None:
+        """A phrase readers see whole is redacted even when tags split it."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):
+            sanitized = sanitize_content(
+                "<p>Contact Jane <b>Doe</b> or J<i>ane</i> Doe today</p>",
+                "html",
+                PRIVACY_PATTERNS_DICT,
+            )
+
+        self.assertEqual(
+            sanitized, "<p>Contact [REDACTED]<b></b> or [REDACTED]<i></i> today</p>"
+        )
+
+    def test_phrases_match_whole_words_only(self) -> None:
+        """Short names redact the name, possessives included, but not words containing it."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Ted,Ed"}):
+            sanitized = sanitize_content(
+                "Ted started; Ed's edits needed Ted.", "text", PRIVACY_PATTERNS_DICT
+            )
+
+        self.assertEqual(
+            sanitized, "[REDACTED] started; [REDACTED]'s edits needed [REDACTED]."
+        )
+
+    def test_obfuscated_privacy_urls_are_matched_as_a_browser_reads_them(self) -> None:
+        """Tabs, newlines and percent-escapes inside a URL don't hide it."""
+        hrefs = [
+            "https://x.list-man&#9;age.com/unsubscribe?u=1",
+            "https://x.list-man&#10;age.com/unsubscribe?u=1",
+            "https://x.list-manage.com/un%73ubscribe?u=1",
+            "https://x.list%2Dmanage.com/unsubscribe",
+            " HTTPS://X.LIST-MANAGE.COM/UNSUBSCRIBE",
+        ]
+        for href in hrefs:
+            with self.subTest(href=href):
+                sanitized = sanitize_content(
+                    f'<p><a href="{href}">here</a></p>', "html", PRIVACY_PATTERNS_DICT
+                )
+                self.assertEqual(sanitized, "<p>here</p>")
+
+        text = "News\nhttps://x.list-manage.com/un%73ubscribe?u=1"
+        self.assertEqual(sanitize_content(text, "text", PRIVACY_PATTERNS_DICT), "News")
+
     def test_phrase_across_class_tokens_is_redacted(self) -> None:
         """Multi-valued attributes are matched as written, not token by token."""
         with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):

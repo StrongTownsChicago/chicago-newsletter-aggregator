@@ -65,11 +65,13 @@ def matches_any(patterns: list[str], value: str) -> bool:
     return any(re.search(pattern, value, re.IGNORECASE) for pattern in patterns)
 
 
-def is_standalone_keyword(line: str) -> bool:
-    return any(
-        re.match(rf"^\s*{pattern}\s*$", line, re.IGNORECASE)
-        for pattern in TEXT_PATTERNS
-    )
+def find_whole_phrase(text: str, phrases: list[str]) -> str | None:
+    """The first phrase present as whole words outside redaction markers, if any."""
+    unredacted = text.replace("[REDACTED]", "\0")
+    for phrase in phrases:
+        if re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", unredacted, re.IGNORECASE):
+            return phrase
+    return None
 
 
 BENIGN_TEXT = WORDS.filter(lambda text: not matches_any(TEXT_PATTERNS, text))
@@ -98,8 +100,22 @@ def container(css_class: str, children: list[str]) -> str:
     return f'<div {attribute}="{css_class.lstrip(".#")}">{"".join(children)}</div>'
 
 
-# Pieces of a strip phrase, so a phrase can end up split around a link.
-INLINE_TEXT = st.one_of(ESCAPED_TEXT, st.sampled_from(["Jane", "Jane ", " Roe", "Roe"]))
+# Pieces of a strip phrase, so a phrase ends up split around a link or inside
+# inline tags, and entity-encoded forms of it.
+INLINE_TEXT = st.one_of(
+    ESCAPED_TEXT,
+    st.sampled_from(
+        [
+            "Jane",
+            "Jane ",
+            " Roe",
+            "Roe",
+            "J<i>ane</i>",
+            "<b>Roe</b>",
+            "J&#97;ne R&#x6F;e",
+        ]
+    ),
+)
 
 
 def html_documents(leaves: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
@@ -138,15 +154,56 @@ def benign_documents() -> st.SearchStrategy[str]:
     return st.lists(fragments, min_size=1, max_size=6).map("".join)
 
 
-TEXT_LINES = st.one_of(
-    WORDS,
-    st.sampled_from(PRIVACY_LINK_TEXTS),
-    st.sampled_from(PRIVACY_URLS + BENIGN_URLS),
+@st.composite
+def obfuscated_privacy_urls(draw: st.DrawFn) -> str:
+    """A privacy URL as a browser would still follow it: tabs or newlines inside,
+    percent-escaped characters, and mixed case."""
+    url = draw(st.sampled_from(PRIVACY_URLS))
+    scheme, rest = url.split("://", 1)
+    characters = []
+    for character in rest:
+        if character.isalnum() and draw(st.booleans()):
+            character = f"%{ord(character):02X}"
+        elif draw(st.integers(0, 9)) == 0:
+            character = draw(st.sampled_from(["\t", "\n"])) + character
+        characters.append(character.upper() if draw(st.booleans()) else character)
+    return f"{scheme}://{''.join(characters)}"
+
+
+# Each line is generated as privacy-sensitive or not, so the expected output
+# comes from how a line was made rather than from re-running the patterns.
+# Plain text drops a line only when a privacy phrase is the whole line, so
+# "unsubscribe from this list" and "Add us to your address book" stay.
+STANDALONE_PRIVACY_TEXTS = [
+    "Unsubscribe",
+    "Update your profile",
+    "Manage your preferences",
+    "Forward to a friend",
+    "View this email in your browser",
+]
+PRIVACY_LINES = st.one_of(
+    st.sampled_from(STANDALONE_PRIVACY_TEXTS + PRIVACY_URLS),
+    obfuscated_privacy_urls().map(lambda url: url.replace("\n", "")),
     st.builds(
         lambda words, url: f"{words} {url}", WORDS, st.sampled_from(PRIVACY_URLS)
     ),
 )
-TEXT_DOCUMENTS = st.lists(TEXT_LINES, min_size=1, max_size=15).map("\n".join)
+BENIGN_LINES = st.one_of(BENIGN_TEXT, st.sampled_from(BENIGN_URLS))
+TAGGED_TEXT_LINES = st.lists(
+    st.one_of(
+        PRIVACY_LINES.map(lambda line: (line, True)),
+        BENIGN_LINES.map(lambda line: (line, False)),
+    ),
+    min_size=1,
+    max_size=15,
+)
+
+
+def join_lines(tagged_lines: list[tuple[str, bool]]) -> str:
+    return "\n".join(line for line, _ in tagged_lines)
+
+
+TEXT_DOCUMENTS = TAGGED_TEXT_LINES.map(join_lines)
 STRIP_PHRASES = st.lists(
     st.one_of(st.sampled_from(STRIP_PHRASE_NAMES), WORDS), max_size=3
 ).map(",".join)
@@ -176,6 +233,17 @@ class TestPrivacyFixtureSamples(unittest.TestCase):
 # Tests that expect no redaction must not inherit phrases from a developer's .env.
 @patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ""})
 class TestHtmlSanitizationProperties(unittest.TestCase):
+    @PROPERTY_SETTINGS
+    @given(st.lists(obfuscated_privacy_urls(), min_size=1, max_size=4))
+    def test_obfuscated_privacy_links_do_not_survive(self, urls: list[str]) -> None:
+        document = "".join(f"<p>{link(url, 'here')}</p>" for url in urls)
+
+        soup = BeautifulSoup(
+            sanitize_content(document, "html", PRIVACY_PATTERNS_DICT), "html.parser"
+        )
+
+        self.assertEqual(soup.find_all("a"), [])
+
     @PROPERTY_SETTINGS
     @given(html_documents(LINKS))
     def test_no_privacy_link_or_container_survives(self, document: str) -> None:
@@ -225,39 +293,32 @@ class TestHtmlSanitizationProperties(unittest.TestCase):
             sanitized = sanitize_content(document, "html", PRIVACY_PATTERNS_DICT)
 
         soup = BeautifulSoup(sanitized, "html.parser")
-        values = [str(text) for text in soup.find_all(string=True)] + [
-            value if isinstance(value, str) else " ".join(value)
-            for tag in soup.find_all(True)
-            for value in tag.attrs.values()
+        # The visible text as a reader sees it, plus each string and attribute.
+        values = [
+            soup.get_text(""),
+            *(str(text) for text in soup.find_all(string=True)),
+            *(
+                value if isinstance(value, str) else " ".join(value)
+                for tag in soup.find_all(True)
+                for value in tag.attrs.values()
+            ),
         ]
         for value in values:
-            for span in value.lower().split("[redacted]"):
-                for phrase in phrases:
-                    self.assertNotIn(phrase.lower(), span)
+            self.assertIsNone(find_whole_phrase(value, phrases))
 
 
 @patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ""})
 class TestTextSanitizationProperties(unittest.TestCase):
     @PROPERTY_SETTINGS
-    @given(TEXT_DOCUMENTS)
-    def test_no_privacy_line_survives(self, document: str) -> None:
-        sanitized = sanitize_content(document, "text", PRIVACY_PATTERNS_DICT)
+    @given(TAGGED_TEXT_LINES)
+    def test_privacy_lines_go_and_other_lines_stay_in_order(
+        self, tagged_lines: list[tuple[str, bool]]
+    ) -> None:
+        sanitized = sanitize_content(
+            join_lines(tagged_lines), "text", PRIVACY_PATTERNS_DICT
+        )
 
-        for line in sanitized.splitlines():
-            self.assertFalse(matches_any(URL_PATTERNS, line))
-            self.assertFalse(is_standalone_keyword(line))
-
-    @PROPERTY_SETTINGS
-    @given(TEXT_DOCUMENTS)
-    def test_other_lines_are_kept_in_order(self, document: str) -> None:
-        expected = [
-            line
-            for line in document.splitlines()
-            if not matches_any(URL_PATTERNS, line) and not is_standalone_keyword(line)
-        ]
-
-        sanitized = sanitize_content(document, "text", PRIVACY_PATTERNS_DICT)
-
+        expected = [line for line, is_private in tagged_lines if not is_private]
         self.assertEqual(sanitized.splitlines(), expected)
 
     @PROPERTY_SETTINGS
@@ -281,10 +342,7 @@ class TestTextSanitizationProperties(unittest.TestCase):
                 f"{document}\n{' '.join(phrases)}", "text", PRIVACY_PATTERNS_DICT
             )
 
-        unredacted_spans = sanitized.lower().split("[redacted]")
-        for phrase in phrases:
-            for span in unredacted_spans:
-                self.assertNotIn(phrase.lower(), span)
+        self.assertIsNone(find_whole_phrase(sanitized, phrases))
 
 
 if __name__ == "__main__":

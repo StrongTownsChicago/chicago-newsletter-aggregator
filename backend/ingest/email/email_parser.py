@@ -1,8 +1,10 @@
 import os
 import re
 from typing import Any, cast
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 from html2text import html2text
 
 REDACTION_MARKER = "[REDACTED]"
@@ -44,7 +46,7 @@ def sanitize_content(
 
             # 2. Remove <a> tags by URL or Link Text
             for a in soup.find_all("a", href=True):
-                href = cast(str, a["href"])
+                href = normalize_url_for_matching(cast(str, a["href"]))
                 text = a.get_text(" ", strip=True)
 
                 url_matched = False
@@ -79,7 +81,8 @@ def sanitize_content(
         clean_lines = []
         for line in lines:
             # 1. Skip if line contains a known bad URL pattern
-            if any(re.search(p, line, re.IGNORECASE) for p in url_patterns):
+            matchable_line = normalize_url_for_matching(line)
+            if any(re.search(p, matchable_line, re.IGNORECASE) for p in url_patterns):
                 continue
 
             # 2. Skip if line is a standalone sensitive keyword (heuristic for plain text links)
@@ -106,6 +109,17 @@ def sanitize_content(
     return result
 
 
+def normalize_url_for_matching(url: str) -> str:
+    """
+    Return the URL a browser would follow, for matching against privacy patterns.
+
+    Browsers drop ASCII tabs and newlines anywhere in a URL and surrounding
+    whitespace, and percent-escapes reach the server decoded, so
+    "list-man<TAB>age.com/un%73ubscribe" is still an unsubscribe link.
+    """
+    return unquote(re.sub(r"[\t\n\r]", "", url).strip())
+
+
 def read_strip_phrases() -> list[str]:
     """Return the phrases to redact, from the PRIVACY_STRIP_PHRASES env var."""
     phrases = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
@@ -120,22 +134,42 @@ def build_redaction_pattern(phrases: list[str]) -> re.Pattern[str] | None:
     replaced with itself: a phrase such as "Ted" never rewrites the "TED" in an
     earlier marker, and sanitizing stored content again changes nothing.
     Longer phrases come first, so "Jane Roe" is redacted whole before "Jane".
+    Phrases match whole words only: "Ted" redacts "Ted's" but not "started".
     """
     if not phrases:
         return None
-    alternatives = [REDACTION_MARKER, *sorted(phrases, key=len, reverse=True)]
-    return re.compile("|".join(map(re.escape, alternatives)), re.IGNORECASE)
+    alternatives = [
+        re.escape(REDACTION_MARKER),
+        *(
+            whole_word_regex(phrase)
+            for phrase in sorted(phrases, key=len, reverse=True)
+        ),
+    ]
+    return re.compile("|".join(alternatives), re.IGNORECASE)
+
+
+def whole_word_regex(phrase: str) -> str:
+    """Escape phrase, refusing to match where its first or last letter continues a word."""
+    escaped = re.escape(phrase)
+    starts_with_word = re.match(r"\w", phrase) is not None
+    ends_with_word = re.match(r"\w", phrase[-1]) is not None
+    return (
+        (r"(?<!\w)" if starts_with_word else "")
+        + escaped
+        + (r"(?!\w)" if ends_with_word else "")
+    )
 
 
 def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
-    """Redact text nodes and attribute values in place; tag and attribute names stay intact.
+    """Redact text, comments and attribute values in place; tag and attribute names stay intact.
 
     Only changed values are reassigned, so a phrase list that matches nothing
     leaves the output as it was without one.
     """
-    # Unwrapping and removing links leaves adjacent text in separate nodes;
-    # joining them catches a phrase that spanned the removed tag ("Jane <a>Doe</a>").
-    soup.smooth()
+    redact_visible_text(soup, pattern)
+    # Every string on its own too: comments, CDATA and script text are not part
+    # of the visible text, and joining text can hide a phrase that sits alone in
+    # its node ("a" from an unwrapped link + "<p>Jane Doe</p>" reads "aJane").
     for string in soup.find_all(string=True):
         redacted = pattern.sub(REDACTION_MARKER, string)
         if redacted != string:
@@ -149,6 +183,55 @@ def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
             redacted = pattern.sub(REDACTION_MARKER, original)
             if redacted != original:
                 tag[name] = redacted
+
+
+def redact_visible_text(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
+    """
+    Redact phrases in the document's visible text, even when split across tags.
+
+    The text nodes are matched as one string in document order, so "Jane
+    <b>Doe</b>" and text left either side of a removed link are caught. Each
+    match leaves the marker in the node where it starts and removes the rest
+    from the nodes it spans. Text of neighbouring blocks is joined too, so a
+    phrase running from one block into the next is also redacted.
+    """
+    nodes = [
+        node for node in soup.find_all(string=True) if type(node) is NavigableString
+    ]
+    text = "".join(nodes)
+    match_spans = [
+        match.span()
+        for match in pattern.finditer(text)
+        if match.group().upper() != REDACTION_MARKER
+    ]
+    if not match_spans:
+        return
+
+    node_start = 0
+    for node in nodes:
+        node_end = node_start + len(node)
+        redacted = redact_span(text, node_start, node_end, match_spans)
+        if redacted != node:
+            node.replace_with(NavigableString(redacted))
+        node_start = node_end
+
+
+def redact_span(
+    text: str, start: int, end: int, match_spans: list[tuple[int, int]]
+) -> str:
+    """Return text[start:end] with the parts covered by match_spans redacted."""
+    pieces: list[str] = []
+    position = start
+    for match_start, match_end in match_spans:
+        if match_end <= start or match_start >= end:
+            continue
+        pieces.append(text[position : max(position, match_start)])
+        # The marker goes where the match starts; later nodes only lose their part.
+        if match_start >= start:
+            pieces.append(REDACTION_MARKER)
+        position = max(position, min(end, match_end))
+    pieces.append(text[position:end])
+    return "".join(pieces)
 
 
 SQL_ANY_CHARACTERS_WILDCARD = "%"
