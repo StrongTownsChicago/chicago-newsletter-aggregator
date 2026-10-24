@@ -88,6 +88,9 @@ function buildMonthColumn(
   if (target instanceof HTMLAnchorElement) {
     target.href = buildMonthSearchUrl(context.searchUrl, entry.month);
     if (isSelected) target.setAttribute("aria-current", "true");
+  } else {
+    // A generic div's aria-label is not announced; as an image it is read whole.
+    target.setAttribute("role", "img");
   }
   target.setAttribute("aria-label", describeMonth(entry, isPartial));
 

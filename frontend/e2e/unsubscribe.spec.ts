@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { UNSUBSCRIBER } from './fixtures/db/facts';
+import { restoreSeededNotificationPreferences } from './support/seed-state';
 import { mintUnsubscribeToken } from './support/unsubscribe-token';
 
 test('a valid link asks to confirm, then unsubscribes once', async ({ page }) => {
+  await restoreSeededNotificationPreferences(UNSUBSCRIBER.id);
   const token = await mintUnsubscribeToken(UNSUBSCRIBER.id);
   await page.goto(`/unsubscribe?token=${token}`);
 

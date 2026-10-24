@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { EDITOR_RULE, READER_RULES, RULE_WARD_OPTIONS, RULES_EDITOR, RULES_READER } from './fixtures/db/facts';
 import { signIn } from './support/auth';
+import { restoreSeededNotificationPreferences } from './support/seed-state';
 
 const ruleCards = (page: Page): Locator => page.getByTestId('notification-rule');
 const ruleCard = (page: Page, name: string): Locator =>
@@ -95,6 +96,8 @@ test.describe.serial('a user changing their rules', () => {
   });
 
   test('turns email notifications off and on', async ({ page }) => {
+    await restoreSeededNotificationPreferences(RULES_EDITOR.id);
+    await page.reload();
     const toggle = page.locator('#enabled');
     await expect(toggle).toBeChecked();
 

@@ -24,22 +24,27 @@ const failedSignIn = {
 };
 
 // Mock Supabase
-vi.mock('../../lib/supabase', () => ({
-  supabase: {
+// The routes' per-request client; exported as `supabase` so tests can reach its mocks.
+vi.mock('../../lib/supabase', () => {
+  const requestClient = {
     auth: {
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
     },
-  },
-  notificationsEnabled: vi.fn(() => true),
-}));
+  };
+  return {
+    supabase: requestClient,
+    createRequestClient: vi.fn(() => requestClient),
+    notificationsEnabled: vi.fn(() => true),
+  };
+});
 
 import { POST as signinPOST } from '../../pages/api/auth/signin';
 import { POST as signupPOST } from '../../pages/api/auth/signup';
 import { POST as signoutPOST } from '../../pages/api/auth/signout';
 import { createMockContext } from '../helpers';
-import { supabase, notificationsEnabled } from '../../lib/supabase';
+import { supabase, createRequestClient, notificationsEnabled } from '../../lib/supabase';
 import { WELCOME_PATH } from '../../lib/onboarding';
 
 const upload = () => new File(['x'], 'upload.txt');
@@ -73,6 +78,7 @@ describe('Auth API Routes', () => {
       expect(response.headers.get('Location')).toBe('/');
       expect(context.cookies.set).toHaveBeenCalledWith('sb-access-token', 'access', expect.any(Object));
       expect(context.cookies.set).toHaveBeenCalledWith('sb-refresh-token', 'refresh', expect.any(Object));
+      expect(createRequestClient).toHaveBeenCalledTimes(1);
     });
 
     it('redirects to a safe next path on successful signin', async () => {
@@ -172,6 +178,7 @@ describe('Auth API Routes', () => {
       expect(response.status).toBe(302);
       expect(response.headers.get('Location')).toBe(WELCOME_PATH);
       expect(context.cookies.set).toHaveBeenCalledWith('sb-access-token', 'access', expect.any(Object));
+      expect(createRequestClient).toHaveBeenCalledTimes(1);
     });
 
     it('redirects with message when email confirmation is required', async () => {

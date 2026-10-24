@@ -7,13 +7,13 @@ interface MockSupabase {
   };
 }
 
-// Mock Supabase
-const mockSupabase: MockSupabase = {
+// Hoisted: importing the middleware creates lib/supabase's shared client.
+const mockSupabase: MockSupabase = vi.hoisted(() => ({
   auth: {
     setSession: vi.fn(),
     getSession: vi.fn(),
   },
-};
+}));
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => mockSupabase),

@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
-import { supabase, notificationsEnabled } from "../../../lib/supabase";
+import { createRequestClient, notificationsEnabled } from "../../../lib/supabase";
 import { WELCOME_PATH, buildEmailConfirmationRedirect } from "../../../lib/onboarding";
 import { formText } from "../../../lib/server/form-data";
 
@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
     return redirect("/signup?error=Password must be at least 6 characters");
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await createRequestClient().auth.signUp({
     email,
     password,
     options: {

@@ -48,8 +48,7 @@ SUPABASE_WORKDIR=${SUPABASE_WORKDIR:-.}
 
 # A path the Windows-native Supabase CLI and Python can open from Git Bash too.
 native_path() {
-  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s
-' "$1"; fi
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi
 }
 
 # TEST_SUPABASE_* for the database tests: as set, or read from the running stack.
@@ -79,7 +78,8 @@ backend_schema_snapshot() {
   local_supabase_env || return 1
   local dump status
   dump=$(mktemp)
-  npx --prefix frontend supabase db dump --local --workdir "$SUPABASE_WORKDIR"     -f "$(native_path "$dump")" &&
+  npx --prefix frontend supabase db dump --local --workdir "$SUPABASE_WORKDIR" \
+    -f "$(native_path "$dump")" &&
     backend_uv python -m tools.check_schema_snapshot "$(native_path "$dump")"
   status=$?
   rm -f "$dump"

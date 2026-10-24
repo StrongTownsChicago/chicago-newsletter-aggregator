@@ -7,13 +7,23 @@ export type AppSupabaseClient = SupabaseClient<Database>;
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-// Create Supabase client with auth enabled
+/** Shared anon client for public reads. Never sign in on it: a server isolate shares it across requests. */
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
   },
 });
+
+/** A client for one request's auth calls; its session dies with the request. */
+export function createRequestClient(): AppSupabaseClient {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 // Check if notifications are enabled via env var
 export const notificationsEnabled = () => {
