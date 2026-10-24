@@ -103,7 +103,7 @@ class TestProcessScrapedNewsletters(ScraperTestCase):
             [
                 {
                     "source_id": 1,
-                    "received_date": "2026-10-01T00:00:00",
+                    "received_date": "2026-10-01T00:00:00-05:00",
                     "subject": "Issue 1",
                     "from_email": None,
                     "to_email": None,
