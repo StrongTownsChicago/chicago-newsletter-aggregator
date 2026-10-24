@@ -93,3 +93,28 @@ export const createMockContext = (options: {
     generator: 'Astro',
   } as unknown as APIContext;
 };
+
+type QueryResult = { error: { message: string } | null; count?: number | null };
+
+/**
+ * A Supabase client whose query chains record every call. Each `from()` starts a
+ * query that resolves, when awaited, to the next queued result (default: no error).
+ */
+export const createQueryRecorder = (...results: QueryResult[]) => {
+  const queue = [...results];
+  let current: QueryResult = { error: null };
+  const builder = {
+    select: vi.fn(() => builder),
+    insert: vi.fn(() => builder),
+    update: vi.fn(() => builder),
+    delete: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    then: (resolve: (value: QueryResult) => unknown) => resolve(current),
+  };
+  const from = vi.fn(() => {
+    current = queue.shift() ?? { error: null };
+    return builder;
+  });
+  const { select, insert, update, eq } = builder;
+  return { from, select, insert, update, delete: builder.delete, eq };
+};
