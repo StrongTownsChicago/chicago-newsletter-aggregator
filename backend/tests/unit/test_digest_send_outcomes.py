@@ -36,7 +36,7 @@ class TestDigestSendOutcomes(unittest.TestCase):
     def setUp(self) -> None:
         self.enterContext(redirect_stdout(io.StringIO()))
         self.supabase = create_mock_supabase()
-        # The user_profiles lookup ends in .single(), so its data is one row.
+        # The user_profiles lookup ends in .maybe_single(), so its data is one row.
         self.supabase.execute.return_value.data = {
             "email": "reader@example.com",
             "notification_preferences": {"enabled": True},
@@ -125,6 +125,43 @@ class TestDigestSendOutcomes(unittest.TestCase):
         self.assertEqual(stats, {"sent": 0, "failed": 0, "skipped": 1})
         send.assert_not_called()
         sleep.assert_not_called()
+
+    def test_a_user_without_a_profile_is_skipped(
+        self,
+        _pending: MagicMock,
+        get_client: MagicMock,
+        send: MagicMock,
+        _log: MagicMock,
+        _sleep: MagicMock,
+    ) -> None:
+        self.supabase.execute.return_value = None  # maybe_single() found no row
+        stats = self.run_digest(get_client, send, {"success": True})
+
+        self.assertEqual(stats, {"sent": 0, "failed": 0, "skipped": 1})
+        send.assert_not_called()
+
+    def test_dry_run_leaves_a_disabled_users_queue_alone(
+        self,
+        _pending: MagicMock,
+        get_client: MagicMock,
+        send: MagicMock,
+        _log: MagicMock,
+        _sleep: MagicMock,
+    ) -> None:
+        self.supabase.execute.return_value.data = {
+            "email": "reader@example.com",
+            "notification_preferences": {"enabled": False},
+        }
+        get_client.return_value = self.supabase
+
+        for dry_run, writes in ((True, 0), (False, 1)):
+            with self.subTest(dry_run=dry_run):
+                self.supabase.update.reset_mock()
+                stats = process_digests(DigestType.DAILY, BATCH_ID, dry_run=dry_run)
+
+                self.assertEqual(stats["skipped"], 1)
+                self.assertEqual(self.supabase.update.call_count, writes)
+        send.assert_not_called()
 
 
 if __name__ == "__main__":

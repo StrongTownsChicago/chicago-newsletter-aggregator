@@ -134,7 +134,7 @@ class TestProcessDigests(unittest.TestCase):
             "email": "test@example.com",
             "notification_preferences": {"enabled": True},
         }
-        mock_supabase_instance.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_profile_response
+        mock_supabase_instance.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_profile_response
 
         # Mock update/insert operations
         mock_supabase_instance.table.return_value.update.return_value.in_.return_value.execute.return_value = Mock()

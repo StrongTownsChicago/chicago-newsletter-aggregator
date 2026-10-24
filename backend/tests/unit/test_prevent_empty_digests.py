@@ -87,7 +87,7 @@ class TestPreventEmptyDigests(unittest.TestCase):
         config_mock.delivery_type = "daily_digest"
 
         # Mock user profile fetch
-        mock_sb.table().select().eq().single().execute.return_value.data = {
+        mock_sb.table().select().eq().maybe_single().execute.return_value.data = {
             "email": "test@example.com",
             "notification_preferences": {"enabled": True},
         }

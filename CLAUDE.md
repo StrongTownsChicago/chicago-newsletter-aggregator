@@ -18,7 +18,7 @@ Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Ch
 ### All gates (from the repo root)
 
 ```bash
-# Run CI's gates locally, in CI's order; stops at the first failure
+# Run CI's gates locally, in CI's order; stops at the first failure (the backend's database gates need the local Supabase stack running)
 bash scripts/check.sh [backend|frontend]
 
 # Enable the pre-commit hook (once per clone): ruff on staged backend files, mypy and the docstring budget when backend files are staged, ESLint on staged frontend files
@@ -88,8 +88,12 @@ uv run python -m cli.compute_analytics --offline        # Compute from the snaps
 uv run python -m cli.compute_analytics --full-refresh   # Rebuild the snapshot from every newsletter (heavy; rarely)
 uv run python -m cli.compute_analytics --min-term-newsletters 30 --output-dir <dir>
 
-# Run all tests
+# Run all tests (database tests skip without TEST_SUPABASE_*)
 uv run python -m unittest discover -s tests
+
+# Database tests against the local Supabase stack (see Local Supabase (tests))
+eval "$(bash ../scripts/supabase-test-env.sh)"   # exports TEST_SUPABASE_* from `supabase status`
+uv run python -m unittest discover -s tests/db_integration -t .
 
 # Run tests with performance timing
 uv run python -m tools.time_test_suite
@@ -168,7 +172,7 @@ ollama pull gpt-oss:20b
 
 **GitHub Actions Workflows:**
 
-- Backend CI (`.github/workflows/backend_tests.yml`) - Runs the backend gates of `scripts/check.sh` on backend changes
+- Backend CI (`.github/workflows/backend_tests.yml`) - Runs the backend gates of `scripts/check.sh` on backend changes; the database tests and the schema snapshot check run in their own job on a local Supabase stack
 - Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, generated database types, E2E on the local stack) on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
@@ -248,6 +252,8 @@ frontend/
 **E2E:** `npm run test:e2e` (`frontend/playwright.config.ts`) takes the stack's URL and keys from `supabase status`, never `frontend/.env`, and starts its own dev server with them (and with `.env` kept out of the Cloudflare dev runtime). Its global setup resets the database to the seed, then checks the server renders seeded data and reads a seeded profile with the service key. Specs assert the seed's facts from `frontend/e2e/fixtures/db/facts.ts`: change it with `seed.sql`. Seed data is synthetic (example.com/example.org addresses, invented people). Specs that write use their own seeded user. `npx supabase stop --workdir ..` stops the stack.
 
 **Generated types:** `frontend/src/lib/database.types.ts` comes from `npm run db:types` (the local stack's schema); the clients are `createClient<Database>`. After a migration, restart or reset the stack, regenerate and commit; Frontend CI fails when it is stale.
+
+Backend database tests (`backend/tests/db_integration/`) read only `TEST_SUPABASE_URL`, `TEST_SUPABASE_DB_URL`, `TEST_SUPABASE_ANON_KEY` and `TEST_SUPABASE_SERVICE_KEY` (`scripts/supabase-test-env.sh [workdir]` prints them for a running stack) and skip without them, never falling back to `backend/.env`. `LocalSupabaseTestCase` empties the app tables per class, points `shared.db` at the stack and guards every client it creates; IMAP, the LLM, Resend and scraped sites are faked (`db_integration/fakes.py`). They empty the tables `seed.sql` fills, so run the E2E suite after them, not alongside: its global setup reseeds. Never create a Supabase client at import time: a module imported before the tests set the env would hold one built from `backend/.env`.
 
 ### Key Design Patterns
 
@@ -358,7 +364,7 @@ UNSUBSCRIBE_SECRET_KEY=         # Must match backend key
 
 ## Testing
 
-**Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section). Property-based tests (`test_*_properties.py`) use Hypothesis with the shared settings in `tests/fixtures/property_settings.py`.
+**Backend**: Tests in `backend/tests/` organized into `unit/`, `integration/` (mocked Supabase) and `db_integration/` (the real local stack: schema rules, row-level security and every database-backed flow) subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section). Property-based tests (`test_*_properties.py`) use Hypothesis with the shared settings in `tests/fixtures/property_settings.py`.
 
 **Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section). E2E: Playwright specs in `frontend/e2e/` against the local Supabase stack (see "Local Supabase (tests)"). Accessibility: `e2e/a11y.spec.ts` runs axe on every page, populated from the seed and signed in where needed, at desktop and phone widths; add new pages to its `SCANNED_PAGES`.
 

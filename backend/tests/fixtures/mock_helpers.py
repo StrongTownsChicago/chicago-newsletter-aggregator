@@ -27,6 +27,7 @@ def create_mock_supabase(return_data: list[dict[str, Any]] | None = None) -> Moc
     mock.order.return_value = mock
     mock.limit.return_value = mock
     mock.single.return_value = mock
+    mock.maybe_single.return_value = mock
     mock.insert.return_value = mock
     mock.update.return_value = mock
     mock.ilike.return_value = mock

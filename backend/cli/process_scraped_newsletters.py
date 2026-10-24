@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from dotenv import load_dotenv
+from supabase import Client
 
 from cli.ingest_summary import print_summary
 from cli.logging_setup import configure_cli_logging
@@ -23,8 +24,6 @@ load_dotenv()
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 OLLAMA_MODEL = os.getenv("LLM_MODEL", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
 
-# Initialize clients
-supabase = get_supabase_client()
 scraper = NewsletterScraper()
 
 ScrapeOutcome = Literal["processed", "skipped", "failed"]
@@ -36,7 +35,7 @@ DUPLICATE_PAUSE_SECONDS = (1.0, 7.0)
 STORE_PAUSE_SECONDS = (1.0, 3.0)
 
 
-def newsletter_exists(source_id: int, subject: str) -> bool:
+def newsletter_exists(supabase: Client, source_id: int, subject: str) -> bool:
     """Check if newsletter already processed"""
     result = (
         supabase.table("newsletters")
@@ -48,7 +47,7 @@ def newsletter_exists(source_id: int, subject: str) -> bool:
     return len(result.data) > 0
 
 
-def get_source_archive_url(source_id: int) -> tuple[str, str]:
+def get_source_archive_url(supabase: Client, source_id: int) -> tuple[str, str]:
     """Fetch source info and archive URL from database"""
     result = (
         supabase.table("sources")
@@ -106,7 +105,9 @@ def pause_politely(pause_range: tuple[float, float]) -> None:
     time.sleep(random.uniform(*pause_range))
 
 
-def scrape_newsletter(source_id: int, link_info: dict[str, str]) -> ScrapeOutcome:
+def scrape_newsletter(
+    supabase: Client, source_id: int, link_info: dict[str, str]
+) -> ScrapeOutcome:
     """Fetch one archived newsletter and store it unless it is already stored."""
     content = scraper.fetch_newsletter_content(
         link_info["url"], link_info["title"], link_info["date_str"]
@@ -118,7 +119,7 @@ def scrape_newsletter(source_id: int, link_info: dict[str, str]) -> ScrapeOutcom
 
     print(f"  ✓ Retrieved {len(content['plain_text'])} chars")
 
-    if newsletter_exists(source_id, content["subject"]):
+    if newsletter_exists(supabase, source_id, content["subject"]):
         print("  ⊘ Duplicate")
         pause_politely(DUPLICATE_PAUSE_SECONDS)
         return "skipped"
@@ -135,10 +136,12 @@ def scrape_newsletter(source_id: int, link_info: dict[str, str]) -> ScrapeOutcom
     return "processed"
 
 
-def process_scraped_newsletters(source_id: int, limit: int | None = None) -> None:
+def process_scraped_newsletters(
+    supabase: Client, source_id: int, limit: int | None = None
+) -> None:
     """Scrape and process newsletters for a specific source"""
 
-    source_name, archive_url = get_source_archive_url(source_id)
+    source_name, archive_url = get_source_archive_url(supabase, source_id)
 
     print(f"\n{'=' * 60}")
     print(
@@ -161,7 +164,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
         print(f"  URL: {link_info['url']}")
 
         try:
-            outcome = scrape_newsletter(source_id, link_info)
+            outcome = scrape_newsletter(supabase, source_id, link_info)
         except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
             print(f"  ✗ Error: {e}")
             outcome = "failed"
@@ -170,7 +173,7 @@ def process_scraped_newsletters(source_id: int, limit: int | None = None) -> Non
     print_summary(outcomes["processed"], outcomes["skipped"], outcomes["failed"])
 
 
-def scrape_all_sources() -> None:
+def scrape_all_sources(supabase: Client) -> None:
     """Scrape newsletters from all sources with archive URLs"""
 
     result = (
@@ -192,7 +195,7 @@ def scrape_all_sources() -> None:
         source_dict = cast(dict[str, Any], source)
         try:
             process_scraped_newsletters(
-                source_id=cast(int, source_dict["id"]), limit=None
+                supabase, source_id=cast(int, source_dict["id"]), limit=None
             )
         except Exception as e:  # noqa: BLE001  per-source boundary: log and continue
             print(f"✗ Error processing source {source_dict['name']}: {e}")
@@ -207,6 +210,6 @@ if __name__ == "__main__":
         source_id = int(sys.argv[1])
         limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
 
-        process_scraped_newsletters(source_id, limit)
+        process_scraped_newsletters(get_supabase_client(), source_id, limit)
     else:
-        scrape_all_sources()
+        scrape_all_sources(get_supabase_client())

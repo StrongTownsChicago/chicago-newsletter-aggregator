@@ -4,25 +4,17 @@ The scraper, Supabase, the LLM and the politeness delays are mocked. The tests
 pin what gets stored, skipped and counted, and where the run keeps going.
 """
 
-import importlib
 import io
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime
-from types import ModuleType
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, Mock, call, patch
 
+from supabase import Client
+
+import cli.process_scraped_newsletters as scraper_cli
 from tests.fixtures.fake_supabase import ExecutedQuery, FakeSupabase
-
-
-def import_scraper_cli() -> ModuleType:
-    """Import the CLI without building a real client at import time."""
-    with patch("shared.db.get_supabase_client", return_value=FakeSupabase()):
-        return importlib.import_module("cli.process_scraped_newsletters")
-
-
-scraper_cli = import_scraper_cli()
 
 SOURCE = {"name": "Ward 1 Office", "newsletter_archive_url": "https://archive.test"}
 
@@ -63,7 +55,6 @@ class ScraperTestCase(unittest.TestCase):
         self.sleep = Mock()
         self.print_summary = Mock()
         for target, value in {
-            "supabase": self.db,
             "scraper": self.scraper,
             "ENABLE_LLM": False,
             "print_summary": self.print_summary,
@@ -71,7 +62,7 @@ class ScraperTestCase(unittest.TestCase):
             patcher = patch.object(scraper_cli, target, value)
             patcher.start()
             self.addCleanup(patcher.stop)
-        sleep_patcher = patch.object(scraper_cli.time, "sleep", self.sleep)
+        sleep_patcher = patch("cli.process_scraped_newsletters.time.sleep", self.sleep)
         sleep_patcher.start()
         self.addCleanup(sleep_patcher.stop)
         self.output = io.StringIO()
@@ -88,7 +79,7 @@ class ScraperTestCase(unittest.TestCase):
 
     def run_scrape(self, limit: int | None = None) -> str:
         with redirect_stdout(self.output):
-            scraper_cli.process_scraped_newsletters(1, limit)
+            scraper_cli.process_scraped_newsletters(cast(Client, self.db), 1, limit)
         return self.output.getvalue()
 
     def stored(self) -> list[dict[str, Any]]:
@@ -112,7 +103,7 @@ class TestProcessScrapedNewsletters(ScraperTestCase):
             [
                 {
                     "source_id": 1,
-                    "received_date": "2026-10-01T00:00:00",
+                    "received_date": "2026-10-01T00:00:00-05:00",
                     "subject": "Issue 1",
                     "from_email": None,
                     "to_email": None,
@@ -243,9 +234,6 @@ class TestScrapeAllSources(unittest.TestCase):
                 ]
             }
         )
-        patcher = patch.object(scraper_cli, "supabase", self.db)
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     @patch.object(scraper_cli, "process_scraped_newsletters")
     def test_scrapes_each_archived_source_and_survives_a_failure(
@@ -255,11 +243,14 @@ class TestScrapeAllSources(unittest.TestCase):
         output = io.StringIO()
 
         with redirect_stdout(output):
-            scraper_cli.scrape_all_sources()
+            scraper_cli.scrape_all_sources(cast(Client, self.db))
 
         self.assertEqual(
             process.call_args_list,
-            [call(source_id=1, limit=None), call(source_id=2, limit=None)],
+            [
+                call(self.db, source_id=1, limit=None),
+                call(self.db, source_id=2, limit=None),
+            ],
         )
         self.assertIn("✗ Error processing source One: archive moved", output.getvalue())
         self.assertIn(("not_", (), {}), self.db.executed[0].calls)
@@ -270,7 +261,7 @@ class TestScrapeAllSources(unittest.TestCase):
         output = io.StringIO()
 
         with redirect_stdout(output):
-            scraper_cli.scrape_all_sources()
+            scraper_cli.scrape_all_sources(cast(Client, self.db))
 
         process.assert_not_called()
         self.assertIn(

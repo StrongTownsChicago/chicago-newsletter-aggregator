@@ -39,6 +39,7 @@ from imap_tools import (  # type: ignore[attr-defined]
     MailMessage,
     MailMessageFlags,
 )
+from supabase import Client
 
 from cli.ingest_summary import print_summary
 from cli.logging_setup import configure_cli_logging
@@ -55,10 +56,8 @@ GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 ENABLE_LLM = os.getenv("ENABLE_LLM", "false").lower() == "true"
 ENABLE_NOTIFICATIONS = os.getenv("ENABLE_NOTIFICATIONS", "false").lower() == "true"
 
-supabase = get_supabase_client()
 
-
-def newsletter_exists(email_uid: str) -> bool:
+def newsletter_exists(supabase: Client, email_uid: str) -> bool:
     """Check if newsletter already processed"""
     result = (
         supabase.table("newsletters").select("id").eq("email_uid", email_uid).execute()
@@ -144,7 +143,7 @@ def queue_newsletter_notifications(
         print(f"  ⚠️  Notification queuing failed: {e}")
 
 
-def store_newsletter(newsletter: dict[str, Any]) -> None:
+def store_newsletter(supabase: Client, newsletter: dict[str, Any]) -> None:
     """Insert a parsed newsletter, then queue its notifications when enabled."""
     # ward_number feeds notification matching but is not a newsletters column.
     ward_number = newsletter.pop("ward_number", None)
@@ -157,7 +156,9 @@ def store_newsletter(newsletter: dict[str, Any]) -> None:
         queue_newsletter_notifications(newsletter_id, newsletter, ward_number)
 
 
-def ingest_message(mailbox: BaseMailBox, msg: MailMessage, tally: IngestTally) -> None:
+def ingest_message(
+    supabase: Client, mailbox: BaseMailBox, msg: MailMessage, tally: IngestTally
+) -> None:
     """
     Store one email and mark it read, or skip it as a duplicate or unmapped.
 
@@ -165,7 +166,7 @@ def ingest_message(mailbox: BaseMailBox, msg: MailMessage, tally: IngestTally) -
     fetched again, and recorded in the tally for the report.
     """
     uid = cast(str, msg.uid)  # every fetched message has a UID
-    if newsletter_exists(uid):
+    if newsletter_exists(supabase, uid):
         print(f"⊘ Duplicate: {msg.subject[:50]}...")
         tally.skipped += 1
         return
@@ -182,7 +183,7 @@ def ingest_message(mailbox: BaseMailBox, msg: MailMessage, tally: IngestTally) -
     if ENABLE_LLM:
         add_llm_metadata(newsletter)
 
-    store_newsletter(newsletter)
+    store_newsletter(supabase, newsletter)
 
     mailbox.flag(uid, MailMessageFlags.SEEN, True)
     tally.processed += 1
@@ -204,6 +205,8 @@ def process_new_newsletters() -> None:
     if not GMAIL_ADDRESS or not GMAIL_PASSWORD:
         raise ValueError("GMAIL_ADDRESS and GMAIL_APP_PASSWORD must be set")
 
+    supabase = get_supabase_client()
+
     with MailBox("imap.gmail.com").login(GMAIL_ADDRESS, GMAIL_PASSWORD) as mailbox:  # type: ignore[no-untyped-call]
         # To process every email when testing, call mailbox.fetch() with no criteria.
         messages = mailbox.fetch(AND(seen=False))
@@ -211,7 +214,7 @@ def process_new_newsletters() -> None:
 
         for msg in messages:
             try:
-                ingest_message(mailbox, msg, tally)
+                ingest_message(supabase, mailbox, msg, tally)
             except Exception as e:  # noqa: BLE001  per-email boundary: log and continue
                 print(f"✗ Error processing {msg.uid}: {e}")
 

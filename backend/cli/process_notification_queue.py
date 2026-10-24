@@ -183,11 +183,12 @@ def _process_user_digest(
         run.supabase.table("user_profiles")
         .select("email, notification_preferences")
         .eq("id", user_id)
-        .single()
+        .maybe_single()
         .execute()
     )
 
-    if not user_response.data:
+    # maybe_single gives None, not an error, when there is no profile
+    if user_response is None or not user_response.data:
         print("  ⚠️  User profile not found, skipping")
         run.stats["skipped"] += 1
         return False
@@ -200,9 +201,10 @@ def _process_user_digest(
     if not preferences.get("enabled", True):
         print("  ⚠️  Notifications disabled for user, skipping")
         run.stats["skipped"] += 1
-        _mark_notifications_failed(
-            run.supabase, notifications, "User notifications disabled"
-        )
+        if not run.dry_run:
+            _mark_notifications_failed(
+                run.supabase, notifications, "User notifications disabled"
+            )
         return False
 
     if run.dry_run:
