@@ -181,7 +181,7 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
                         )
                     )
                 )
-            elif table_name == "user_profiles":
+            if table_name == "user_profiles":
                 return Mock(
                     select=Mock(
                         return_value=Mock(
@@ -193,7 +193,7 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
                         )
                     )
                 )
-            elif table_name == "weekly_topic_reports":
+            if table_name == "weekly_topic_reports":
                 return Mock(
                     select=Mock(
                         return_value=Mock(
@@ -205,13 +205,14 @@ class TestWeeklyNotificationQueuing(unittest.TestCase):
                         )
                     )
                 )
-            elif table_name == "notification_queue":
+            if table_name == "notification_queue":
                 # Mock insert and track calls
                 def track_insert(data: Any) -> Mock:
                     insert_calls.append(data)
                     return Mock(execute=Mock(return_value=Mock()))
 
                 return Mock(insert=track_insert)
+            raise AssertionError(f"unexpected table: {table_name}")
 
         mock_supabase.table.side_effect = table_side_effect
 

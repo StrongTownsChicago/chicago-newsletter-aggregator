@@ -28,16 +28,10 @@ class PricingData:
 
     def __init__(self, pricing_file: str | None = None):
         """
-        Initialize pricing data from JSON file.
+        Load pricing from pricing_file (default: backend/config/llm_pricing.json).
 
-        Args:
-            pricing_file: Path to pricing JSON file. If None, uses default location
-                         (backend/config/llm_pricing.json)
-
-        Raises:
-            FileNotFoundError: If pricing file doesn't exist
-            json.JSONDecodeError: If pricing file is invalid JSON
-            ValueError: If pricing data is missing required fields
+        Raises FileNotFoundError if the file is missing, json.JSONDecodeError if
+        it is not valid JSON, and ValueError if a model lacks a required field.
         """
         if pricing_file is None:
             # Default to backend/config/llm_pricing.json
@@ -75,16 +69,9 @@ class PricingData:
 
     def get_model_pricing(self, model_name: str) -> ModelPricing:
         """
-        Get pricing info for a specific model.
+        Return pricing for a model such as "gpt-5" or "claude-sonnet-4.5".
 
-        Args:
-            model_name: Model identifier (e.g., "gpt-5", "claude-sonnet-4.5")
-
-        Returns:
-            ModelPricing object for the model
-
-        Raises:
-            KeyError: If model not found in pricing data
+        Raises KeyError, listing the available models, if it is not in the pricing data.
         """
         if model_name not in self.models:
             available = ", ".join(sorted(self.models.keys()))
@@ -131,18 +118,10 @@ def calculate_cost(
     input_tokens: int, output_tokens: int, model_pricing: ModelPricing
 ) -> dict[str, float]:
     """
-    Calculate cost for token counts using model pricing.
+    Price token counts with a model's per-1M-token rates.
 
-    Args:
-        input_tokens: Number of input tokens
-        output_tokens: Number of output tokens
-        model_pricing: ModelPricing object with cost per 1M tokens
-
-    Returns:
-        Dict with keys: "input_cost", "output_cost", "total_cost"
-
-    Raises:
-        ValueError: If token counts are negative
+    Returns "input_cost", "output_cost" and "total_cost" in dollars, rounded to
+    6 decimal places. Raises ValueError if either token count is negative.
     """
     if input_tokens < 0 or output_tokens < 0:
         raise ValueError("Token counts cannot be negative")

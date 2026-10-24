@@ -80,7 +80,7 @@ def create_mock_openai_client(response_content: str = '{"topics": []}') -> Mock:
 def create_mock_mail_message(
     uid: str = "test_123",
     from_: str = "alderman@ward1.org",
-    subject: str = "Test Newsletter",
+    subject: str | None = "Test Newsletter",
     date: datetime | None = None,
     html: str = "<html><body>Test content</body></html>",
     text: str = "Test content",

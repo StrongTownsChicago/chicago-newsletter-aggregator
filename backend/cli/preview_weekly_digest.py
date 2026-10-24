@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from notifications.digest_config import DigestType
 from notifications.digest_data import (
     fetch_newsletter_details,
@@ -57,7 +58,7 @@ def fetch_weekly_report(topic: str, week_id: str) -> dict[str, Any] | None:
             print(f"✗ No report found for {topic} / {week_id}")
             return None
 
-        return dict(response.data)  # type: ignore
+        return dict(response.data)  # type: ignore[arg-type]
 
     except Exception as e:  # noqa: BLE001  CLI: report a fetch error and stop
         print(f"✗ Error fetching report: {e}")
@@ -268,4 +269,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

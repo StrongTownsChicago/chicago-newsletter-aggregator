@@ -291,19 +291,12 @@ def collapse_terms_sharing_newsletters(
     """Merge the fragments of one repeated block or phrase into one entry each.
 
     A standing block just under the boilerplate threshold yields dozens of
-    fragments ("procurement news", "certified vendor", "website provides"),
-    all in exactly the same newsletters, which would fill a ward's list with
-    one block. Walking the ranking, a term joins a group when its newsletters
-    are exactly the group's first term's, or when it nests with a member
-    (`are_nested_terms`) and its newsletters have at least
-    min_nested_similarity Jaccard similarity with the first term's;
-    otherwise it starts a group, up to limit groups.
-
-    Near-identical sets alone are not enough: a long weekly digest carries
-    several standing sections in nearly the same issues, and comparing
-    newsletter sets loosely merges them all. Each group is reported by
-    `choose_representative_term`, with the number of other terms it stands
-    for, ranked by its representative's score.
+    fragments in exactly the same newsletters. A term joins a group when its
+    newsletters equal the first term's, or when it nests with a member
+    (`are_nested_terms`) and reaches min_nested_similarity Jaccard with the
+    first term's; near-identical sets alone would merge a digest's separate
+    standing sections. Up to limit groups are reported by
+    `choose_representative_term`, with how many terms each stands for.
     """
     groups: list[list[DistinctiveTerm]] = []
     groups_by_newsletters: dict[frozenset[int], list[DistinctiveTerm]] = {}
@@ -346,15 +339,22 @@ def index_newsletters_by_term(
     return positions
 
 
+@dataclass(frozen=True)
+class DistinctiveTuning:
+    """Thresholds for `compute_distinctive_terms`."""
+
+    top_n: int
+    min_ward_newsletters: int
+    min_term_newsletters_in_ward: int
+    max_ward_share: float
+    min_nested_term_similarity: float
+
+
 def compute_distinctive_terms(
     documents: list[NewsletterTerms],
     vocabulary: set[str],
     name_tokens_by_ward: dict[str, set[str]],
-    top_n: int,
-    min_ward_newsletters: int,
-    min_term_newsletters_in_ward: int,
-    max_ward_share: float,
-    min_nested_term_similarity: float,
+    tuning: DistinctiveTuning,
 ) -> dict[str, list[dict[str, Any]]]:
     """Find the top terms each ward uses far more often than the rest of the city.
 
@@ -379,7 +379,7 @@ def compute_distinctive_terms(
     for ward in sorted(documents_by_ward, key=ward_sort_key):
         ward_documents = documents_by_ward[ward]
         ward_total = len(ward_documents)
-        if ward_total < min_ward_newsletters:
+        if ward_total < tuning.min_ward_newsletters:
             continue
         name_tokens = name_tokens_by_ward.get(ward, set())
         newsletters_by_term = index_newsletters_by_term(ward_documents, vocabulary)
@@ -392,8 +392,8 @@ def compute_distinctive_terms(
                 city_total - ward_total,
             )
             for term, newsletters in newsletters_by_term.items()
-            if len(newsletters) >= min_term_newsletters_in_ward
-            and len(newsletters) / ward_total <= max_ward_share
+            if len(newsletters) >= tuning.min_term_newsletters_in_ward
+            and len(newsletters) / ward_total <= tuning.max_ward_share
             and not term_mentions_name(term, name_tokens)
             and not contains_filler_word(term)
         ]
@@ -406,8 +406,8 @@ def compute_distinctive_terms(
             for item in collapse_terms_sharing_newsletters(
                 ranked,
                 newsletters_by_term,
-                min_nested_term_similarity,
-                top_n,
+                tuning.min_nested_term_similarity,
+                tuning.top_n,
                 specificity,
             )
         ]
@@ -453,33 +453,35 @@ def is_rising_candidate(term: str, min_phrase_words: int) -> bool:
     return len(term.split(" ")) >= min_phrase_words and not contains_filler_word(term)
 
 
+@dataclass(frozen=True)
+class RisingTuning:
+    """Thresholds for `compute_rising_terms`."""
+
+    baseline_months: int
+    min_latest_wards: int
+    min_ward_gain: int
+    top_n: int
+    min_phrase_words: int
+
+
 def compute_rising_terms(
     documents: list[NewsletterTerms],
     vocabulary: set[str],
     latest_month: str,
-    baseline_months: int,
-    min_latest_wards: int,
-    min_ward_gain: int,
-    top_n: int,
-    min_phrase_words: int,
+    tuning: RisingTuning,
 ) -> dict[str, Any]:
-    """Rank terms by how many more wards mentioned them in latest_month than in a
-    typical recent month.
+    """Rank terms by how many more wards mentioned them in latest_month than usual.
 
-    Counting wards rather than pooling newsletters means one prolific sender
-    cannot manufacture a trend. The baseline is the median ward count over the
-    baseline_months before latest_month, so one unusual month does not set it;
-    baseline months with no active ward (before the archive starts) are left
-    out of the median rather than counted as zero.
-    A term must reach at least min_latest_wards wards and gain at least
-    min_ward_gain wards over the baseline, and pass `is_rising_candidate`;
-    each is tagged when it is a recurring calendar event. Pass only newsletters whose text
-    could be read: the wards active each month are the denominator readers
-    compare against, and a ward whose text was unavailable could not mention
-    anything.
+    Counting wards means one prolific sender cannot manufacture a trend. The
+    baseline is the median ward count over the prior baseline_months, so one
+    unusual month does not set it; months with no active ward are skipped. A term needs min_latest_wards wards, a gain of
+    min_ward_gain, and `is_rising_candidate`; recurring calendar events are
+    tagged. Pass only readable newsletters: active wards are the denominator,
+    and a ward with unreadable text could not mention anything.
     """
     baseline = sorted(
-        shift_month(latest_month, -offset) for offset in range(1, baseline_months + 1)
+        shift_month(latest_month, -offset)
+        for offset in range(1, tuning.baseline_months + 1)
     )
     window = {latest_month, *baseline}
     window_documents = [
@@ -500,7 +502,9 @@ def compute_rising_terms(
         return result
 
     candidate_terms = {
-        term for term in vocabulary if is_rising_candidate(term, min_phrase_words)
+        term
+        for term in vocabulary
+        if is_rising_candidate(term, tuning.min_phrase_words)
     }
     wards_by_term: dict[str, dict[str, set[str]]] = defaultdict(
         lambda: defaultdict(set)
@@ -520,7 +524,7 @@ def compute_rising_terms(
             statistics.median(len(wards_by_month[month]) for month in observed_baseline)
         )
         gain = latest_wards - baseline_wards
-        if latest_wards >= min_latest_wards and gain >= min_ward_gain:
+        if latest_wards >= tuning.min_latest_wards and gain >= tuning.min_ward_gain:
             candidates.append(
                 RisingTerm(
                     term=term,
@@ -537,7 +541,7 @@ def compute_rising_terms(
     )
     result["terms"] = [
         asdict(item) for item in drop_overlapping_terms(ranked, lambda i: i.term)
-    ][:top_n]
+    ][: tuning.top_n]
     return result
 
 

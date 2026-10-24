@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from cli.logging_setup import configure_cli_logging
 from shared.dates import CHICAGO_TIMEZONE
 from shared.db import get_supabase_client
 
@@ -84,4 +85,5 @@ def download_samples() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     download_samples()

@@ -14,6 +14,7 @@ Usage:
 import argparse
 from typing import Any, cast
 
+from cli.logging_setup import configure_cli_logging
 from notifications.rule_matcher import match_newsletter_to_rules, queue_notifications
 from shared.db import get_supabase_client
 
@@ -116,4 +117,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

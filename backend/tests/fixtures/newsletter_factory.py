@@ -19,23 +19,10 @@ def create_test_newsletter(
     **overrides: Any,
 ) -> dict[str, Any]:
     """
-    Factory for creating test newsletter data.
+    Build a newsletter dict matching the database schema.
 
-    Args:
-        subject: Newsletter subject line
-        plain_text: Plain text content
-        raw_html: HTML content (defaults to wrapping plain_text)
-        source_id: Source database ID
-        topics: List of topics (defaults to empty list)
-        received_date: ISO format date (defaults to now)
-        email_uid: Email UID (defaults to random)
-        summary: Newsletter summary (defaults to None)
-        from_email: Sender email address
-        to_email: Recipient email address
-        **overrides: Override any field
-
-    Returns:
-        Dictionary with newsletter data matching database schema
+    Omitted fields get defaults: raw_html wraps plain_text, received_date is
+    now, email_uid is random. `overrides` replace any field.
     """
     newsletter_id = str(uuid.uuid4())
 

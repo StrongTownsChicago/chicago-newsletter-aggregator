@@ -171,28 +171,27 @@ export interface ActiveSearchFilter {
   removeUrl: string;
 }
 
+/** Each filter's chip label, or null when the filter is unset. */
+const FILTER_DESCRIBERS: Record<
+  NarrowingFilterKey,
+  (filters: SearchFilters, sourceNames: ReadonlyMap<number, string>) => string | null
+> = {
+  ward: (filters) => filters.ward && `Ward ${filters.ward}`,
+  sourceId: (filters, sourceNames) =>
+    filters.sourceId === null
+      ? null
+      : (sourceNames.get(filters.sourceId) ?? `Source ${filters.sourceId}`),
+  sourceType: (filters) => filters.sourceType && humanizeIdentifier(filters.sourceType),
+  topic: (filters) => filters.topic && formatTopicLabel(filters.topic),
+  fromDate: (filters) => filters.fromDate && `From ${formatLongDate(filters.fromDate)}`,
+  toDate: (filters) => filters.toDate && `To ${formatLongDate(filters.toDate)}`,
+};
+
 const describeFilter = (
   key: NarrowingFilterKey,
   filters: SearchFilters,
   sourceNames: ReadonlyMap<number, string>,
-): string | null => {
-  switch (key) {
-    case "ward":
-      return filters.ward && `Ward ${filters.ward}`;
-    case "sourceId":
-      return filters.sourceId === null
-        ? null
-        : (sourceNames.get(filters.sourceId) ?? `Source ${filters.sourceId}`);
-    case "sourceType":
-      return filters.sourceType && humanizeIdentifier(filters.sourceType);
-    case "topic":
-      return filters.topic && formatTopicLabel(filters.topic);
-    case "fromDate":
-      return filters.fromDate && `From ${formatLongDate(filters.fromDate)}`;
-    case "toDate":
-      return filters.toDate && `To ${formatLongDate(filters.toDate)}`;
-  }
-};
+): string | null => FILTER_DESCRIBERS[key](filters, sourceNames);
 
 const NARROWING_FILTER_KEYS: readonly NarrowingFilterKey[] = [
   "topic",

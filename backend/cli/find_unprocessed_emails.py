@@ -38,6 +38,7 @@ from typing import Any
 from dotenv import load_dotenv
 from imap_tools import MailBox  # type: ignore[attr-defined]
 
+from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
 INGESTED_FOLDER = "INBOX"
@@ -156,4 +157,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

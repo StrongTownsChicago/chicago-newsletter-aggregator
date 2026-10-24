@@ -1,7 +1,6 @@
 """Unit tests for email parsing and source matching logic."""
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import (
@@ -15,6 +14,11 @@ from tests.fixtures.newsletter_factory import (
     create_test_email_mapping,
     create_test_source,
 )
+from tests.fixtures.quiet_logging import quiet_logger
+
+
+def setUpModule() -> None:
+    quiet_logger("ingest.email.email_parser")
 
 
 class TestEmailMatchesPattern(unittest.TestCase):
@@ -132,7 +136,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("alderman@ward1.org", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 1)
         self.assertEqual(result["name"], "Test Ward")
 
@@ -146,7 +150,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("any@ward1.org", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 1)
 
     def test_wildcard_suffix_match(self) -> None:
@@ -161,7 +165,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("ward1alderman@chicago.gov", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 2)
 
     def test_wildcard_contains_match(self) -> None:
@@ -174,7 +178,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("info@ward25chicago.org", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 25)
 
     def test_no_match_returns_none(self) -> None:
@@ -196,7 +200,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("test@ward1.org", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 1)
 
     def test_multiple_patterns_first_match_wins(self) -> None:
@@ -214,7 +218,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
 
         result = lookup_source_by_email("test@ward1.org", mock_supabase)
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["name"], "First Match")
 
     def test_mid_pattern_wildcard_match(self) -> None:
@@ -230,7 +234,7 @@ class TestLookupSourceByEmail(unittest.TestCase):
             "nicolelee11thwardchi-gmail.com@shared1.ccsend.com", mock_supabase
         )
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["id"], 11)
 
     def test_exact_pattern_does_not_substring_match(self) -> None:
@@ -302,7 +306,7 @@ class TestCleanHtmlContent(unittest.TestCase):
         """Broken HTML doesn't crash."""
         result = clean_html_content("<div><p>Unclosed tags<div>")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("Unclosed tags", result)
 
     def test_preserves_links_as_markdown(self) -> None:
@@ -317,8 +321,7 @@ class TestCleanHtmlContent(unittest.TestCase):
 class TestParseNewsletter(unittest.TestCase):
     """Tests for parse_newsletter() main parsing function."""
 
-    @patch("builtins.print")
-    def test_parse_with_matched_source(self, mock_print: MagicMock) -> None:
+    def test_parse_with_matched_source(self) -> None:
         """Email with source match sets source_id."""
         source = create_test_source(source_id=1, name="Test Ward")
         mapping = create_test_email_mapping(email_pattern="%@ward1.org", source_id=1)
@@ -336,10 +339,9 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["source_id"], 1)
         self.assertEqual(result["subject"], "Test Subject")
 
-    @patch("builtins.print")
-    def test_parse_includes_ward_number(self, mock_print: MagicMock) -> None:
+    def test_parse_includes_ward_number(self) -> None:
         """Verify ward_number is included in parsed data from source."""
-        source = create_test_source(source_id=1, name="Ward 10", ward_number="10")
+        source = create_test_source(source_id=1, name="Ward 10", ward_number=10)
         mapping = create_test_email_mapping(email_pattern="%@ward10.org", source_id=1)
         mapping["sources"] = source
 
@@ -349,10 +351,9 @@ class TestParseNewsletter(unittest.TestCase):
         result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
 
         self.assertEqual(result["source_id"], 1)
-        self.assertEqual(result["ward_number"], "10")
+        self.assertEqual(result["ward_number"], 10)
 
-    @patch("builtins.print")
-    def test_parse_with_unmapped_source(self, mock_print: MagicMock) -> None:
+    def test_parse_with_unmapped_source(self) -> None:
         """Email without source match sets source_id=None."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -363,8 +364,7 @@ class TestParseNewsletter(unittest.TestCase):
 
         self.assertIsNone(result["source_id"])
 
-    @patch("builtins.print")
-    def test_parse_with_html_only(self, mock_print: MagicMock) -> None:
+    def test_parse_with_html_only(self) -> None:
         """Email with only HTML generates plain_text."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -376,8 +376,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertIn("Test content", result["plain_text"])
         self.assertIn("<p>", result["raw_html"])
 
-    @patch("builtins.print")
-    def test_parse_with_plain_text_only(self, mock_print: MagicMock) -> None:
+    def test_parse_with_plain_text_only(self) -> None:
         """Email with only plain text preserves it."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(html="", text="Plain text content only")
@@ -387,8 +386,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertEqual(result["plain_text"], "Plain text content only")
         self.assertEqual(result["raw_html"], "")
 
-    @patch("builtins.print")
-    def test_parse_with_both_html_and_text(self, mock_print: MagicMock) -> None:
+    def test_parse_with_both_html_and_text(self) -> None:
         """Email with both formats preserves both."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(
@@ -400,8 +398,7 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertIn("HTML", result["raw_html"])
         self.assertEqual(result["plain_text"], "Text version")
 
-    @patch("builtins.print")
-    def test_sanitization_applied(self, mock_print: MagicMock) -> None:
+    def test_sanitization_applied(self) -> None:
         """Privacy sanitization removes unsubscribe links."""
         mock_supabase = create_mock_supabase(return_data=[])
         html_with_unsubscribe = """
@@ -415,8 +412,7 @@ class TestParseNewsletter(unittest.TestCase):
         # Unsubscribe link should be removed
         self.assertNotIn("list-manage.com/unsubscribe", result["raw_html"])
 
-    @patch("builtins.print")
-    def test_missing_subject_defaults(self, mock_print: MagicMock) -> None:
+    def test_missing_subject_defaults(self) -> None:
         """Email without subject gets default."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message(subject=None)
@@ -425,8 +421,7 @@ class TestParseNewsletter(unittest.TestCase):
 
         self.assertEqual(result["subject"], "(No subject)")
 
-    @patch("builtins.print")
-    def test_missing_date_handled(self, mock_print: MagicMock) -> None:
+    def test_missing_date_handled(self) -> None:
         """Email with no date doesn't crash."""
         mock_supabase = create_mock_supabase(return_data=[])
         mock_message = create_mock_mail_message()

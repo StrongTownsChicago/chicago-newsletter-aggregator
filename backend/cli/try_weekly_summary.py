@@ -17,6 +17,7 @@ import os
 
 from dotenv import load_dotenv
 
+from cli.logging_setup import configure_cli_logging
 from models.types import NewsletterID
 from models.weekly_report import KeyDevelopment, WeeklySynthesis
 from processing.llm_processor import call_llm
@@ -90,10 +91,10 @@ def fetch_report_facts(
             return None
 
         data = response.data
-        raw_developments = data.get("key_developments", [])  # type: ignore
+        raw_developments = data.get("key_developments", [])  # type: ignore[union-attr]
 
         # Convert raw dicts to KeyDevelopment objects
-        facts = [KeyDevelopment(**dev) for dev in raw_developments]  # type: ignore
+        facts = [KeyDevelopment(**dev) for dev in raw_developments]  # type: ignore[arg-type, union-attr]
 
         # Get friendly topic name
         topic_names = {
@@ -126,16 +127,10 @@ def synthesize_summary(
     model: str = "gpt-oss:20b",
 ) -> str:
     """
-    Generate summary using the FACTUAL_SUMMARY prompt.
+    Synthesize a summary of facts with the FACTUAL_SUMMARY prompt.
 
-    Args:
-        facts: List of KeyDevelopment objects
-        topic_display: Human-readable topic name
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        Generated summary text or error message
+    Returns the summary text, or "ERROR: ..." if the LLM call fails, so the
+    harness can show the failure as its output.
     """
     # Format facts for prompt
     facts_text = []
@@ -243,4 +238,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

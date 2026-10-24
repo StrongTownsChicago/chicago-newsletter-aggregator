@@ -13,6 +13,7 @@ Usage:
 
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
 
@@ -39,7 +40,7 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
         # Group rules by user_id
         users_rules: dict[str, list[dict[str, Any]]] = {}
         for rule in response.data:
-            rule_dict = dict(rule)  # type: ignore
+            rule_dict = dict(rule)  # type: ignore[arg-type]
             user_id = str(rule_dict["user_id"])
             if user_id not in users_rules:
                 users_rules[user_id] = []
@@ -58,7 +59,7 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
             # Build set of users with notifications enabled
             enabled_users = set()
             for profile in profiles_response.data:
-                profile_dict = dict(profile)  # type: ignore
+                profile_dict = dict(profile)  # type: ignore[arg-type]
                 prefs = profile_dict.get("notification_preferences", {})
                 if isinstance(prefs, dict) and prefs.get("enabled", True):
                     enabled_users.add(str(profile_dict["id"]))
@@ -77,25 +78,11 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
 
 def queue_weekly_notifications(week_id: str) -> dict[str, int]:
     """
-    Queue weekly notifications based on generated reports and user rules.
+    Queue a pending weekly notification for each rule topic that has a report.
 
-    Workflow:
-    1. Fetch all active weekly notification rules grouped by user
-    2. For each user:
-       a. Get their subscribed topics (from rules)
-       b. Fetch generated reports for those topics + week
-       c. For each matching report, queue notification:
-          - user_id, report_id (stored in newsletter_id), rule_id
-          - status: pending
-          - digest_batch_id: week_id
-          - notification_type: weekly
-    3. Return stats (queued, skipped, users)
-
-    Args:
-        week_id: Week identifier (YYYY-WXX)
-
-    Returns:
-        Dictionary with stats: {queued, skipped, users}
+    Inserts notification_queue rows (report_id, rule_id, digest_batch_id=week_id)
+    for week_id (YYYY-WXX). Rule topics without a report that week count as
+    skipped. Returns queued, skipped and users counts.
     """
     supabase = get_supabase_client()
 
@@ -126,7 +113,7 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
         # Build topic -> report_id mapping
         topic_to_report: dict[str, str] = {}
         for report in reports_response.data:
-            report_dict = dict(report)  # type: ignore
+            report_dict = dict(report)  # type: ignore[arg-type]
             topic_to_report[str(report_dict["topic"])] = str(report_dict["id"])
 
         print(
@@ -231,4 +218,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

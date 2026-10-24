@@ -108,7 +108,7 @@ export function renderWardProfilePanel({ state, filters, profile, factsIgnoringL
   replaceContent(
     topicsChart,
     months.length
-      ? renderWardTopicGrid(profile.topicCells, lenses, months, ward, filters.lens, chartWidth(topicsChart))
+      ? renderWardTopicGrid(profile.topicCells, lenses, months, { ward, selectedLens: filters.lens }, chartWidth(topicsChart))
       : emptyMessage("Nothing in these dates."),
   );
 

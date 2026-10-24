@@ -8,11 +8,14 @@ prefix default to Ollama for backward compatibility.
 """
 
 import json
+import logging
 import time
 from typing import Any
 
 from ollama import Client
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 # LLM processing limits
 MAX_LLM_RETRIES = 6
@@ -43,22 +46,12 @@ def _get_openai_client() -> OpenAI:
 
 def parse_model_string(model_string: str) -> tuple[str, str]:
     """
-    Parse a model string into (provider, model_name).
+    Parse a model string such as "openai:gpt-5" into (provider, model_name).
 
-    Accepts an optional provider prefix separated by a colon. Bare model names
-    (without a recognized provider prefix) default to Ollama for backward
-    compatibility. Ollama model names may contain colons (e.g., "gpt-oss:20b")
-    and are handled correctly.
-
-    Args:
-        model_string: Model identifier, optionally prefixed with provider
-                      (e.g., "openai:gpt-5", "ollama:gpt-oss:20b", "gpt-oss:20b")
-
-    Returns:
-        Tuple of (provider, model_name)
-
-    Raises:
-        ValueError: If the provider prefix is present but not in SUPPORTED_PROVIDERS
+    Bare model names (without a recognized provider prefix) default to Ollama
+    for backward compatibility; Ollama names may themselves contain colons
+    ("gpt-oss:20b"). Raises ValueError when the prefix looks like a provider
+    name but is not in SUPPORTED_PROVIDERS.
     """
     if ":" in model_string:
         first_segment = model_string.split(":")[0]
@@ -89,26 +82,12 @@ def call_llm(
     max_retries: int = MAX_LLM_RETRIES,
 ) -> str:
     """
-    Dispatch an LLM call to the appropriate provider adapter.
+    Dispatch an LLM call to the provider named by the model string's prefix.
 
-    The model string may include an optional provider prefix (e.g., "openai:gpt-5").
-    Bare model names without a recognized prefix default to Ollama for backward
-    compatibility.
-
-    Args:
-        model: Model identifier with optional provider prefix
-        prompt: Prompt text to send to the LLM
-        schema: Optional Pydantic model JSON schema for structured output
-        temperature: Sampling temperature (0 = deterministic). Ollama only; OpenAI
-            reasoning models reject sampling params, so it is not sent to OpenAI.
-        max_retries: Maximum retry attempts on failure
-
-    Returns:
-        JSON string response from the LLM (or raw text if no schema provided)
-
-    Raises:
-        ValueError: If the provider prefix is unrecognized
-        Exception: If all retry attempts fail
+    Returns the JSON string response, or raw text when no schema is given.
+    temperature applies to Ollama only: OpenAI reasoning models reject sampling
+    params. Raises ValueError for an unrecognized provider prefix and Exception
+    once all retries fail.
     """
     provider, model_name = parse_model_string(model)
 
@@ -150,22 +129,10 @@ def _call_ollama(
     """
     Call an Ollama model with structured output and exponential backoff retry.
 
-    Handles the gpt-oss model limitation where Ollama's native 'format' parameter
-    fails. For those models, the schema is embedded in the prompt text and JSON is
-    extracted from the raw response.
-
-    Args:
-        model: Bare Ollama model name (e.g., "gpt-oss:20b")
-        prompt: Prompt text
-        schema: Optional JSON schema for structured output
-        temperature: Sampling temperature
-        max_retries: Maximum retry attempts
-
-    Returns:
-        JSON string response
-
-    Raises:
-        Exception: If all retry attempts fail
+    Ollama's native 'format' parameter fails for gpt-oss models, so for those
+    the schema is embedded in the prompt text and JSON is extracted from the
+    raw response. Returns the JSON string; raises Exception once all retries
+    fail.
     """
     # gpt-oss models fail with "failed to load model vocabulary required for format"
     # when using Ollama's native 'format' parameter. Embed the schema in the prompt
@@ -199,7 +166,7 @@ def _call_ollama(
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2**attempt
-                print(
+                logger.warning(
                     f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
                 )
                 time.sleep(wait_time)
@@ -246,22 +213,10 @@ def _call_openai(
     """
     Call an OpenAI model with structured output and exponential backoff retry.
 
-    Uses response_format with json_schema for structured output, maintaining the
-    same JSON string return type as the Ollama adapter. Sampling params such as
-    temperature are never sent: current OpenAI models are reasoning models and
-    reject them with a 400.
-
-    Args:
-        model: OpenAI model name (e.g., "gpt-5")
-        prompt: Prompt text
-        schema: Optional JSON schema for structured output
-        max_retries: Maximum retry attempts
-
-    Returns:
-        JSON string response
-
-    Raises:
-        Exception: If all retry attempts fail
+    Uses response_format with json_schema and returns a JSON string, like the
+    Ollama adapter. Sampling params such as temperature are never sent: current
+    OpenAI models are reasoning models and reject them with a 400. Raises
+    Exception once all retries fail.
     """
     client = _get_openai_client()
 
@@ -305,7 +260,7 @@ def _call_openai(
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2**attempt
-                print(
+                logger.warning(
                     f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
                 )
                 time.sleep(wait_time)

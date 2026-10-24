@@ -1,7 +1,10 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
-import { formText, formTexts } from "../../../lib/server/form-data";
+import { formText } from "../../../lib/server/form-data";
+import { readRuleFields } from "../../../lib/server/rule-fields";
+
+const MAX_RULES_PER_USER = 5;
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -16,51 +19,16 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   const formData = await request.formData();
   const name = formText(formData, "name");
-  const topics = formTexts(formData, "topics");
-  let searchTerm = formText(formData, "search_term")?.trim();
-  let wards = formTexts(formData, "wards")
-    .map((w) => w.trim())
-    .filter((w) => w.length > 0);
-  const isActive = formData.get("is_active") === "on";
-  let deliveryFrequency =
-    formText(formData, "delivery_frequency") || "daily";
 
   if (!name) {
     return redirect("/preferences?error=Rule name is required");
   }
 
-  // Validation: Weekly rules
-  if (deliveryFrequency === "weekly") {
-    if (topics.length === 0) {
-      return redirect(
-        "/preferences?error=At least one topic is required for weekly summaries",
-      );
-    }
-    if (wards.length > 0) {
-      return redirect(
-        "/preferences?error=Ward filters cannot be applied to weekly summaries. Weekly summaries cover citywide activity.",
-      );
-    }
-    // Weekly rules cannot have search terms or ward filters
-    searchTerm = undefined;
-    wards = [];
-  } else {
-    // Validation: Daily rules (default)
-    deliveryFrequency = "daily"; // Ensure it's exactly 'daily' if not 'weekly'
-
-    if (!searchTerm && topics.length === 0) {
-      return redirect(
-        "/preferences?error=Please specify at least one topic or search phrase",
-      );
-    }
-    if (searchTerm && searchTerm.length > 100) {
-      return redirect(
-        "/preferences?error=Search phrase must be under 100 characters",
-      );
-    }
+  const { fields, error: fieldsError } = readRuleFields(formData);
+  if (fieldsError) {
+    return redirect(`/preferences?error=${fieldsError}`);
   }
 
-  // Check rule limit (max 5 rules per user)
   const { count, error: countError } = await locals.supabase
     .from("notification_rules")
     .select("*", { count: "exact", head: true })
@@ -72,20 +40,15 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     );
   }
 
-  if (count !== null && count >= 5) {
-    return redirect("/preferences?error=Maximum 5 rules allowed per user");
+  if (count !== null && count >= MAX_RULES_PER_USER) {
+    return redirect(
+      `/preferences?error=Maximum ${MAX_RULES_PER_USER} rules allowed per user`,
+    );
   }
 
-  // Create rule
-  const { error } = await locals.supabase.from("notification_rules").insert({
-    user_id: user.id,
-    name,
-    topics,
-    search_term: searchTerm || null,
-    ward_numbers: wards.length > 0 ? wards : null,
-    is_active: isActive,
-    delivery_frequency: deliveryFrequency,
-  });
+  const { error } = await locals.supabase
+    .from("notification_rules")
+    .insert({ user_id: user.id, name, ...fields });
 
   if (error) {
     return redirect(`/preferences?error=${encodeURIComponent(error.message)}`);

@@ -31,17 +31,9 @@ def _get_secret_key() -> str:
 
 def generate_unsubscribe_token(user_id: str, max_age_days: int = 90) -> str:
     """
-    Generate a JWT unsubscribe token for a user.
+    Generate a JWT unsubscribe token for a user, expiring after `max_age_days`.
 
-    Args:
-        user_id: User's unique identifier (UUID)
-        max_age_days: Token expiry in days (default: 90)
-
-    Returns:
-        JWT token string
-
-    Raises:
-        ValueError: If UNSUBSCRIBE_SECRET_KEY not configured
+    Raises ValueError if UNSUBSCRIBE_SECRET_KEY is not configured.
     """
     secret_key = _get_secret_key()
     expiration = datetime.now(UTC) + timedelta(days=max_age_days)

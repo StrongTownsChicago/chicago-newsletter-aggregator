@@ -17,13 +17,7 @@ def validate_unsubscribe_token(token: str) -> str | None:
     Validate an unsubscribe JWT and extract the user_id.
 
     Verifies the token's signature, expiration, and type.
-    Never raises exceptions - returns None for any invalid token.
-
-    Args:
-        token: JWT token string
-
-    Returns:
-        user_id if token is valid, None if invalid or expired
+    Never raises exceptions - returns None for any invalid or expired token.
     """
     secret_key = os.getenv("UNSUBSCRIBE_SECRET_KEY")
     if not secret_key:

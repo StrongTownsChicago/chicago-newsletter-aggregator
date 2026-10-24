@@ -1,8 +1,8 @@
 """Bound the size and prose content of docstrings and comment blocks.
 
 Ruff governs docstring format; nothing upstream bounds length or inspects
-prose. ``RULES`` lists what is checked. DS002 is ratcheted: ``FROZEN`` holds
-today's count, which may only go down.
+prose. ``RULES`` lists what is checked. A rule in ``FROZEN`` is ratcheted by
+site count instead of gated per site; the count may only go down.
 
     uv run python -m tools.lint.check_docstrings            # gate
     uv run python -m tools.lint.check_docstrings --report   # list every site
@@ -52,10 +52,10 @@ RULES = {
 #: and DS106 is a keyword heuristic that fires on ordinary prose.
 ADVISORY = frozenset({"DS102", "DS106"})
 
-#: The ratchet, not a target: lower it freely, never raise it. A test fails
-#: when it is above the measured count, so removing a site forces it down.
-#: Held up mostly by notifications/ and cli/ (``--report`` lists every site).
-FROZEN = {"DS002": 48}
+#: Rules gated by a site count instead of per site: lower a count freely, never
+#: raise it; a test fails when it is above the measured count. Empty: every rule
+#: gates per site.
+FROZEN: dict[str, int] = {}
 
 _PLANNING_DOC = re.compile(r"feature_planning/|handoff_archive/|HANDOFF|docs/plans")
 _ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")

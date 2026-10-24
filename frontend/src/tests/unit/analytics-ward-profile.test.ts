@@ -101,7 +101,7 @@ describe("buildWardProfile", () => {
       source({ first_date: "2026-02-01", last_date: "2026-04-01", newsletters: 3 }),
       source({ id: 2, name: "Bo Alder", ward: "2", newsletters: 1 }),
     ];
-    const profile = buildWardProfile(facts, sources, "1", months, months, lensIds);
+    const profile = buildWardProfile(facts, sources, "1", { window: months, archive: months }, lensIds);
 
     expect(profile.aldermen).toEqual(["Ada Alder"]);
     expect(profile.firstDate).toBe("2026-02-01");
@@ -124,7 +124,7 @@ describe("buildWardProfile", () => {
 
   it("restricts the window but keeps the whole archive for the ward's own history", () => {
     const facts = [...monthOfFacts("1", "2026-01", 6), ...monthOfFacts("1", "2026-03", 2)];
-    const profile = buildWardProfile(facts, [source()], "1", ["2026-03"], months, lensIds);
+    const profile = buildWardProfile(facts, [source()], "1", { window: ["2026-03"], archive: months }, lensIds);
     expect(profile.windowNewsletters).toBe(2);
     expect(profile.archiveNewsletters).toBe(8);
     expect(profile.cadence.medianPerTrackedMonth).toBe(2);
@@ -133,7 +133,7 @@ describe("buildWardProfile", () => {
   });
 
   it("withholds shares until the ward has enough newsletters and months", () => {
-    const sparse = buildWardProfile(monthOfFacts("1", "2026-01", 5, ["budget"]), [source()], "1", months, months, lensIds);
+    const sparse = buildWardProfile(monthOfFacts("1", "2026-01", 5, ["budget"]), [source()], "1", { window: months, archive: months }, lensIds);
     expect(sparse.sharesShown).toBe(false);
     expect(sparse.topics.every((topic) => topic.wardShare === null && topic.cityShare === null)).toBe(true);
   });
@@ -148,7 +148,7 @@ describe("buildWardProfile", () => {
       ...wardMonths.flatMap((month) => monthOfFacts("2", month, 1, ["budget"])),
       ...wardMonths.flatMap((month) => monthOfFacts("3", month, 1)),
     ];
-    const profile = buildWardProfile(facts, [source()], "1", months, months, lensIds);
+    const profile = buildWardProfile(facts, [source()], "1", { window: months, archive: months }, lensIds);
     const budget = profile.topics.find((topic) => topic.lens === "budget");
 
     expect(profile.sharesShown).toBe(true);
@@ -164,7 +164,7 @@ describe("buildWardProfile", () => {
       ...months.slice(0, MIN_WARD_MONTHS_FOR_SHARES).flatMap((month) => monthOfFacts("1", month, perMonth, ["budget"])),
       fact({ ward: "1", date: "2026-04-10", text_unavailable: true }),
     ];
-    const budget = buildWardProfile(facts, [source()], "1", months, months, lensIds).topics.find(
+    const budget = buildWardProfile(facts, [source()], "1", { window: months, archive: months }, lensIds).topics.find(
       (topic) => topic.lens === "budget",
     );
     expect(budget?.monthsChecked).toBe(MIN_WARD_MONTHS_FOR_SHARES);
@@ -172,7 +172,7 @@ describe("buildWardProfile", () => {
   });
 
   it("reports a ward with no archived newsletters without inventing activity", () => {
-    const profile = buildWardProfile(monthOfFacts("2", "2026-01", 3), [source({ ward: "4", newsletters: 0 })], "4", months, months, lensIds);
+    const profile = buildWardProfile(monthOfFacts("2", "2026-01", 3), [source({ ward: "4", newsletters: 0 })], "4", { window: months, archive: months }, lensIds);
     expect(profile.archiveNewsletters).toBe(0);
     expect(profile.months.every((cell) => cell.status === "untracked")).toBe(true);
     expect(profile.cadence.medianPerTrackedMonth).toBeNull();

@@ -14,14 +14,14 @@ class TestParseDateString(unittest.TestCase):
         """Parse ISO format (2026-01-24T12:00:00)."""
         result = parse_date_string("2026-01-24T12:00:00")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("2026-01-24", result)
 
     def test_parse_us_format(self) -> None:
         """Parse US format (01/24/2026)."""
         result = parse_date_string("01/24/2026")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         # Should parse successfully
         self.assertIn("2026", result)
 
@@ -29,21 +29,21 @@ class TestParseDateString(unittest.TestCase):
         """Parse verbose format (January 24, 2026)."""
         result = parse_date_string("January 24, 2026")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("2026-01-24", result)
 
     def test_parse_with_timezone(self) -> None:
         """Parse date with timezone."""
         result = parse_date_string("2026-01-24T12:00:00+00:00")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("2026-01-24", result)
 
     def test_fuzzy_parsing(self) -> None:
         """Fuzzy parsing extracts date from text."""
         result = parse_date_string("Published on Jan 24th, 2026")
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertIn("2026", result)
 
     def test_invalid_date_returns_none(self) -> None:
@@ -60,7 +60,7 @@ class TestParseDateString(unittest.TestCase):
 
     def test_none_returns_none(self) -> None:
         """None input returns None."""
-        result = parse_date_string(None)
+        result = parse_date_string(None)  # type: ignore[arg-type]  # a missing value from a scraped page
 
         self.assertIsNone(result)
 
@@ -75,7 +75,7 @@ class TestParseDateString(unittest.TestCase):
             self.assertIsNone(result)
         else:
             # If it doesn't overflow, that's fine too
-            self.assertIsNotNone(result)
+            assert result is not None
 
 
 if __name__ == "__main__":
