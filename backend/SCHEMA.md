@@ -2,15 +2,25 @@
 
 Complete reference for the Chicago Alderman Newsletter Tracker database schema.
 
-> **Authoritative Schema**: See `sql/schema.sql` for the exact SQL definitions.
+> **Source of truth**: `migrations/` builds the schema; apply them in order to an empty Supabase database. `sql/schema.sql` is a schema-only snapshot of production (2026-10-24) for reference.
+
+## Production status
+
+Production is migrations `000`–`005` and `007`. **`006` has not been applied**, so production differs from a database built from every migration in two ways:
+
+- `email_source_mappings` still has the `"Allow public read access"` policy, so anyone with the anon key can read the sender patterns and notes. `006` drops it; nothing outside the backend (service key) reads this table.
+- The `newsletters` write gates still have their old names, `"Service role insert newsletters"` / `"Service role update newsletters"`. `006` renames them; behaviour is the same.
+
+After applying `006` in production, refresh `sql/schema.sql` and this section (see "Keeping the schema accurate").
 
 ## Row-Level Security
 
-RLS is enabled on every public table. Policies are defined in `sql/schema.sql` (section 5) and `migrations/006_enable_rls_public_tables.sql`, which match production; see those files for the exact policy set.
+RLS is enabled on every public table. See `migrations/006_enable_rls_public_tables.sql` for the intended policy set and "Production status" above for where production still differs.
 
-- **Default deny**: any command without a permissive policy is denied to `anon`/`authenticated`. `sources` and `newsletters` are public read-only; `email_source_mappings` and `weekly_topic_reports` have no public policies (backend only).
+- **RLS is the only barrier**: `anon` and `authenticated` hold Supabase's default `GRANT ALL` on every public table, so a table without RLS (or with a permissive policy) is writable or readable through the public API.
+- **Default deny**: any command without a permissive policy is denied to `anon`/`authenticated`. `sources` and `newsletters` are public read-only; `weekly_topic_reports` has no public policies (backend only), and `email_source_mappings` has none once `006` is applied.
 - **`service_role` bypasses RLS**, so backend jobs using `SUPABASE_SERVICE_KEY` are unaffected.
-- **`Block non-service inserts/updates`** on `newsletters` use literal `false`: deny-all gates, not grants. Do not turn them into grants.
+- **The `newsletters` insert/update policies** use literal `false`: deny-all gates, not grants. Do not turn them into grants.
 - Owner-scoped tables (`user_profiles`, `notification_*`) check `auth.uid()`, which is null for anonymous requests.
 
 ## Core Tables
@@ -59,12 +69,14 @@ Main table for ingested newsletters.
 | topics          | text[]      |                            | Array of extracted topics          |
 | entities        | jsonb       |                            | Extracted entities (deprecated)    |
 | source_id       | integer     | NOT NULL, FK → sources(id) | Source reference                   |
-| search_vector   | tsvector    | GENERATED                  | Full-text search index             |
+| search_vector   | tsvector    | GENERATED, STORED          | Full-text search index             |
 | relevance_score | integer     | CHECK (0-10)               | LLM relevance score (deprecated)   |
+
+**Full-text search**: `search_vector` is `to_tsvector('english', coalesce(subject, '') || ' ' || coalesce(plain_text, ''))`, so search covers the subject and plain text, unweighted, with English stemming.
 
 **Foreign Keys**:
 
-- `source_id` → `sources(id)` ON DELETE SET NULL
+- `source_id` → `sources(id)` ON DELETE SET NULL. Because `source_id` is also `NOT NULL`, deleting a source that still has newsletters fails; reassign or delete its newsletters first.
 
 **Indexes**:
 
@@ -97,6 +109,8 @@ Maps email patterns to sources for automatic matching.
 **Indexes**:
 
 - `idx_email_source_mappings_pattern` on `email_pattern`
+
+**Row-Level Security**: backend only once `006` is applied; publicly readable in production until then (see "Production status").
 
 ---
 
@@ -137,7 +151,7 @@ User account data (extends Supabase Auth).
 
 - `idx_user_profiles_email` on `email`
 
-**Auto-Created**: Profile is automatically created via trigger when user signs up in Supabase Auth.
+**Auto-Created**: the `on_auth_user_created` trigger on `auth.users` (migration `001`) calls `create_user_profile()` when a user signs up. The trigger lives in the `auth` schema, so the public-schema snapshot doesn't show it; production's profile and user counts match.
 
 ---
 
@@ -297,10 +311,12 @@ AI-generated weekly summaries for specific topics.
 
 ## Database Functions
 
-- `create_user_profile()`: Trigger function to create profile on signup.
-- `update_updated_at_column()`: Trigger function to update timestamps.
-- `count_user_rules(user_uuid)`: Returns count of rules for a user.
-- `get_active_weekly_topics()`: Returns list of topics with active weekly subscribers.
+- `create_user_profile()`: trigger function that inserts a `user_profiles` row (id, email) for a new auth user. `SECURITY DEFINER` with `search_path = public`.
+- `update_updated_at_column()`: trigger function behind the `update_user_profiles_updated_at` and `update_notification_rules_updated_at` triggers, which set `updated_at` on every update.
+- `count_user_rules(user_uuid)`: returns the number of rules a user has.
+- `get_active_weekly_topics()`: returns the distinct topics of active weekly rules.
+
+Functions are executable by `anon`, `authenticated` and `service_role` (Supabase defaults), except as noted below.
 
 ### `get_week_date_range(week_id TEXT)`
 
@@ -337,10 +353,17 @@ Counts the newsletters matching a `/search` query per month. Powers the search p
 
 | Version | File                                  | Description                                                     |
 | ------- | ------------------------------------- | --------------------------------------------------------------- |
+| 000     | `000_baseline_schema.sql`             | Core tables (sources, email mappings, newsletters), from production; already applied there |
 | 001     | `001_notification_system.sql`         | Added notification system (4 tables, triggers, RLS)             |
 | 002     | `002_add_search_term.sql`             | Replaced keywords array with single search_term column          |
 | 003     | `003_weekly_topic_reports.sql`        | Added weekly topic reports (table, delivery_frequency, helpers) |
 | 004     | `004_polymorphic_notifications.sql`   | Polymorphic notification_queue (dedicated report_id column)     |
 | 005     | `005_weekly_rules_no_ward_filter.sql` | Constraint to prevent ward filters on weekly rules              |
-| 006     | `006_enable_rls_public_tables.sql`    | RLS on all public tables; codifies production policies          |
+| 006     | `006_enable_rls_public_tables.sql`    | RLS on all public tables; **not yet applied in production**     |
 | 007     | `007_search_term_timeline.sql`        | `search_term_timeline` RPC for the search page timeline         |
+
+## Keeping the schema accurate
+
+- **Every schema change is a migration** in `migrations/`, applied to production after review. Never change the schema only in the Supabase dashboard: that is how the core tables and the migration list drifted apart before `000` existed.
+- **Checking the repo against a database** needs no production access. Start a throwaway Supabase Postgres (`docker run -d -e POSTGRES_PASSWORD=<local> -p 127.0.0.1:<port>:5432 public.ecr.aws/supabase/postgres:<production version>`), apply the migrations production has with `psql -v ON_ERROR_STOP=1 -f`, dump it with `npx supabase db dump --db-url <local url>`, and diff against `sql/schema.sql`. On 2026-10-24, `000`–`005` + `007` matched production apart from a comment inside `create_user_profile()`.
+- **Refreshing `sql/schema.sql` from production** reads only the catalog (`npx supabase db dump`, schema-only by default), but it connects to the live database. Do it rarely, at a quiet time, and never with `--data-only`.

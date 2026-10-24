@@ -237,7 +237,7 @@ frontend/
 
 **Notification Tables:** `user_profiles`, `notification_rules`, `notification_queue`, `notification_history`, `weekly_topic_reports`
 
-**Full schema and RLS policies:** See [backend/SCHEMA.md](backend/SCHEMA.md)
+**Full schema and RLS policies:** See [backend/SCHEMA.md](backend/SCHEMA.md). `backend/migrations/` (from `000`) builds the whole schema; `backend/sql/schema.sql` is a production snapshot. Every schema change is a new migration, never a dashboard-only edit; SCHEMA.md lists which migrations production has applied.
 
 ### Key Design Patterns
 
