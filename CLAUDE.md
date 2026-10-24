@@ -170,7 +170,6 @@ ollama pull gpt-oss:20b
 - Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, analytics E2E) on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
-- Dependency audit (`.github/workflows/dependency_audit.yml`) - `pip-audit` and `npm audit --omit=dev --audit-level=high`, weekly and when a lockfile changes; kept out of PR checks
 
 All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 

@@ -154,8 +154,6 @@ bash scripts/check.sh [backend|frontend]
 git config core.hooksPath .githooks
 ```
 
-A weekly workflow (`.github/workflows/dependency_audit.yml`) audits both lockfiles for known vulnerabilities.
-
 ### Frontend Setup
 
 ```bash
