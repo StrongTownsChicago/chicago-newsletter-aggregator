@@ -192,7 +192,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "https://example.com/nl", "Archive Title", "01/24/2026"
         )
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(result["url"], "https://example.com/nl")
         self.assertIn("html_content", result)
         self.assertIn("plain_text", result)
@@ -210,6 +210,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "https://example.com/nl", "Archive Title", ""
         )
 
+        assert result is not None
         self.assertEqual(result["subject"], "Newsletter Subject")
 
     @patch("requests.Session.get")
@@ -224,6 +225,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "https://example.com/nl", "Archive Title", ""
         )
 
+        assert result is not None
         self.assertEqual(result["subject"], "Newsletter Heading")
 
     @patch("requests.Session.get")
@@ -238,6 +240,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "https://example.com/nl", "Archive Title", ""
         )
 
+        assert result is not None
         self.assertEqual(result["subject"], "Archive Title")
 
     @patch("builtins.print")
@@ -262,7 +265,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "https://example.com/nl", "Archive Title", ""
         )
 
-        self.assertIsNotNone(result)
+        assert result is not None
         self.assertEqual(mock_get.call_count, 3)
 
     @patch("builtins.print")
@@ -301,6 +304,7 @@ class TestFetchNewsletterContent(unittest.TestCase):
             "archive_title",
             "archive_date_str",
         ]
+        assert result is not None
         for field in required_fields:
             self.assertIn(field, result)
 

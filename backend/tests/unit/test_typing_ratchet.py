@@ -20,9 +20,9 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[2]
 MYPY_INI = BACKEND / "mypy.ini"
 
-# The counts at adoption. Lower them as entries go; never raise either.
-ADOPTED_MODULES = 5
-ADOPTED_CODES = 9
+# Every test module is strict. An entry added to mypy.ini fails these counts.
+ADOPTED_MODULES = 0
+ADOPTED_CODES = 0
 
 TEST_SECTION_PREFIX = "mypy-tests."
 # Any other setting (above all ignore_errors) would switch a module off
@@ -151,6 +151,8 @@ class TestEveryClaimStillFires(unittest.TestCase):
 
     def test_every_disabled_code_still_fires(self) -> None:
         claims = ratchet()
+        if not claims:
+            self.skipTest("no test module is relaxed")
         found = self.strict_errors(sorted(claims))
         stale = {
             module: sorted(codes - found.get(module, set()))

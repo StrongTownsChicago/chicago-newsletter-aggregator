@@ -24,7 +24,7 @@ class TestNotificationMatching(unittest.TestCase):
         )
 
         # Create mock newsletter data
-        newsletter_id = 123
+        newsletter_id = "123"
         newsletter_data = {
             "id": newsletter_id,
             "subject": "Bike Lane Update",

@@ -18,6 +18,7 @@ from models import (
     Source,
     UserProfile,
 )
+from models.types import NewsletterID, RuleID, SourceID, UserID
 
 
 class TestNewsletterModels(unittest.TestCase):
@@ -44,7 +45,7 @@ class TestNewsletterModels(unittest.TestCase):
             received_date=datetime(2026, 1, 30, 10, 0, 0),
             from_email="test@example.com",
             to_email="recipient@example.com",
-            source_id="source-456",
+            source_id=SourceID("source-456"),
             topics=["bike_lanes", "transit_funding"],
             summary="Test summary",
         )
@@ -60,7 +61,7 @@ class TestNewsletterModels(unittest.TestCase):
     def test_newsletter_with_id_from_db(self) -> None:
         """Newsletter model includes ID after DB fetch."""
         newsletter = Newsletter(
-            id="uuid-123",
+            id=NewsletterID("uuid-123"),
             subject="Test",
             plain_text="Content",
             created_at=datetime(2026, 1, 30, 10, 0, 0),
@@ -88,7 +89,7 @@ class TestNewsletterModels(unittest.TestCase):
     def test_newsletter_missing_plain_text_fails(self) -> None:
         """Missing required field raises error."""
         with self.assertRaises(ValidationError):
-            NewsletterCreate(subject="Test")  # deliberately missing fields
+            NewsletterCreate(subject="Test")  # type: ignore[call-arg]  # deliberately missing plain_text
 
     def test_newsletter_ignores_legacy_relevance_score_column(self) -> None:
         """Deprecated relevance_score in database rows is ignored, even if out of range."""
@@ -192,7 +193,7 @@ class TestSourceModels(unittest.TestCase):
     def test_source_valid_alderman(self) -> None:
         """Alderman source with ward number."""
         source = Source(
-            id="source-123",
+            id=SourceID("source-123"),
             name="Alderman Smith",
             ward_number=1,
             source_type="alderman",
@@ -206,7 +207,7 @@ class TestSourceModels(unittest.TestCase):
     def test_source_valid_other(self) -> None:
         """Non-alderman source without ward."""
         source = Source(
-            id="source-456",
+            id=SourceID("source-456"),
             name="Chicago Transit Authority",
             ward_number=None,
             source_type="other",
@@ -219,7 +220,9 @@ class TestSourceModels(unittest.TestCase):
     def test_source_empty_name_fails(self) -> None:
         """Empty name raises error."""
         with self.assertRaises(ValidationError) as ctx:
-            Source(id="test", name="", source_type="alderman")
+            Source(
+                id=SourceID("test"), name="", ward_number=None, source_type="alderman"
+            )
 
         error = ctx.exception
         self.assertIn("name", str(error))
@@ -227,26 +230,37 @@ class TestSourceModels(unittest.TestCase):
     def test_source_ward_in_range(self) -> None:
         """Ward 1-50 accepted."""
         # Valid boundaries
-        Source(id="1", name="Ward 1", ward_number=1, source_type="alderman")
-        Source(id="50", name="Ward 50", ward_number=50, source_type="alderman")
+        Source(id=SourceID("1"), name="Ward 1", ward_number=1, source_type="alderman")
+        Source(
+            id=SourceID("50"), name="Ward 50", ward_number=50, source_type="alderman"
+        )
 
         # Valid middle
-        Source(id="25", name="Ward 25", ward_number=25, source_type="alderman")
+        Source(
+            id=SourceID("25"), name="Ward 25", ward_number=25, source_type="alderman"
+        )
 
     def test_source_ward_out_of_range(self) -> None:
         """Ward 0, 51+ rejected."""
         # Ward 0
         with self.assertRaises(ValidationError):
-            Source(id="0", name="Ward 0", ward_number=0, source_type="alderman")
+            Source(
+                id=SourceID("0"), name="Ward 0", ward_number=0, source_type="alderman"
+            )
 
         # Ward 51
         with self.assertRaises(ValidationError):
-            Source(id="51", name="Ward 51", ward_number=51, source_type="alderman")
+            Source(
+                id=SourceID("51"),
+                name="Ward 51",
+                ward_number=51,
+                source_type="alderman",
+            )
 
         # Ward 100
         with self.assertRaises(ValidationError):
             Source(
-                id="100",
+                id=SourceID("100"),
                 name="Ward 100",
                 ward_number=100,
                 source_type="alderman",
@@ -255,7 +269,7 @@ class TestSourceModels(unittest.TestCase):
     def test_email_mapping_valid(self) -> None:
         """Email mapping with pattern and source_id."""
         mapping = EmailSourceMapping(
-            id=1, email_pattern="%@example.com", source_id="source-123"
+            id=1, email_pattern="%@example.com", source_id=SourceID("source-123")
         )
 
         self.assertEqual(mapping.id, 1)
@@ -265,7 +279,7 @@ class TestSourceModels(unittest.TestCase):
     def test_email_mapping_empty_pattern_fails(self) -> None:
         """Empty email pattern rejected."""
         with self.assertRaises(ValidationError) as ctx:
-            EmailSourceMapping(id=1, email_pattern="", source_id="source-123")
+            EmailSourceMapping(id=1, email_pattern="", source_id=SourceID("source-123"))
 
         error = ctx.exception
         self.assertIn("email_pattern", str(error))
@@ -276,7 +290,9 @@ class TestNotificationModels(unittest.TestCase):
 
     def test_notification_rule_minimal(self) -> None:
         """Rule with just required fields."""
-        rule = NotificationRule(id="rule-123", user_id="user-456", name="My Rule")
+        rule = NotificationRule(
+            id=RuleID("rule-123"), user_id=UserID("user-456"), name="My Rule"
+        )
 
         self.assertEqual(rule.id, "rule-123")
         self.assertEqual(rule.user_id, "user-456")
@@ -290,8 +306,8 @@ class TestNotificationModels(unittest.TestCase):
     def test_notification_rule_full(self) -> None:
         """Rule with all filters."""
         rule = NotificationRule(
-            id="rule-123",
-            user_id="user-456",
+            id=RuleID("rule-123"),
+            user_id=UserID("user-456"),
             name="Bike Lane Notifications",
             topics=["bike_lanes", "pedestrian_infrastructure"],
             search_term="cycling",
@@ -308,14 +324,16 @@ class TestNotificationModels(unittest.TestCase):
     def test_notification_rule_empty_name_fails(self) -> None:
         """Empty rule name rejected."""
         with self.assertRaises(ValidationError) as ctx:
-            NotificationRule(id="rule-123", user_id="user-456", name="")
+            NotificationRule(id=RuleID("rule-123"), user_id=UserID("user-456"), name="")
 
         error = ctx.exception
         self.assertIn("name", str(error))
 
     def test_notification_rule_topics_default_empty(self) -> None:
         """Topics default to empty list."""
-        rule = NotificationRule(id="rule-123", user_id="user-456", name="Test")
+        rule = NotificationRule(
+            id=RuleID("rule-123"), user_id=UserID("user-456"), name="Test"
+        )
 
         self.assertEqual(rule.topics, [])
         self.assertIsInstance(rule.topics, list)
@@ -335,7 +353,11 @@ class TestNotificationModels(unittest.TestCase):
 
     def test_rule_match_valid(self) -> None:
         """RuleMatch with all required fields."""
-        match = RuleMatch(user_id="user-123", rule_id="rule-456", rule_name="Test Rule")
+        match = RuleMatch(
+            user_id=UserID("user-123"),
+            rule_id=RuleID("rule-456"),
+            rule_name="Test Rule",
+        )
 
         self.assertEqual(match.user_id, "user-123")
         self.assertEqual(match.rule_id, "rule-456")
@@ -345,9 +367,9 @@ class TestNotificationModels(unittest.TestCase):
         """Queue entry with all fields."""
         entry = NotificationQueueEntry(
             id="notif-123",
-            user_id="user-123",
-            newsletter_id="newsletter-456",
-            rule_id="rule-789",
+            user_id=UserID("user-123"),
+            newsletter_id=NewsletterID("newsletter-456"),
+            rule_id=RuleID("rule-789"),
             status="pending",
             digest_batch_id="2026-01-30",
             created_at=datetime(2026, 1, 30, 10, 0, 0),
@@ -364,9 +386,9 @@ class TestNotificationModels(unittest.TestCase):
         for status in ["pending", "sent", "failed"]:
             entry = NotificationQueueEntry(
                 id="notif-123",
-                user_id="user-123",
-                newsletter_id="newsletter-456",
-                rule_id="rule-789",
+                user_id=UserID("user-123"),
+                newsletter_id=NewsletterID("newsletter-456"),
+                rule_id=RuleID("rule-789"),
                 status=status,
                 digest_batch_id="2026-01-30",
                 created_at=datetime.now(),
@@ -378,9 +400,9 @@ class TestNotificationModels(unittest.TestCase):
         with self.assertRaises(ValidationError) as ctx:
             NotificationQueueEntry(
                 id="notif-123",
-                user_id="user-123",
-                newsletter_id="newsletter-456",
-                rule_id="rule-789",
+                user_id=UserID("user-123"),
+                newsletter_id=NewsletterID("newsletter-456"),
+                rule_id=RuleID("rule-789"),
                 status="invalid",
                 digest_batch_id="2026-01-30",
                 created_at=datetime.now(),
@@ -391,7 +413,7 @@ class TestNotificationModels(unittest.TestCase):
 
     def test_user_profile_valid_email(self) -> None:
         """User with valid email."""
-        profile = UserProfile(id="user-123", email="test@example.com")
+        profile = UserProfile(id=UserID("user-123"), email="test@example.com")
 
         self.assertEqual(profile.id, "user-123")
         self.assertEqual(profile.email, "test@example.com")
@@ -402,11 +424,11 @@ class TestNotificationModels(unittest.TestCase):
 
         for invalid_email in invalid_emails:
             with self.assertRaises(ValidationError):
-                UserProfile(id="user-123", email=invalid_email)
+                UserProfile(id=UserID("user-123"), email=invalid_email)
 
     def test_user_profile_preferences_default(self) -> None:
         """Notification preferences default to enabled and daily."""
-        profile = UserProfile(id="user-123", email="test@example.com")
+        profile = UserProfile(id=UserID("user-123"), email="test@example.com")
 
         self.assertEqual(
             profile.notification_preferences,
@@ -421,7 +443,7 @@ class TestEdgeCases(unittest.TestCase):
         """Invalid type raises clear error."""
         with self.assertRaises(ValidationError) as ctx:
             NewsletterCreate(
-                subject=123,  # deliberately wrong type
+                subject=123,  # type: ignore[arg-type]  # deliberately wrong type
                 plain_text="Content",
             )
 
@@ -433,15 +455,24 @@ class TestEdgeCases(unittest.TestCase):
     def test_source_ward_boundary_values(self) -> None:
         """Ward number boundary validation."""
         # Valid boundaries
-        Source(id="1", name="Ward 1", ward_number=1, source_type="alderman")
-        Source(id="50", name="Ward 50", ward_number=50, source_type="alderman")
+        Source(id=SourceID("1"), name="Ward 1", ward_number=1, source_type="alderman")
+        Source(
+            id=SourceID("50"), name="Ward 50", ward_number=50, source_type="alderman"
+        )
 
         # Invalid boundaries
         with self.assertRaises(ValidationError):
-            Source(id="0", name="Ward 0", ward_number=0, source_type="alderman")
+            Source(
+                id=SourceID("0"), name="Ward 0", ward_number=0, source_type="alderman"
+            )
 
         with self.assertRaises(ValidationError):
-            Source(id="51", name="Ward 51", ward_number=51, source_type="alderman")
+            Source(
+                id=SourceID("51"),
+                name="Ward 51",
+                ward_number=51,
+                source_type="alderman",
+            )
 
     def test_date_parsing(self) -> None:
         """Dates parsed from ISO strings."""
@@ -455,6 +486,7 @@ class TestEdgeCases(unittest.TestCase):
         newsletter = Newsletter.model_validate(db_data)
 
         self.assertIsInstance(newsletter.received_date, datetime)
+        assert newsletter.received_date is not None
         self.assertEqual(newsletter.received_date.year, 2026)
         self.assertEqual(newsletter.received_date.month, 1)
         self.assertEqual(newsletter.received_date.day, 30)
