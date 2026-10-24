@@ -137,6 +137,10 @@ uv run python -m cli.process_notification_queue --weekly-digest
 # Backend tests
 uv run python -m unittest discover -s tests
 
+# Backend database tests, against a running local Supabase stack (see CLAUDE.md)
+eval "$(bash ../scripts/supabase-test-env.sh)"
+uv run python -m unittest discover -s tests/db_integration -t .
+
 # Frontend tests
 cd ../frontend
 npm run test      # Unit tests
@@ -193,6 +197,7 @@ backend/
   ├── tests/            # Test suite
   │   ├── unit/         # Unit tests
   │   ├── integration/  # Integration tests
+  │   ├── db_integration/ # Tests against the local Supabase stack
   │   └── fixtures/     # Test data and fixtures
   ├── config/           # Privacy patterns configuration
   ├── shared/           # Shared database client and date helpers

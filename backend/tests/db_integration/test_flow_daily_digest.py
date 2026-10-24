@@ -72,6 +72,11 @@ class TestDailyDigests(LocalSupabaseTestCase):
         for patcher in (
             patch("resend.Emails.send", self.resend),
             patch("cli.process_notification_queue.time.sleep"),
+            # A failed send writes an error file; keep it out of the repo.
+            patch(
+                "cli.process_notification_queue.log_notification_error",
+                return_value="error-log.txt",
+            ),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
