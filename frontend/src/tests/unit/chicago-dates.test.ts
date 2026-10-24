@@ -10,12 +10,16 @@ describe('parseIsoDate', () => {
     expect(parseIsoDate(' 2026-01-15 ')).toBe('2026-01-15');
   });
 
-  it.each([null, undefined, '', '2026-02-29', '2026-04-31', '2026-00-10', '2026-1-5', '15/01/2026', '2026-01-15T00:00'])(
+  it.each([null, undefined, '', '2026-02-29', '2026-04-31', '2026-00-10', '2026-1-5', '15/01/2026', '2026-01-15T00:00', 'x2026-01-15'])(
     'rejects %j',
     (value) => {
       expect(parseIsoDate(value)).toBeNull();
     },
   );
+
+  it('rejects years before 100, which Date.UTC reads as 19xx', () => {
+    expect(parseIsoDate('0050-01-01')).toBeNull();
+  });
 });
 
 describe('addDaysToIsoDate', () => {

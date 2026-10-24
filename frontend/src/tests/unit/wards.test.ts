@@ -123,12 +123,26 @@ describe('buildWardContactLinks', () => {
     ).toEqual([]);
   });
 
-  it('drops web links that are not absolute http(s) URLs', () => {
-    const links = buildWardContactLinks({
-      ...fullSource,
-      website: 'javascript:alert(1)',
-    });
-    expect(links.map((link) => link.kind)).toEqual(['phone', 'email']);
+  it('omits fields that are not on file', () => {
+    expect(buildWardContactLinks({ website: null, phone: null, email_address: null })).toEqual([]);
+  });
+
+  it.each(['javascript:alert(1)', 'not a url', 'www.the1stward.com'])(
+    'drops web link %j, which is not an absolute http(s) URL',
+    (website) => {
+      const links = buildWardContactLinks({ ...fullSource, website });
+      expect(links.map((link) => link.kind)).toEqual(['phone', 'email']);
+    },
+  );
+
+  it('keeps an http website and trims it', () => {
+    const links = buildWardContactLinks({ ...fullSource, website: ' http://ward1.example.org/ ' });
+    expect(links[0]).toMatchObject({ kind: 'website', href: 'http://ward1.example.org/' });
+  });
+
+  it('trims whitespace from the phone label', () => {
+    const links = buildWardContactLinks({ ...fullSource, phone: ' 872-206-2685 ' });
+    expect(links.find((link) => link.kind === 'phone')?.label).toBe('872-206-2685');
   });
 
   it('drops a phone number with no digits', () => {

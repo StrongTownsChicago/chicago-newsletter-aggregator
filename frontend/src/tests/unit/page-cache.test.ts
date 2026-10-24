@@ -45,7 +45,7 @@ describe("findPageCacheMaxAge", () => {
     expect(findPageCacheMaxAge(path)).toBe(THIRTY_DAYS_SECONDS);
   });
 
-  it.each(["/", "/search", "/wards", "/ward/1", "/ward/50/", "/analytics"])(
+  it.each(["/", "/search", "/search/", "/search//", "/wards", "/ward/1", "/ward/50/", "/analytics", "/analytics/"])(
     "caches %s for 10 minutes",
     (path) => {
       expect(findPageCacheMaxAge(path)).toBe(TEN_MINUTES_SECONDS);
@@ -66,6 +66,13 @@ describe("findPageCacheMaxAge", () => {
     "/newsletter/1/extra",
     "/ward/1/extra",
     "/searching",
+    "/wards-map",
+    "/analytics.json",
+    "/api/newsletter/1",
+    "/old/search",
+    "/old/wards",
+    "/old/ward/1",
+    "/old/analytics",
   ])("does not cache %s", (path) => {
     expect(findPageCacheMaxAge(path)).toBeNull();
   });
@@ -116,6 +123,7 @@ describe("buildPageCacheKey", () => {
   it("detects link-tracking parameters", () => {
     expect(hasTrackingParams(new URL(`${ORIGIN}/search?q=x&UTM_Campaign=a`))).toBe(true);
     expect(hasTrackingParams(new URL(`${ORIGIN}/search?q=utm_source`))).toBe(false);
+    expect(hasTrackingParams(new URL(`${ORIGIN}/search?xgclid=1&fbclid_note=a`))).toBe(false);
   });
 
   it("does not change the request URL it was given", () => {
@@ -251,6 +259,17 @@ describe("respondWithPageCache", () => {
     expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
     await waitUntil.mock.calls[0][0];
     expect(memory.cache.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes the store before responding when there is no waitUntil", async () => {
+    let storeFinished = false;
+    memory.cache.put.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      storeFinished = true;
+    });
+
+    await respondWithPageCache(pageRequest("/"), dependencies(), async () => htmlResponse());
+    expect(storeFinished).toBe(true);
   });
 
   it.each(["sb-access-token", "sb-refresh-token"])(

@@ -123,6 +123,9 @@ npm run test:coverage
 # Run tests in watch mode
 npm run test:watch
 
+# Mutation testing with StrykerJS (dev-only, not in CI; narrow with -- --mutate src/lib/wards.ts)
+npm run test:mutation
+
 # Run linting
 npm run lint
 ```
