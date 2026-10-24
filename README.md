@@ -140,7 +140,7 @@ uv run python -m unittest discover -s tests
 # Frontend tests
 cd ../frontend
 npm run test      # Unit tests
-npm run test:e2e -- --project=chromium  # E2E tests (Playwright)
+npm run test:e2e  # E2E tests (Playwright), on the local Supabase stack: npx supabase start --workdir .. (Docker)
 npm run lint
 ```
 

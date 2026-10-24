@@ -53,6 +53,20 @@ frontend_build() {
     frontend_npm build
 }
 
+# The types check and the e2e run need the local stack (supabase/config.toml).
+require_local_supabase() {
+  if ! npx --prefix frontend supabase status --workdir . >/dev/null 2>&1; then
+    echo "The local Supabase stack is not running. Start it (needs Docker) with:" >&2
+    echo "  npx --prefix frontend supabase start --workdir ." >&2
+    return 1
+  fi
+}
+
+frontend_database_types_current() {
+  frontend_npm db:types &&
+    git diff --exit-code -- frontend/src/lib/database.types.ts
+}
+
 check_backend() {
   gate "backend: ruff check" backend_uv ruff check .
   gate "backend: ruff format --check" backend_uv ruff format --check .
@@ -70,8 +84,10 @@ check_frontend() {
   gate "frontend: typecheck" frontend_npm typecheck
   gate "frontend: tests with coverage" frontend_npm test:coverage
   gate "frontend: build" frontend_build
+  gate "frontend: local Supabase running" require_local_supabase
+  gate "frontend: generated database types current" frontend_database_types_current
   # First run needs: npx --prefix frontend playwright install chromium
-  gate "frontend: analytics E2E" frontend_npm test:e2e:analytics
+  gate "frontend: E2E" frontend_npm test:e2e
 }
 
 case "${1:-all}" in

@@ -128,12 +128,14 @@ npm run preview
 # Run unit tests
 npm run test
 
-# Run E2E tests (Playwright)
-npm run test:e2e -- --project=chromium
+# Start the local Supabase stack once (Docker); see "Local Supabase (tests)"
+npx supabase start --workdir ..
 
-# E2E without the database: /analytics on fixture data and axe WCAG A/AA scans (e2e/a11y.spec.ts)
-# Own dev server on port 4358, placeholder Supabase env; Frontend CI runs it
-npm run test:e2e:analytics
+# Run E2E tests (Playwright) against the local stack, reset to supabase/seed.sql first
+npm run test:e2e
+
+# Regenerate src/lib/database.types.ts from the local stack after a migration
+npm run db:types
 
 # Run tests with coverage (floors in vitest.config.ts)
 npm run test:coverage
@@ -167,7 +169,7 @@ ollama pull gpt-oss:20b
 **GitHub Actions Workflows:**
 
 - Backend CI (`.github/workflows/backend_tests.yml`) - Runs the backend gates of `scripts/check.sh` on backend changes
-- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, analytics E2E) on frontend changes
+- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, generated database types, E2E on the local stack) on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
 
@@ -243,6 +245,10 @@ frontend/
 
 `supabase/config.toml` defines a local stack (Postgres, PostgREST, GoTrue; production's Postgres image) for database-backed tests. `npx --prefix frontend supabase start --workdir .` from the repo root applies every `backend/migrations/*.sql` in filename order, then the synthetic `supabase/seed.sql` (both through `[db.seed] sql_paths`, so the migrations stay in `backend/migrations/`); `supabase db reset --local` reapplies them. The CLI is pinned as a frontend dev dependency and in `.github/actions/local-supabase/`. **Never `supabase link`** or pass `--linked`/`--project-id`: `backend/.env` and `frontend/.env` point at production. Test code that connects checks its URL and key with the local-only guard first (`backend/tests/db_integration/local_guard.py`, `frontend/e2e/support/local-supabase-guard.ts`): loopback hosts and the stack's demo JWTs only.
 
+**E2E:** `npm run test:e2e` (`frontend/playwright.config.ts`) takes the stack's URL and keys from `supabase status`, never `frontend/.env`, and starts its own dev server with them (and with `.env` kept out of the Cloudflare dev runtime). Its global setup resets the database to the seed, then checks the server renders seeded data and reads a seeded profile with the service key. Specs assert the seed's facts from `frontend/e2e/fixtures/db/facts.ts`: change it with `seed.sql`. Seed data is synthetic (example.com/example.org addresses, invented people). Specs that write use their own seeded user. `npx supabase stop --workdir ..` stops the stack.
+
+**Generated types:** `frontend/src/lib/database.types.ts` comes from `npm run db:types` (the local stack's schema); the clients are `createClient<Database>`. After a migration, restart or reset the stack, regenerate and commit; Frontend CI fails when it is stale.
+
 ### Key Design Patterns
 
 **Email Source Matching** (`email_parser.py:lookup_source_by_email()`): Each pattern must match the whole sender address, case-insensitively; `%` is a wildcard anywhere in the pattern (e.g., `%@40thward.org`), and `_` is a literal character. See `email_parser.py:email_matches_pattern()`.
@@ -282,7 +288,7 @@ Subjects come from **keyword lenses** (reviewed phrase lists in `analytics/lense
 
 **Framing rules** (dashboard, ward summaries, reports): show ward counts with their denominator, compare a ward only with its own history and the average of active wards, never rank aldermen or list wards missing from a month.
 
-**Views and sharing:** the view lives in the query string (`lib/analytics/url-state.ts`, `lib/analytics/views.ts`). PNG exports (`lib/analytics/charts/export.ts`) carry the window, data date, caveat and production URL. `npm run test:e2e:analytics` runs the dashboard on fixture data with off-origin requests aborted; Frontend CI runs it.
+**Views and sharing:** the view lives in the query string (`lib/analytics/url-state.ts`, `lib/analytics/views.ts`). PNG exports (`lib/analytics/charts/export.ts`) carry the window, data date, caveat and production URL. `e2e/analytics-dashboard.spec.ts` runs the dashboard on fixture data with off-origin requests aborted.
 
 **Ward Summaries and Monthly Reports** (public, indexed): built by `analytics/ward_glance.py` and `monthly_reports.py` into `frontend/src/generated/`. `ward-glance.json` is bundled into the worker (`components/WardGlance.astro`), so keep it small. `pages/reports/` are prerendered from `monthly-reports.json` (no DB) and excluded from the worker in `astro.config.mjs`. Reports cover only complete months. Distinctive and rising terms stay on the dashboard: they surface personal names and filler words.
 
@@ -354,7 +360,7 @@ UNSUBSCRIBE_SECRET_KEY=         # Must match backend key
 
 **Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section). Property-based tests (`test_*_properties.py`) use Hypothesis with the shared settings in `tests/fixtures/property_settings.py`.
 
-**Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section). Accessibility: `e2e/a11y.spec.ts` runs axe on each page that renders without the database, at desktop and phone widths; add new pages to its `SCANNED_PAGES`.
+**Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section). E2E: Playwright specs in `frontend/e2e/` against the local Supabase stack (see "Local Supabase (tests)"). Accessibility: `e2e/a11y.spec.ts` runs axe on every page, populated from the seed and signed in where needed, at desktop and phone widths; add new pages to its `SCANNED_PAGES`.
 
 ## Deployment
 
