@@ -10,6 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from ingest.email.email_parser import clean_html_content
+from ingest.markup_sanitizer import sanitize_markup
 from ingest.scraper.scraper_strategies import get_strategy_for_url
 
 logger = logging.getLogger(__name__)
@@ -79,10 +80,12 @@ class NewsletterScraper:
                         subject = element.get_text(strip=True)
                         break
 
+                # Archive pages are whole documents with their own scripts.
+                html_content = sanitize_markup(response.text)
                 return {
                     "url": url,
-                    "html_content": response.text,
-                    "plain_text": clean_html_content(response.text),
+                    "html_content": html_content,
+                    "plain_text": clean_html_content(html_content),
                     "subject": subject or title or "Untitled Newsletter",
                     "archive_title": title,
                     "archive_date_str": date_str,

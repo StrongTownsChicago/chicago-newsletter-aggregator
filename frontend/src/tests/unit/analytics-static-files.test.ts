@@ -4,25 +4,13 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ANALYTICS_DATA_BASE_PATH, analyticsFileUrl, CORE_ANALYTICS_FILES } from "../../lib/analytics/data";
+import { headersForPattern } from "../headers-rules";
 import { disallowRulesFor, isPathDisallowed } from "../robots-rules";
 
 const PUBLIC_DIRECTORY = path.resolve(__dirname, "../../../public");
 
 function readPublicFile(relativePath: string): string {
   return readFileSync(`${PUBLIC_DIRECTORY}/${relativePath}`, "utf-8");
-}
-
-/** The header lines of the `_headers` rule for exactly this path pattern. */
-function headersForPattern(headersFile: string, pattern: string): string[] {
-  const lines = headersFile.split(/\r?\n/);
-  const start = lines.indexOf(pattern);
-  if (start === -1) return [];
-  const rule: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (!/^\s+\S/.test(line)) break;
-    rule.push(line.trim());
-  }
-  return rule;
 }
 
 describe("published analytics data", () => {

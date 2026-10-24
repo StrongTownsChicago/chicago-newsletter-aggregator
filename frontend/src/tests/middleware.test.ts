@@ -27,6 +27,7 @@ vi.mock('astro:middleware', () => ({
 import { createClient } from '@supabase/supabase-js';
 import { onRequest } from '../middleware';
 import { PAGE_CACHE_HEADER } from '../lib/server/page-cache';
+import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_HEADER } from '../lib/content-security-policy';
 import { createMockContext } from './helpers';
 import type { APIContext } from 'astro';
 
@@ -112,6 +113,12 @@ describe('Middleware', () => {
 
     expect(context.locals.session).toBe(mockSession);
     expect(context.locals.user).toBe(mockSession.user);
+  });
+
+  it('sets the Content-Security-Policy on every response', async () => {
+    const response = (await onRequest(createMockContext(), vi.fn(() => Promise.resolve(new Response())))) as Response;
+
+    expect(response.headers.get(CONTENT_SECURITY_POLICY_HEADER)).toBe(CONTENT_SECURITY_POLICY);
   });
 
   describe('X-Robots-Tag', () => {

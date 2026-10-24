@@ -195,6 +195,24 @@ class TestFetchNewsletterContent(unittest.TestCase):
         self.assertIn("subject", result)
 
     @patch("requests.Session.get")
+    def test_archive_page_markup_is_sanitized(self, mock_get: MagicMock) -> None:
+        """The page's head and scripts are dropped from the stored HTML and its text."""
+        html = (
+            "<html><head><title>Ward News</title><script>track()</script></head>"
+            '<body><p onclick="track()">Content</p></body></html>'
+        )
+        mock_get.return_value = Mock(status_code=200, text=html)
+
+        result = NewsletterScraper().fetch_newsletter_content(
+            "https://example.com/nl", "Archive Title", "01/24/2026"
+        )
+
+        assert result is not None
+        self.assertEqual(result["html_content"], "<p>Content</p>")
+        self.assertEqual(result["plain_text"], "Content")
+        self.assertEqual(result["subject"], "Ward News")
+
+    @patch("requests.Session.get")
     def test_extracts_subject_from_title(self, mock_get: MagicMock) -> None:
         """Subject extracted from <title> tag."""
         html = "<html><title>Newsletter Subject</title><body>Content</body></html>"

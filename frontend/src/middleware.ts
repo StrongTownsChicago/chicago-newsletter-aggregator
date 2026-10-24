@@ -2,6 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import type { APIContext, MiddlewareNext } from "astro";
 import { createRequestClient } from "./lib/supabase";
 import { isNonProductionHost } from "./lib/seo";
+import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_HEADER } from "./lib/content-security-policy";
 import { getDefaultEdgeCache } from "./lib/server/edge-cache";
 import { respondWithPageCache, resolvePageCacheVersion } from "./lib/server/page-cache";
 
@@ -60,6 +61,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     },
     () => renderWithSession(context, next),
   );
+
+  response.headers.set(CONTENT_SECURITY_POLICY_HEADER, CONTENT_SECURITY_POLICY);
 
   // Cloudflare Pages also serves *.pages.dev and preview hosts; keep them out of search indexes.
   if (isNonProductionHost(context.url.host, context.site)) {

@@ -68,6 +68,14 @@ Call the ward office to request a tree trimming.', 'Leaf pickup starts in Octobe
     (29, 6, '2026-09-22', 'Fiftieth Ward tax assessment help', 'Volunteers can help you appeal your property tax assessment on Tuesday.', 'Volunteers help with property tax assessment appeals on Tuesday.', ARRAY['tax_policy'], true)
 ) AS seed (number, source_id, received_on, subject, body, summary, topics, has_html);
 
+-- Newsletter 27 was stored before ingestion sanitized markup: its HTML carries a
+-- script and an event handler, which the Content-Security-Policy must block.
+UPDATE public.newsletters
+SET raw_html = raw_html
+    || '<script>document.documentElement.dataset.unsafeMarkupRan = ''script''</script>'
+    || '<img src="data:," alt="" onerror="document.documentElement.dataset.unsafeMarkupRan = ''handler''">'
+WHERE id = '00000000-0000-4000-8000-000000000027';
+
 -- Newsletter 30: the newest, with a body that uses the markup the detail page renders.
 INSERT INTO public.newsletters (id, received_date, subject, from_email, source_id, plain_text, raw_html, summary, topics) VALUES (
     '00000000-0000-4000-8000-000000000030',

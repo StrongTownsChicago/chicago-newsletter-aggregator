@@ -38,6 +38,9 @@ export const LONG_SUBJECT_NEWSLETTER = {
     'Fiftieth Ward weekly bulletin with every neighborhood event, street closure, park program, library story time, farmers market date, recycling reminder and volunteer opportunity happening across the ward over the next several weeks',
 };
 
+/** Stored before ingestion sanitized markup: its HTML has a script and an onerror handler that set `data-unsafe-markup-ran` on <html>. */
+export const UNSAFE_MARKUP_NEWSLETTER = { id: seededNewsletterId(27), subject: 'Tenth Ward fall festival' };
+
 /** From a source with no ward. */
 export const AGENCY_NEWSLETTER = {
   id: seededNewsletterId(11),

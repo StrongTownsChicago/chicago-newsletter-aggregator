@@ -38,6 +38,9 @@ export default defineConfig({
   // slash-free URL that canonicals and the sitemap use, but redirects the
   // latter to a trailing-slash URL.
   build: { format: "file" },
+  // The dev toolbar configures itself with an inline script, which the
+  // Content-Security-Policy (src/lib/content-security-policy.ts) blocks.
+  devToolbar: { enabled: false },
   // The adapter excludes `/reports/*` from the worker but not the prerendered
   // index at `/reports` itself, so serve it as a static file too.
   adapter: cloudflare({ routes: { extend: { exclude: [{ pattern: "/reports" }] } } }),
@@ -54,6 +57,11 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    // Never inline scripts: the Content-Security-Policy (src/lib/content-security-policy.ts)
+    // allows only script files. Other assets keep Vite's default limit.
+    build: {
+      assetsInlineLimit: (/** @type {string} */ filePath) => (filePath.endsWith(".js") ? false : undefined),
+    },
     define: {
       "import.meta.env.BUILD_ID": JSON.stringify(BUILD_ID),
     },
