@@ -15,6 +15,16 @@ Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Ch
 
 ## Common Commands
 
+### All gates (from the repo root)
+
+```bash
+# Run CI's gates locally, in CI's order; stops at the first failure
+bash scripts/check.sh [backend|frontend]
+
+# Enable the pre-commit hook (once per clone): ruff, mypy, docstring budget and ESLint on staged files
+git config core.hooksPath .githooks
+```
+
 ### Backend (from `backend/` directory)
 
 ```bash
@@ -87,10 +97,17 @@ uv run python -m tools.time_test_suite
 # Mutation testing (dev-only, not in CI; minutes per module; targets in the tool)
 uv run --group mutation python -m tools.run_mutation_tests [rule_matcher ...]
 
+# Tests with coverage (floor in pyproject.toml)
+uv run coverage run -m unittest discover -s tests -p "test_*.py" && uv run coverage report
+
 # Code quality checks (run before committing Python changes)
 uv run ruff check --fix
 uv run ruff format
 uv run mypy .
+PYTHONUTF8=1 uv run lint-imports                              # Import contracts (.importlinter)
+uv run python -m tools.lint.check_docstrings [--report]       # Docstring budget; --report lists every site
+uv run python -m tools.lint.check_module_size [--report]      # Module size ratchet; --update re-records the baseline
+uv run python -m tools.lint.check_symbol_reachability [--report]  # Unreachable symbols
 ```
 
 ### Frontend (from `frontend/` directory)
@@ -117,8 +134,11 @@ npm run test:e2e -- --project=chromium
 # /analytics E2E on fixture data (own dev server on port 4358, placeholder Supabase env)
 npm run test:e2e:analytics
 
-# Run tests with coverage
+# Run tests with coverage (floors in vitest.config.ts)
 npm run test:coverage
+
+# Type check (astro check; expects 0 errors)
+npm run typecheck
 
 # Run tests in watch mode
 npm run test:watch
@@ -145,10 +165,11 @@ ollama pull gpt-oss:20b
 
 **GitHub Actions Workflows:**
 
-- Backend CI (`.github/workflows/backend_tests.yml`) - Runs ruff, mypy, and tests on backend changes
-- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs linting and unit tests on frontend changes
+- Backend CI (`.github/workflows/backend_tests.yml`) - Runs the backend gates of `scripts/check.sh` on backend changes
+- Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, analytics E2E) on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
+- Dependency audit (`.github/workflows/dependency_audit.yml`) - `pip-audit` and `npm audit --omit=dev --audit-level=high`, weekly and when a lockfile changes; kept out of PR checks
 
 All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
