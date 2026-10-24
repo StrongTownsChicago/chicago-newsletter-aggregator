@@ -41,6 +41,14 @@ APP_TABLES = (
 )
 
 TEST_PASSWORD = "local-test-password"
+TEST_UNSUBSCRIBE_SECRET = "local-test-unsubscribe-secret-at-least-32-bytes"
+
+#: Calls that reach a service other than the database.
+UNFAKED_SERVICES = (
+    "resend.Emails.send",
+    "processing.llm_processor.call_llm",
+    "processing.weekly_report_generator.call_llm",
+)
 
 
 @dataclass(frozen=True)
@@ -114,10 +122,19 @@ class LocalSupabaseTestCase(unittest.TestCase):
         cls._start_class_patch(
             patch.dict(
                 os.environ,
-                {"SUPABASE_URL": stack.url, "SUPABASE_SERVICE_KEY": stack.service_key},
+                {
+                    "SUPABASE_URL": stack.url,
+                    "SUPABASE_SERVICE_KEY": stack.service_key,
+                    "UNSUBSCRIBE_SECRET_KEY": TEST_UNSUBSCRIBE_SECRET,
+                },
             )
         )
         cls._start_class_patch(patch("shared.db.create_client", create_local_client))
+        # Outside services fail loudly unless a test fakes them (tests/db_integration/fakes.py).
+        for target in UNFAKED_SERVICES:
+            cls._start_class_patch(
+                patch(target, side_effect=AssertionError(f"{target} is not faked"))
+            )
         cls.reset()
         cls.db = create_local_client(stack.url, stack.service_key)
 

@@ -97,8 +97,12 @@ def insert_source(client: Any, **fields: Any) -> dict[str, Any]:
 
 
 def insert_newsletter(client: Any, source_id: int, **fields: Any) -> dict[str, Any]:
-    """Insert a newsletter for `source_id`; `fields` as for create_test_newsletter."""
+    """Insert a newsletter for `source_id`; `fields` as for create_test_newsletter.
+
+    A field given as None stays None (create_test_newsletter fills some in).
+    """
     row = create_test_newsletter(source_id=source_id, **fields)
+    row.update({name: value for name, value in fields.items() if value is None})
     del row["created_at"]  # the column default
     return insert_row(client, "newsletters", row)
 
