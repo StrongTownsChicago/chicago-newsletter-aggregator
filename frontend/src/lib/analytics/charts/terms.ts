@@ -15,6 +15,7 @@ import {
   renderKey,
   TOP_AXIS_MARGIN,
   wrap,
+  renderPlot,
 } from "./common";
 
 /** Right margin of the rising terms chart when a "seasonal" tag may sit past the last dot. */
@@ -51,7 +52,7 @@ function monthlyShareMarks<T extends { month: string; share: number | null }>(
 export function renderTermTimeline(points: TermMonthPoint[], width: number): Element {
   const marginLeft = 48;
   const marginRight = 20;
-  return Plot.plot({
+  return renderPlot({
     ...baseOptions(width),
     height: 260 + AXIS_BAND,
     marginLeft,
@@ -73,7 +74,7 @@ export function renderTermWards(
   searchScope: SearchLinkParams,
   width: number,
 ): Element {
-  return Plot.plot({
+  return renderPlot({
     ...baseOptions(width),
     height: rows.length * BAR_ROW_HEIGHT + AXIS_BAND,
     marginLeft: 70,
@@ -87,6 +88,7 @@ export function renderTermWards(
         fill: CHART_COLORS.series,
         rx: 4,
         href: (row: TermWardRow) => buildSearchUrl({ ...searchScope, q: term, ward: row.ward }),
+        ariaLabel: (row: TermWardRow) => `Search "${term}" in ${formatWard(row.ward)}: ${row.mentions} newsletters`,
         title: (row: TermWardRow) =>
           `${formatWard(row.ward)}: ${row.mentions} of ${row.newsletters} newsletters (${formatPercent(row.share)})\nClick to search`,
         tip: true,
@@ -118,7 +120,7 @@ export function renderRisingTerms(
 ): Element {
   const marginLeft = longestLabelMargin(terms.map((item) => item.term));
   const seasonalTerms = terms.filter((item) => item.seasonal === true);
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(width),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
@@ -151,6 +153,7 @@ export function renderRisingTerms(
         stroke: CHART_COLORS.surface,
         strokeWidth: 2,
         href: (item: RisingTerm) => buildSearchUrl({ q: item.term }),
+        ariaLabel: (item: RisingTerm) => `Search "${item.term}": ${item.latest_wards} of ${activeWards} wards in ${latestLabel}`,
         title: (item: RisingTerm) =>
           `"${item.term}"\n${latestLabel}: ${item.latest_wards} of ${activeWards} wards (${item.latest_newsletters} newsletters)\n` +
           `${baselineLabel}: ${item.baseline_wards} wards (median; ${item.baseline_month_wards.join(", ")} by month)` +

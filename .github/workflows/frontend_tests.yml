@@ -64,7 +64,7 @@ jobs:
           cd frontend
           npx playwright install --with-deps chromium
 
-      - name: Run analytics E2E tests
+      - name: Run database-free E2E tests (analytics, accessibility)
         run: |
           cd frontend
           npm run test:e2e:analytics

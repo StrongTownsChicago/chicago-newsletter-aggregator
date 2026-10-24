@@ -17,6 +17,7 @@ import {
   renderKey,
   TOP_AXIS_MARGIN,
   wrap,
+  renderPlot,
 } from "./common";
 
 const CADENCE_HEIGHT = 160;
@@ -38,7 +39,7 @@ export function renderWardCadence(cells: CoverageCell[], months: string[], width
   const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
   const maxCount = Math.max(1, ...cells.map((cell) => cell.newsletters));
   const label = (cell: CoverageCell) => `${formatWard(cell.ward)} · ${formatMonth(cell.month)}`;
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(plotWidth),
     height: CADENCE_HEIGHT + AXIS_BAND,
     marginLeft,
@@ -115,7 +116,7 @@ export function renderWardTopicComparison(
   const describe = (topic: WardTopicSummary) =>
     `${labelOf.get(topic.lens) ?? topic.lens}\n${formatWard(ward)}: ${topic.monthsMentioning} of ${topic.monthsChecked} months ` +
     `(${formatPercent(topic.wardShare ?? 0)})\nAll active wards, same months: ${formatPercent(topic.cityShare ?? 0)} on average`;
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(width),
     height: rows.length * BAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
@@ -175,7 +176,7 @@ export function renderDistinctiveTerms(
     `${item.ward_newsletters} of ${wardNewsletters} · ${formatPercent(item.rest_share)} elsewhere` +
     (item.related_terms ? ` · +${item.related_terms} related` : "");
   const marginRight = terms.some((item) => item.related_terms) ? DISTINCTIVE_RELATED_MARGIN : DISTINCTIVE_RIGHT_MARGIN;
-  return Plot.plot({
+  return renderPlot({
     ...baseOptions(Math.max(width, DISTINCTIVE_LEFT_MARGIN + marginRight + MIN_DISTINCTIVE_BAR_SPAN)),
     height: terms.length * BAR_ROW_HEIGHT + AXIS_BAND,
     marginLeft: DISTINCTIVE_LEFT_MARGIN,
@@ -189,6 +190,7 @@ export function renderDistinctiveTerms(
         fill: CHART_COLORS.series,
         rx: 4,
         href: (item: DistinctiveTerm) => buildSearchUrl({ q: item.term, ward }),
+        ariaLabel: (item: DistinctiveTerm) => `Search "${item.term}" in ${formatWard(ward)}`,
         title: (item: DistinctiveTerm) =>
           `"${item.term}" in ${item.ward_newsletters} of ${wardNewsletters} ${formatWard(ward)} newsletters (${formatPercent(item.ward_share)})\n` +
           `Rest of city: ${formatPercent(item.rest_share)} · ${formatLift(item.lift)} as likely here` +

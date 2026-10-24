@@ -18,6 +18,7 @@ import {
   TOP_AXIS_MARGIN,
   withColorLegend,
   wrap,
+  renderPlot,
 } from "./common";
 
 /** Ward × month grids (coverage, topic detail), compact: reference, not a headline. */
@@ -55,7 +56,7 @@ function renderMentionGrid<T extends Pick<LensWardCell, "month" | "status" | "me
   const marginRight = 10;
   const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + options.marginLeft + marginRight);
   const statuses = Object.keys(LENS_WARD_COLORS) as LensWardCell["status"][];
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(plotWidth, options.fontSize),
     height: options.rows.length * (options.rowHeight ?? ROW_HEIGHT) + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
@@ -141,7 +142,7 @@ export function renderWardTopicGrid(
   const selectedRow = selectedLens ? months.map((month) => ({ month, lens: selectedLens })) : [];
   const heading = (cell: WardTopicMonthCell) =>
     `${labelOf.get(cell.lens) ?? cell.lens} · ${formatWard(ward)} · ${formatMonth(cell.month)}`;
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(plotWidth),
     height: lenses.length * ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
@@ -207,7 +208,7 @@ export function renderCoverageGrid(
   const marginRight = 10;
   const cellsByStatus = (status: CoverageCell["status"]) => cells.filter((cell) => cell.status === status);
   const plotWidth = Math.max(width, months.length * MIN_COVERAGE_CELL_WIDTH + marginLeft + marginRight);
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(plotWidth, COVERAGE_FONT_SIZE),
     height: wards.length * COVERAGE_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,
@@ -251,6 +252,8 @@ export function renderCoverageGrid(
         fill: "newsletters",
         rx: 2,
         href: (cell: CoverageCell) => buildSearchUrl({ ...searchScope, ...monthDateRange(cell.month), ward: cell.ward }),
+        ariaLabel: (cell: CoverageCell) =>
+          `Search ${formatWard(cell.ward)}, ${formatMonth(cell.month)}: ${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"}`,
         title: (cell: CoverageCell) =>
           `${formatWard(cell.ward)} · ${formatMonth(cell.month)}\n${cell.newsletters} newsletter${cell.newsletters === 1 ? "" : "s"}\nClick to search`,
         tip: true,

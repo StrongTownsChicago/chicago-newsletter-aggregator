@@ -114,7 +114,8 @@ npm run test
 # Run E2E tests (Playwright)
 npm run test:e2e -- --project=chromium
 
-# /analytics E2E on fixture data (own dev server on port 4358, placeholder Supabase env)
+# E2E without the database: /analytics on fixture data and axe WCAG A/AA scans (e2e/a11y.spec.ts)
+# Own dev server on port 4358, placeholder Supabase env; Frontend CI runs it
 npm run test:e2e:analytics
 
 # Run tests with coverage
@@ -329,7 +330,7 @@ UNSUBSCRIBE_SECRET_KEY=         # Must match backend key
 
 **Backend**: Tests in `backend/tests/` organized into `unit/` and `integration/` subdirectories. Run all tests with `uv run python -m unittest discover -s tests` or target specific modules (see Common Commands section). Property-based tests (`test_*_properties.py`) use Hypothesis with the shared settings in `tests/fixtures/property_settings.py`.
 
-**Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section).
+**Frontend**: Tests in `frontend/src/tests/` using Vitest. Run with `npm run test` (see Common Commands section). Accessibility: `e2e/a11y.spec.ts` runs axe on each page that renders without the database, at desktop and phone widths; add new pages to its `SCANNED_PAGES`.
 
 ## Deployment
 
