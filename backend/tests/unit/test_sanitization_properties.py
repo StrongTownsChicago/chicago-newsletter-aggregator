@@ -98,10 +98,20 @@ def container(css_class: str, children: list[str]) -> str:
     return f'<div {attribute}="{css_class.lstrip(".#")}">{"".join(children)}</div>'
 
 
+# Pieces of a strip phrase, so a phrase can end up split around a link.
+INLINE_TEXT = st.one_of(ESCAPED_TEXT, st.sampled_from(["Jane", "Jane ", " Roe", "Roe"]))
+
+
 def html_documents(leaves: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
-    """Nested divs and paragraphs around the given leaf fragments."""
+    """Nested divs and paragraphs around the given leaf fragments.
+
+    Paragraphs mix loose text with leaves, as newsletters put links mid-sentence.
+    """
+    paragraphs = st.lists(st.one_of(leaves, INLINE_TEXT), min_size=1, max_size=6).map(
+        lambda parts: f"<p>{''.join(parts)}</p>"
+    )
     fragments = st.recursive(
-        st.one_of(leaves, ESCAPED_TEXT.map(lambda text: f"<p>{text}</p>")),
+        st.one_of(leaves, paragraphs),
         lambda children: st.builds(
             container,
             st.sampled_from(BENIGN_CLASSES + SELECTORS),
@@ -163,6 +173,8 @@ class TestPrivacyFixtureSamples(unittest.TestCase):
                 self.assertFalse(matches_any(URL_PATTERNS, url))
 
 
+# Tests that expect no redaction must not inherit phrases from a developer's .env.
+@patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ""})
 class TestHtmlSanitizationProperties(unittest.TestCase):
     @PROPERTY_SETTINGS
     @given(html_documents(LINKS))
@@ -201,7 +213,30 @@ class TestHtmlSanitizationProperties(unittest.TestCase):
 
         self.assertEqual(twice, once)
 
+    @PROPERTY_SETTINGS
+    @given(
+        html_documents(LINKS),
+        st.lists(st.sampled_from(STRIP_PHRASE_NAMES), min_size=1),
+    )
+    def test_strip_phrases_never_survive_in_a_text_or_attribute(
+        self, document: str, phrases: list[str]
+    ) -> None:
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ",".join(phrases)}):
+            sanitized = sanitize_content(document, "html", PRIVACY_PATTERNS_DICT)
 
+        soup = BeautifulSoup(sanitized, "html.parser")
+        values = [str(text) for text in soup.find_all(string=True)] + [
+            value if isinstance(value, str) else " ".join(value)
+            for tag in soup.find_all(True)
+            for value in tag.attrs.values()
+        ]
+        for value in values:
+            for span in value.lower().split("[redacted]"):
+                for phrase in phrases:
+                    self.assertNotIn(phrase.lower(), span)
+
+
+@patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ""})
 class TestTextSanitizationProperties(unittest.TestCase):
     @PROPERTY_SETTINGS
     @given(TEXT_DOCUMENTS)

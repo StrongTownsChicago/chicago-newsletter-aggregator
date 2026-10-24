@@ -3,7 +3,6 @@ import re
 from typing import Any, cast
 
 from bs4 import BeautifulSoup
-from bs4.element import AttributeValueList
 from html2text import html2text
 
 REDACTION_MARKER = "[REDACTED]"
@@ -129,7 +128,14 @@ def build_redaction_pattern(phrases: list[str]) -> re.Pattern[str] | None:
 
 
 def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
-    """Redact text nodes and attribute values in place; tag and attribute names stay intact."""
+    """Redact text nodes and attribute values in place; tag and attribute names stay intact.
+
+    Only changed values are reassigned, so a phrase list that matches nothing
+    leaves the output as it was without one.
+    """
+    # Unwrapping and removing links leaves adjacent text in separate nodes;
+    # joining them catches a phrase that spanned the removed tag ("Jane <a>Doe</a>").
+    soup.smooth()
     for string in soup.find_all(string=True):
         redacted = pattern.sub(REDACTION_MARKER, string)
         if redacted != string:
@@ -137,12 +143,12 @@ def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
             string.replace_with(type(string)(redacted))
     for tag in soup.find_all(True):
         for name, value in list(tag.attrs.items()):
-            if isinstance(value, str):
-                tag[name] = pattern.sub(REDACTION_MARKER, value)
-            else:
-                tag[name] = AttributeValueList(
-                    pattern.sub(REDACTION_MARKER, item) for item in value
-                )
+            # Multi-valued attributes (class, rel) are redacted as written, so a
+            # phrase spanning two tokens ("Jane Doe") still matches.
+            original = value if isinstance(value, str) else " ".join(value)
+            redacted = pattern.sub(REDACTION_MARKER, original)
+            if redacted != original:
+                tag[name] = redacted
 
 
 SQL_ANY_CHARACTERS_WILDCARD = "%"

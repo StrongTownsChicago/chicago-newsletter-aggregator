@@ -101,8 +101,25 @@ def run_cosmic_ray(*arguments: str) -> int:
     ).returncode
 
 
-def run_target(name: str, target: MutationTarget) -> bool:
-    """Mutate one module and report its survivors. False if its tests fail unmutated."""
+def has_uncommitted_changes(module_path: str) -> bool:
+    return (
+        subprocess.run(
+            ["git", "diff", "--quiet", "HEAD", "--", module_path],
+            cwd=BACKEND_ROOT,
+            check=False,
+        ).returncode
+        != 0
+    )
+
+
+def run_target(name: str, target: MutationTarget) -> str | None:
+    """Mutate one module and report its survivors; return why it failed, if it did."""
+    # cosmic-ray edits the module in place, so an interrupted run leaves a
+    # mutant on disk. Starting from committed source makes that detectable
+    # and undoable with git.
+    if has_uncommitted_changes(target.module_path):
+        return f"{target.module_path} has uncommitted changes; commit them first"
+
     config_path = SESSION_DIRECTORY / f"{name}.toml"
     session_path = SESSION_DIRECTORY / f"{name}.sqlite"
     config_path.write_text(build_config(target), encoding="utf-8")
@@ -111,10 +128,15 @@ def run_target(name: str, target: MutationTarget) -> bool:
     print(f"\n=== {name}: {target.module_path}", flush=True)
     # Without a passing baseline every mutant counts as killed, so the score would be meaningless.
     if run_cosmic_ray("baseline", str(config_path)) != 0:
-        print(f"Baseline failed: the {name} tests fail without any mutation.")
-        return False
-    run_cosmic_ray("init", str(config_path), str(session_path))
-    run_cosmic_ray("exec", str(config_path), str(session_path))
+        return "its tests fail without any mutation"
+    if run_cosmic_ray("init", str(config_path), str(session_path)) != 0:
+        return "cosmic-ray init failed"
+    exec_status = run_cosmic_ray("exec", str(config_path), str(session_path))
+    if has_uncommitted_changes(target.module_path):
+        return f"a mutant was left on disk: git checkout -- {target.module_path}"
+    # A failed exec leaves mutants untested, and the report would list no survivors.
+    if exec_status != 0:
+        return "cosmic-ray exec failed"
     subprocess.run(
         [
             sys.executable,
@@ -129,7 +151,7 @@ def run_target(name: str, target: MutationTarget) -> bool:
         # Diffs carry the modules' emoji, which a Windows console codepage can't encode.
         env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
-    return True
+    return None
 
 
 def main() -> None:
@@ -145,9 +167,13 @@ def main() -> None:
         parser.error(f"unknown target(s): {', '.join(unknown)}")
 
     SESSION_DIRECTORY.mkdir(exist_ok=True)
-    failed = [name for name in selected if not run_target(name, MUTATION_TARGETS[name])]
-    if failed:
-        sys.exit(f"Baseline failed for: {', '.join(failed)}")
+    failures = {
+        name: reason
+        for name in selected
+        if (reason := run_target(name, MUTATION_TARGETS[name])) is not None
+    }
+    if failures:
+        sys.exit("\n".join(f"{name}: {reason}" for name, reason in failures.items()))
 
 
 if __name__ == "__main__":
