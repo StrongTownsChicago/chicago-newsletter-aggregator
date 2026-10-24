@@ -12,6 +12,8 @@ from tests.fixtures.newsletter_factory import insert_newsletter, insert_source
 from tests.fixtures.user_factory import create_auth_user, insert_rule
 
 INVALID_PARAMETER_VALUE = "22023"
+#: SEARCH_TIMELINE_MAX_QUERY_LENGTH in frontend/src/lib/search-timeline.ts.
+MAX_TIMELINE_QUERY = 200
 
 
 class TestRuleFunctions(LocalSupabaseTestCase):
@@ -136,3 +138,10 @@ class TestFullTextSearch(LocalSupabaseTestCase):
 
     def test_timeline_rejects_an_empty_query(self) -> None:
         self.assert_api_error(INVALID_PARAMETER_VALUE, lambda: self.timeline("  "))
+
+    def test_timeline_takes_up_to_200_characters_after_trimming(self) -> None:
+        self.assertEqual(self.timeline(f"  {'z' * MAX_TIMELINE_QUERY}  "), [])
+        self.assert_api_error(
+            INVALID_PARAMETER_VALUE,
+            lambda: self.timeline("z" * (MAX_TIMELINE_QUERY + 1)),
+        )

@@ -4,11 +4,15 @@
 so these policies are the site's only security boundary.
 """
 
+import json
 from functools import partial
 from typing import Any, ClassVar
 
+import psycopg
+from postgrest.types import ReturnMethod
 from supabase import Client
 
+from tests.db_integration.local_guard import abort_unless_local_postgres
 from tests.db_integration.local_supabase import (
     TEST_PASSWORD,
     LocalSupabaseTestCase,
@@ -135,6 +139,16 @@ class RowLevelSecurityTestCase(LocalSupabaseTestCase):
             client.table(table).insert(self.new_row(table, owner)).execute()
         )
 
+    def forge(self, client: Client, table: str, owner: str = "alice") -> None:
+        """Insert ``new_row(table, owner)`` through ``client`` without reading it back.
+
+        With nothing returned, no SELECT policy is involved: only the table's
+        INSERT policy can refuse the row.
+        """
+        client.table(table).insert(
+            self.new_row(table, owner), returning=ReturnMethod.minimal
+        ).execute()
+
     def assert_writes_change_nothing(self, client: Client, table: str) -> None:
         """Updates and deletes through ``client`` leave ``table`` as it was."""
         before = self.rows(table)
@@ -166,7 +180,7 @@ class TestAnonKey(RowLevelSecurityTestCase):
         for table in ALL_TABLES:
             with self.subTest(table=table):
                 self.assert_api_error(
-                    RLS_VIOLATION, partial(self.insert, self.anon, table)
+                    RLS_VIOLATION, partial(self.forge, self.anon, table)
                 )
 
     def test_cannot_update_or_delete_anything(self) -> None:
@@ -233,7 +247,7 @@ class TestUserJwt(RowLevelSecurityTestCase):
 
         self.assert_api_error(
             RLS_VIOLATION,
-            partial(self.insert, self.alice, "notification_rules", owner="bob"),
+            partial(self.forge, self.alice, "notification_rules", owner="bob"),
         )
         self.alice.table("notification_rules").delete().eq(
             "id", self.rules["bob"]["id"]
@@ -251,7 +265,7 @@ class TestUserJwt(RowLevelSecurityTestCase):
         ):
             with self.subTest(table=table):
                 self.assert_api_error(
-                    RLS_VIOLATION, partial(self.insert, self.alice, table)
+                    RLS_VIOLATION, partial(self.forge, self.alice, table)
                 )
                 self.assert_writes_change_nothing(self.alice, table)
 
@@ -283,3 +297,32 @@ class TestServiceKey(RowLevelSecurityTestCase):
         ).execute()
         (bob,) = self.rows("user_profiles", id=self.users["bob"])
         self.assertEqual(bob["email"], "renamed@example.test")
+
+
+class TestWritePoliciesAlone(RowLevelSecurityTestCase):
+    """Each UPDATE and DELETE policy refuses other users' rows by itself.
+
+    Through the API a filter makes the SELECT policy hide those rows first, so
+    these statements run in SQL as alice, unfiltered, and are rolled back.
+    """
+
+    def rows_alice_changes(self, statement: str) -> int:
+        abort_unless_local_postgres(self.stack.db_url)
+        claims = json.dumps({"sub": self.users["alice"], "role": "authenticated"})
+        with psycopg.connect(self.stack.db_url) as connection:
+            connection.execute("SET LOCAL ROLE authenticated")
+            connection.execute(
+                "SELECT set_config('request.jwt.claims', %s, true)", (claims,)
+            )
+            changed = connection.execute(statement.encode()).rowcount
+            connection.rollback()
+        return changed
+
+    def test_alice_changes_only_her_own_rows(self) -> None:
+        for statement in (
+            "UPDATE notification_rules SET name = 'Renamed'",
+            "DELETE FROM notification_rules",
+            "UPDATE user_profiles SET email = 'renamed@example.test'",
+        ):
+            with self.subTest(statement=statement):
+                self.assertEqual(self.rows_alice_changes(statement), 1)

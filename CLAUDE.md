@@ -102,6 +102,9 @@ uv run python -m tools.time_test_suite
 # Run it in a separate worktree: it edits the module in place while it runs.
 uv run --group mutation python -m tools.run_mutation_tests [rule_matcher ...]
 
+# Schema mutation testing against the database tests (local stack, nothing else using it; about an hour)
+uv run python -m tools.run_schema_mutation_tests [--list] [--match TEXT ...]
+
 # Tests with coverage (floor in pyproject.toml)
 uv run coverage run -m unittest discover -s tests -p "test_*.py" && uv run coverage report
 
