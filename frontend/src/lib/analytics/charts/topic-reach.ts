@@ -12,6 +12,7 @@ import {
   monthAxis,
   TOP_AXIS_MARGIN,
   withColorLegend,
+  renderPlot,
 } from "./common";
 
 /** Civic calendar columns never get narrower than this, so ward counts fit; wider calendars scroll. */
@@ -37,7 +38,7 @@ export function renderReachTrend(
 ): Element {
   const marginLeft = 40;
   const marginRight = 20;
-  return Plot.plot({
+  return renderPlot({
     ...baseOptions(width),
     height: TREND_HEIGHT + AXIS_BAND,
     marginLeft,
@@ -74,7 +75,7 @@ export function renderReachTrend(
 /** A tiny line of monthly ward reach on its own tight scale, ending in a dot. */
 export function renderSparkline(points: TopicTrendPoint[], domain: [number, number], ariaLabel: string): Element {
   const shown = points.filter((point) => point.share !== null);
-  const sparkline = Plot.plot({
+  const sparkline = renderPlot({
     width: SPARKLINE_WIDTH,
     height: SPARKLINE_HEIGHT,
     margin: 4,
@@ -137,7 +138,7 @@ export function renderCivicCalendar(cells: LensReachCell[], options: CivicCalend
         : `\n${formatPointChange(row.deviation)} vs average (${formatPercent(average)})`;
     return `${labelOf.get(row.lens)} · ${formatMonth(row.month)}\n${describeWardReach(row)}${comparison}${row.fade ? `\n${row.fade}` : ""}`;
   };
-  const plot = Plot.plot({
+  const plot = renderPlot({
     ...baseOptions(plotWidth),
     height: lenses.length * CALENDAR_ROW_HEIGHT + AXIS_BAND + TOP_AXIS_MARGIN,
     marginTop: TOP_AXIS_MARGIN,

@@ -49,6 +49,17 @@ export function baseOptions(width: number, fontSize = "12px"): Plot.PlotOptions 
   return { width, style: { fontFamily: FONT, fontSize, color: CHART_COLORS.mutedInk, maxWidth: "none" } };
 }
 
+/**
+ * `Plot.plot`, with each mark layer's label made valid ARIA: Plot names its
+ * layers ("cell", "line", ...) with `aria-label` on `<g>` elements that have
+ * no role, which ARIA prohibits. Code that selects layers by that label still works.
+ */
+export function renderPlot(options: Plot.PlotOptions): ReturnType<typeof Plot.plot> {
+  const plot = Plot.plot(options);
+  plot.querySelectorAll("g[aria-label]:not([role])").forEach((layer) => layer.setAttribute("role", "group"));
+  return plot;
+}
+
 /** Render the color legend outside the plot so its end labels are never clipped. */
 export function withColorLegend(plot: ReturnType<typeof Plot.plot>): HTMLElement {
   const wrapper = document.createElement("div");

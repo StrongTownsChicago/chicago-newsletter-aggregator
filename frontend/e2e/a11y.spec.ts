@@ -29,12 +29,14 @@ const SCANNED_PAGES: ScannedPage[] = [
   {
     name: 'analytics',
     path: '/analytics',
-    prepare: (page) => expect(page.locator('#analytics-dashboard')).toBeVisible(),
+    // Export buttons are enabled last in a dashboard render, so the charts and controls exist.
+    prepare: (page) => expect(page.getByRole('button', { name: 'Download PNG of Civic calendar' })).toBeEnabled(),
   },
   { name: 'reports index', path: '/reports' },
   ...(reportMonth ? [{ name: 'monthly report', path: `/reports/${reportMonth}` }] : []),
   { name: 'login', path: '/login' },
   { name: 'signup', path: '/signup' },
+  { name: 'unsubscribe without a token', path: '/unsubscribe' },
   { name: 'not found', path: '/no-such-page' },
 ];
 
