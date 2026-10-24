@@ -3,7 +3,9 @@ import {
   parseIsoDate,
   startOfChicagoDayUtc,
 } from "./chicago-dates";
-import { ALL_TOPICS } from "./topics";
+import { formatLongDate } from "./archive-months";
+import { humanizeIdentifier } from "./format";
+import { ALL_TOPICS, formatTopicLabel } from "./topics";
 
 /**
  * Search page URL parameters: parsing/validation into a typed filter object,
@@ -53,6 +55,16 @@ export interface SearchFilters {
   /** Inclusive Chicago calendar date, `YYYY-MM-DD`. */
   toDate: string | null;
 }
+
+export const EMPTY_SEARCH_FILTERS: SearchFilters = {
+  query: "",
+  ward: null,
+  sourceId: null,
+  sourceType: null,
+  topic: null,
+  fromDate: null,
+  toDate: null,
+};
 
 export interface SearchState {
   filters: SearchFilters;
@@ -147,6 +159,73 @@ export function buildSearchBaseUrl(
 
   const queryString = params.toString();
   return queryString ? `${SEARCH_PATH}?${queryString}` : SEARCH_PATH;
+}
+
+/** Filters other than the keyword query, which has its own search box. */
+type NarrowingFilterKey = Exclude<keyof SearchFilters, "query">;
+
+export interface ActiveSearchFilter {
+  key: NarrowingFilterKey;
+  label: string;
+  /** Search URL with this one filter removed, back on the first page. */
+  removeUrl: string;
+}
+
+const describeFilter = (
+  key: NarrowingFilterKey,
+  filters: SearchFilters,
+  sourceNames: ReadonlyMap<number, string>,
+): string | null => {
+  switch (key) {
+    case "ward":
+      return filters.ward && `Ward ${filters.ward}`;
+    case "sourceId":
+      return filters.sourceId === null
+        ? null
+        : (sourceNames.get(filters.sourceId) ?? `Source ${filters.sourceId}`);
+    case "sourceType":
+      return filters.sourceType && humanizeIdentifier(filters.sourceType);
+    case "topic":
+      return filters.topic && formatTopicLabel(filters.topic);
+    case "fromDate":
+      return filters.fromDate && `From ${formatLongDate(filters.fromDate)}`;
+    case "toDate":
+      return filters.toDate && `To ${formatLongDate(filters.toDate)}`;
+  }
+};
+
+const NARROWING_FILTER_KEYS: readonly NarrowingFilterKey[] = [
+  "topic",
+  "ward",
+  "sourceId",
+  "sourceType",
+  "fromDate",
+  "toDate",
+];
+
+/**
+ * The filters narrowing the results beyond the keyword query, each with a
+ * label and a link that removes it. `sourceNames` labels a source filter.
+ */
+export function listActiveSearchFilters(
+  filters: SearchFilters,
+  sort: SearchSort,
+  sourceNames: ReadonlyMap<number, string>,
+): ActiveSearchFilter[] {
+  return NARROWING_FILTER_KEYS.flatMap((key) => {
+    const label = describeFilter(key, filters, sourceNames);
+    if (!label) return [];
+    const removeUrl = buildSearchBaseUrl({ ...filters, [key]: null }, sort);
+    return [{ key, label, removeUrl }];
+  });
+}
+
+/** The search URL keeping only the keywords and sort, dropping every filter. */
+export function buildSearchUrlWithoutFilters(
+  filters: SearchFilters,
+  sort: SearchSort,
+): string {
+  return buildSearchBaseUrl({ ...EMPTY_SEARCH_FILTERS, query: filters.query }, sort);
 }
 
 /**
