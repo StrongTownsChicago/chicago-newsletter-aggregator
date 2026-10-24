@@ -91,6 +91,7 @@ class TestFetchNewsletters(unittest.TestCase):
         self.mock_table.eq.return_value = self.mock_table
         self.mock_table.or_.return_value = self.mock_table
         self.mock_table.order.return_value = self.mock_table
+        self.mock_table.range.return_value = self.mock_table
         self.mock_table.execute.return_value.data = []
 
         # Act

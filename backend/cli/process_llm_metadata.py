@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 
 from cli.logging_setup import configure_cli_logging
 from processing.llm_processor import extract_newsletter_metadata
-from shared.db import get_supabase_client
+from shared.db import fetch_all_rows, get_supabase_client
 
 load_dotenv()
 
@@ -40,38 +40,34 @@ LARGE_RUN_THRESHOLD = 100
 
 
 def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str, Any]]:
-    """Fetch newsletters based on filter arguments."""
+    """Fetch newsletters based on filter arguments, newest first."""
 
-    # Join with sources table to get ward_number
-    query = supabase.table("newsletters").select("*, sources(ward_number)")
+    def build_query() -> Any:
+        # Join with sources table to get ward_number
+        query = supabase.table("newsletters").select("*, sources(ward_number)")
 
-    # Apply filters
-    if args.newsletter_id:
-        query = query.eq("id", args.newsletter_id)
+        if args.newsletter_id:
+            query = query.eq("id", args.newsletter_id)
 
-    if args.source_id:
-        query = query.eq("source_id", args.source_id)
+        if args.source_id:
+            query = query.eq("source_id", args.source_id)
 
-    # Filter for missing metadata
-    if args.missing_metadata:
-        # Filter for newsletters where ANY metadata is missing
-        # Using OR logic: topics is null OR summary is null
-        query = query.or_("topics.is.null,summary.is.null")
+        if args.missing_metadata:
+            # Newsletters where ANY metadata is missing
+            query = query.or_("topics.is.null,summary.is.null")
 
-    # Order by date for consistency
-    query = query.order("received_date", desc=True)
+        # id breaks date ties, so pages never overlap
+        return query.order("received_date", desc=True).order("id")
 
-    # Apply limit and skip using range
     if args.latest and not args.all:
         start = args.skip
         end = args.skip + args.latest - 1
-        query = query.range(start, end)
-    elif args.skip > 0:
-        # If only skip is specified (no limit), skip and get everything after
-        query = query.range(args.skip, args.skip + 999999)
+        return cast(
+            list[dict[str, Any]], build_query().range(start, end).execute().data
+        )
 
-    result = query.execute()
-    return cast(list[dict[str, Any]], result.data)
+    # Everything after skip, read in pages past the API's row cap
+    return fetch_all_rows(build_query, start=args.skip)
 
 
 def reprocess_newsletter(

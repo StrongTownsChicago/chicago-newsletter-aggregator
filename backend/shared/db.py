@@ -1,4 +1,6 @@
 import os
+from collections.abc import Callable
+from typing import Any, cast
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -15,3 +17,28 @@ def get_supabase_client() -> Client:
         raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
 
     return create_client(url, key)
+
+
+#: PostgREST's max_rows: one response never holds more rows than this.
+API_ROW_CAP = 1000
+
+
+def fetch_all_rows(
+    build_query: Callable[[], Any], start: int = 0, page_size: int = API_ROW_CAP
+) -> list[dict[str, Any]]:
+    """Every row a query matches from offset `start`, read in pages past the row cap.
+
+    `build_query` returns a fresh query with a total order (end it on a unique
+    column), so pages neither overlap nor skip rows. `page_size` must not
+    exceed the cap, or a capped page would look like the last one.
+    """
+    rows: list[dict[str, Any]] = []
+    while True:
+        offset = start + len(rows)
+        page = cast(
+            list[dict[str, Any]],
+            build_query().range(offset, offset + page_size - 1).execute().data,
+        )
+        rows.extend(page)
+        if len(page) < page_size:
+            return rows

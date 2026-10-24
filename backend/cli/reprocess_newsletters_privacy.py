@@ -28,7 +28,7 @@ from typing import Any, cast
 from cli.logging_setup import configure_cli_logging
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import sanitize_content
-from shared.db import get_supabase_client
+from shared.db import fetch_all_rows, get_supabase_client
 
 
 def fetch_newsletter(supabase: Any, newsletter_id: str) -> dict[str, Any] | None:
@@ -38,13 +38,12 @@ def fetch_newsletter(supabase: Any, newsletter_id: str) -> dict[str, Any] | None
 
 
 def fetch_all_newsletters(supabase: Any) -> list[dict[str, Any]]:
-    """Fetch all newsletters from the database."""
-    result = (
-        supabase.table("newsletters")
+    """Fetch all newsletters from the database, in pages past the API's row cap."""
+    return fetch_all_rows(
+        lambda: supabase.table("newsletters")
         .select("id, subject, source_id, raw_html, plain_text")
-        .execute()
+        .order("id")
     )
-    return cast(list[dict[str, Any]], result.data or [])
 
 
 def show_diff(
