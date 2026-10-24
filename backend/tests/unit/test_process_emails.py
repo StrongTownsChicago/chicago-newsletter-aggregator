@@ -4,7 +4,6 @@ IMAP, Supabase, the parser, the LLM and rule matching are all mocked. The tests
 pin what gets stored, which emails are marked read, and what is counted.
 """
 
-import importlib
 import io
 import os
 import tempfile
@@ -12,24 +11,15 @@ import unittest
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 from imap_tools import MailMessageFlags  # type: ignore[attr-defined]
 
+import cli.process_emails as process_emails
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from tests.fixtures.fake_supabase import ExecutedQuery, FakeSupabase
 from tests.fixtures.mock_helpers import create_mock_mail_message
-
-
-def import_process_emails() -> ModuleType:
-    """Import the CLI without building a real client at import time."""
-    with patch("shared.db.get_supabase_client", return_value=FakeSupabase()):
-        return importlib.import_module("cli.process_emails")
-
-
-process_emails = import_process_emails()
 
 
 def parsed_newsletter(uid: str, source_id: int | None = 7) -> dict[str, Any]:
@@ -68,7 +58,7 @@ class ProcessEmailsTestCase(unittest.TestCase):
         self.save_report = Mock()
         self.print_summary = Mock()
         for target, value in {
-            "supabase": self.db,
+            "get_supabase_client": Mock(return_value=self.db),
             "MailBox": mailbox_factory,
             "GMAIL_ADDRESS": "inbox@example.com",
             "GMAIL_PASSWORD": "app-password",

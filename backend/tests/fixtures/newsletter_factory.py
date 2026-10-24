@@ -78,3 +78,37 @@ def create_test_email_mapping(
     }
     mapping.update(overrides)
     return mapping
+
+
+def insert_row(client: Any, table: str, row: dict[str, Any]) -> dict[str, Any]:
+    """Insert one row with ``client`` and return it as stored."""
+    stored: dict[str, Any] = client.table(table).insert(row).execute().data[0]
+    return stored
+
+
+def insert_source(client: Any, **fields: Any) -> dict[str, Any]:
+    """Insert a source; its id comes from the sequence unless `source_id` is given."""
+    row = create_test_source(**fields)
+    if "source_id" not in fields:
+        del row["id"]
+    if row["ward_number"] is not None:
+        row["ward_number"] = str(row["ward_number"])  # a text column
+    return insert_row(client, "sources", row)
+
+
+def insert_newsletter(client: Any, source_id: int, **fields: Any) -> dict[str, Any]:
+    """Insert a newsletter for `source_id`; `fields` as for create_test_newsletter."""
+    row = create_test_newsletter(source_id=source_id, **fields)
+    del row["created_at"]  # the column default
+    return insert_row(client, "newsletters", row)
+
+
+def insert_email_mapping(
+    client: Any, email_pattern: str, source_id: int
+) -> dict[str, Any]:
+    """Insert an email_source_mappings row."""
+    return insert_row(
+        client,
+        "email_source_mappings",
+        {"email_pattern": email_pattern, "source_id": source_id},
+    )
