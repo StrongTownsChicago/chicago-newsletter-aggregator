@@ -216,9 +216,13 @@ class TestMain(unittest.TestCase):
         self.fetch = Mock(side_effect=lambda *_: self.newsletters)
         self.reprocess = Mock(return_value=True)
         self.get_client = Mock(return_value=self.client)
+        self.fetch_text = Mock(
+            side_effect=lambda _client, newsletter_id: f"{newsletter_id} text"
+        )
         for target, value in {
             "get_supabase_client": self.get_client,
             "fetch_newsletters": self.fetch,
+            "fetch_plain_text": self.fetch_text,
             "reprocess_newsletter": self.reprocess,
         }.items():
             patcher = patch.object(process_llm_metadata, target, value)
@@ -275,8 +279,20 @@ class TestMain(unittest.TestCase):
         self.assertEqual(
             self.reprocess.call_args_list,
             [
-                call(self.client, {"id": "a"}, "openai:gpt-5", False, True),
-                call(self.client, {"id": "b"}, "openai:gpt-5", False, True),
+                call(
+                    self.client,
+                    {"id": "a", "plain_text": "a text"},
+                    "openai:gpt-5",
+                    False,
+                    True,
+                ),
+                call(
+                    self.client,
+                    {"id": "b", "plain_text": "b text"},
+                    "openai:gpt-5",
+                    False,
+                    True,
+                ),
             ],
         )
 
@@ -316,6 +332,7 @@ class TestMain(unittest.TestCase):
         prompt.assert_called_once()
         self.assertIn("Cancelled", output)
         self.reprocess.assert_not_called()
+        self.fetch_text.assert_not_called()
 
     @patch("builtins.input", return_value="Y")
     def test_large_run_continues_when_confirmed(self, _prompt: MagicMock) -> None:
@@ -332,6 +349,39 @@ class TestMain(unittest.TestCase):
         self.run_main("--all", "--dry-run")
 
         prompt.assert_not_called()
+        self.fetch_text.assert_not_called()
+
+    def test_each_newsletter_gets_its_text_as_it_is_processed(self) -> None:
+        self.run_main("--latest", "2")
+
+        processed = [entry.args[1] for entry in self.reprocess.call_args_list]
+        self.assertEqual(
+            processed,
+            [{"id": "a", "plain_text": "a text"}, {"id": "b", "plain_text": "b text"}],
+        )
+
+    def test_latest_must_be_positive(self) -> None:
+        for latest in ("0", "-3"):
+            with self.subTest(latest=latest), self.assertRaises(SystemExit):
+                self.run_main("--latest", latest, "--source-id", "5")
+        self.fetch.assert_not_called()
+
+
+class TestFetchPlainText(unittest.TestCase):
+    def test_reads_one_newsletters_text(self) -> None:
+        client = MagicMock()
+        query = client.table.return_value.select.return_value.eq.return_value
+        query.execute.return_value.data = [{"plain_text": "body"}]
+
+        self.assertEqual(process_llm_metadata.fetch_plain_text(client, "a"), "body")
+        client.table.return_value.select.assert_called_once_with("plain_text")
+
+    def test_a_deleted_newsletter_has_no_text(self) -> None:
+        client = MagicMock()
+        query = client.table.return_value.select.return_value.eq.return_value
+        query.execute.return_value.data = []
+
+        self.assertIsNone(process_llm_metadata.fetch_plain_text(client, "a"))
 
 
 if __name__ == "__main__":

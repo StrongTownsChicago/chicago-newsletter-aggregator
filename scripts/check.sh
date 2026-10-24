@@ -3,10 +3,11 @@
 #
 #   bash scripts/check.sh            # backend, then frontend
 #   bash scripts/check.sh backend    # .github/workflows/backend_tests.yml
-#
-# The backend's database gates need a local Supabase stack (CLAUDE.md, Local
-# Supabase); SUPABASE_WORKDIR names one started with another --workdir.
 #   bash scripts/check.sh frontend   # .github/workflows/frontend_tests.yml
+#
+# The database gates and the E2E run need a local Supabase stack (CLAUDE.md,
+# Local Supabase); SUPABASE_WORKDIR names one started with another --workdir
+# for the backend's database gates.
 #
 # Keep the steps in step with those workflows (tests/unit/test_check_script.py
 # checks that both run every tools.lint gate).

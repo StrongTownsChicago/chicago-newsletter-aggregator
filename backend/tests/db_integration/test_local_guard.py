@@ -85,6 +85,26 @@ class TestEnsureLocalPostgresUrl(unittest.TestCase):
                 ensure_local_postgres_url(url)
 
 
+class TestPostgresEnvironmentDefaults(unittest.TestCase):
+    local = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+    def test_rejects_libpq_environment_that_redirects_the_connection(self) -> None:
+        for environ in (
+            {"PGHOSTADDR": "203.0.113.7"},
+            {"PGSERVICE": "production"},
+            {"PGSERVICEFILE": "/tmp/pg_service.conf"},
+        ):
+            with (
+                self.subTest(environ=environ),
+                self.assertRaises(NotLocalDatabaseError),
+            ):
+                ensure_local_postgres_url(self.local, environ)
+
+    def test_accepts_a_loopback_hostaddr_and_unrelated_variables(self) -> None:
+        ensure_local_postgres_url(self.local, {"PGHOSTADDR": "127.0.0.1"})
+        ensure_local_postgres_url(self.local, {"PGHOST": "db.x.supabase.co"})
+
+
 class TestEnsureLocalKey(unittest.TestCase):
     def test_accepts_the_local_demo_key(self) -> None:
         ensure_local_key(LOCAL_SERVICE_KEY)

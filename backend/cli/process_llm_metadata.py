@@ -22,13 +22,13 @@ Usage:
     # Dry run (preview what would be processed)
     uv run python -m cli.process_llm_metadata --latest 10 --dry-run
 
-Without --latest, every matching newsletter's text is read from the database,
-which for --all or --missing-metadata can be the whole table.
+Matching newsletters are listed without their text, which is read one at a
+time as each is processed, so a dry run or a declined confirmation reads none.
 """
 
 import argparse
 import os
-from typing import Any
+from typing import Any, cast
 
 from dotenv import load_dotenv
 
@@ -43,12 +43,12 @@ LARGE_RUN_THRESHOLD = 100
 
 
 def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str, Any]]:
-    """Fetch newsletters based on filter arguments, newest first."""
+    """List the newsletters the filter arguments select, newest first, without their text."""
 
     def build_query() -> Any:
-        # Only what processing and rule matching read; ward_number from the source
+        # ward_number from the source, for rule matching; plain_text comes later
         query = supabase.table("newsletters").select(
-            "id, subject, source_id, received_date, plain_text, sources(ward_number)"
+            "id, subject, source_id, received_date, sources(ward_number)"
         )
 
         if args.newsletter_id:
@@ -65,8 +65,20 @@ def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str,
         return query.order("received_date", desc=True).order("id")
 
     # After skip, the latest N (or everything), in pages past the API's row cap
-    limit = args.latest if args.latest and not args.all else None
+    limit = args.latest if args.latest is not None and not args.all else None
     return fetch_all_rows(build_query, start=args.skip, limit=limit)
+
+
+def fetch_plain_text(supabase: Any, newsletter_id: str) -> str | None:
+    """One newsletter's plain_text, read just before it is processed."""
+    rows = (
+        supabase.table("newsletters")
+        .select("plain_text")
+        .eq("id", newsletter_id)
+        .execute()
+        .data
+    )
+    return cast(str | None, rows[0]["plain_text"]) if rows else None
 
 
 def reprocess_newsletter(
@@ -239,6 +251,9 @@ def parse_args() -> argparse.Namespace:
             "Must specify at least one filter: --latest, --source-id, --newsletter-id, --all, or --missing-metadata"
         )
 
+    if args.latest is not None and args.latest < 1:
+        parser.error("--latest must be at least 1")
+
     if args.all and args.latest:
         parser.error("Cannot use --all with --latest (--all processes everything)")
 
@@ -265,8 +280,13 @@ def reprocess_newsletters(
     success_count = 0
     fail_count = 0
 
-    for newsletter in newsletters:
+    for listed in newsletters:
         try:
+            newsletter = (
+                listed
+                if args.dry_run
+                else {**listed, "plain_text": fetch_plain_text(supabase, listed["id"])}
+            )
             success = reprocess_newsletter(
                 supabase,
                 newsletter,

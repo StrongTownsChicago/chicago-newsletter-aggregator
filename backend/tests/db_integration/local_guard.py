@@ -11,7 +11,7 @@ import binascii
 import json
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from urllib.parse import urlsplit
 
 import psycopg
@@ -44,18 +44,31 @@ def ensure_local_url(url: str) -> None:
 #: libpq settings that read connection details (including a host) from a file.
 _REDIRECTING_POSTGRES_SETTINGS = frozenset({"service", "servicefile"})
 
+#: Environment variables libpq reads for settings a URL leaves out.
+_POSTGRES_ENV_SETTINGS = {
+    "PGHOSTADDR": "hostaddr",
+    "PGSERVICE": "service",
+    "PGSERVICEFILE": "servicefile",
+}
 
-def ensure_local_postgres_url(url: str) -> None:
+
+def ensure_local_postgres_url(
+    url: str, environ: Mapping[str, str] = os.environ
+) -> None:
     """Raise unless every host libpq would connect to for ``url`` is loopback.
 
     Query parameters override the URL's host (``...@127.0.0.1/db?host=remote``),
-    so the parsed connection settings are checked, not just the URL.
+    and libpq fills settings the URL leaves out from the environment
+    (``PGHOSTADDR``), so the settings libpq would use are checked, not the URL.
     """
     ensure_local_url(url)
     try:
         settings = conninfo_to_dict(url)
     except psycopg.ProgrammingError as error:
         raise NotLocalDatabaseError(f"unparseable Postgres URL: {error}") from error
+    for variable, setting in _POSTGRES_ENV_SETTINGS.items():
+        if environ.get(variable) and setting not in settings:
+            settings[setting] = environ[variable]
     redirecting = _REDIRECTING_POSTGRES_SETTINGS & settings.keys()
     if redirecting:
         raise NotLocalDatabaseError(f"Postgres URL sets {sorted(redirecting)}")
