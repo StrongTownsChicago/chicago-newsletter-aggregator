@@ -9,10 +9,13 @@ import unittest
 
 from llm_costs.cost_calculator import ModelPricing
 from llm_costs.cost_report_generator import (
+    TokenTotals,
+    format_cost_row,
     generate_combined_text_report,
     generate_csv_report,
     generate_json_report,
     generate_text_report,
+    sum_operation_tokens,
 )
 from llm_costs.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
@@ -123,6 +126,23 @@ class TestCostReportGenerator(unittest.TestCase):
 
         self.assertIn("2 calls per newsletter", report)
         self.assertNotIn("Scoring", report)
+
+
+class TestTokenTotals(unittest.TestCase):
+    def test_sums_operations(self) -> None:
+        self.assertEqual(
+            sum_operation_tokens([operation("a", 10, 1), operation("b", 5, 2)]),
+            TokenTotals(input_tokens=15, output_tokens=3),
+        )
+
+    def test_no_operations_sum_to_zero(self) -> None:
+        self.assertEqual(sum_operation_tokens([]), TokenTotals())
+
+    def test_cost_row_prices_the_summed_tokens(self) -> None:
+        self.assertEqual(
+            format_cost_row("TOTAL", TokenTotals(1_000_000, 500_000), PRICING),
+            "TOTAL                   1,000,000      500,000 $   2.0000",
+        )
 
 
 class TestCombinedTextReport(unittest.TestCase):
