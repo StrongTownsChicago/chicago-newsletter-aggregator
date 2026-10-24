@@ -86,6 +86,20 @@ class TestUserProfiles(SchemaTestCase):
                 self.assertGreater(updated_at.year, 2020)
 
 
+class TestRuleDefaults(SchemaTestCase):
+    def test_a_rule_saved_with_only_a_name_gets_the_documented_defaults(
+        self,
+    ) -> None:
+        rule = insert_row(
+            self.db, "notification_rules", {"user_id": self.user_id, "name": "Bare"}
+        )
+
+        self.assertEqual(
+            {key: rule[key] for key in ("topics", "is_active", "delivery_frequency")},
+            {"topics": [], "is_active": True, "delivery_frequency": "daily"},
+        )
+
+
 class TestCascades(SchemaTestCase):
     def test_deleting_a_user_removes_their_profile_rules_queue_and_history(
         self,
@@ -187,10 +201,19 @@ class TestCheckConstraints(SchemaTestCase):
         )
 
     def test_relevance_score_is_between_0_and_10(self) -> None:
-        self.assert_api_error(
-            CHECK_VIOLATION,
-            lambda: insert_newsletter(self.db, self.source["id"], relevance_score=11),
-        )
+        for score in (0, 10):
+            insert_newsletter(self.db, self.source["id"], relevance_score=score)
+        for score in (-1, 11):
+            with self.subTest(score=score):
+                self.assert_api_error(
+                    CHECK_VIOLATION,
+                    partial(
+                        insert_newsletter,
+                        self.db,
+                        self.source["id"],
+                        relevance_score=score,
+                    ),
+                )
 
     def test_a_queue_row_references_exactly_one_content_item(self) -> None:
         report = self.weekly_report()
@@ -245,6 +268,13 @@ class TestUniqueness(SchemaTestCase):
         (stored,) = self.rows("weekly_topic_reports")
         self.assertEqual(stored["id"], original["id"])
         self.assertEqual(stored["report_summary"], "Revised.")
+
+    def test_a_source_name_is_unique_within_its_type(self) -> None:
+        self.assert_api_error(
+            UNIQUE_VIOLATION,
+            lambda: insert_source(self.db, name="Ward 3 Office", ward_number=4),
+        )
+        insert_source(self.db, name="Ward 3 Office", source_type="city")
 
     def test_email_uid_is_unique(self) -> None:
         insert_newsletter(self.db, self.source["id"], email_uid="uid-1")

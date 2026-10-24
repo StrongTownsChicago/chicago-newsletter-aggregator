@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Any, ClassVar
 from unittest.mock import Mock, patch
 
+from imap_tools.consts import MailMessageFlags
+
 import cli.process_emails as process_emails
 from ingest.email.email_parser import lookup_source_by_email
 from shared.dates import CHICAGO_TIMEZONE
@@ -116,7 +118,7 @@ class TestProcessEmails(SourcesTestCase):
         self.addCleanup(patcher.stop)
 
     def test_stores_a_sanitized_searchable_newsletter(self) -> None:
-        self.ingest(
+        mailbox = self.ingest(
             mail_message("101", WARD_1_SENDER, html=PRIVATE_HTML, text=PRIVATE_TEXT)
         )
 
@@ -135,6 +137,7 @@ class TestProcessEmails(SourcesTestCase):
             .execute()
         )
         self.assertEqual(found, [{"id": row["id"]}])
+        self.assertEqual(mailbox.flags, [("101", MailMessageFlags.SEEN, True)])
 
     def test_the_same_message_is_stored_once(self) -> None:
         message = mail_message("102", f"news@{WARD_40_DOMAIN}")
@@ -149,7 +152,8 @@ class TestProcessEmails(SourcesTestCase):
         mailbox = self.ingest(mail_message("103", "someone@elsewhere.example.org"))
 
         self.assertEqual(self.rows("newsletters"), [])
-        self.assertEqual(len(mailbox.flags), 1)
+        # Marked read so the next run skips it; replay_unprocessed_emails can unmark it.
+        self.assertEqual(mailbox.flags, [("103", MailMessageFlags.SEEN, True)])
         ((unmapped,),), _ = self.save_report.call_args
         self.assertEqual(unmapped["from"], "someone@elsewhere.example.org")
 
