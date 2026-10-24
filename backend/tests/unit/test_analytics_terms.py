@@ -7,7 +7,9 @@ from typing import Any
 
 from analytics.records import NewsletterRecord, SourceRecord
 from analytics.terms import (
+    DistinctiveTuning,
     NewsletterTerms,
+    RisingTuning,
     build_name_tokens_by_ward,
     build_newsletter_terms,
     build_term_index,
@@ -153,7 +155,13 @@ class TestDistinctiveTerms(unittest.TestCase):
             "min_nested_term_similarity": 0.8,
         }
         params.update(overrides)
-        return compute_distinctive_terms(self.documents, self.vocabulary, **params)
+        name_tokens_by_ward = params.pop("name_tokens_by_ward")
+        return compute_distinctive_terms(
+            self.documents,
+            self.vocabulary,
+            name_tokens_by_ward,
+            DistinctiveTuning(**params),
+        )
 
     def test_ranks_ward_specific_terms_and_excludes_shared_terms(self) -> None:
         result = self.compute()
@@ -251,15 +259,17 @@ class TestRisingTerms(unittest.TestCase):
 
     def compute(self, **overrides: Any) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "latest_month": "2026-09",
             "baseline_months": 3,
             "min_latest_wards": 3,
             "min_ward_gain": 2,
             "top_n": 10,
             "min_phrase_words": 1,
         }
+        latest_month = overrides.pop("latest_month", "2026-09")
         params.update(overrides)
-        return compute_rising_terms(self.documents, self.vocabulary, **params)
+        return compute_rising_terms(
+            self.documents, self.vocabulary, latest_month, RisingTuning(**params)
+        )
 
     def terms(self, **overrides: Any) -> list[str]:
         return [item["term"] for item in self.compute(**overrides)["terms"]]
@@ -292,12 +302,14 @@ class TestRisingTerms(unittest.TestCase):
         result = compute_rising_terms(
             documents,
             terms,
-            latest_month="2026-09",
-            baseline_months=1,
-            min_latest_wards=3,
-            min_ward_gain=2,
-            top_n=10,
-            min_phrase_words=2,
+            "2026-09",
+            RisingTuning(
+                baseline_months=1,
+                min_latest_wards=3,
+                min_ward_gain=2,
+                top_n=10,
+                min_phrase_words=2,
+            ),
         )
         self.assertEqual(
             [item["term"] for item in result["terms"]], ["tenant ordinance"]
@@ -330,12 +342,14 @@ class TestRisingTerms(unittest.TestCase):
         result = compute_rising_terms(
             documents,
             {"fest"},
-            latest_month="2026-07",
-            baseline_months=3,
-            min_latest_wards=3,
-            min_ward_gain=2,
-            top_n=10,
-            min_phrase_words=1,
+            "2026-07",
+            RisingTuning(
+                baseline_months=3,
+                min_latest_wards=3,
+                min_ward_gain=2,
+                top_n=10,
+                min_phrase_words=1,
+            ),
         )
         self.assertEqual(result["baseline_active_wards"], [0, 0, 1])
         (fest,) = result["terms"]

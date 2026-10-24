@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import Any, cast
@@ -6,6 +7,8 @@ from urllib.parse import unquote
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 from html2text import html2text
+
+logger = logging.getLogger(__name__)
 
 REDACTION_MARKER = "[REDACTED]"
 # Joins text nodes for matching: a private-use character, so never newsletter text.
@@ -21,15 +24,8 @@ def sanitize_content(
     Remove privacy-sensitive elements from newsletter content.
 
     Filters out unsubscribe links, tracking URLs, and sensitive text based on
-    provided patterns and PRIVACY_STRIP_PHRASES env var.
-
-    Args:
-        content: Raw HTML or plain text content
-        content_type: Either 'html' or 'text'
-        privacy_patterns: Dict with keys: url_patterns, text_patterns, selectors
-
-    Returns:
-        Sanitized content with privacy elements removed
+    `privacy_patterns` (keys: url_patterns, text_patterns, selectors) and the
+    PRIVACY_STRIP_PHRASES env var. `content_type` is 'html' or 'text'.
     """
     if not content:
         return ""
@@ -40,77 +36,80 @@ def sanitize_content(
     selectors = privacy_patterns.get("selectors", [])
 
     if content_type == "html":
-        try:
-            soup = BeautifulSoup(content, "html.parser")
-
-            # 1. Remove by CSS Selector (containers like footers)
-            for selector in selectors:
-                for match in soup.select(selector):
-                    match.decompose()
-
-            # 2. Remove <a> tags by URL or Link Text
-            for a in soup.find_all("a", href=True):
-                href = normalize_url_for_matching(cast(str, a["href"]))
-                text = a.get_text(" ", strip=True)
-
-                url_matched = False
-                for pattern in url_patterns:
-                    if re.search(pattern, href, re.IGNORECASE):
-                        url_matched = True
-                        break
-
-                text_matched = False
-                for pattern in text_patterns:
-                    if re.search(pattern, text, re.IGNORECASE):
-                        text_matched = True
-                        break
-
-                if text_matched:
-                    a.decompose()
-                elif url_matched:
-                    a.unwrap()
-
-            # 3. Redact sensitive phrases in text and attribute values, not in markup
-            if redaction_pattern:
-                redact_html(soup, redaction_pattern)
-            return str(soup)
-
-        except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
-            print(f"  ⚠️  HTML Sanitization failed: {e}")
-            result = content
-
-    elif content_type == "text":
-        # For text, we'll strip lines that look like privacy links or are standalone keywords
-        lines = content.splitlines()
-        clean_lines = []
-        for line in lines:
-            # 1. Skip if line contains a known bad URL pattern
-            matchable_line = normalize_url_for_matching(line)
-            if any(re.search(p, matchable_line, re.IGNORECASE) for p in url_patterns):
-                continue
-
-            # 2. Skip if line is a standalone sensitive keyword (heuristic for plain text links)
-            # We wrap the patterns in start/end anchor to ensure we don't catch sentences
-            is_standalone_keyword = False
-            for pattern in text_patterns:
-                # Build a strict line match regex for this pattern
-                strict_pattern = rf"^\s*{pattern}\s*$"
-                if re.match(strict_pattern, line, re.IGNORECASE):
-                    is_standalone_keyword = True
-                    break
-
-            if is_standalone_keyword:
-                continue
-
-            clean_lines.append(line)
-        result = "\n".join(clean_lines)
+        return _sanitize_html(
+            content, url_patterns, text_patterns, selectors, redaction_pattern
+        )
+    if content_type == "text":
+        result = _sanitize_text(content, url_patterns, text_patterns)
     else:
         result = content
 
     # 3. Redact sensitive phrases (names, emails, etc.)
-    if redaction_pattern:
-        result = redaction_pattern.sub(REDACTION_MARKER, result)
-    return result
+    return redact_text(result, redaction_pattern)
+
+
+def _matches_any(patterns: list[str], value: str) -> bool:
+    return any(re.search(pattern, value, re.IGNORECASE) for pattern in patterns)
+
+
+def _sanitize_html(
+    content: str,
+    url_patterns: list[str],
+    text_patterns: list[str],
+    selectors: list[str],
+    redaction_pattern: re.Pattern[str] | None,
+) -> str:
+    try:
+        soup = BeautifulSoup(content, "html.parser")
+
+        # 1. Remove by CSS Selector (containers like footers)
+        for selector in selectors:
+            for match in soup.select(selector):
+                match.decompose()
+
+        # 2. Remove <a> tags by URL or Link Text
+        for a in soup.find_all("a", href=True):
+            url_matched = _matches_any(
+                url_patterns, normalize_url_for_matching(cast(str, a["href"]))
+            )
+            if _matches_any(text_patterns, a.get_text(" ", strip=True)):
+                a.decompose()
+            elif url_matched:
+                a.unwrap()
+
+        # 3. Redact sensitive phrases in text and attribute values, not in markup
+        if redaction_pattern:
+            redact_html(soup, redaction_pattern)
+        return str(soup)
+
+    except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
+        logger.warning(f"  ⚠️  HTML Sanitization failed: {e}")
+        return redact_text(content, redaction_pattern)
+
+
+def _is_standalone_keyword(line: str, text_patterns: list[str]) -> bool:
+    """Whether the whole line is one sensitive keyword (a plain-text link), not a sentence."""
+    return any(
+        re.match(rf"^\s*{pattern}\s*$", line, re.IGNORECASE)
+        for pattern in text_patterns
+    )
+
+
+def _sanitize_text(
+    content: str, url_patterns: list[str], text_patterns: list[str]
+) -> str:
+    """Drop lines holding a privacy URL and lines that are a standalone sensitive keyword."""
+    return "\n".join(
+        line
+        for line in content.splitlines()
+        if not _matches_any(url_patterns, normalize_url_for_matching(line))
+        and not _is_standalone_keyword(line, text_patterns)
+    )
+
+
+def redact_text(content: str, pattern: re.Pattern[str] | None) -> str:
+    """Replace every phrase pattern matches with the redaction marker."""
+    return pattern.sub(REDACTION_MARKER, content) if pattern else content
 
 
 def normalize_url_for_matching(url: str) -> str:
@@ -298,20 +297,12 @@ def email_matches_pattern(email: str, pattern: str) -> bool:
     """
     Check whether a sender address matches an email_source_mappings pattern.
 
-    The whole address must match the whole pattern (no substring matching),
-    case-insensitively, with surrounding whitespace ignored on both sides.
-    `%` matches any run of characters (including none), as in SQL LIKE, and
-    may appear anywhere in the pattern. Every other character, including
-    regex metacharacters such as `.` and `+`, matches only itself.
-
-    The SQL single-character wildcard `_` is deliberately NOT supported:
-    underscores legitimately appear in email addresses, so it is treated as
-    a literal character.
-
-    Examples:
-        email_matches_pattern("info@40thward.org", "%@40thward.org") -> True
-        email_matches_pattern("x@40thward.org.evil.io", "%@40thward.org") -> False
-        email_matches_pattern("Ward23@CityOfChicago.org", "ward23@cityofchicago.org") -> True
+    The whole address must match the whole pattern, case-insensitively, with
+    surrounding whitespace ignored. `%` matches any run of characters (even
+    none), anywhere in the pattern, as in SQL LIKE. Every other character,
+    including `.` and `+`, matches only itself; `_` is a literal, not SQL's
+    wildcard, because underscores legitimately appear in email addresses.
+    E.g. "%@40thward.org" matches "info@40thward.org", not "x@40thward.org.evil.io".
     """
     normalized_email = email.strip()
     normalized_pattern = pattern.strip()
@@ -370,15 +361,10 @@ def parse_newsletter(
     msg: Any, supabase_client: Any, privacy_patterns: dict[str, Any]
 ) -> dict[str, Any]:
     """
-    Parse email message into structured newsletter data.
+    Parse an imap_tools MailMessage into a newsletter row ready for insertion.
 
-    Args:
-        msg: MailMessage object from imap_tools
-        supabase_client: Supabase client for database lookups
-        privacy_patterns: Dict with privacy filtering patterns (url_patterns, text_patterns, selectors)
-
-    Returns:
-        Dictionary with newsletter data ready for database insertion
+    `supabase_client` is used for the sender-to-source lookup; `privacy_patterns`
+    is passed to `sanitize_content()`.
     """
 
     to_email = msg.to[0] if msg.to else ""
@@ -390,11 +376,13 @@ def parse_newsletter(
     if source:
         source_id = source.get("id")
         ward_number = source.get("ward_number")
-        print(f"  ✓ Matched to: {source.get('name')} ({source.get('source_type')})")
+        logger.info(
+            f"  ✓ Matched to: {source.get('name')} ({source.get('source_type')})"
+        )
     else:
         source_id = None
         ward_number = None
-        print(f"  ⚠️  No mapping found for: {msg.from_}")
+        logger.warning(f"  ⚠️  No mapping found for: {msg.from_}")
 
     # Get HTML content (prefer HTML over plain text)
     html_content = msg.html or ""

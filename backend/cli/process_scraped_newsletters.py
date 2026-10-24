@@ -10,8 +10,9 @@ from typing import Any, cast
 
 from dotenv import load_dotenv
 
+from cli.ingest_summary import print_summary
+from cli.logging_setup import configure_cli_logging
 from ingest.scraper.newsletter_scraper import NewsletterScraper
-from ingest.summary import print_summary
 from shared.dates import CHICAGO_TIMEZONE, parse_date_string
 from shared.db import get_supabase_client
 
@@ -189,6 +190,7 @@ def scrape_all_sources() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     import sys
 
     if len(sys.argv) > 1:

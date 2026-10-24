@@ -3,11 +3,14 @@
 Each function does all data work once, so the renderers only handle presentation.
 """
 
+import logging
 from datetime import datetime
 from typing import Any
 
 from notifications.digest_config import frontend_base_url
 from shared.db import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 def prepare_newsletter_data(
@@ -16,13 +19,8 @@ def prepare_newsletter_data(
     """
     Group notifications by newsletter, collect matching rules, and extract all needed data.
 
-    This does ALL data processing once so formatters only handle presentation.
-
-    Args:
-        notifications: List of notification records from database
-
-    Returns:
-        List of dicts with all formatted fields ready for display
+    This does ALL data processing once so formatters only handle presentation:
+    each returned dict holds the formatted fields ready for display.
     """
     # Group by newsletter and collect rule names
     newsletters_with_rules = {}
@@ -132,7 +130,7 @@ def fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]:
 
         newsletters = []
         for nl in response.data:
-            nl_dict = dict(nl)  # type: ignore
+            nl_dict = dict(nl)  # type: ignore[arg-type]
             source_data = nl_dict.get("source")
             ward_number = (
                 source_data.get("ward_number")
@@ -157,7 +155,7 @@ def fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]:
         return newsletters
 
     except Exception as e:  # noqa: BLE001  database boundary: log and return no newsletters
-        print(f"Warning: Failed to fetch newsletter details: {e}")
+        logger.warning(f"Warning: Failed to fetch newsletter details: {e}")
         return []
 
 
@@ -167,14 +165,9 @@ def prepare_weekly_report_data(
     """
     Extract and format weekly report data for email rendering.
 
-    Groups notifications by topic, fetches report summaries, formats data.
-
-    Args:
-        notifications: List of notification records from database
-                      (report data should be joined as 'report')
-
-    Returns:
-        List of dicts with topic, summary, newsletter_count, week_id, matched_rules
+    Groups notifications by topic; report data must be joined on each record
+    as 'report'. Returns dicts with topic, summary, newsletter_count, week_id
+    and matched_rules.
     """
     # Group by topic and collect rule names
     reports_with_rules = {}
@@ -270,8 +263,7 @@ def format_week_range(week_id: str) -> str:
         # Formats as "January 26 - February 1, 2026"
         if week_start.month == week_end.month:
             return f"{week_start.strftime('%B %d')} - {week_end.strftime('%d, %Y')}"
-        else:
-            return f"{week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
+        return f"{week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
 
     except (ValueError, AttributeError):
         return week_id

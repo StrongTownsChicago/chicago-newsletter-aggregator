@@ -16,6 +16,11 @@ from processing.weekly_report_generator import (
     extract_facts_from_single_newsletter,
     synthesize_weekly_summary,
 )
+from tests.fixtures.quiet_logging import quiet_logger
+
+
+def setUpModule() -> None:
+    quiet_logger("processing.weekly_report_generator")
 
 
 class TestExtractFactsFromNewsletters(unittest.TestCase):

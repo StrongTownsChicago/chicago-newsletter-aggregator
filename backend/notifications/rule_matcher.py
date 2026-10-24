@@ -5,12 +5,15 @@ Matches newsletters against user-defined notification rules and queues
 notifications for delivery.
 """
 
+import logging
 from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from notifications.error_logger import log_notification_error
 from shared.db import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 def match_newsletter_to_rules(
@@ -19,16 +22,8 @@ def match_newsletter_to_rules(
     """
     Find all notification rules that match a given newsletter.
 
-    Args:
-        newsletter_id: UUID of the newsletter
-        newsletter_data: Dictionary containing:
-            - topics: List of extracted topics
-            - plain_text: Full text content
-            - source_id: UUID of the source
-            - ward_number: Ward number
-
-    Returns:
-        List of matching rules (each rule dict includes user_id, rule_id, rule_name)
+    `newsletter_data` needs topics, plain_text, source_id and ward_number.
+    Each returned rule dict includes user_id, rule_id and rule_name.
     """
     try:
         supabase = get_supabase_client()
@@ -96,7 +91,7 @@ def match_newsletter_to_rules(
                 "newsletter_source_id": newsletter_data.get("source_id"),
             },
         )
-        print(
+        logger.warning(
             f"  ⚠️  Error matching newsletter to rules. Details logged to: {error_file}"
         )
         # Return empty list to avoid breaking ingestion
@@ -111,13 +106,6 @@ def _rule_matches_newsletter(
 
     All filter conditions are AND-ed together.
     Within each condition type (topics, keywords), matches are OR-ed.
-
-    Args:
-        rule: Notification rule from database
-        newsletter_data: Newsletter data to match against
-
-    Returns:
-        True if the rule matches the newsletter
     """
     # Extract newsletter data; both columns are nullable (no LLM topics yet, no text)
     newsletter_topics = set(newsletter_data.get("topics") or [])
@@ -198,7 +186,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
                     failed_notifications.append(
                         {"notification": notification, "error": error_str}
                     )
-                print(
+                logger.warning(
                     f"  ⚠ Could not queue notification for user {notification['user_id']}: {e}"
                 )
 
@@ -224,7 +212,9 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
                 "matched_rules_count": len(matched_rules),
             },
         )
-        print(f"  ⚠️  Error queuing notifications. Details logged to: {error_file}")
+        logger.warning(
+            f"  ⚠️  Error queuing notifications. Details logged to: {error_file}"
+        )
         return 0
 
 

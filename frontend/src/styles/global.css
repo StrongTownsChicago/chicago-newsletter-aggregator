@@ -1,1 +1,40 @@
 @import "tailwindcss";
+@import "@fontsource-variable/public-sans";
+
+/*
+ * Site palette, drawn from the Chicago flag: its light blue for accents,
+ * a navy for text and headings, and cool grays tinted toward that navy.
+ * The flag's red appears only in the logo's star.
+ *
+ * Tailwind's blue and gray scales are redefined so existing utility classes
+ * (text-blue-600, text-gray-900, ...) pick up the palette without markup changes.
+ * Blue 500 is the flag blue itself; text-weight shades (600 and up) are darker
+ * so links and white-on-blue buttons meet WCAG AA contrast.
+ */
+@theme {
+  --font-sans: "Public Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-blue-50: #eef7fd;
+  --color-blue-100: #d9eefa;
+  --color-blue-200: #b3ddf2;
+  --color-blue-300: #86c8ec;
+  --color-blue-400: #5bb4e5;
+  --color-blue-500: #41a6e0;
+  --color-blue-600: #1a72af;
+  --color-blue-700: #165f92;
+  --color-blue-800: #144e77;
+  --color-blue-900: #12324f;
+  --color-blue-950: #0b2236;
+
+  --color-gray-50: #f5f8fb;
+  --color-gray-100: #ebf0f5;
+  --color-gray-200: #dce4ec;
+  --color-gray-300: #c5d1dd;
+  --color-gray-400: #93a4b6;
+  --color-gray-500: #586b80;
+  --color-gray-600: #51647a;
+  --color-gray-700: #3d4f63;
+  --color-gray-800: #263a4f;
+  --color-gray-900: #14304a;
+  --color-gray-950: #0c1e30;
+}

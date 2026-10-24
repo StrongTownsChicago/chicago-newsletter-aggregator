@@ -1,47 +1,36 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildSourceOptions,
-  extractSourceTypes,
-  extractWardNumbers,
-} from '../../lib/server/search-form-options';
+import { buildSourceNames, buildWardOptions } from '../../lib/server/search-form-options';
 import type { SearchSourceRow } from '../../lib/server/search-form-options';
 
 const SOURCES: SearchSourceRow[] = [
-  { id: 51, name: 'Chicago Transit Authority', ward_number: null, source_type: 'agency' },
-  { id: 10, name: 'Ward Ten Alder', ward_number: '10', source_type: 'alderman' },
-  { id: 2, name: 'Ward Two Alder', ward_number: '2', source_type: 'alderman' },
-  { id: 40, name: 'Andre Vasquez', ward_number: '40', source_type: 'alderman' },
-  { id: 41, name: 'Another Ward 40 Office', ward_number: '40', source_type: 'alderman' },
-  { id: 60, name: 'Board of Elections', ward_number: null, source_type: 'agency' },
+  { id: 51, name: 'Chicago Transit Authority', ward_number: null },
+  { id: 10, name: 'Ward Ten Alder', ward_number: '10' },
+  { id: 2, name: 'Ward Two Alder', ward_number: '2' },
+  { id: 41, name: 'Previous Ward 40 Office', ward_number: '40' },
+  { id: 40, name: 'Andre Vasquez', ward_number: '40' },
 ];
 
-describe('buildSourceOptions', () => {
-  it('orders ward offices numerically, then other sources by name, with ward labels', () => {
-    expect(buildSourceOptions(SOURCES)).toEqual([
-      { id: 2, label: 'Ward 2 – Ward Two Alder' },
-      { id: 10, label: 'Ward 10 – Ward Ten Alder' },
-      { id: 40, label: 'Ward 40 – Andre Vasquez' },
-      { id: 41, label: 'Ward 40 – Another Ward 40 Office' },
-      { id: 60, label: 'Board of Elections' },
-      { id: 51, label: 'Chicago Transit Authority' },
+describe('buildWardOptions', () => {
+  it('lists wards numerically, labelled with their sources, skipping sources without a ward', () => {
+    expect(buildWardOptions(SOURCES)).toEqual([
+      { ward: '2', label: 'Ward 2 – Ward Two Alder' },
+      { ward: '10', label: 'Ward 10 – Ward Ten Alder' },
+      { ward: '40', label: 'Ward 40 – Andre Vasquez, Previous Ward 40 Office' },
     ]);
   });
 
   it('does not mutate its input', () => {
     const input = [...SOURCES];
-    buildSourceOptions(input);
+    buildWardOptions(input);
     expect(input).toEqual(SOURCES);
   });
 });
 
-describe('extractWardNumbers', () => {
-  it('returns distinct wards in numeric order, skipping sources without a ward', () => {
-    expect(extractWardNumbers(SOURCES)).toEqual(['2', '10', '40']);
-  });
-});
-
-describe('extractSourceTypes', () => {
-  it('returns distinct source types alphabetically', () => {
-    expect(extractSourceTypes(SOURCES)).toEqual(['agency', 'alderman']);
+describe('buildSourceNames', () => {
+  it('maps source ids to names', () => {
+    const names = buildSourceNames(SOURCES);
+    expect(names.get(51)).toBe('Chicago Transit Authority');
+    expect(names.get(40)).toBe('Andre Vasquez');
+    expect(names.size).toBe(SOURCES.length);
   });
 });

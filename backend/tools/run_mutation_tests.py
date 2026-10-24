@@ -112,6 +112,19 @@ def has_uncommitted_changes(module_path: str) -> bool:
     )
 
 
+def run_session(config_path: Path, session_path: Path, module_path: str) -> str | None:
+    """Create and execute a cosmic-ray session; return why it failed, if it did."""
+    if run_cosmic_ray("init", str(config_path), str(session_path)) != 0:
+        return "cosmic-ray init failed"
+    exec_status = run_cosmic_ray("exec", str(config_path), str(session_path))
+    if has_uncommitted_changes(module_path):
+        return f"a mutant was left on disk: git checkout -- {module_path}"
+    # A failed exec leaves mutants untested, and the report would list no survivors.
+    if exec_status != 0:
+        return "cosmic-ray exec failed"
+    return None
+
+
 def run_target(name: str, target: MutationTarget) -> str | None:
     """Mutate one module and report its survivors; return why it failed, if it did."""
     # cosmic-ray edits the module in place, so an interrupted run leaves a
@@ -129,14 +142,9 @@ def run_target(name: str, target: MutationTarget) -> str | None:
     # Without a passing baseline every mutant counts as killed, so the score would be meaningless.
     if run_cosmic_ray("baseline", str(config_path)) != 0:
         return "its tests fail without any mutation"
-    if run_cosmic_ray("init", str(config_path), str(session_path)) != 0:
-        return "cosmic-ray init failed"
-    exec_status = run_cosmic_ray("exec", str(config_path), str(session_path))
-    if has_uncommitted_changes(target.module_path):
-        return f"a mutant was left on disk: git checkout -- {target.module_path}"
-    # A failed exec leaves mutants untested, and the report would list no survivors.
-    if exec_status != 0:
-        return "cosmic-ray exec failed"
+    failure = run_session(config_path, session_path, target.module_path)
+    if failure:
+        return failure
     subprocess.run(
         [
             sys.executable,

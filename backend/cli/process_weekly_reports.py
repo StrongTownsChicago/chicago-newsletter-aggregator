@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+from cli.logging_setup import configure_cli_logging
 from models.weekly_report import WeeklyTopicReport
 from notifications.error_logger import log_notification_error
 from processing.weekly_report_generator import generate_weekly_topic_report
@@ -85,7 +86,7 @@ def get_active_weekly_topics() -> list[str]:
         # Extract and deduplicate topics
         all_topics: set[str] = set()
         for rule in response.data:
-            topics_list = rule.get("topics", [])  # type: ignore
+            topics_list = rule.get("topics", [])  # type: ignore[union-attr]
             if isinstance(topics_list, list):
                 all_topics.update(topics_list)
 
@@ -127,15 +128,9 @@ def report_exists(topic: str, week_id: str) -> bool:
 
 def store_weekly_report(report: WeeklyTopicReport) -> bool:
     """
-    Store generated report in weekly_topic_reports table.
+    Upsert a report into weekly_topic_reports and return whether it was stored.
 
-    Uses ON CONFLICT to handle duplicate week/topic (idempotent).
-
-    Args:
-        report: WeeklyTopicReport object to store
-
-    Returns:
-        True if stored successfully, False otherwise
+    Conflicts on (topic, week_id) update the existing row, so reruns are idempotent.
     """
     supabase = get_supabase_client()
 
@@ -178,26 +173,11 @@ def process_weekly_reports(
     model: str = "gpt-oss:20b",
 ) -> dict[str, int]:
     """
-    Main orchestration: Generate reports for all active topics.
+    Generate and store a weekly report for each topic with active weekly subscribers.
 
-    Workflow:
-    1. Calculate week_id (defaults to previous week, or current week if --current-week)
-    2. Query active weekly topics from notification_rules
-    3. For each topic:
-       a. Check if report already exists (skip if yes, unless force=True)
-       b. Generate report via generate_weekly_topic_report()
-       c. Store in database via store_weekly_report() (unless dry_run=True)
-    4. Return stats (generated, skipped, failed)
-
-    Args:
-        week_id: Week identifier (YYYY-WXX), defaults based on current_week flag
-        dry_run: If True, generate but don't store
-        force: If True, regenerate even if report exists
-        current_week: If True, use current week instead of previous week
-        model: Ollama model name
-
-    Returns:
-        Dictionary with stats: {generated, skipped, failed}
+    week_id defaults to the previous week, or the current week if current_week.
+    Topics that already have a report are skipped unless force; dry_run generates
+    without storing. Returns generated, skipped and failed counts.
     """
     # Determine week to process
     if week_id is None:
@@ -343,4 +323,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

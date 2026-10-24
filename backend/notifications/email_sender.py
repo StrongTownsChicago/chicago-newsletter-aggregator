@@ -48,18 +48,10 @@ def send_digest(
     """
     Send a digest email (daily or weekly) with matched content.
 
-    Generic digest sender that handles both daily newsletter digests and
-    weekly topic report digests using template-based rendering.
-
-    Args:
-        user_id: User's unique identifier (for generating unsubscribe token)
-        user_email: Recipient email address
-        notifications: List of notification records (from notification_queue)
-        digest_type: Type of digest (DigestType.DAILY or DigestType.WEEKLY)
-        preferences_url: URL to preferences page for managing notifications
-
-    Returns:
-        Dictionary with 'success' (bool), 'email_id' (str if success), 'error' (str if failed)
+    Handles daily newsletter digests and weekly topic report digests.
+    `user_id` signs the unsubscribe token; `notifications` are notification_queue
+    records. Returns a dict with 'success', plus 'email_id' on success or
+    'error' on failure.
     """
     if not notifications:
         return {"success": False, "error": "No notifications to send"}

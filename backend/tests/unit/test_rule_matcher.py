@@ -14,10 +14,15 @@ from notifications.rule_matcher import (
     match_newsletter_to_rules,
 )
 from tests.fixtures.mock_helpers import create_mock_supabase
+from tests.fixtures.quiet_logging import quiet_logger
 from tests.fixtures.user_factory import (
     create_test_rule,
     create_test_user,
 )
+
+
+def setUpModule() -> None:
+    quiet_logger("notifications.rule_matcher")
 
 
 class TestRuleMatchesNewsletter(unittest.TestCase):
@@ -213,10 +218,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
     """Tests for match_newsletter_to_rules() public matching function"""
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_match_single_rule(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_match_single_rule(self, mock_get_supabase: MagicMock) -> None:
         """One rule matches newsletter"""
         user = create_test_user(user_id="user1", notifications_enabled=True)
         rule = create_test_rule(user_id="user1", topics=["bike_lanes"], is_active=True)
@@ -238,10 +240,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual(result[0]["rule_id"], rule["id"])
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_match_multiple_rules(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_match_multiple_rules(self, mock_get_supabase: MagicMock) -> None:
         """Multiple rules match same newsletter"""
         user1 = create_test_user(user_id="user1", notifications_enabled=True)
         user2 = create_test_user(user_id="user2", notifications_enabled=True)
@@ -269,10 +268,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertIn("user2", [match["user_id"] for match in result])
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_no_rules_match(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_no_rules_match(self, mock_get_supabase: MagicMock) -> None:
         """No rules match newsletter"""
         user = create_test_user(user_id="user1", notifications_enabled=True)
         rule = create_test_rule(
@@ -293,10 +289,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual(len(result), 0)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_filters_disabled_users(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_filters_disabled_users(self, mock_get_supabase: MagicMock) -> None:
         """Users with notifications_enabled=false excluded"""
         user = create_test_user(
             user_id="user1", notifications_enabled=False
@@ -317,9 +310,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual(len(result), 0)  # User filtered out
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
     def test_disabled_user_does_not_stop_later_rules(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+        self, mock_get_supabase: MagicMock
     ) -> None:
         """A disabled user's rule is skipped, and rules after it are still matched"""
         disabled = create_test_user(user_id="user1", notifications_enabled=False)
@@ -341,9 +333,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual([match["user_id"] for match in result], ["user2"])
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
     def test_user_without_enabled_preference_is_notified(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
+        self, mock_get_supabase: MagicMock
     ) -> None:
         """Notifications default to enabled when preferences don't say"""
         user = create_test_user(user_id="user1", notification_preferences={})
@@ -359,10 +350,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_filters_inactive_rules(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_filters_inactive_rules(self, mock_get_supabase: MagicMock) -> None:
         """Only is_active=true rules considered"""
         # Rule with is_active=False should not be returned by query
         # (the query filters .eq("is_active", True))
@@ -380,9 +368,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
-    @patch("builtins.print")
     def test_error_handling_returns_empty(
-        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+        self, mock_log: MagicMock, mock_get_supabase: MagicMock
     ) -> None:
         """Database error returns empty list"""
         mock_get_supabase.side_effect = Exception("Database connection failed")
@@ -397,9 +384,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
-    @patch("builtins.print")
     def test_error_logged_on_failure(
-        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+        self, mock_log: MagicMock, mock_get_supabase: MagicMock
     ) -> None:
         """Errors logged to file"""
         mock_get_supabase.side_effect = Exception("Test error")
@@ -415,10 +401,7 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertIn("newsletter_id", call_kwargs["context"])
 
     @patch("notifications.rule_matcher.get_supabase_client")
-    @patch("builtins.print")
-    def test_no_active_rules_returns_empty(
-        self, mock_print: MagicMock, mock_get_supabase: MagicMock
-    ) -> None:
+    def test_no_active_rules_returns_empty(self, mock_get_supabase: MagicMock) -> None:
         """Empty rules list returns empty matches"""
         mock_supabase = create_mock_supabase()
         mock_supabase.execute.return_value = Mock(data=[])  # No rules

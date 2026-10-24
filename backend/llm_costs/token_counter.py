@@ -33,19 +33,11 @@ MODEL_ENCODING_MAP = {
 
 def get_encoding_for_model(model_name: str) -> str:
     """
-    Get the tiktoken encoding name for a model.
+    Return the tiktoken encoding name for a model.
 
-    Maps model names to appropriate tiktoken encodings. Uses pattern matching
-    to handle model variants (e.g., gpt-5-mini -> o200k_base).
-
-    Args:
-        model_name: Model identifier (e.g., "gpt-5", "claude-sonnet-4.5")
-
-    Returns:
-        Encoding name (e.g., "o200k_base", "cl100k_base")
-
-    Raises:
-        ValueError: If model name doesn't match any known pattern
+    Matches the model name case-insensitively by prefix against MODEL_ENCODING_MAP,
+    so variants share an encoding (gpt-5-mini -> o200k_base). Unknown models
+    fall back to cl100k_base.
     """
     model_lower = model_name.lower()
 
@@ -60,18 +52,9 @@ def get_encoding_for_model(model_name: str) -> str:
 
 def get_encoder_for_model(model_name: str) -> tiktoken.Encoding:
     """
-    Get tiktoken encoder for a model (with caching).
+    Return the tiktoken encoder for a model, cached per model name.
 
-    Returns a cached encoder if available, otherwise creates and caches a new one.
-
-    Args:
-        model_name: Model identifier
-
-    Returns:
-        tiktoken.Encoding instance for the model
-
-    Raises:
-        Exception: If encoding cannot be loaded
+    Propagates tiktoken's error if the encoding cannot be loaded.
     """
     if model_name not in _encoder_cache:
         encoding_name = get_encoding_for_model(model_name)
@@ -82,18 +65,7 @@ def get_encoder_for_model(model_name: str) -> tiktoken.Encoding:
 
 def count_tokens(text: str, model_name: str) -> int:
     """
-    Count tokens in text using model-specific encoding.
-
-    Args:
-        text: Text to count tokens for
-        model_name: Model identifier to determine encoding
-
-    Returns:
-        Token count as integer
-
-    Raises:
-        Exception: If encoding fails
-    """
+    Count tokens in text with the model's encoding; empty text is 0."""
     if not text:
         return 0
 
@@ -104,17 +76,10 @@ def count_tokens(text: str, model_name: str) -> int:
 
 def count_schema_tokens(schema: dict[str, Any], model_name: str) -> int:
     """
-    Count tokens in a JSON schema.
+    Count tokens in a JSON schema serialized with indent=2.
 
-    Schemas are added to prompts as JSON for models that don't support native
-    structured output (e.g., gpt-oss). This counts the overhead.
-
-    Args:
-        schema: Pydantic model JSON schema dict
-        model_name: Model identifier
-
-    Returns:
-        Token count for schema JSON representation
+    Models without native structured output (e.g. gpt-oss) get the schema in
+    the prompt as JSON; this measures that overhead.
     """
     import json
 
@@ -130,22 +95,12 @@ def estimate_llm_call_tokens(
     include_schema_in_prompt: bool = False,
 ) -> dict[str, int]:
     """
-    Calculate input and output tokens for an LLM call.
+    Count input and output tokens for one LLM call.
 
-    Counts tokens for prompt (including schema if manually added) and response.
-    Matches the actual LLM processing behavior where some models require schema
-    in the prompt text.
-
-    Args:
-        prompt: Input prompt text
-        response: LLM response text
-        schema: Optional Pydantic schema dict
-        model_name: Model identifier
-        include_schema_in_prompt: Whether schema is added to prompt manually
-                                  (True for gpt-oss models, False for native format)
-
-    Returns:
-        Dict with keys: "input_tokens", "output_tokens", "total_tokens"
+    Input is the prompt, plus the schema and its instruction line when
+    include_schema_in_prompt (gpt-oss models take the schema in the prompt text
+    rather than a native format). Returns "input_tokens", "output_tokens" and
+    "total_tokens".
     """
 
     # Count prompt tokens

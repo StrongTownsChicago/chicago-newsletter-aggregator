@@ -131,8 +131,7 @@ export function renderWardTopicGrid(
   cells: WardTopicMonthCell[],
   lenses: { id: string; label: string }[],
   months: string[],
-  ward: string,
-  selectedLens: string | null,
+  { ward, selectedLens }: { ward: string; selectedLens: string | null },
   width: number,
 ): Element {
   const labelOf = new Map(lenses.map((lens) => [lens.id, lens.label]));
@@ -199,8 +198,7 @@ export function renderWardTopicGrid(
  */
 export function renderCoverageGrid(
   cells: CoverageCell[],
-  wards: string[],
-  months: string[],
+  { wards, months }: { wards: string[]; months: string[] },
   wardsNeverArchived: string[],
   searchScope: SearchLinkParams,
   width: number,

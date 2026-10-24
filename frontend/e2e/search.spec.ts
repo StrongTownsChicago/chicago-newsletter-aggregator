@@ -1,38 +1,80 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+const openFilters = (page: Page) => page.getByTestId('search-filters-toggle').click();
 
 test('can perform keyword search', async ({ page }) => {
   await page.goto('/search');
-  
+
   const searchInput = page.getByTestId('search-input');
   await searchInput.fill('zoning');
   await page.getByTestId('search-button').click();
-  
+
   await expect(page).toHaveURL(/.*q=zoning/);
+});
+
+test('keeps filters collapsed behind the Filters button', async ({ page }) => {
+  await page.goto('/search');
+
+  await expect(page.getByTestId('search-input')).toBeVisible();
+  await expect(page.getByTestId('ward-filter')).toBeHidden();
+
+  await openFilters(page);
+  await expect(page.getByTestId('ward-filter')).toBeVisible();
+  await expect(page.getByTestId('topic-filter')).toBeVisible();
+  await expect(page.getByTestId('source-filter')).toHaveCount(0);
 });
 
 test('can filter by ward', async ({ page }) => {
   await page.goto('/search');
-  
+  await openFilters(page);
+
   const wardFilter = page.getByTestId('ward-filter');
-  // Check if options exist
-  const options = await wardFilter.locator('option').count();
-  if (options > 1) {
-    const firstWard = await wardFilter.locator('option').nth(1).getAttribute('value');
-    if (firstWard) {
-        await wardFilter.selectOption(firstWard);
-        await page.getByTestId('search-button').click();
-        await expect(page).toHaveURL(new RegExp(`.*ward=${firstWard}`));
-    }
+  await expect(wardFilter.locator('option').nth(1)).toHaveText(/^Ward \d+ – \S/);
+  const firstWard = await wardFilter.locator('option').nth(1).getAttribute('value');
+  if (firstWard) {
+    await wardFilter.selectOption(firstWard);
+    await page.getByTestId('apply-filters-button').click();
+    await expect(page).toHaveURL(new RegExp(`.*ward=${firstWard}(&|$)`));
+    await expect(page.getByTestId('active-filter-count')).toContainText('1');
+    await expect(page.getByTestId('active-filter')).toHaveText(`Ward ${firstWard}`);
   }
 });
 
-test('can clear filters', async ({ page }) => {
+test('lists active filters with links that remove each one', async ({ page }) => {
+  await page.goto('/search?q=test&ward=1&topic=bike_lanes');
+
+  const activeFilters = page.getByTestId('active-filter');
+  await expect(activeFilters).toHaveText(['Bike lanes', 'Ward 1']);
+  await expect(page.getByRole('link', { name: 'Remove filter: Ward 1' })).toHaveAttribute(
+    'href',
+    '/search?q=test&topic=bike_lanes',
+  );
+});
+
+test('clearing filters keeps the keywords', async ({ page }) => {
   await page.goto('/search?q=test&ward=1');
   await expect(page.getByTestId('search-input')).toHaveValue('test');
-  
+
   await page.getByTestId('clear-filters-link').click();
-  await expect(page).toHaveURL(/\/search$/);
-  await expect(page.getByTestId('search-input')).toHaveValue('');
+  await expect(page).toHaveURL(/\/search\?q=test$/);
+  await expect(page.getByTestId('search-input')).toHaveValue('test');
+  await expect(page.getByTestId('active-filters')).toHaveCount(0);
+});
+
+test('keeps a source filter from the URL when searching again', async ({ page }) => {
+  await page.goto('/search?source=1');
+  await expect(page.getByTestId('active-filter')).toHaveCount(1);
+
+  await page.getByTestId('search-input').fill('zoning');
+  await page.getByTestId('search-button').click();
+  await expect(page).toHaveURL(/source=1(&|$)/);
+  await expect(page).toHaveURL(/q=zoning/);
+});
+
+test('keeps a ward from the URL selected when it has no listed source', async ({ page }) => {
+  await page.goto('/search?ward=99');
+  await expect(page.getByTestId('ward-filter')).toHaveValue('99');
 });
 
 test('groups topics by category with readable labels', async ({ page }) => {
@@ -44,6 +86,7 @@ test('groups topics by category with readable labels', async ({ page }) => {
 
 test('applies new filters from the form and reflects them back', async ({ page }) => {
   await page.goto('/search');
+  await openFilters(page);
 
   await page.getByTestId('sort-select').selectOption('oldest');
   await page.getByTestId('from-date-filter').fill('2026-01-01');
@@ -56,19 +99,6 @@ test('applies new filters from the form and reflects them back', async ({ page }
   await expect(page.getByTestId('sort-select')).toHaveValue('oldest');
   await expect(page.getByTestId('from-date-filter')).toHaveValue('2026-01-01');
   await expect(page.getByTestId('to-date-filter')).toHaveValue('2026-06-30');
-});
-
-test('can filter by source', async ({ page }) => {
-  await page.goto('/search');
-
-  const sourceFilter = page.getByTestId('source-filter');
-  const firstSource = await sourceFilter.locator('option').nth(1).getAttribute('value');
-  if (firstSource) {
-    await sourceFilter.selectOption(firstSource);
-    await page.getByTestId('search-button').click();
-    await expect(page).toHaveURL(new RegExp(`source=${firstSource}(&|$)`));
-    await expect(sourceFilter).toHaveValue(firstSource);
-  }
 });
 
 test('preserves filters in pagination links', async ({ page }) => {
@@ -87,6 +117,7 @@ test('ignores invalid filter params instead of failing', async ({ page }) => {
   await expect(page.getByTestId('sort-select')).toHaveValue('newest');
   await expect(page.getByTestId('topic-filter')).toHaveValue('');
   await expect(page.getByTestId('from-date-filter')).toHaveValue('');
+  await expect(page.getByTestId('active-filters')).toHaveCount(0);
 });
 
 test('loads old links with removed relevance params and drops them', async ({ page }) => {

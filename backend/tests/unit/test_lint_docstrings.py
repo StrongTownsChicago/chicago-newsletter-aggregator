@@ -155,10 +155,15 @@ class TestProseRules(unittest.TestCase):
 
 
 class TestRatchet(unittest.TestCase):
-    def test_ds002_is_ratcheted_not_gated_per_site(self) -> None:
+    def test_ds002_gates_per_site(self) -> None:
         violations = checker.check_source(def_docstring(20), "cli/thing.py")
-        self.assertEqual(checker.gating(violations), [])
-        self.assertEqual(checker.ratchet_counts(violations), {"DS002": 1})
+        self.assertEqual([v.rule for v in checker.gating(violations)], ["DS002"])
+
+    def test_a_frozen_rule_is_counted_not_gated_per_site(self) -> None:
+        violations = checker.check_source(def_docstring(20), "cli/thing.py")
+        with mock.patch.dict(checker.FROZEN, {"DS002": 1}):
+            self.assertEqual(checker.gating(violations), [])
+            self.assertEqual(checker.ratchet_counts(violations), {"DS002": 1})
 
     def test_a_count_over_the_frozen_number_fails(self) -> None:
         violations = checker.check_source(def_docstring(20), "cli/thing.py")

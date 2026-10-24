@@ -8,6 +8,7 @@ Two-phase LLM processing:
 Designed to aggregate newsletter content by topic and generate insight-driven summaries.
 """
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -22,6 +23,8 @@ from processing.llm_processor import TOPICS, call_llm
 from prompts.weekly_synthesis import FACTUAL_SUMMARY
 from shared.db import get_supabase_client
 
+logger = logging.getLogger(__name__)
+
 
 def extract_facts_from_single_newsletter(
     topic: str, newsletter: dict[str, Any], model: str = "gpt-oss:20b"
@@ -29,19 +32,9 @@ def extract_facts_from_single_newsletter(
     """
     Phase 1a: Extract structured facts from a single newsletter about a topic.
 
-    Analyzes one newsletter and extracts:
-    - Key decisions or announcements
-    - Development approvals or zoning changes
-    - Policy changes or ordinances
-    - Community meetings or hearings
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        newsletter: Newsletter dict with id, subject, plain_text, source_name, ward_number
-        model: Ollama model name
-
-    Returns:
-        List of KeyDevelopment objects with structured facts from this newsletter
+    Facts are key decisions or announcements, development approvals or zoning
+    changes, policy changes or ordinances, and community meetings or hearings.
+    newsletter needs id, subject, plain_text, source_name and ward_number.
     """
     ward_info = (
         f"Ward {newsletter.get('ward_number', 'Unknown')}"
@@ -105,7 +98,9 @@ Newsletter:
         ]
 
     except Exception as e:  # noqa: BLE001  per-newsletter LLM boundary: log and continue
-        print(f"    ⚠ Extraction failed for newsletter {newsletter_id[:8]}: {e}")
+        logger.warning(
+            f"    ⚠ Extraction failed for newsletter {newsletter_id[:8]}: {e}"
+        )
         return []
 
 
@@ -117,31 +112,25 @@ def extract_facts_from_newsletters(
 
     Processes each newsletter individually to avoid context limit issues,
     then aggregates all extracted facts.
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        newsletters: List of newsletter dicts with id, subject, plain_text, source, ward
-        model: Ollama model name
-
-    Returns:
-        Aggregated list of KeyDevelopment objects from all newsletters
     """
     if not newsletters:
-        print(f"  ℹ No newsletters for {topic}, skipping fact extraction")
+        logger.info(f"  ℹ No newsletters for {topic}, skipping fact extraction")
         return []
 
-    print(f"  → Extracting facts for {topic} from {len(newsletters)} newsletters...")
+    logger.info(
+        f"  → Extracting facts for {topic} from {len(newsletters)} newsletters..."
+    )
 
     all_developments = []
 
     # Process each newsletter individually
     for i, newsletter in enumerate(newsletters, 1):
-        print(f"    Processing newsletter {i}/{len(newsletters)}...", end=" ")
+        logger.info(f"    Processing newsletter {i}/{len(newsletters)}...")
         developments = extract_facts_from_single_newsletter(topic, newsletter, model)
         all_developments.extend(developments)
-        print(f"✓ {len(developments)} developments")
+        logger.info(f"    ✓ {len(developments)} developments")
 
-    print(f"  ✓ Extracted {len(all_developments)} total developments")
+    logger.info(f"  ✓ Extracted {len(all_developments)} total developments")
     return all_developments
 
 
@@ -152,26 +141,15 @@ def synthesize_weekly_summary(
     model: str = "gpt-oss:20b",
 ) -> str:
     """
-    Phase 2: Synthesize facts into narrative weekly summary.
+    Phase 2: Synthesize Phase 1 facts into a 2-4 paragraph weekly summary.
 
-    Takes structured facts and creates a 2-4 paragraph summary that:
-    - Identifies trends or patterns across wards
-    - Highlights most significant developments
-    - Notes any citywide implications
-    - Provides context on topic-specific activity level
-    - Applies Strong Towns perspective (safe streets, more housing, transit, fiscal responsibility)
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        facts: Extracted KeyDevelopment objects from Phase 1
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        Weekly summary text (2-4 paragraphs)
+    The summary identifies trends across wards, highlights the most significant
+    developments and citywide implications, gives context on the topic's
+    activity level, and applies a Strong Towns perspective (safe streets, more
+    housing, transit, fiscal responsibility). week_id is YYYY-WXX.
     """
     if not facts:
-        print(f"  ℹ No facts to synthesize for {topic}")
+        logger.info(f"  ℹ No facts to synthesize for {topic}")
         return ""
 
     # Format facts for prompt
@@ -204,15 +182,15 @@ def synthesize_weekly_summary(
     )
 
     try:
-        print(f"  → Synthesizing summary for {topic}...")
+        logger.info(f"  → Synthesizing summary for {topic}...")
         response = call_llm(model, prompt, WeeklySynthesis.model_json_schema())
         data = WeeklySynthesis.model_validate_json(response)
 
-        print(f"  ✓ Generated summary ({len(data.summary)} chars)")
+        logger.info(f"  ✓ Generated summary ({len(data.summary)} chars)")
         return data.summary
 
     except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no summary
-        print(f"  ✗ Summary synthesis failed for {topic}: {e}")
+        logger.error(f"  ✗ Summary synthesis failed for {topic}: {e}")
         return ""
 
 
@@ -220,137 +198,133 @@ def generate_weekly_topic_report(
     topic: str, week_id: str, model: str = "gpt-oss:20b"
 ) -> WeeklyTopicReport | None:
     """
-    Complete pipeline: Fetch newsletters, extract facts, synthesize summary.
+    Complete pipeline: fetch newsletters, extract facts, synthesize summary.
 
-    Orchestrates the full two-phase process:
-    1. Query newsletters tagged with topic from specified week
-    2. Extract structured facts via LLM (Phase 1)
-    3. Synthesize narrative summary via LLM (Phase 2)
-    4. Return complete WeeklyTopicReport object
-
-    Returns None if no newsletters found for topic/week or if processing fails.
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        WeeklyTopicReport object or None if no content or processing failed
+    Queries newsletters tagged with topic in week_id (YYYY-WXX), extracts facts
+    (Phase 1) and synthesizes the summary (Phase 2). Returns None if no
+    newsletters are found or processing fails.
     """
-    # Validate topic
-    if topic not in TOPICS:
-        print(f"  ✗ Invalid topic: {topic}")
+    if not _is_valid_report_request(topic, week_id):
         return None
 
-    # Validate week_id format (basic check before RPC call)
+    # Query newsletters for this topic and week
+    logger.info(f"\n=== Generating report for {topic} (week {week_id}) ===")
+
+    supabase = get_supabase_client()
+    week_range = _fetch_week_range(supabase, week_id)
+    if week_range is None:
+        return None
+
+    try:
+        newsletters = _fetch_topic_newsletters(supabase, topic, *week_range)
+
+        if not newsletters:
+            logger.info(f"  ℹ No newsletters found for {topic} in week {week_id}")
+            return None
+
+        logger.info(f"  ✓ Found {len(newsletters)} newsletters")
+        return _build_report(topic, week_id, newsletters, model)
+
+    except Exception as e:  # noqa: BLE001  per-report boundary: log and skip the report
+        logger.error(f"  ✗ Report generation failed: {e}")
+        return None
+
+
+def _is_valid_report_request(topic: str, week_id: str) -> bool:
+    """Check the topic is known and week_id looks like YYYY-WXX, before any RPC call."""
+    if topic not in TOPICS:
+        logger.error(f"  ✗ Invalid topic: {topic}")
+        return False
+
     try:
         year_str, week_str = week_id.split("-W")
         int(year_str)
         int(week_str)
     except ValueError:
-        print(f"  ✗ Invalid week_id format: {week_id} (expected YYYY-WXX)")
-        return None
+        logger.error(f"  ✗ Invalid week_id format: {week_id} (expected YYYY-WXX)")
+        return False
+    return True
 
-    # Query newsletters for this topic and week
-    print(f"\n=== Generating report for {topic} (week {week_id}) ===")
 
-    supabase = get_supabase_client()
-
-    # Get week date range from PostgreSQL function
+def _fetch_week_range(supabase: Any, week_id: str) -> tuple[str, str] | None:
+    """The week's first and last dates from the get_week_date_range function, or None."""
     try:
         week_range_result = supabase.rpc(
             "get_week_date_range", {"week_id_param": week_id}
         ).execute()
 
         if not week_range_result.data:
-            print(f"  ✗ Invalid week_id: {week_id}")
+            logger.error(f"  ✗ Invalid week_id: {week_id}")
             return None
 
-        week_range = dict(week_range_result.data[0])  # type: ignore
+        week_range = dict(week_range_result.data[0])
         week_start = str(week_range["week_start"])
         week_end = str(week_range["week_end"])
-        print(f"  → Querying newsletters from {week_start} to {week_end}...")
+        logger.info(f"  → Querying newsletters from {week_start} to {week_end}...")
+        return week_start, week_end
 
     except Exception as e:  # noqa: BLE001  database boundary: log and skip the report
-        print(f"  ✗ Failed to calculate week range: {e}")
+        logger.error(f"  ✗ Failed to calculate week range: {e}")
         return None
 
-    try:
-        # Query newsletters (filtered in PostgreSQL)
-        response = (
-            supabase.table("newsletters")
-            .select(
-                "id, subject, plain_text, received_date, source:sources(name, ward_number)"
-            )
-            .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
-            .gte("received_date", week_start)  # PostgreSQL date filter
-            .lte("received_date", week_end)  # PostgreSQL date filter
-            .execute()
+
+def _fetch_topic_newsletters(
+    supabase: Any, topic: str, week_start: str, week_end: str
+) -> list[dict[str, Any]]:
+    """Newsletters tagged with the topic and received in the week (filtered in PostgreSQL)."""
+    response = (
+        supabase.table("newsletters")
+        .select(
+            "id, subject, plain_text, received_date, source:sources(name, ward_number)"
         )
+        .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
+        .gte("received_date", week_start)
+        .lte("received_date", week_end)
+        .execute()
+    )
+    return [_newsletter_from_row(dict(row)) for row in response.data]
 
-        # Process results
-        newsletters = []
-        for nl_data in response.data:
-            # Type assertions for Supabase response
-            nl_dict = dict(nl_data)  # type: ignore
-            source_data = nl_dict.get("source")
 
-            newsletter = {
-                "id": str(nl_dict["id"]),
-                "subject": str(nl_dict["subject"]),
-                "plain_text": str(nl_dict["plain_text"] or ""),
-                "received_date": str(nl_dict["received_date"]),
-                "source_name": str(source_data["name"])
-                if source_data and isinstance(source_data, dict)
-                else "Unknown",
-                "ward_number": str(source_data["ward_number"])
-                if source_data
-                and isinstance(source_data, dict)
-                and source_data.get("ward_number")
-                else None,
-            }
-            newsletters.append(newsletter)
+def _newsletter_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    source = row.get("source")
+    source = source if isinstance(source, dict) else {}
+    return {
+        "id": str(row["id"]),
+        "subject": str(row["subject"]),
+        "plain_text": str(row["plain_text"] or ""),
+        "received_date": str(row["received_date"]),
+        "source_name": str(source["name"]) if source else "Unknown",
+        "ward_number": str(source["ward_number"])
+        if source.get("ward_number")
+        else None,
+    }
 
-        if not newsletters:
-            print(f"  ℹ No newsletters found for {topic} in week {week_id}")
-            return None
 
-        print(f"  ✓ Found {len(newsletters)} newsletters")
+def _build_report(
+    topic: str, week_id: str, newsletters: list[dict[str, Any]], model: str
+) -> WeeklyTopicReport | None:
+    """Extract facts (Phase 1) and synthesize the summary (Phase 2); None if either is empty."""
+    facts = extract_facts_from_newsletters(topic, newsletters, model)
 
-        # Phase 1: Extract facts (per-newsletter, then aggregate)
-        facts = extract_facts_from_newsletters(topic, newsletters, model)
-
-        if not facts:
-            print("  ℹ No developments extracted, skipping report generation")
-            return None
-
-        # Phase 2: Synthesize summary
-        summary = synthesize_weekly_summary(topic, facts, week_id, model)
-
-        if not summary:
-            print("  ℹ No summary generated, skipping report creation")
-            return None
-
-        # Build report object
-        newsletter_ids: list[NewsletterID] = []
-        for nl in newsletters:
-            nl_id = nl.get("id")
-            if nl_id:
-                newsletter_ids.append(NewsletterID(nl_id))
-        report = WeeklyTopicReport(
-            id="",  # Will be generated by database
-            topic=topic,
-            week_id=week_id,
-            report_summary=summary,
-            newsletter_ids=newsletter_ids,
-            key_developments=facts,
-            created_at=datetime.now(UTC),
-        )
-
-        print("  ✓ Report generated successfully")
-        return report
-
-    except Exception as e:  # noqa: BLE001  per-report boundary: log and skip the report
-        print(f"  ✗ Report generation failed: {e}")
+    if not facts:
+        logger.info("  ℹ No developments extracted, skipping report generation")
         return None
+
+    summary = synthesize_weekly_summary(topic, facts, week_id, model)
+
+    if not summary:
+        logger.info("  ℹ No summary generated, skipping report creation")
+        return None
+
+    report = WeeklyTopicReport(
+        id="",  # Will be generated by database
+        topic=topic,
+        week_id=week_id,
+        report_summary=summary,
+        newsletter_ids=[NewsletterID(nl["id"]) for nl in newsletters if nl.get("id")],
+        key_developments=facts,
+        created_at=datetime.now(UTC),
+    )
+
+    logger.info("  ✓ Report generated successfully")
+    return report

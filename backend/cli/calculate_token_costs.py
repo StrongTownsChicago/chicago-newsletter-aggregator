@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from llm_costs.cost_calculator import PricingData
 from llm_costs.cost_report_generator import (
     generate_combined_text_report,
@@ -49,15 +50,9 @@ def fetch_newsletters(
     source_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Fetch newsletters from database based on filters.
+    Fetch newsletters matching the filters (latest N, one ID, or one source).
 
-    Args:
-        latest: Number of most recent newsletters to fetch
-        newsletter_id: Specific newsletter ID
-        source_id: Filter by source ID
-
-    Returns:
-        List of newsletter dicts with id, subject, plain_text, topics, source info
+    Each dict carries id, subject, plain_text, topics and the joined source info.
     """
     supabase = get_supabase_client()
 
@@ -408,4 +403,5 @@ Examples:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

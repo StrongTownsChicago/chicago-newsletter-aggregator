@@ -1,9 +1,9 @@
-"""Unit tests for ingest/summary.py"""
+"""Unit tests for cli/ingest_summary.py"""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
-from ingest.summary import print_summary
+from cli.ingest_summary import print_summary
 
 
 class TestPrintSummary(unittest.TestCase):

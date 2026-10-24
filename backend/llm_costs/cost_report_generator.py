@@ -288,15 +288,9 @@ def generate_combined_text_report(
     model_pricing: ModelPricing,
 ) -> str:
     """
-    Generate combined text report including both newsletter and weekly costs.
+    Format a text report of newsletter and weekly report costs for one model.
 
-    Args:
-        newsletter_analyses: List of newsletter token analyses
-        weekly_analyses: List of weekly report token analyses
-        model_pricing: Pricing information for the model
-
-    Returns:
-        Formatted text report with newsletter and weekly costs
+    Returns "No newsletters analyzed." when newsletter_analyses is empty.
     """
     if not newsletter_analyses:
         return "No newsletters analyzed."

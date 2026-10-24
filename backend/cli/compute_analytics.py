@@ -61,7 +61,9 @@ from analytics.records import (
     select_as_of_month,
 )
 from analytics.terms import (
+    DistinctiveTuning,
     NewsletterTerms,
+    RisingTuning,
     build_name_tokens_by_ward,
     build_newsletter_terms,
     build_term_index,
@@ -76,6 +78,7 @@ from analytics.topic_reach import (
     select_broad_complete_months,
 )
 from analytics.ward_glance import WardGlanceSettings, build_ward_glances
+from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -251,12 +254,14 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
         compute_rising_terms(
             analysis.readable_documents,
             vocabulary,
-            latest_month=latest_month,
-            baseline_months=RISING_BASELINE_MONTHS,
-            min_latest_wards=RISING_MIN_LATEST_WARDS,
-            min_ward_gain=RISING_MIN_WARD_GAIN,
-            top_n=RISING_TOP_N,
-            min_phrase_words=RISING_MIN_PHRASE_WORDS,
+            latest_month,
+            RisingTuning(
+                baseline_months=RISING_BASELINE_MONTHS,
+                min_latest_wards=RISING_MIN_LATEST_WARDS,
+                min_ward_gain=RISING_MIN_WARD_GAIN,
+                top_n=RISING_TOP_N,
+                min_phrase_words=RISING_MIN_PHRASE_WORDS,
+            ),
         )
         if latest_month
         else {
@@ -300,12 +305,14 @@ def compute_outputs(analysis: ArchiveAnalysis) -> dict[str, Any]:
             "wards": compute_distinctive_terms(
                 documents,
                 vocabulary,
-                name_tokens_by_ward=build_name_tokens_by_ward(sources),
-                top_n=DISTINCTIVE_TOP_N,
-                min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
-                min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
-                max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
-                min_nested_term_similarity=DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY,
+                build_name_tokens_by_ward(sources),
+                DistinctiveTuning(
+                    top_n=DISTINCTIVE_TOP_N,
+                    min_ward_newsletters=DISTINCTIVE_MIN_WARD_NEWSLETTERS,
+                    min_term_newsletters_in_ward=DISTINCTIVE_MIN_TERM_NEWSLETTERS_IN_WARD,
+                    max_ward_share=DISTINCTIVE_MAX_WARD_SHARE,
+                    min_nested_term_similarity=DISTINCTIVE_MIN_NESTED_TERM_SIMILARITY,
+                ),
             )
         },
         "rising": rising,
@@ -427,4 +434,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

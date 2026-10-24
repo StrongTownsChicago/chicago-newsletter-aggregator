@@ -20,6 +20,7 @@ import argparse
 from collections import defaultdict
 from typing import Any, cast
 
+from cli.logging_setup import configure_cli_logging
 from processing.llm_processor import TOPICS as VALID_TOPICS
 from shared.db import get_supabase_client
 
@@ -253,4 +254,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

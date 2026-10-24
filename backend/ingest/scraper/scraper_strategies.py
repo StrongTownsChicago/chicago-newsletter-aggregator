@@ -106,5 +106,4 @@ def get_strategy_for_url(url: str) -> NewsletterArchiveStrategy:
     url_lower = url.lower()
     if "mailchi.mp" in url_lower or "campaign-archive.com" in url_lower:
         return MailChimpArchiveStrategy()
-    else:
-        return GenericListStrategy()
+    return GenericListStrategy()
