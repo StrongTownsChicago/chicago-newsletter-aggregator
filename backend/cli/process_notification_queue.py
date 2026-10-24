@@ -15,7 +15,7 @@ Usage:
 import argparse
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, cast
 from zoneinfo import ZoneInfo
@@ -139,8 +139,7 @@ def process_digests(
     if not batch_id:
         batch_id = config.batch_id_calculator()
 
-    digest_name = "daily" if digest_type == DigestType.DAILY else "weekly"
-    print(f"Processing {digest_name} digest for batch: {batch_id}")
+    print(f"Processing {_digest_name(digest_type)} digest for batch: {batch_id}")
 
     # Fetch pending notifications grouped by user (type-specific)
     notifications_by_user = config.fetch_notifications(batch_id)
@@ -151,149 +150,169 @@ def process_digests(
 
     print(f"Found notifications for {len(notifications_by_user)} users")
 
-    supabase = get_supabase_client()
-    stats = {"sent": 0, "failed": 0, "skipped": 0}
+    run = _DigestRun(get_supabase_client(), config, batch_id, dry_run)
 
-    # Process each user
     for user_id, notifications in notifications_by_user.items():
         print(f"\nProcessing user {user_id} ({len(notifications)} notifications)...")
+        if _process_user_digest(run, user_id, notifications):
+            # Rate limiting: max 10 emails/second
+            time.sleep(0.1)
 
-        # Get user email
-        user_response = (
-            supabase.table("user_profiles")
-            .select("email, notification_preferences")
-            .eq("id", user_id)
-            .single()
-            .execute()
+    _print_summary(run)
+    return run.stats
+
+
+@dataclass
+class _DigestRun:
+    """One batch being sent: what each user's step needs, and the running stats."""
+
+    supabase: Any
+    config: DigestConfig
+    batch_id: str
+    dry_run: bool
+    stats: dict[str, int] = field(
+        default_factory=lambda: {"sent": 0, "failed": 0, "skipped": 0}
+    )
+
+    @property
+    def digest_name(self) -> str:
+        return _digest_name(self.config.digest_type)
+
+
+def _digest_name(digest_type: DigestType) -> str:
+    return "daily" if digest_type == DigestType.DAILY else "weekly"
+
+
+def _process_user_digest(
+    run: _DigestRun, user_id: str, notifications: list[dict[str, Any]]
+) -> bool:
+    """Send one user's digest and record the outcome. False when the user is skipped unsent."""
+    user_response = (
+        run.supabase.table("user_profiles")
+        .select("email, notification_preferences")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+
+    if not user_response.data:
+        print("  ⚠️  User profile not found, skipping")
+        run.stats["skipped"] += 1
+        return False
+
+    user_data = cast(dict[str, Any], user_response.data)
+    user_email = cast(str, user_data["email"])
+    preferences = cast(dict[str, Any], user_data.get("notification_preferences", {}))
+
+    # Double-check notifications are enabled (should be filtered already, but be safe)
+    if not preferences.get("enabled", True):
+        print("  ⚠️  Notifications disabled for user, skipping")
+        run.stats["skipped"] += 1
+        _mark_notifications_failed(
+            run.supabase, notifications, "User notifications disabled"
+        )
+        return False
+
+    if run.dry_run:
+        print(f"  [DRY RUN] Would send {run.digest_name} digest to {user_email}")
+        run.stats["sent"] += 1
+    else:
+        result = send_digest(user_id, user_email, notifications, run.config.digest_type)
+        _record_send_result(run, user_id, notifications, result)
+    return True
+
+
+def _record_send_result(
+    run: _DigestRun,
+    user_id: str,
+    notifications: list[dict[str, Any]],
+    result: dict[str, Any],
+) -> None:
+    """Update the queue and history for a sent, empty or failed digest."""
+    if result["success"]:
+        print(f"  ✓ Sent digest to user {user_id}")
+        run.stats["sent"] += 1
+
+        # Update notification queue status
+        notification_ids = [n["id"] for n in notifications]
+        run.supabase.table("notification_queue").update(
+            {"status": "sent", "sent_at": "now()"}
+        ).in_("id", notification_ids).execute()
+
+        _record_history(
+            run,
+            user_id,
+            notifications,
+            {"success": True, "resend_email_id": result.get("email_id")},
         )
 
-        if not user_response.data:
-            print("  ⚠️  User profile not found, skipping")
-            stats["skipped"] += 1
-            continue
+    elif result.get("error") == "Empty digest content":
+        print(f"  ⚠ Skipped user {user_id}: Empty digest content")
+        run.stats["skipped"] += 1
 
-        user_data = cast(dict[str, Any], user_response.data)
-        user_email = cast(str, user_data["email"])
-        preferences = cast(
-            dict[str, Any], user_data.get("notification_preferences", {})
+        # Update notification queue with skip reason
+        _mark_notifications_failed(run.supabase, notifications, result["error"])
+
+        # Record skip in history (as failure, but with specific reason)
+        _record_history(
+            run,
+            user_id,
+            notifications,
+            {"success": False, "error_message": result["error"]},
         )
 
-        # Double-check notifications are enabled (should be filtered already, but be safe)
-        if not preferences.get("enabled", True):
-            print("  ⚠️  Notifications disabled for user, skipping")
-            stats["skipped"] += 1
-            _mark_notifications_failed(
-                supabase, notifications, "User notifications disabled"
-            )
-            continue
+    else:
+        error_msg = cast(str, result.get("error", "Unknown error"))
+        print(f"  ✗ Failed to send to user {user_id}: {error_msg}")
+        run.stats["failed"] += 1
 
-        # Send digest email (type-specific sender)
-        if dry_run:
-            print(f"  [DRY RUN] Would send {digest_name} digest to {user_email}")
-            stats["sent"] += 1
-        else:
-            result = send_digest(user_id, user_email, notifications, config.digest_type)
+        error_file = log_notification_error(
+            error_type="sending",
+            error_message=error_msg,
+            context={
+                "user_id": user_id,
+                "batch_id": run.batch_id,
+                "notification_count": len(notifications),
+                "content_ids": _extract_content_ids(notifications),
+            },
+        )
+        print(f"    Error details logged to: {error_file}")
 
-            if result["success"]:
-                print(f"  ✓ Sent digest to user {user_id}")
-                stats["sent"] += 1
+        _mark_notifications_failed(run.supabase, notifications, error_msg)
+        _record_history(
+            run, user_id, notifications, {"success": False, "error_message": error_msg}
+        )
 
-                # Update notification queue status
-                notification_ids = [n["id"] for n in notifications]
-                supabase.table("notification_queue").update(
-                    {"status": "sent", "sent_at": "now()"}
-                ).in_("id", notification_ids).execute()
 
-                # Record in history
-                # Extract content IDs (works for both newsletter_id and report_id)
-                content_ids = _extract_content_ids(notifications)
-                rule_ids = list({n["rule_id"] for n in notifications})
+def _record_history(
+    run: _DigestRun,
+    user_id: str,
+    notifications: list[dict[str, Any]],
+    outcome: dict[str, Any],
+) -> None:
+    """Insert a notification_history row; `outcome` holds success and its detail."""
+    run.supabase.table("notification_history").insert(
+        {
+            "user_id": user_id,
+            # Stores both newsletter and report IDs
+            "newsletter_ids": _extract_content_ids(notifications),
+            "rule_ids": list({n["rule_id"] for n in notifications}),
+            "digest_batch_id": run.batch_id,
+            "delivery_type": run.config.delivery_type,
+            **outcome,
+        }
+    ).execute()
 
-                supabase.table("notification_history").insert(
-                    {
-                        "user_id": user_id,
-                        "newsletter_ids": content_ids,  # Stores both newsletter and report IDs
-                        "rule_ids": rule_ids,
-                        "digest_batch_id": batch_id,
-                        "delivery_type": config.delivery_type,
-                        "success": True,
-                        "resend_email_id": result.get("email_id"),
-                    }
-                ).execute()
 
-            elif result.get("error") == "Empty digest content":
-                print(f"  ⚠ Skipped user {user_id}: Empty digest content")
-                stats["skipped"] += 1
-
-                # Update notification queue with skip reason
-                _mark_notifications_failed(supabase, notifications, result["error"])
-
-                # Record skip in history (as failure, but with specific reason)
-                content_ids = _extract_content_ids(notifications)
-                rule_ids = list({n["rule_id"] for n in notifications})
-                supabase.table("notification_history").insert(
-                    {
-                        "user_id": user_id,
-                        "newsletter_ids": content_ids,
-                        "rule_ids": rule_ids,
-                        "digest_batch_id": batch_id,
-                        "delivery_type": config.delivery_type,
-                        "success": False,
-                        "error_message": result["error"],
-                    }
-                ).execute()
-
-            else:
-                error_msg = cast(str, result.get("error", "Unknown error"))
-                print(f"  ✗ Failed to send to user {user_id}: {error_msg}")
-                stats["failed"] += 1
-
-                # Log error to file
-                content_ids = _extract_content_ids(notifications)
-                error_file = log_notification_error(
-                    error_type="sending",
-                    error_message=error_msg,
-                    context={
-                        "user_id": user_id,
-                        "batch_id": batch_id,
-                        "notification_count": len(notifications),
-                        "content_ids": content_ids,  # Works for both newsletter and report IDs
-                    },
-                )
-                print(f"    Error details logged to: {error_file}")
-
-                # Update notification queue with error
-                _mark_notifications_failed(supabase, notifications, error_msg)
-
-                # Record failure in history
-                rule_ids = list({n["rule_id"] for n in notifications})
-
-                supabase.table("notification_history").insert(
-                    {
-                        "user_id": user_id,
-                        "newsletter_ids": content_ids,  # Stores both newsletter and report IDs
-                        "rule_ids": rule_ids,
-                        "digest_batch_id": batch_id,
-                        "delivery_type": config.delivery_type,
-                        "success": False,
-                        "error_message": error_msg,
-                    }
-                ).execute()
-
-        # Rate limiting: max 10 emails/second
-        time.sleep(0.1)
-
-    # Print summary
+def _print_summary(run: _DigestRun) -> None:
     print(f"\n{'=' * 60}")
-    print(f"{digest_name.title()} Digest Processing Complete")
+    print(f"{run.digest_name.title()} Digest Processing Complete")
     print(f"{'=' * 60}")
-    print(f"Batch ID: {batch_id}")
-    print(f"Sent:     {stats['sent']}")
-    print(f"Failed:   {stats['failed']}")
-    print(f"Skipped:  {stats['skipped']}")
-    print(f"Total:    {sum(stats.values())}")
-
-    return stats
+    print(f"Batch ID: {run.batch_id}")
+    print(f"Sent:     {run.stats['sent']}")
+    print(f"Failed:   {run.stats['failed']}")
+    print(f"Skipped:  {run.stats['skipped']}")
+    print(f"Total:    {sum(run.stats.values())}")
 
 
 def process_daily_digests(

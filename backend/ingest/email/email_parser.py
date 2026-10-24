@@ -31,80 +31,75 @@ def sanitize_content(
     selectors = privacy_patterns.get("selectors", [])
 
     if content_type == "html":
-        try:
-            soup = BeautifulSoup(content, "html.parser")
-
-            # 1. Remove by CSS Selector (containers like footers)
-            for selector in selectors:
-                for match in soup.select(selector):
-                    match.decompose()
-
-            # 2. Remove <a> tags by URL or Link Text
-            for a in soup.find_all("a", href=True):
-                href = cast(str, a["href"])
-                text = a.get_text(" ", strip=True)
-
-                url_matched = False
-                for pattern in url_patterns:
-                    if re.search(pattern, href, re.IGNORECASE):
-                        url_matched = True
-                        break
-
-                text_matched = False
-                for pattern in text_patterns:
-                    if re.search(pattern, text, re.IGNORECASE):
-                        text_matched = True
-                        break
-
-                if text_matched:
-                    a.decompose()
-                elif url_matched:
-                    a.unwrap()
-
-            result = str(soup)
-
-        except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
-            print(f"  ⚠️  HTML Sanitization failed: {e}")
-            result = content
-
+        result = _sanitize_html(content, url_patterns, text_patterns, selectors)
     elif content_type == "text":
-        # For text, we'll strip lines that look like privacy links or are standalone keywords
-        lines = content.splitlines()
-        clean_lines = []
-        for line in lines:
-            # 1. Skip if line contains a known bad URL pattern
-            if any(re.search(p, line, re.IGNORECASE) for p in url_patterns):
-                continue
-
-            # 2. Skip if line is a standalone sensitive keyword (heuristic for plain text links)
-            # We wrap the patterns in start/end anchor to ensure we don't catch sentences
-            is_standalone_keyword = False
-            for pattern in text_patterns:
-                # Build a strict line match regex for this pattern
-                strict_pattern = rf"^\s*{pattern}\s*$"
-                if re.match(strict_pattern, line, re.IGNORECASE):
-                    is_standalone_keyword = True
-                    break
-
-            if is_standalone_keyword:
-                continue
-
-            clean_lines.append(line)
-        result = "\n".join(clean_lines)
+        result = _sanitize_text(content, url_patterns, text_patterns)
     else:
         result = content
 
     # 3. Strip sensitive phrases (names, emails, etc.) from environment variable
     phrases_to_strip = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
-    phrases_to_strip = [p.strip() for p in phrases_to_strip if p.strip()]
+    return _redact_phrases(result, [p.strip() for p in phrases_to_strip if p.strip()])
 
-    if phrases_to_strip:
-        for phrase in phrases_to_strip:
-            # Use escape to ensure any special regex characters don't break things
-            pattern = re.escape(phrase)
-            result = re.sub(pattern, "[REDACTED]", result, flags=re.IGNORECASE)
 
-    return result
+def _matches_any(patterns: list[str], value: str) -> bool:
+    return any(re.search(pattern, value, re.IGNORECASE) for pattern in patterns)
+
+
+def _sanitize_html(
+    content: str,
+    url_patterns: list[str],
+    text_patterns: list[str],
+    selectors: list[str],
+) -> str:
+    try:
+        soup = BeautifulSoup(content, "html.parser")
+
+        # 1. Remove by CSS Selector (containers like footers)
+        for selector in selectors:
+            for match in soup.select(selector):
+                match.decompose()
+
+        # 2. Remove <a> tags by URL or Link Text
+        for a in soup.find_all("a", href=True):
+            url_matched = _matches_any(url_patterns, cast(str, a["href"]))
+            if _matches_any(text_patterns, a.get_text(" ", strip=True)):
+                a.decompose()
+            elif url_matched:
+                a.unwrap()
+
+        return str(soup)
+
+    except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
+        print(f"  ⚠️  HTML Sanitization failed: {e}")
+        return content
+
+
+def _is_standalone_keyword(line: str, text_patterns: list[str]) -> bool:
+    """Whether the whole line is one sensitive keyword (a plain-text link), not a sentence."""
+    return any(
+        re.match(rf"^\s*{pattern}\s*$", line, re.IGNORECASE)
+        for pattern in text_patterns
+    )
+
+
+def _sanitize_text(
+    content: str, url_patterns: list[str], text_patterns: list[str]
+) -> str:
+    """Drop lines holding a privacy URL and lines that are a standalone sensitive keyword."""
+    return "\n".join(
+        line
+        for line in content.splitlines()
+        if not _matches_any(url_patterns, line)
+        and not _is_standalone_keyword(line, text_patterns)
+    )
+
+
+def _redact_phrases(content: str, phrases: list[str]) -> str:
+    for phrase in phrases:
+        # Escaped so regex characters in a phrase match literally
+        content = re.sub(re.escape(phrase), "[REDACTED]", content, flags=re.IGNORECASE)
+    return content
 
 
 SQL_ANY_CHARACTERS_WILDCARD = "%"

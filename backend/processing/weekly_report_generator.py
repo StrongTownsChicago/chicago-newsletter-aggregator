@@ -238,26 +238,50 @@ def generate_weekly_topic_report(
     Returns:
         WeeklyTopicReport object or None if no content or processing failed
     """
-    # Validate topic
-    if topic not in TOPICS:
-        print(f"  ✗ Invalid topic: {topic}")
-        return None
-
-    # Validate week_id format (basic check before RPC call)
-    try:
-        year_str, week_str = week_id.split("-W")
-        int(year_str)
-        int(week_str)
-    except ValueError:
-        print(f"  ✗ Invalid week_id format: {week_id} (expected YYYY-WXX)")
+    if not _is_valid_report_request(topic, week_id):
         return None
 
     # Query newsletters for this topic and week
     print(f"\n=== Generating report for {topic} (week {week_id}) ===")
 
     supabase = get_supabase_client()
+    week_range = _fetch_week_range(supabase, week_id)
+    if week_range is None:
+        return None
 
-    # Get week date range from PostgreSQL function
+    try:
+        newsletters = _fetch_topic_newsletters(supabase, topic, *week_range)
+
+        if not newsletters:
+            print(f"  ℹ No newsletters found for {topic} in week {week_id}")
+            return None
+
+        print(f"  ✓ Found {len(newsletters)} newsletters")
+        return _build_report(topic, week_id, newsletters, model)
+
+    except Exception as e:  # noqa: BLE001  per-report boundary: log and skip the report
+        print(f"  ✗ Report generation failed: {e}")
+        return None
+
+
+def _is_valid_report_request(topic: str, week_id: str) -> bool:
+    """Check the topic is known and week_id looks like YYYY-WXX, before any RPC call."""
+    if topic not in TOPICS:
+        print(f"  ✗ Invalid topic: {topic}")
+        return False
+
+    try:
+        year_str, week_str = week_id.split("-W")
+        int(year_str)
+        int(week_str)
+    except ValueError:
+        print(f"  ✗ Invalid week_id format: {week_id} (expected YYYY-WXX)")
+        return False
+    return True
+
+
+def _fetch_week_range(supabase: Any, week_id: str) -> tuple[str, str] | None:
+    """The week's first and last dates from the get_week_date_range function, or None."""
     try:
         week_range_result = supabase.rpc(
             "get_week_date_range", {"week_id_param": week_id}
@@ -267,90 +291,74 @@ def generate_weekly_topic_report(
             print(f"  ✗ Invalid week_id: {week_id}")
             return None
 
-        week_range = dict(week_range_result.data[0])  # type: ignore
+        week_range = dict(week_range_result.data[0])
         week_start = str(week_range["week_start"])
         week_end = str(week_range["week_end"])
         print(f"  → Querying newsletters from {week_start} to {week_end}...")
+        return week_start, week_end
 
     except Exception as e:  # noqa: BLE001  database boundary: log and skip the report
         print(f"  ✗ Failed to calculate week range: {e}")
         return None
 
-    try:
-        # Query newsletters (filtered in PostgreSQL)
-        response = (
-            supabase.table("newsletters")
-            .select(
-                "id, subject, plain_text, received_date, source:sources(name, ward_number)"
-            )
-            .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
-            .gte("received_date", week_start)  # PostgreSQL date filter
-            .lte("received_date", week_end)  # PostgreSQL date filter
-            .execute()
+
+def _fetch_topic_newsletters(
+    supabase: Any, topic: str, week_start: str, week_end: str
+) -> list[dict[str, Any]]:
+    """Newsletters tagged with the topic and received in the week (filtered in PostgreSQL)."""
+    response = (
+        supabase.table("newsletters")
+        .select(
+            "id, subject, plain_text, received_date, source:sources(name, ward_number)"
         )
+        .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
+        .gte("received_date", week_start)
+        .lte("received_date", week_end)
+        .execute()
+    )
+    return [_newsletter_from_row(dict(row)) for row in response.data]
 
-        # Process results
-        newsletters = []
-        for nl_data in response.data:
-            # Type assertions for Supabase response
-            nl_dict = dict(nl_data)  # type: ignore
-            source_data = nl_dict.get("source")
 
-            newsletter = {
-                "id": str(nl_dict["id"]),
-                "subject": str(nl_dict["subject"]),
-                "plain_text": str(nl_dict["plain_text"] or ""),
-                "received_date": str(nl_dict["received_date"]),
-                "source_name": str(source_data["name"])
-                if source_data and isinstance(source_data, dict)
-                else "Unknown",
-                "ward_number": str(source_data["ward_number"])
-                if source_data
-                and isinstance(source_data, dict)
-                and source_data.get("ward_number")
-                else None,
-            }
-            newsletters.append(newsletter)
+def _newsletter_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    source = row.get("source")
+    source = source if isinstance(source, dict) else {}
+    return {
+        "id": str(row["id"]),
+        "subject": str(row["subject"]),
+        "plain_text": str(row["plain_text"] or ""),
+        "received_date": str(row["received_date"]),
+        "source_name": str(source["name"]) if source else "Unknown",
+        "ward_number": str(source["ward_number"])
+        if source.get("ward_number")
+        else None,
+    }
 
-        if not newsletters:
-            print(f"  ℹ No newsletters found for {topic} in week {week_id}")
-            return None
 
-        print(f"  ✓ Found {len(newsletters)} newsletters")
+def _build_report(
+    topic: str, week_id: str, newsletters: list[dict[str, Any]], model: str
+) -> WeeklyTopicReport | None:
+    """Extract facts (Phase 1) and synthesize the summary (Phase 2); None if either is empty."""
+    facts = extract_facts_from_newsletters(topic, newsletters, model)
 
-        # Phase 1: Extract facts (per-newsletter, then aggregate)
-        facts = extract_facts_from_newsletters(topic, newsletters, model)
-
-        if not facts:
-            print("  ℹ No developments extracted, skipping report generation")
-            return None
-
-        # Phase 2: Synthesize summary
-        summary = synthesize_weekly_summary(topic, facts, week_id, model)
-
-        if not summary:
-            print("  ℹ No summary generated, skipping report creation")
-            return None
-
-        # Build report object
-        newsletter_ids: list[NewsletterID] = []
-        for nl in newsletters:
-            nl_id = nl.get("id")
-            if nl_id:
-                newsletter_ids.append(NewsletterID(nl_id))
-        report = WeeklyTopicReport(
-            id="",  # Will be generated by database
-            topic=topic,
-            week_id=week_id,
-            report_summary=summary,
-            newsletter_ids=newsletter_ids,
-            key_developments=facts,
-            created_at=datetime.now(UTC),
-        )
-
-        print("  ✓ Report generated successfully")
-        return report
-
-    except Exception as e:  # noqa: BLE001  per-report boundary: log and skip the report
-        print(f"  ✗ Report generation failed: {e}")
+    if not facts:
+        print("  ℹ No developments extracted, skipping report generation")
         return None
+
+    summary = synthesize_weekly_summary(topic, facts, week_id, model)
+
+    if not summary:
+        print("  ℹ No summary generated, skipping report creation")
+        return None
+
+    report = WeeklyTopicReport(
+        id="",  # Will be generated by database
+        topic=topic,
+        week_id=week_id,
+        report_summary=summary,
+        newsletter_ids=[NewsletterID(nl["id"]) for nl in newsletters if nl.get("id")],
+        key_developments=facts,
+        created_at=datetime.now(UTC),
+    )
+
+    print("  ✓ Report generated successfully")
+    return report
