@@ -416,6 +416,35 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertNotIn("list-manage.com/unsubscribe", result["raw_html"])
 
     @patch("builtins.print")
+    def test_plain_text_body_is_sanitized(self, mock_print: MagicMock) -> None:
+        """The email's own plain text part is sanitized, not only the HTML."""
+        mock_supabase = create_mock_supabase(return_data=[])
+        mock_message = create_mock_mail_message(
+            text="Content\nUnsubscribe\nhttps://x.list-manage.com/unsubscribe?u=1"
+        )
+
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(result["plain_text"], "Content")
+
+    @patch("builtins.print")
+    def test_to_email_is_the_first_recipient(self, mock_print: MagicMock) -> None:
+        """to_email is the first recipient, or empty when there is none."""
+        mock_supabase = create_mock_supabase(return_data=[])
+        mock_message = create_mock_mail_message(
+            to=["first@example.com", "second@example.com"]
+        )
+
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
+        mock_message.to = []
+        no_recipient = parse_newsletter(
+            mock_message, mock_supabase, PRIVACY_PATTERNS_DICT
+        )
+
+        self.assertEqual(result["to_email"], "first@example.com")
+        self.assertEqual(no_recipient["to_email"], "")
+
+    @patch("builtins.print")
     def test_missing_subject_defaults(self, mock_print: MagicMock) -> None:
         """Email without subject gets default."""
         mock_supabase = create_mock_supabase(return_data=[])

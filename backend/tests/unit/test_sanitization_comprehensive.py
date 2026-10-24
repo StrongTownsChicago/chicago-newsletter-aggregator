@@ -285,6 +285,40 @@ Keep this sentence: I will not unsubscribe from your great news.
         self.assertEqual(once, "[REDACTED] met [REDACTED]")
         self.assertEqual(twice, once)
 
+    def test_longer_phrases_are_redacted_whole(self) -> None:
+        """A phrase that contains a shorter one ("Jane Roe", "Jane") is redacted entirely."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane,Jane Roe"}):
+            sanitized = sanitize_content("From Jane Roe", "text", PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(sanitized, "From [REDACTED]")
+
+    def test_html_parser_failure_falls_back_to_redacted_original(self) -> None:
+        """If the HTML sanitizer raises, the original content is kept, still redacted."""
+        html = '<a href="https://x.list-manage.com/unsubscribe">Jane</a>'
+        with (
+            patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane"}),
+            patch(
+                "ingest.email.email_parser.BeautifulSoup",
+                side_effect=ValueError("parser failed"),
+            ),
+            patch("builtins.print"),
+        ):
+            sanitized = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(
+            sanitized, '<a href="https://x.list-manage.com/unsubscribe">[REDACTED]</a>'
+        )
+
+    def test_unknown_content_type_is_only_redacted(self) -> None:
+        """Content that is neither HTML nor text skips link and line filtering."""
+        content = "Tom & Jerry\nUnsubscribe"
+        for content_type in ("csv", "markdown", "xml"):
+            with self.subTest(content_type=content_type):
+                self.assertEqual(
+                    sanitize_content(content, content_type, PRIVACY_PATTERNS_DICT),
+                    content,
+                )
+
     def test_html_redaction_leaves_markup_intact(self) -> None:
         """Phrases are redacted in text and attribute values, never in tag or attribute names."""
         html = '<p align="center" title="From Al"><!-- Al -->Al wrote</p>'
