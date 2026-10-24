@@ -17,6 +17,7 @@ import os
 
 from dotenv import load_dotenv
 
+from cli.logging_setup import configure_cli_logging
 from models.types import NewsletterID
 from models.weekly_report import KeyDevelopment, WeeklySynthesis
 from processing.llm_processor import call_llm
@@ -237,4 +238,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

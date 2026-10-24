@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from notifications.digest_config import DigestType
 from notifications.digest_data import (
     fetch_newsletter_details,
@@ -268,4 +269,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

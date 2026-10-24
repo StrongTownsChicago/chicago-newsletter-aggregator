@@ -13,6 +13,7 @@ Usage:
 
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
 
@@ -217,4 +218,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

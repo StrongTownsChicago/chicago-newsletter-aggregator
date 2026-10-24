@@ -33,9 +33,10 @@ from typing import Any, cast
 from dotenv import load_dotenv
 from imap_tools import AND, MailBox, MailMessageFlags  # type: ignore[attr-defined]
 
+from cli.ingest_summary import print_summary
+from cli.logging_setup import configure_cli_logging
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import parse_newsletter
-from ingest.summary import print_summary
 from shared.dates import CHICAGO_TIMEZONE
 from shared.db import get_supabase_client
 
@@ -80,34 +81,12 @@ def save_unmapped_report(unmapped_emails: list[dict[str, str]]) -> None:
 
 def process_new_newsletters() -> None:
     """
-    Process unread newsletters from Gmail inbox via IMAP.
+    Ingest unread Gmail newsletters: match sources, optionally run the LLM, store.
 
-    This function connects to Gmail, fetches unread emails, matches them to sources,
-    optionally processes with LLM, and stores them in the database. Emails are marked
-    as read after processing to prevent reprocessing.
-
-    Usage:
-        Run from the backend/ directory:
-
-        $ uv run python -m cli.process_emails
-
-    Required environment variables:
-        - GMAIL_ADDRESS: Gmail account email address
-        - GMAIL_APP_PASSWORD: Gmail app password (not regular password)
-        - SUPABASE_URL: Supabase project URL
-        - SUPABASE_SERVICE_KEY: Supabase service role key
-
-    Optional environment variables:
-        - ENABLE_LLM: Set to "true" to process with Ollama (default: "false")
-        - ENABLE_NOTIFICATIONS: Set to "true" to queue notifications (default: "false")
-        - OLLAMA_MODEL: LLM model name (default: "gpt-oss:20b")
-
-    Behavior:
-        - Fetches only unread emails to avoid duplicates
-        - Skips emails already in database (by email_uid)
-        - Logs unmapped emails to a timestamped report file
-        - Marks emails as read after processing (even unmapped ones)
-        - Continues processing even if individual emails fail
+    Only unread emails are fetched, and ones already stored (by email_uid) are
+    skipped. Every email is marked read after processing, including unmapped ones,
+    which are logged to a timestamped report file. A failing email does not stop
+    the run. Environment variables are listed in the module docstring.
     """
 
     print(f"[{datetime.now(CHICAGO_TIMEZONE)}] Starting newsletter ingestion...")
@@ -230,4 +209,5 @@ def process_new_newsletters() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     process_new_newsletters()

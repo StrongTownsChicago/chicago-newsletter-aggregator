@@ -5,12 +5,15 @@ Matches newsletters against user-defined notification rules and queues
 notifications for delivery.
 """
 
+import logging
 from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from notifications.error_logger import log_notification_error
 from shared.db import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 def match_newsletter_to_rules(
@@ -88,7 +91,7 @@ def match_newsletter_to_rules(
                 "newsletter_source_id": newsletter_data.get("source_id"),
             },
         )
-        print(
+        logger.warning(
             f"  ⚠️  Error matching newsletter to rules. Details logged to: {error_file}"
         )
         # Return empty list to avoid breaking ingestion
@@ -183,7 +186,7 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
                     failed_notifications.append(
                         {"notification": notification, "error": error_str}
                     )
-                print(
+                logger.warning(
                     f"  ⚠ Could not queue notification for user {notification['user_id']}: {e}"
                 )
 
@@ -209,7 +212,9 @@ def queue_notifications(newsletter_id: str, matched_rules: list[dict[str, Any]])
                 "matched_rules_count": len(matched_rules),
             },
         )
-        print(f"  ⚠️  Error queuing notifications. Details logged to: {error_file}")
+        logger.warning(
+            f"  ⚠️  Error queuing notifications. Details logged to: {error_file}"
+        )
         return 0
 
 

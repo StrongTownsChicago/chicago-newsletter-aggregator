@@ -8,11 +8,14 @@ prefix default to Ollama for backward compatibility.
 """
 
 import json
+import logging
 import time
 from typing import Any
 
 from ollama import Client
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 # LLM processing limits
 MAX_LLM_RETRIES = 6
@@ -163,7 +166,7 @@ def _call_ollama(
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2**attempt
-                print(
+                logger.warning(
                     f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
                 )
                 time.sleep(wait_time)
@@ -257,7 +260,7 @@ def _call_openai(
         except Exception as e:
             if attempt < max_retries - 1:
                 wait_time = 2**attempt
-                print(
+                logger.warning(
                     f"  ⚠ Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s..."
                 )
                 time.sleep(wait_time)

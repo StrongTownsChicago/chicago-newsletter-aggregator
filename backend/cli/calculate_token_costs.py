@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from cli.logging_setup import configure_cli_logging
 from llm_costs.cost_calculator import PricingData
 from llm_costs.cost_report_generator import (
     generate_combined_text_report,
@@ -402,4 +403,5 @@ Examples:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

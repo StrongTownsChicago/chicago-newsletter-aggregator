@@ -29,6 +29,7 @@ from typing import Any, cast
 
 from dotenv import load_dotenv
 
+from cli.logging_setup import configure_cli_logging
 from processing.llm_processor import extract_newsletter_metadata
 from shared.db import get_supabase_client
 
@@ -307,4 +308,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

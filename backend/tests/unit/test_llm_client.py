@@ -26,6 +26,11 @@ from tests.fixtures.mock_helpers import (
     create_mock_ollama_client,
     create_mock_openai_client,
 )
+from tests.fixtures.quiet_logging import quiet_logger
+
+
+def setUpModule() -> None:
+    quiet_logger("processing.llm_client")
 
 
 class TestParseModelString(unittest.TestCase):
@@ -176,9 +181,8 @@ class TestCallOllama(unittest.TestCase):
 
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_retry_on_failure(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """Failed calls retry with exponential backoff."""
         success_response = Mock()
@@ -200,9 +204,8 @@ class TestCallOllama(unittest.TestCase):
 
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_max_retries_raises(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """All retries exhausted raises an exception."""
         mock_client = Mock()
@@ -215,9 +218,8 @@ class TestCallOllama(unittest.TestCase):
 
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_empty_response_triggers_retry(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """Empty response triggers retry."""
         empty_response = Mock()
@@ -232,9 +234,8 @@ class TestCallOllama(unittest.TestCase):
 
     @patch("processing.llm_client._get_ollama_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_whitespace_response_triggers_retry(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """Whitespace-only response triggers retry."""
         whitespace_response = Mock()
@@ -307,9 +308,8 @@ class TestCallOpenAI(unittest.TestCase):
 
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_retry_on_failure(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """Failed OpenAI calls retry with exponential backoff."""
         success_mock = create_mock_openai_client('{"topics": []}')
@@ -329,9 +329,8 @@ class TestCallOpenAI(unittest.TestCase):
 
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_max_retries_raises(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """All OpenAI retries exhausted raises exception."""
         mock_client = Mock()
@@ -344,9 +343,8 @@ class TestCallOpenAI(unittest.TestCase):
 
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_empty_response_triggers_retry(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """Empty OpenAI response content triggers retry."""
         mock_client = create_mock_openai_client("")
@@ -358,9 +356,8 @@ class TestCallOpenAI(unittest.TestCase):
 
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_refusal_treated_as_error(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """OpenAI content policy refusal is treated as an error and retried."""
         mock_client = Mock()
@@ -378,9 +375,8 @@ class TestCallOpenAI(unittest.TestCase):
 
     @patch("processing.llm_client._get_openai_client")
     @patch("time.sleep")
-    @patch("builtins.print")
     def test_api_key_error_propagated(
-        self, mock_print: MagicMock, mock_sleep: MagicMock, mock_get_client: MagicMock
+        self, mock_sleep: MagicMock, mock_get_client: MagicMock
     ) -> None:
         """AuthenticationError propagates after exhausting retries."""
         import httpx

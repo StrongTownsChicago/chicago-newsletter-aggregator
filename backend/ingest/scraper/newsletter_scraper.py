@@ -2,6 +2,7 @@
 Main newsletter scraper - fetches newsletter archives and individual newsletters.
 """
 
+import logging
 import time
 from typing import cast
 
@@ -10,6 +11,8 @@ from bs4 import BeautifulSoup
 
 from ingest.email.email_parser import clean_html_content
 from ingest.scraper.scraper_strategies import get_strategy_for_url
+
+logger = logging.getLogger(__name__)
 
 
 class NewsletterScraper:
@@ -33,25 +36,27 @@ class NewsletterScraper:
                 return cast(str, response.text)
             except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
-                    print(f"  ⚠ Archive fetch failed (attempt {attempt + 1}): {e}")
+                    logger.warning(
+                        f"  ⚠ Archive fetch failed (attempt {attempt + 1}): {e}"
+                    )
                     time.sleep(2**attempt)
                 else:
-                    print(f"  ✗ Could not fetch archive: {e}")
+                    logger.error(f"  ✗ Could not fetch archive: {e}")
         return None
 
     def extract_newsletter_links(self, archive_url: str) -> list[dict[str, str]]:
         """Extract all newsletter links from archive page"""
-        print(f"→ Fetching archive: {archive_url}")
+        logger.info(f"→ Fetching archive: {archive_url}")
 
         html = self.fetch_archive_page(archive_url)
         if not html:
             return []
 
         strategy = get_strategy_for_url(archive_url)
-        print(f"  Using strategy: {strategy.__class__.__name__}")
+        logger.info(f"  Using strategy: {strategy.__class__.__name__}")
 
         newsletters = strategy.extract_newsletters(html, archive_url)
-        print(f"  ✓ Found {len(newsletters)} newsletters")
+        logger.info(f"  ✓ Found {len(newsletters)} newsletters")
 
         return newsletters
 
@@ -85,8 +90,10 @@ class NewsletterScraper:
 
             except Exception as e:  # noqa: BLE001  retry loop: any fetch error is retried, then reported
                 if attempt < self.max_retries - 1:
-                    print(f"  ⚠ Newsletter fetch failed (attempt {attempt + 1}): {e}")
+                    logger.warning(
+                        f"  ⚠ Newsletter fetch failed (attempt {attempt + 1}): {e}"
+                    )
                     time.sleep(2**attempt)
                 else:
-                    print(f"  ✗ Could not fetch newsletter: {url} - {e}")
+                    logger.error(f"  ✗ Could not fetch newsletter: {url} - {e}")
         return None

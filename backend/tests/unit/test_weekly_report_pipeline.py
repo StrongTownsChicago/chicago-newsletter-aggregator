@@ -1,8 +1,6 @@
 """Tests for generate_weekly_topic_report(): validation, week range, query and report assembly."""
 
-import io
 import unittest
-from contextlib import redirect_stdout
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +8,12 @@ from models.types import NewsletterID
 from models.weekly_report import KeyDevelopment
 from processing.weekly_report_generator import generate_weekly_topic_report
 from tests.fixtures.mock_helpers import create_mock_supabase
+from tests.fixtures.quiet_logging import quiet_logger
+
+
+def setUpModule() -> None:
+    quiet_logger("processing.weekly_report_generator")
+
 
 TOPIC = "missing_middle_housing"
 WEEK_ID = "2026-W42"
@@ -51,9 +55,6 @@ def supabase_with(
 @patch("processing.weekly_report_generator.extract_facts_from_newsletters")
 @patch("processing.weekly_report_generator.get_supabase_client")
 class TestGenerateWeeklyTopicReport(unittest.TestCase):
-    def setUp(self) -> None:
-        self.enterContext(redirect_stdout(io.StringIO()))
-
     def test_builds_report_from_the_weeks_newsletters(
         self, get_client: MagicMock, extract: MagicMock, synthesize: MagicMock
     ) -> None:

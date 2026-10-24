@@ -78,6 +78,7 @@ from analytics.topic_reach import (
     select_broad_complete_months,
 )
 from analytics.ward_glance import WardGlanceSettings, build_ward_glances
+from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -433,4 +434,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

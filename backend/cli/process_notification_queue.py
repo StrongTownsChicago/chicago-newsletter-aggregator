@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
+from cli.logging_setup import configure_cli_logging
 from notifications.digest_config import DigestType
 from notifications.email_sender import send_digest
 from notifications.error_logger import log_notification_error
@@ -392,4 +393,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

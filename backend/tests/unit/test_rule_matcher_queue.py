@@ -8,9 +8,14 @@ from notifications.rule_matcher import (
     queue_notifications,
 )
 from tests.fixtures.mock_helpers import create_mock_supabase
+from tests.fixtures.quiet_logging import quiet_logger
 from tests.fixtures.user_factory import (
     create_test_notification,
 )
+
+
+def setUpModule() -> None:
+    quiet_logger("notifications.rule_matcher")
 
 
 class TestQueueNotifications(unittest.TestCase):
@@ -18,10 +23,8 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
-    @patch("builtins.print")
     def test_queue_single_notification(
         self,
-        mock_print: MagicMock,
         mock_datetime: MagicMock,
         mock_get_supabase: MagicMock,
     ) -> None:
@@ -46,10 +49,8 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
-    @patch("builtins.print")
     def test_queue_multiple_notifications(
         self,
-        mock_print: MagicMock,
         mock_datetime: MagicMock,
         mock_get_supabase: MagicMock,
     ) -> None:
@@ -76,10 +77,8 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
-    @patch("builtins.print")
     def test_generates_batch_id(
         self,
-        mock_print: MagicMock,
         mock_datetime: MagicMock,
         mock_get_supabase: MagicMock,
     ) -> None:
@@ -103,10 +102,8 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.datetime")
-    @patch("builtins.print")
     def test_duplicate_handling(
         self,
-        mock_print: MagicMock,
         mock_datetime: MagicMock,
         mock_get_supabase: MagicMock,
     ) -> None:
@@ -145,10 +142,8 @@ class TestQueueNotifications(unittest.TestCase):
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
     @patch("notifications.rule_matcher.datetime")
-    @patch("builtins.print")
     def test_partial_failure_continues(
         self,
-        mock_print: MagicMock,
         mock_datetime: MagicMock,
         mock_log: MagicMock,
         mock_get_supabase: MagicMock,
@@ -192,9 +187,8 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
-    @patch("builtins.print")
     def test_error_logged_on_failure(
-        self, mock_print: MagicMock, mock_log: MagicMock, mock_get_supabase: MagicMock
+        self, mock_log: MagicMock, mock_get_supabase: MagicMock
     ) -> None:
         """Failures logged to file"""
         mock_get_supabase.side_effect = Exception("Database connection failed")

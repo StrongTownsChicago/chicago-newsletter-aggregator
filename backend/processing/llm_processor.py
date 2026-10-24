@@ -13,12 +13,15 @@ Pass a provider-prefixed model string (e.g., "openai:gpt-5") to use a cloud prov
 Bare model names default to Ollama for backward compatibility.
 """
 
+import logging
 from datetime import datetime
 
 from pydantic import BaseModel, Field
 
 from processing.llm_client import call_llm
 from shared.dates import CHICAGO_TIMEZONE
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["call_llm"]
 
@@ -80,18 +83,18 @@ Newsletter:
 {content}
 """
     try:
-        print("  → Extracting topics...")
+        logger.info("  → Extracting topics...")
         response = call_llm(model, prompt, TopicsExtraction.model_json_schema())
         data = TopicsExtraction.model_validate_json(response)
         # Filter to only valid topics
         valid_topics = [t for t in data.topics if t in TOPICS]
 
-        print(
+        logger.info(
             f"  ✓ Valid Topics: {', '.join(valid_topics) if valid_topics else 'none'}"
         )
         return valid_topics
     except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no topics
-        print(f"  ✗ Topic extraction failed: {e}")
+        logger.error(f"  ✗ Topic extraction failed: {e}")
         return []
 
 
@@ -124,13 +127,13 @@ Newsletter:
 """
 
     try:
-        print("  → Generating summary...")
+        logger.info("  → Generating summary...")
         response = call_llm(model, prompt, Summary.model_json_schema())
         data = Summary.model_validate_json(response)
-        print(f"  ✓ Summary: {data.summary}")
+        logger.info(f"  ✓ Summary: {data.summary}")
         return data.summary
     except Exception as e:  # noqa: BLE001  LLM boundary: a failed call yields no summary
-        print(f"  ✗ Summary generation failed: {e}")
+        logger.error(f"  ✗ Summary generation failed: {e}")
         return ""
 
 
@@ -150,7 +153,9 @@ def extract_newsletter_metadata(
 
     if len(plain_text) > max_chars:
         plain_text = plain_text[:max_chars]
-        print(f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars")
+        logger.warning(
+            f"  ⚠ Truncated: {len(newsletter['plain_text'])} → {max_chars} chars"
+        )
 
     today = datetime.now(CHICAGO_TIMEZONE).strftime("%Y-%m-%d")
     content = (

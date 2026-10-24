@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
+from cli.logging_setup import configure_cli_logging
 from models.weekly_report import WeeklyTopicReport
 from notifications.error_logger import log_notification_error
 from processing.weekly_report_generator import generate_weekly_topic_report
@@ -322,4 +323,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

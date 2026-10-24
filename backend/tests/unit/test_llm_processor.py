@@ -14,16 +14,22 @@ from processing.llm_processor import (
     extract_topics,
     generate_summary,
 )
+from tests.fixtures.quiet_logging import quiet_logger
+
+
+def setUpModule() -> None:
+    quiet_logger("processing.llm_processor")
+    quiet_logger("processing.llm_client")
+
+
+PROCESSOR_LOGGER = "processing.llm_processor"
 
 
 class TestExtractTopics(unittest.TestCase):
     """Tests for extract_topics() function"""
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_extract_valid_topics(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_extract_valid_topics(self, mock_call_llm: MagicMock) -> None:
         """LLM returns valid topics, filtered correctly"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "zoning_or_development_meeting_or_approval"]}'
@@ -37,10 +43,7 @@ class TestExtractTopics(unittest.TestCase):
         mock_call_llm.assert_called_once()
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_filters_invalid_topics(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_filters_invalid_topics(self, mock_call_llm: MagicMock) -> None:
         """LLM returns invalid topics, filtered out"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "invalid_topic", "not_in_list"]}'
@@ -52,10 +55,7 @@ class TestExtractTopics(unittest.TestCase):
         self.assertEqual(result, ["bike_lanes"])
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_returns_empty_on_no_topics(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_returns_empty_on_no_topics(self, mock_call_llm: MagicMock) -> None:
         """LLM returns no topics"""
         mock_call_llm.return_value = '{"topics": []}'
 
@@ -64,27 +64,18 @@ class TestExtractTopics(unittest.TestCase):
         self.assertEqual(result, [])
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_handles_llm_failure(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_handles_llm_failure(self, mock_call_llm: MagicMock) -> None:
         """LLM call fails, returns empty list"""
         mock_call_llm.side_effect = Exception("LLM service down")
 
-        result = extract_topics("Newsletter content", "test-model")
+        with self.assertLogs(PROCESSOR_LOGGER, level="ERROR") as logs:
+            result = extract_topics("Newsletter content", "test-model")
 
         self.assertEqual(result, [])
-        # Verify error message was printed
-        error_printed = any(
-            "Topic extraction failed" in str(call) for call in mock_print.call_args_list
-        )
-        self.assertTrue(error_printed)
+        self.assertIn("Topic extraction failed", logs.output[0])
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_topic_name_exact_match_required(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_topic_name_exact_match_required(self, mock_call_llm: MagicMock) -> None:
         """Topic names must match TOPICS list exactly"""
         # Return topics with wrong case
         mock_call_llm.return_value = '{"topics": ["Bike_Lanes", "TRANSIT_FUNDING"]}'
@@ -95,10 +86,7 @@ class TestExtractTopics(unittest.TestCase):
         self.assertEqual(result, [])
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_duplicate_topics_deduplicated(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_duplicate_topics_deduplicated(self, mock_call_llm: MagicMock) -> None:
         """LLM returns duplicates, should be handled"""
         mock_call_llm.return_value = (
             '{"topics": ["bike_lanes", "bike_lanes", "transit_funding"]}'
@@ -112,10 +100,7 @@ class TestExtractTopics(unittest.TestCase):
         self.assertIn("transit_funding", result)
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_prompt_includes_all_valid_topics(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_prompt_includes_all_valid_topics(self, mock_call_llm: MagicMock) -> None:
         """Prompt includes all topics from TOPICS constant"""
         mock_call_llm.return_value = '{"topics": []}'
 
@@ -134,10 +119,7 @@ class TestGenerateSummary(unittest.TestCase):
     """Tests for generate_summary() function"""
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_generate_valid_summary(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_generate_valid_summary(self, mock_call_llm: MagicMock) -> None:
         """LLM returns valid summary"""
         summary_text = "Ward 1 announces new bike lane on Main St. Public meeting scheduled for next week."
         mock_call_llm.return_value = f'{{"summary": "{summary_text}"}}'
@@ -148,10 +130,7 @@ class TestGenerateSummary(unittest.TestCase):
         mock_call_llm.assert_called_once()
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_max_length_enforced(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_max_length_enforced(self, mock_call_llm: MagicMock) -> None:
         """Pydantic validates ≤2000 chars"""
         # Create a summary >2000 chars
         long_summary = "x" * 2001
@@ -164,27 +143,19 @@ class TestGenerateSummary(unittest.TestCase):
         self.assertEqual(result, "")
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
-    def test_returns_empty_on_failure(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
-    ) -> None:
+    def test_returns_empty_on_failure(self, mock_call_llm: MagicMock) -> None:
         """LLM fails, returns empty string"""
         mock_call_llm.side_effect = Exception("LLM service down")
 
-        result = generate_summary("Newsletter content", "test-model")
+        with self.assertLogs(PROCESSOR_LOGGER, level="ERROR") as logs:
+            result = generate_summary("Newsletter content", "test-model")
 
         self.assertEqual(result, "")
-        # Verify error message was printed
-        error_printed = any(
-            "Summary generation failed" in str(call)
-            for call in mock_print.call_args_list
-        )
-        self.assertTrue(error_printed)
+        self.assertIn("Summary generation failed", logs.output[0])
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
     def test_prompt_warns_against_alfred_hallucination(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
+        self, mock_call_llm: MagicMock
     ) -> None:
         """Prompt includes warning about not assuming Alfred as first name"""
         mock_call_llm.return_value = '{"summary": "Test summary."}'
@@ -229,9 +200,8 @@ class TestProcessWithOllama(unittest.TestCase):
         mock_summary.assert_called_once()
 
     @patch("processing.llm_processor.call_llm")
-    @patch("builtins.print")
     def test_pipeline_makes_exactly_two_llm_calls(
-        self, mock_print: MagicMock, mock_call_llm: MagicMock
+        self, mock_call_llm: MagicMock
     ) -> None:
         """Pipeline calls the LLM once for topics and once for the summary"""
         mock_call_llm.side_effect = [
@@ -251,10 +221,9 @@ class TestProcessWithOllama(unittest.TestCase):
         )
 
     @patch("processing.llm_processor.extract_topics")
-    @patch("builtins.print")
     @patch("time.sleep")
     def test_truncation_applied(
-        self, mock_sleep: MagicMock, mock_print: MagicMock, mock_topics: MagicMock
+        self, mock_sleep: MagicMock, mock_topics: MagicMock
     ) -> None:
         """Content >100k chars truncated"""
         mock_topics.return_value = []
@@ -266,13 +235,10 @@ class TestProcessWithOllama(unittest.TestCase):
             "plain_text": long_content,
         }
 
-        extract_newsletter_metadata(newsletter, "test-model", max_chars=100000)
+        with self.assertLogs(PROCESSOR_LOGGER, level="WARNING") as logs:
+            extract_newsletter_metadata(newsletter, "test-model", max_chars=100000)
 
-        # Verify truncation message was printed
-        truncation_printed = any(
-            "Truncated: 150000" in str(call) for call in mock_print.call_args_list
-        )
-        self.assertTrue(truncation_printed)
+        self.assertIn("Truncated: 150000", logs.output[0])
 
         # Verify content passed to extract_topics is truncated
         call_args = mock_topics.call_args[0]
@@ -307,12 +273,10 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("builtins.print")
     @patch("time.sleep")
     def test_partial_failure_handling(
         self,
         mock_sleep: MagicMock,
-        mock_print: MagicMock,
         mock_summary: MagicMock,
         mock_topics: MagicMock,
     ) -> None:
@@ -335,12 +299,10 @@ class TestProcessWithOllama(unittest.TestCase):
 
     @patch("processing.llm_processor.extract_topics")
     @patch("processing.llm_processor.generate_summary")
-    @patch("builtins.print")
     @patch("time.sleep")
     def test_returns_empty_on_complete_failure(
         self,
         mock_sleep: MagicMock,
-        mock_print: MagicMock,
         mock_summary: MagicMock,
         mock_topics: MagicMock,
     ) -> None:

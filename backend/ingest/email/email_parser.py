@@ -1,9 +1,12 @@
+import logging
 import os
 import re
 from typing import Any, cast
 
 from bs4 import BeautifulSoup
 from html2text import html2text
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_content(
@@ -64,7 +67,7 @@ def _sanitize_html(
         return str(soup)
 
     except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
-        print(f"  ⚠️  HTML Sanitization failed: {e}")
+        logger.warning(f"  ⚠️  HTML Sanitization failed: {e}")
         return content
 
 
@@ -181,11 +184,13 @@ def parse_newsletter(
     if source:
         source_id = source.get("id")
         ward_number = source.get("ward_number")
-        print(f"  ✓ Matched to: {source.get('name')} ({source.get('source_type')})")
+        logger.info(
+            f"  ✓ Matched to: {source.get('name')} ({source.get('source_type')})"
+        )
     else:
         source_id = None
         ward_number = None
-        print(f"  ⚠️  No mapping found for: {msg.from_}")
+        logger.warning(f"  ⚠️  No mapping found for: {msg.from_}")
 
     # Get HTML content (prefer HTML over plain text)
     html_content = msg.html or ""

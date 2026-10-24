@@ -25,6 +25,7 @@ import argparse
 import difflib
 from typing import Any, cast
 
+from cli.logging_setup import configure_cli_logging
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import sanitize_content
 from shared.db import get_supabase_client
@@ -195,4 +196,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()

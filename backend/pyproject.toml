@@ -76,15 +76,6 @@ external = ["DS"]
 # Console reports for the analytics CLI.
 "analytics/io/output.py" = ["T20"]
 "analytics/io/snapshot_refresh.py" = ["T20"]
-# Library modules that use print as logging. This list only shrinks: moving one to `logging` removes its line.
-"ingest/email/email_parser.py" = ["T20"]
-"ingest/scraper/newsletter_scraper.py" = ["T20"]
-"notifications/digest_data.py" = ["T20"]
-"notifications/rule_matcher.py" = ["T20"]
-"processing/llm_client.py" = ["T20"]
-"processing/llm_processor.py" = ["T20"]
-"processing/weekly_report_generator.py" = ["T20"]
-"ingest/summary.py" = ["T20"]
 # Pydantic fields use these aliases; a `type` statement makes a TypeAliasType,
 # which Pydantic turns into a named schema reference instead of the plain type.
 "models/types.py" = ["UP040"]

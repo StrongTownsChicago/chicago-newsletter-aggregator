@@ -3,11 +3,14 @@
 Each function does all data work once, so the renderers only handle presentation.
 """
 
+import logging
 from datetime import datetime
 from typing import Any
 
 from notifications.digest_config import frontend_base_url
 from shared.db import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 def prepare_newsletter_data(
@@ -152,7 +155,7 @@ def fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]:
         return newsletters
 
     except Exception as e:  # noqa: BLE001  database boundary: log and return no newsletters
-        print(f"Warning: Failed to fetch newsletter details: {e}")
+        logger.warning(f"Warning: Failed to fetch newsletter details: {e}")
         return []
 
 

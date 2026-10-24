@@ -46,6 +46,7 @@ from cli.find_unprocessed_emails import (
     fetch_stored_email_uids,
     find_unprocessed_emails,
 )
+from cli.logging_setup import configure_cli_logging
 from ingest.email.email_parser import lookup_source_by_email
 from shared.db import get_supabase_client
 
@@ -270,4 +271,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    configure_cli_logging()
     main()
