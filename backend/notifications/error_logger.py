@@ -15,15 +15,10 @@ def log_notification_error(
     error_type: str, error_message: str, context: dict[str, Any] | None = None
 ) -> str:
     """
-    Log a notification error to a timestamped file.
+    Log a notification error to a timestamped file and return its path.
 
-    Args:
-        error_type: Type of error (e.g., 'matching', 'queuing', 'sending')
-        error_message: The error message
-        context: Optional dictionary with additional context (newsletter_id, user_id, etc.)
-
-    Returns:
-        Path to the log file created
+    `error_type` names the stage (e.g. 'matching', 'queuing', 'sending');
+    `context` carries extra details such as newsletter_id or user_id.
     """
     # Create logs directory if it doesn't exist
     log_dir = Path(__file__).parent / "logs"

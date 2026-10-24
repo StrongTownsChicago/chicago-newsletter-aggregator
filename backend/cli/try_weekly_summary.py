@@ -126,16 +126,10 @@ def synthesize_summary(
     model: str = "gpt-oss:20b",
 ) -> str:
     """
-    Generate summary using the FACTUAL_SUMMARY prompt.
+    Synthesize a summary of facts with the FACTUAL_SUMMARY prompt.
 
-    Args:
-        facts: List of KeyDevelopment objects
-        topic_display: Human-readable topic name
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        Generated summary text or error message
+    Returns the summary text, or "ERROR: ..." if the LLM call fails, so the
+    harness can show the failure as its output.
     """
     # Format facts for prompt
     facts_text = []

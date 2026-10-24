@@ -59,18 +59,11 @@ class Summary(BaseModel):
 
 def extract_topics(content: str, model: str) -> list[str]:
     """
-    Extract STC-relevant topics from newsletter content.
+    Extract STC-relevant topics from newsletter text (subject + body).
 
-    Uses LLM to identify which predefined topics (from TOPICS constant) are explicitly discussed
-    in the newsletter. Filters results to only valid topics. Prioritizes housing, transit, parking,
-    and governance-related content.
-
-    Args:
-        content: Newsletter text (subject + body)
-        model: Ollama model name to use
-
-    Returns:
-        List of topic strings from TOPICS that are relevant (empty list if none found or on error)
+    Asks the LLM which predefined TOPICS are explicitly discussed, prioritizing
+    housing, transit, parking and governance, and drops any topic not in TOPICS.
+    Returns an empty list if none are found or the call fails.
     """
 
     prompt = f"""Identify topics from this Chicago alderman newsletter relevant to Strong Towns Chicago.
@@ -106,16 +99,10 @@ def generate_summary(content: str, model: str) -> str:
     """
     Generate a 2-3 sentence summary prioritizing STC-relevant content.
 
-    Uses LLM to create a concise summary that leads with the most relevant content (meetings,
-    policy changes, development approvals, budget decisions, transit/street projects) before
-    mentioning other announcements. Includes alderman and ward information when available.
-
-    Args:
-        content: Newsletter text (subject + body)
-        model: Ollama model name to use
-
-    Returns:
-        2-3 sentence summary string (empty string on error)
+    The summary leads with meetings, policy changes, development approvals,
+    budget decisions and transit/street projects before other announcements,
+    and names the alderman and ward when available. Returns an empty string if
+    the call fails.
     """
 
     # The sentence about Alfred is to avoid hallucinations by the gpt-oss 20b.
@@ -153,18 +140,11 @@ def extract_newsletter_metadata(
     max_chars: int = MAX_NEWSLETTER_CHARS,
 ) -> dict[str, list[str] | str]:
     """
-    Process a newsletter through the complete LLM pipeline.
+    Process a newsletter ('subject' and 'plain_text') through the LLM pipeline.
 
-    Runs two sequential LLM calls to extract topics and generate a summary. Truncates content
-    to max_chars to prevent token limit issues.
-
-    Args:
-        newsletter: Newsletter dict with 'subject' and 'plain_text' keys
-        model: Ollama model name (default: "gpt-oss:20b")
-        max_chars: Maximum characters to send to LLM (default: MAX_NEWSLETTER_CHARS)
-
-    Returns:
-        Dict with keys: 'topics' (list[str]) and 'summary' (str)
+    Runs two sequential LLM calls to extract topics and generate a summary,
+    truncating the text to max_chars to stay within token limits. Returns a
+    dict with 'topics' (list[str]) and 'summary' (str).
     """
     plain_text = newsletter["plain_text"]
 

@@ -29,19 +29,9 @@ def extract_facts_from_single_newsletter(
     """
     Phase 1a: Extract structured facts from a single newsletter about a topic.
 
-    Analyzes one newsletter and extracts:
-    - Key decisions or announcements
-    - Development approvals or zoning changes
-    - Policy changes or ordinances
-    - Community meetings or hearings
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        newsletter: Newsletter dict with id, subject, plain_text, source_name, ward_number
-        model: Ollama model name
-
-    Returns:
-        List of KeyDevelopment objects with structured facts from this newsletter
+    Facts are key decisions or announcements, development approvals or zoning
+    changes, policy changes or ordinances, and community meetings or hearings.
+    newsletter needs id, subject, plain_text, source_name and ward_number.
     """
     ward_info = (
         f"Ward {newsletter.get('ward_number', 'Unknown')}"
@@ -117,14 +107,6 @@ def extract_facts_from_newsletters(
 
     Processes each newsletter individually to avoid context limit issues,
     then aggregates all extracted facts.
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        newsletters: List of newsletter dicts with id, subject, plain_text, source, ward
-        model: Ollama model name
-
-    Returns:
-        Aggregated list of KeyDevelopment objects from all newsletters
     """
     if not newsletters:
         print(f"  ℹ No newsletters for {topic}, skipping fact extraction")
@@ -152,23 +134,12 @@ def synthesize_weekly_summary(
     model: str = "gpt-oss:20b",
 ) -> str:
     """
-    Phase 2: Synthesize facts into narrative weekly summary.
+    Phase 2: Synthesize Phase 1 facts into a 2-4 paragraph weekly summary.
 
-    Takes structured facts and creates a 2-4 paragraph summary that:
-    - Identifies trends or patterns across wards
-    - Highlights most significant developments
-    - Notes any citywide implications
-    - Provides context on topic-specific activity level
-    - Applies Strong Towns perspective (safe streets, more housing, transit, fiscal responsibility)
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        facts: Extracted KeyDevelopment objects from Phase 1
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        Weekly summary text (2-4 paragraphs)
+    The summary identifies trends across wards, highlights the most significant
+    developments and citywide implications, gives context on the topic's
+    activity level, and applies a Strong Towns perspective (safe streets, more
+    housing, transit, fiscal responsibility). week_id is YYYY-WXX.
     """
     if not facts:
         print(f"  ℹ No facts to synthesize for {topic}")
@@ -220,23 +191,11 @@ def generate_weekly_topic_report(
     topic: str, week_id: str, model: str = "gpt-oss:20b"
 ) -> WeeklyTopicReport | None:
     """
-    Complete pipeline: Fetch newsletters, extract facts, synthesize summary.
+    Complete pipeline: fetch newsletters, extract facts, synthesize summary.
 
-    Orchestrates the full two-phase process:
-    1. Query newsletters tagged with topic from specified week
-    2. Extract structured facts via LLM (Phase 1)
-    3. Synthesize narrative summary via LLM (Phase 2)
-    4. Return complete WeeklyTopicReport object
-
-    Returns None if no newsletters found for topic/week or if processing fails.
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        week_id: Week identifier (YYYY-WXX)
-        model: Ollama model name
-
-    Returns:
-        WeeklyTopicReport object or None if no content or processing failed
+    Queries newsletters tagged with topic in week_id (YYYY-WXX), extracts facts
+    (Phase 1) and synthesizes the summary (Phase 2). Returns None if no
+    newsletters are found or processing fails.
     """
     if not _is_valid_report_request(topic, week_id):
         return None

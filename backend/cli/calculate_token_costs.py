@@ -49,15 +49,9 @@ def fetch_newsletters(
     source_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Fetch newsletters from database based on filters.
+    Fetch newsletters matching the filters (latest N, one ID, or one source).
 
-    Args:
-        latest: Number of most recent newsletters to fetch
-        newsletter_id: Specific newsletter ID
-        source_id: Filter by source ID
-
-    Returns:
-        List of newsletter dicts with id, subject, plain_text, topics, source info
+    Each dict carries id, subject, plain_text, topics and the joined source info.
     """
     supabase = get_supabase_client()
 

@@ -16,13 +16,8 @@ def prepare_newsletter_data(
     """
     Group notifications by newsletter, collect matching rules, and extract all needed data.
 
-    This does ALL data processing once so formatters only handle presentation.
-
-    Args:
-        notifications: List of notification records from database
-
-    Returns:
-        List of dicts with all formatted fields ready for display
+    This does ALL data processing once so formatters only handle presentation:
+    each returned dict holds the formatted fields ready for display.
     """
     # Group by newsletter and collect rule names
     newsletters_with_rules = {}
@@ -167,14 +162,9 @@ def prepare_weekly_report_data(
     """
     Extract and format weekly report data for email rendering.
 
-    Groups notifications by topic, fetches report summaries, formats data.
-
-    Args:
-        notifications: List of notification records from database
-                      (report data should be joined as 'report')
-
-    Returns:
-        List of dicts with topic, summary, newsletter_count, week_id, matched_rules
+    Groups notifications by topic; report data must be joined on each record
+    as 'report'. Returns dicts with topic, summary, newsletter_count, week_id
+    and matched_rules.
     """
     # Group by topic and collect rule names
     reports_with_rules = {}

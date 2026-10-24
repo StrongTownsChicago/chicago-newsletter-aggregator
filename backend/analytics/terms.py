@@ -291,19 +291,12 @@ def collapse_terms_sharing_newsletters(
     """Merge the fragments of one repeated block or phrase into one entry each.
 
     A standing block just under the boilerplate threshold yields dozens of
-    fragments ("procurement news", "certified vendor", "website provides"),
-    all in exactly the same newsletters, which would fill a ward's list with
-    one block. Walking the ranking, a term joins a group when its newsletters
-    are exactly the group's first term's, or when it nests with a member
-    (`are_nested_terms`) and its newsletters have at least
-    min_nested_similarity Jaccard similarity with the first term's;
-    otherwise it starts a group, up to limit groups.
-
-    Near-identical sets alone are not enough: a long weekly digest carries
-    several standing sections in nearly the same issues, and comparing
-    newsletter sets loosely merges them all. Each group is reported by
-    `choose_representative_term`, with the number of other terms it stands
-    for, ranked by its representative's score.
+    fragments in exactly the same newsletters. A term joins a group when its
+    newsletters equal the first term's, or when it nests with a member
+    (`are_nested_terms`) and reaches min_nested_similarity Jaccard with the
+    first term's; near-identical sets alone would merge a digest's separate
+    standing sections. Up to limit groups are reported by
+    `choose_representative_term`, with how many terms each stands for.
     """
     groups: list[list[DistinctiveTerm]] = []
     groups_by_newsletters: dict[frozenset[int], list[DistinctiveTerm]] = {}
@@ -477,20 +470,14 @@ def compute_rising_terms(
     latest_month: str,
     tuning: RisingTuning,
 ) -> dict[str, Any]:
-    """Rank terms by how many more wards mentioned them in latest_month than in a
-    typical recent month.
+    """Rank terms by how many more wards mentioned them in latest_month than usual.
 
-    Counting wards rather than pooling newsletters means one prolific sender
-    cannot manufacture a trend. The baseline is the median ward count over the
-    baseline_months before latest_month, so one unusual month does not set it;
-    baseline months with no active ward (before the archive starts) are left
-    out of the median rather than counted as zero.
-    A term must reach at least min_latest_wards wards and gain at least
-    min_ward_gain wards over the baseline, and pass `is_rising_candidate`;
-    each is tagged when it is a recurring calendar event. Pass only newsletters whose text
-    could be read: the wards active each month are the denominator readers
-    compare against, and a ward whose text was unavailable could not mention
-    anything.
+    Counting wards means one prolific sender cannot manufacture a trend. The
+    baseline is the median ward count over the prior baseline_months, so one
+    unusual month does not set it; months with no active ward are skipped. A term needs min_latest_wards wards, a gain of
+    min_ward_gain, and `is_rising_candidate`; recurring calendar events are
+    tagged. Pass only readable newsletters: active wards are the denominator,
+    and a ward with unreadable text could not mention anything.
     """
     baseline = sorted(
         shift_month(latest_month, -offset)

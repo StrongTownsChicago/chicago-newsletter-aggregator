@@ -77,25 +77,11 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
 
 def queue_weekly_notifications(week_id: str) -> dict[str, int]:
     """
-    Queue weekly notifications based on generated reports and user rules.
+    Queue a pending weekly notification for each rule topic that has a report.
 
-    Workflow:
-    1. Fetch all active weekly notification rules grouped by user
-    2. For each user:
-       a. Get their subscribed topics (from rules)
-       b. Fetch generated reports for those topics + week
-       c. For each matching report, queue notification:
-          - user_id, report_id (stored in newsletter_id), rule_id
-          - status: pending
-          - digest_batch_id: week_id
-          - notification_type: weekly
-    3. Return stats (queued, skipped, users)
-
-    Args:
-        week_id: Week identifier (YYYY-WXX)
-
-    Returns:
-        Dictionary with stats: {queued, skipped, users}
+    Inserts notification_queue rows (report_id, rule_id, digest_batch_id=week_id)
+    for week_id (YYYY-WXX). Rule topics without a report that week count as
+    skipped. Returns queued, skipped and users counts.
     """
     supabase = get_supabase_client()
 

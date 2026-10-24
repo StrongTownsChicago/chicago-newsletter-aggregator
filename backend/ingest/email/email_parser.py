@@ -13,15 +13,8 @@ def sanitize_content(
     Remove privacy-sensitive elements from newsletter content.
 
     Filters out unsubscribe links, tracking URLs, and sensitive text based on
-    provided patterns and PRIVACY_STRIP_PHRASES env var.
-
-    Args:
-        content: Raw HTML or plain text content
-        content_type: Either 'html' or 'text'
-        privacy_patterns: Dict with keys: url_patterns, text_patterns, selectors
-
-    Returns:
-        Sanitized content with privacy elements removed
+    `privacy_patterns` (keys: url_patterns, text_patterns, selectors) and the
+    PRIVACY_STRIP_PHRASES env var. `content_type` is 'html' or 'text'.
     """
     if not content:
         return ""
@@ -109,20 +102,12 @@ def email_matches_pattern(email: str, pattern: str) -> bool:
     """
     Check whether a sender address matches an email_source_mappings pattern.
 
-    The whole address must match the whole pattern (no substring matching),
-    case-insensitively, with surrounding whitespace ignored on both sides.
-    `%` matches any run of characters (including none), as in SQL LIKE, and
-    may appear anywhere in the pattern. Every other character, including
-    regex metacharacters such as `.` and `+`, matches only itself.
-
-    The SQL single-character wildcard `_` is deliberately NOT supported:
-    underscores legitimately appear in email addresses, so it is treated as
-    a literal character.
-
-    Examples:
-        email_matches_pattern("info@40thward.org", "%@40thward.org") -> True
-        email_matches_pattern("x@40thward.org.evil.io", "%@40thward.org") -> False
-        email_matches_pattern("Ward23@CityOfChicago.org", "ward23@cityofchicago.org") -> True
+    The whole address must match the whole pattern, case-insensitively, with
+    surrounding whitespace ignored. `%` matches any run of characters (even
+    none), anywhere in the pattern, as in SQL LIKE. Every other character,
+    including `.` and `+`, matches only itself; `_` is a literal, not SQL's
+    wildcard, because underscores legitimately appear in email addresses.
+    E.g. "%@40thward.org" matches "info@40thward.org", not "x@40thward.org.evil.io".
     """
     normalized_email = email.strip()
     normalized_pattern = pattern.strip()
@@ -181,15 +166,10 @@ def parse_newsletter(
     msg: Any, supabase_client: Any, privacy_patterns: dict[str, Any]
 ) -> dict[str, Any]:
     """
-    Parse email message into structured newsletter data.
+    Parse an imap_tools MailMessage into a newsletter row ready for insertion.
 
-    Args:
-        msg: MailMessage object from imap_tools
-        supabase_client: Supabase client for database lookups
-        privacy_patterns: Dict with privacy filtering patterns (url_patterns, text_patterns, selectors)
-
-    Returns:
-        Dictionary with newsletter data ready for database insertion
+    `supabase_client` is used for the sender-to-source lookup; `privacy_patterns`
+    is passed to `sanitize_content()`.
     """
 
     to_email = msg.to[0] if msg.to else ""

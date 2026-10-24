@@ -134,15 +134,8 @@ def build_digest_html(
     Build HTML email body for digest (daily or weekly).
 
     Uses template-based rendering with type-specific content sections.
-
-    Args:
-        prepared_data: List of prepared data (newsletters or reports)
-        digest_type: Type of digest (DAILY or WEEKLY)
-        preferences_url: URL to preferences page
-        unsubscribe_url: One-click unsubscribe URL with signed token
-
-    Returns:
-        HTML string
+    `prepared_data` holds newsletters (daily) or reports (weekly);
+    `unsubscribe_url` is the one-click link with a signed token.
     """
     # Determine header and content based on digest type
     if digest_type == DigestType.DAILY:

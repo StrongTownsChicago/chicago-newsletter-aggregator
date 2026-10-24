@@ -117,20 +117,11 @@ def process_digests(
     digest_type: DigestType, batch_id: str | None = None, dry_run: bool = False
 ) -> dict[str, int]:
     """
-    Process digest notifications (daily or weekly).
+    Send the queued daily or weekly digests for one batch.
 
-    Generic digest processor that handles both daily newsletter digests and
-    weekly topic report digests using type-specific configuration.
-
-    Args:
-        digest_type: Type of digest to process (DigestType.DAILY or DigestType.WEEKLY)
-        batch_id: Digest batch ID. Format depends on type:
-                  - Daily: YYYY-MM-DD (defaults to yesterday in Chicago time)
-                  - Weekly: YYYY-WXX (defaults to previous week)
-        dry_run: If True, don't actually send emails (for testing)
-
-    Returns:
-        Dictionary with stats: sent, failed, skipped
+    batch_id is YYYY-MM-DD for daily (default: yesterday, Chicago time) and
+    YYYY-WXX for weekly (default: previous week). dry_run sends no email.
+    Returns sent, failed and skipped counts.
     """
     # Get configuration for this digest type
     config = DIGEST_CONFIGS[digest_type]
@@ -319,32 +310,18 @@ def process_daily_digests(
     batch_id: str | None = None, dry_run: bool = False
 ) -> dict[str, int]:
     """
-    Process daily digest notifications.
+    Send daily digests via process_digests().
 
-    Wrapper around process_digests() for backward compatibility and CLI convenience.
-
-    Args:
-        batch_id: Digest batch ID (YYYY-MM-DD format). Defaults to yesterday (Chicago time).
-        dry_run: If True, don't actually send emails (for testing)
-
-    Returns:
-        Dictionary with stats: sent, failed, skipped
+    batch_id is YYYY-MM-DD, defaulting to yesterday (Chicago time).
     """
     return process_digests(DigestType.DAILY, batch_id, dry_run)
 
 
 def _extract_content_ids(notifications: list[dict[str, Any]]) -> list[str]:
     """
-    Extract content IDs from notifications (either newsletter_id or report_id).
+    Return the unique content IDs of notifications, in no particular order.
 
-    For daily notifications, extracts newsletter_id.
-    For weekly notifications, extracts report_id.
-
-    Args:
-        notifications: List of notification dictionaries
-
-    Returns:
-        List of unique content IDs (UUIDs as strings)
+    Weekly notifications contribute their report_id, daily ones their newsletter_id.
     """
     content_ids = []
     for n in notifications:
@@ -370,16 +347,9 @@ def process_weekly_digests(
     batch_id: str | None = None, dry_run: bool = False
 ) -> dict[str, int]:
     """
-    Process weekly digest notifications.
+    Send weekly digests via process_digests().
 
-    Wrapper around process_digests() for backward compatibility and CLI convenience.
-
-    Args:
-        batch_id: Week identifier (YYYY-WXX format). Defaults to previous week.
-        dry_run: If True, don't actually send emails (for testing)
-
-    Returns:
-        Dictionary with stats: sent, failed, skipped
+    batch_id is YYYY-WXX, defaulting to the previous week.
     """
     return process_digests(DigestType.WEEKLY, batch_id, dry_run)
 

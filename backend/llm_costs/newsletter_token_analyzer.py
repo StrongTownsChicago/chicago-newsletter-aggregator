@@ -75,19 +75,12 @@ def analyze_newsletter_tokens(
     max_chars: int = MAX_NEWSLETTER_CHARS,
 ) -> NewsletterTokenAnalysis:
     """
-    Simulate both LLM calls for newsletter processing and count tokens.
+    Count tokens for a newsletter's topic extraction and summary LLM calls.
 
-    Replicates exact prompt construction from llm_processor.py:
-    1. extract_topics()
-    2. generate_summary()
-
-    Args:
-        newsletter: Newsletter dict with 'subject' and 'plain_text' keys
-        model_name: Model identifier for encoding selection
-        max_chars: Maximum characters to send to LLM (default: MAX_NEWSLETTER_CHARS)
-
-    Returns:
-        NewsletterTokenAnalysis with token counts for each operation
+    Replicates the prompt construction of llm_processor.py's extract_topics()
+    and generate_summary(), including truncating plain_text to max_chars, and
+    uses canned typical responses for output tokens. model_name selects the
+    tokenizer encoding.
     """
     # Replicate truncation logic from llm_processor.py:367-370
     plain_text = newsletter.get("plain_text", "")
@@ -191,20 +184,11 @@ def analyze_weekly_report_tokens(
     model_name: str,
 ) -> WeeklyReportTokenAnalysis:
     """
-    Simulate weekly report LLM calls and count tokens.
+    Count tokens for one topic's weekly report LLM calls.
 
-    Replicates two-phase process from weekly_report_generator.py:
-    Phase 1: Extract facts from each newsletter individually
-    Phase 2: Synthesize summary from aggregated facts
-
-    Args:
-        topic: Topic identifier (from TOPICS constant)
-        newsletters: List of newsletter dicts with id, subject, plain_text, source, ward
-        week_id: Week identifier (YYYY-WXX)
-        model_name: Model identifier for encoding selection
-
-    Returns:
-        WeeklyReportTokenAnalysis with Phase 1 and Phase 2 token counts
+    Replicates the two phases of weekly_report_generator.py: phase 1 extracts
+    facts from each newsletter separately, phase 2 synthesizes a summary from
+    all the facts. model_name selects the tokenizer encoding.
     """
     _, bare_model = parse_model_string(model_name)
     include_schema = bare_model.startswith("gpt-oss")
