@@ -69,20 +69,30 @@ CATALOG_QUERIES = {
     "rls_tables": f"""
         SELECT 'public', c.relname FROM pg_class c
         WHERE {_PUBLIC_TABLE} AND c.relrowsecurity ORDER BY 2""",
+    # Comments are read too: dropping an object drops its comment, so a restore
+    # must put it back, and the check after each restore must see it.
     "policies": """
-        SELECT schemaname, tablename, policyname, cmd, roles::text[],
-               permissive = 'PERMISSIVE', qual, with_check
-        FROM pg_policies WHERE schemaname = 'public' ORDER BY 2, 3""",
+        SELECT 'public', c.relname, p.polname, pp.cmd, pp.roles::text[],
+               p.polpermissive, pp.qual, pp.with_check,
+               obj_description(p.oid, 'pg_policy')
+        FROM pg_policy p
+        JOIN pg_class c ON c.oid = p.polrelid
+        JOIN pg_policies pp ON pp.schemaname = 'public'
+          AND pp.tablename = c.relname AND pp.policyname = p.polname
+        WHERE c.relnamespace = 'public'::regnamespace
+        ORDER BY 2, 3""",
     "constraints": """
-        SELECT 'public', conrelid::regclass::text, conname, contype,
-               pg_get_constraintdef(oid)
-        FROM pg_constraint
-        WHERE connamespace = 'public'::regnamespace AND contype IN ('c', 'u', 'f')
+        SELECT 'public', c.relname, k.conname, k.contype,
+               pg_get_constraintdef(k.oid), obj_description(k.oid, 'pg_constraint')
+        FROM pg_constraint k JOIN pg_class c ON c.oid = k.conrelid
+        WHERE k.connamespace = 'public'::regnamespace AND k.contype IN ('c', 'u', 'f')
         ORDER BY 2, 3""",
     "unique_indexes": f"""
-        SELECT 'public', c.relname, i.indexrelid::regclass::text,
-               pg_get_indexdef(i.indexrelid)
-        FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid
+        SELECT 'public', c.relname, ic.relname, pg_get_indexdef(i.indexrelid),
+               obj_description(i.indexrelid, 'pg_class')
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indrelid
+        JOIN pg_class ic ON ic.oid = i.indexrelid
         WHERE {_PUBLIC_TABLE} AND i.indisunique AND NOT i.indisprimary
           AND NOT EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conindid = i.indexrelid)
         ORDER BY 2, 3""",
@@ -95,7 +105,8 @@ CATALOG_QUERIES = {
         ORDER BY 2, 3""",
     # Triggers on any table (the profile trigger is on auth.users) that run a public function.
     "triggers": """
-        SELECT n.nspname, c.relname, t.tgname, pg_get_triggerdef(t.oid)
+        SELECT n.nspname, c.relname, t.tgname, pg_get_triggerdef(t.oid),
+               obj_description(t.oid, 'pg_trigger')
         FROM pg_trigger t
         JOIN pg_class c ON c.oid = t.tgrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -220,15 +231,18 @@ def main() -> None:
     for number, mutant in enumerate(mutants, start=1):
         try:
             outcome = run_mutant(stack.db_url, mutant, original)
-        except psycopg.OperationalError as error:
+        except psycopg.Error as error:
             sys.exit(
-                f"lost the database during {mutant.label!r} ({error}); "
+                f"database error during {mutant.label!r} ({error}); "
                 f"the schema may still hold the mutant: {RESET_COMMAND}"
             )
         outcomes.setdefault(outcome, []).append(mutant)
         print(f"[{number}/{len(mutants)}] {outcome}: {mutant.label}", flush=True)
 
     print(", ".join(f"{len(group)} {name}" for name, group in sorted(outcomes.items())))
+    # An invalid mutant failed to apply, so it tested nothing.
+    for mutant in outcomes.get("invalid", []):
+        print(f"\nINVALID [{mutant.kind}] {mutant.label}")
     for mutant in outcomes.get("survived", []):
         print(f"\nSURVIVED [{mutant.kind}] {mutant.label}")
         print("\n".join(f"    {statement}" for statement in mutant.apply))

@@ -120,9 +120,30 @@ class TestConstraintMutants(unittest.TestCase):
             (f"{references} ON DELETE CASCADE", f"{references} ON DELETE NO ACTION"),
             (f"{references} ON DELETE SET NULL", f"{references} ON DELETE CASCADE"),
             (references, f"{references} ON DELETE CASCADE"),
+            (
+                f"{references} ON DELETE SET NULL (user_id)",
+                f"{references} ON DELETE CASCADE",
+            ),
+            (
+                f"{references} DEFERRABLE INITIALLY DEFERRED",
+                f"{references} ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED",
+            ),
         ):
             with self.subTest(definition=definition):
                 self.assertEqual(swap_foreign_key_action(definition)[0], mutated)
+
+    def test_restores_put_back_the_comment_a_drop_removes(self) -> None:
+        check = Constraint(
+            RULES, "weekly_check", "c", "CHECK (true)", comment="Weekly rules' note"
+        )
+
+        dropped = generate_mutants(SchemaCatalog(constraints=(check,)))[0]
+
+        self.assertEqual(
+            dropped.restore[-1],
+            'COMMENT ON CONSTRAINT "weekly_check" ON "public"."notification_rules"'
+            " IS 'Weekly rules'' note'",
+        )
 
     def test_unique_constraint_and_index_are_dropped(self) -> None:
         index_sql = "CREATE UNIQUE INDEX idx ON public.weekly_topic_reports (topic)"
@@ -191,7 +212,10 @@ class TestOtherMutants(unittest.TestCase):
 
         self.assertEqual(
             labels(mutants),
-            ["f(integer): SECURITY DEFINER -> INVOKER", "f(integer): = -> <> (line 2)"],
+            [
+                "f(integer): SECURITY DEFINER -> INVOKER",
+                "f(integer): = -> <> (line 2, col 32)",
+            ],
         )
         self.assertNotIn("SECURITY DEFINER", mutants[0].apply[0])
         self.assertIn("WHERE a <> n -- a = b", mutants[1].apply[0])
@@ -200,7 +224,7 @@ class TestOtherMutants(unittest.TestCase):
 
 class TestOperatorVariants(unittest.TestCase):
     def test_leaves_literals_identifiers_comments_and_assignments_alone(self) -> None:
-        sql = "x := 'a = b' || \"c<d\"; -- e > f\n/* g AND h */ y => z"
+        sql = "x := 'a = b' || E'it\\'s 1' || \"c<d\"; -- e > f\n/* g AND h */ y => z"
 
         self.assertEqual(operator_variants(sql), [])
 
@@ -208,10 +232,10 @@ class TestOperatorVariants(unittest.TestCase):
         self.assertEqual(
             operator_variants("a >= 1 AND b IS NULL"),
             [
-                (">= -> > (line 1)", "a > 1 AND b IS NULL"),
-                ("AND -> OR (line 1)", "a >= 1 OR b IS NULL"),
-                ("IS NULL -> IS NOT NULL (line 1)", "a >= 1 AND b IS NOT NULL"),
-                ("n -> n+1 (line 1)", "a >= 2 AND b IS NULL"),
+                (">= -> > (line 1, col 3)", "a > 1 AND b IS NULL"),
+                ("AND -> OR (line 1, col 8)", "a >= 1 OR b IS NULL"),
+                ("IS NULL -> IS NOT NULL (line 1, col 14)", "a >= 1 AND b IS NOT NULL"),
+                ("n -> n+1 (line 1, col 6)", "a >= 2 AND b IS NULL"),
             ],
         )
 

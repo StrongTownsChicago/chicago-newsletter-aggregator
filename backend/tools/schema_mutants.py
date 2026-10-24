@@ -45,6 +45,7 @@ class Policy:
     permissive: bool
     using: str | None
     check: str | None
+    comment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,7 @@ class Constraint:
     name: str
     kind: str  # pg_constraint.contype: c(heck), u(nique), f(oreign key)
     definition: str
+    comment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,7 @@ class UniqueIndex:
     table: TableName
     name: str
     definition: str
+    comment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,7 @@ class Trigger:
     table: TableName
     name: str
     definition: str
+    comment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,19 @@ class SchemaMutant:
 
 def quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+def sql_literal(text: str) -> str:
+    return "'" + text.replace("'", "''") + "'"
+
+
+def with_comment(
+    restore: tuple[str, ...], target: str, comment: str | None
+) -> tuple[str, ...]:
+    """``restore`` plus re-adding ``comment``: dropping an object drops its comment."""
+    if comment is None:
+        return restore
+    return (*restore, f"COMMENT ON {target} IS {sql_literal(comment)}")
 
 
 def if_exists(drop: str) -> str:
@@ -162,7 +179,11 @@ def _policy_mutants(catalog: SchemaCatalog) -> Iterator[SchemaMutant]:
     for policy in catalog.policies:
         label = f"{policy.table} policy {policy.name!r}"
         drop = f"DROP POLICY {quote_identifier(policy.name)} ON {policy.table.sql()}"
-        restore = (if_exists(drop), create_policy_sql(policy))
+        restore = with_comment(
+            (if_exists(drop), create_policy_sql(policy)),
+            f"POLICY {quote_identifier(policy.name)} ON {policy.table.sql()}",
+            policy.comment,
+        )
         conditions = [c for c in (policy.using, policy.check) if c is not None]
         only_bypass_roles = set(policy.roles) <= RLS_BYPASS_ROLES
         # A permissive policy that grants nothing changes nothing when dropped.
@@ -196,7 +217,11 @@ def _constraint_mutants(catalog: SchemaCatalog) -> Iterator[SchemaMutant]:
         table, name = constraint.table.sql(), quote_identifier(constraint.name)
         drop = f"ALTER TABLE {table} DROP CONSTRAINT {name}"
         add = f"ALTER TABLE {table} ADD CONSTRAINT {name} "
-        restore = (if_exists(drop), add + constraint.definition)
+        restore = with_comment(
+            (if_exists(drop), add + constraint.definition),
+            f"CONSTRAINT {name} ON {table}",
+            constraint.comment,
+        )
         label = f"{constraint.table} constraint {constraint.name}"
         if constraint.kind == "f":
             mutated, change = swap_foreign_key_action(constraint.definition)
@@ -215,13 +240,20 @@ def _constraint_mutants(catalog: SchemaCatalog) -> Iterator[SchemaMutant]:
 
 def swap_foreign_key_action(definition: str) -> tuple[str, str]:
     """``definition`` with its ON DELETE action swapped, and what changed."""
-    match = re.search(r"ON DELETE (CASCADE|SET NULL|SET DEFAULT|RESTRICT)", definition)
+    # SET NULL and SET DEFAULT may name columns, which no other action takes.
+    match = re.search(
+        r"ON DELETE (CASCADE|SET NULL|SET DEFAULT|RESTRICT)(?: \([^)]*\))?", definition
+    )
     action = match.group(1) if match else "NO ACTION"
     replacement = FOREIGN_KEY_ACTION_SWAPS[action]
+    clause = f"ON DELETE {replacement}"
     if match:
-        mutated = definition.replace(match.group(0), f"ON DELETE {replacement}")
+        mutated = definition[: match.start()] + clause + definition[match.end() :]
     else:
-        mutated = f"{definition} ON DELETE {replacement}"
+        # The clause goes before any DEFERRABLE or NOT VALID suffix.
+        suffix = re.search(r" (?:NOT )?DEFERRABLE| NOT VALID", definition)
+        end = suffix.start() if suffix else len(definition)
+        mutated = f"{definition[:end]} {clause}{definition[end:]}"
     return mutated, f"ON DELETE {action} -> {replacement}"
 
 
@@ -232,7 +264,11 @@ def _unique_index_mutants(catalog: SchemaCatalog) -> Iterator[SchemaMutant]:
             "unique",
             f"{index.table} unique index {index.name}: dropped",
             (f"DROP INDEX {name}",),
-            (f"DROP INDEX IF EXISTS {name}", index.definition),
+            with_comment(
+                (f"DROP INDEX IF EXISTS {name}", index.definition),
+                f"INDEX {name}",
+                index.comment,
+            ),
         )
 
 
@@ -260,7 +296,11 @@ def _trigger_mutants(catalog: SchemaCatalog) -> Iterator[SchemaMutant]:
             "trigger",
             f"{trigger.table} trigger {trigger.name}: dropped",
             (drop,),
-            (if_exists(drop), trigger.definition),
+            with_comment(
+                (if_exists(drop), trigger.definition),
+                f"TRIGGER {quote_identifier(trigger.name)} ON {trigger.table.sql()}",
+                trigger.comment,
+            ),
         )
 
 
@@ -308,9 +348,12 @@ OPERATOR_MUTATIONS: tuple[tuple[str, Callable[[re.Match[str]], str], str], ...] 
     (r"(?<![\w.$])\d+(?![\w.])", lambda m: str(int(m.group(0)) + 1), "n -> n+1"),
 )
 
-#: SQL text no mutation may touch: string literals, quoted identifiers, comments.
+#: SQL text no mutation may touch: string literals (E'...' ones with backslash
+#: escapes too), quoted identifiers, comments.
 _PROTECTED = re.compile(
-    r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|--[^\n]*|/\*.*?\*/", re.DOTALL
+    r"(?<![\w$])[Ee]'(?:[^'\\]|\\.|'')*'|'(?:[^']|'')*'"
+    r"|\"(?:[^\"]|\"\")*\"|--[^\n]*|/\*.*?\*/",
+    re.DOTALL,
 )
 
 
@@ -327,6 +370,7 @@ def operator_variants(sql: str) -> list[tuple[str, str]]:
             if is_protected(match.start()):
                 continue
             line = sql.count("\n", 0, match.start()) + 1
+            column = match.start() - sql.rfind("\n", 0, match.start())
             mutated = sql[: match.start()] + substitute(match) + sql[match.end() :]
-            variants.append((f"{label} (line {line})", mutated))
+            variants.append((f"{label} (line {line}, col {column})", mutated))
     return variants
