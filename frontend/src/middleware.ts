@@ -1,25 +1,16 @@
 import { defineMiddleware } from "astro:middleware";
 import type { APIContext, MiddlewareNext } from "astro";
-import { createClient } from "@supabase/supabase-js";
+import { createRequestClient } from "./lib/supabase";
 import { isNonProductionHost } from "./lib/seo";
 import { getDefaultEdgeCache } from "./lib/server/edge-cache";
 import { respondWithPageCache, resolvePageCacheVersion } from "./lib/server/page-cache";
-
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 // Inlined at build time (astro.config.mjs), so each deploy has its own page cache.
 const pageCacheVersion = resolvePageCacheVersion(import.meta.env.BUILD_ID);
 
 /** Restores the visitor's session into locals, then renders the page. */
 async function renderWithSession(context: APIContext, next: MiddlewareNext): Promise<Response> {
-  // Create a Supabase client for this request
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false, // Server-side doesn't persist
-      autoRefreshToken: false,
-    },
-  });
+  const supabase = createRequestClient();
 
   // Try to restore session from cookies. Prerendered pages are built without a
   // visitor's request, so there are no cookies to read.

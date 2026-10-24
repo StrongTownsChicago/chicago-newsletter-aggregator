@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "../supabase";
 import { ALL_WARD_NUMBERS, buildWardPath } from "../wards";
 
 /** PostgREST caps each response at this many rows by default. */
@@ -113,7 +113,7 @@ export function buildWardSitemapPages(
  * PostgREST row cap. Ordered by id so pages are stable across requests.
  */
 export async function fetchNewsletterSitemapEntries(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   pageSize: number = SUPABASE_PAGE_SIZE,
 ): Promise<NewsletterSitemapEntry[]> {
   const entries: NewsletterSitemapEntry[] = [];
@@ -129,7 +129,7 @@ export async function fetchNewsletterSitemapEntries(
       throw new Error(`Failed to fetch newsletters for sitemap: ${error.message}`);
     }
 
-    const page = (data ?? []) as NewsletterSitemapEntry[];
+    const page: NewsletterSitemapEntry[] = data ?? [];
     entries.push(...page);
 
     if (page.length < pageSize) {

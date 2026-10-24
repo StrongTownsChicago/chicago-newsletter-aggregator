@@ -3,7 +3,7 @@ import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
 import { getSupabaseAdmin } from "../../../lib/server/supabase-admin";
 import { readServerSecret } from "../../../lib/server/server-env";
-import type { UserProfile } from "../../../lib/supabase";
+import { areNotificationsEnabled } from "../../../lib/notification-preferences";
 
 interface PreferencesRequestBody {
   token?: string;
@@ -73,9 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .from("user_profiles")
       .select("notification_preferences")
       .eq("id", targetUserId)
-      .single<{
-        notification_preferences: UserProfile["notification_preferences"] | null;
-      }>();
+      .single();
 
     if (error || !data) {
       // Don't reveal 404 vs 403 to anon users, but here we have a token so 404 is fine.
@@ -87,7 +85,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     return new Response(
       JSON.stringify({
-        enabled: data.notification_preferences?.enabled ?? true,
+        enabled: areNotificationsEnabled(data.notification_preferences),
       }),
       {
         status: 200,

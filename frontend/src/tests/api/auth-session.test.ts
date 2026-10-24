@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AuthResponse, Session, User } from "@supabase/supabase-js";
 
-vi.mock("../../lib/supabase", () => ({
-  supabase: { auth: { signInWithPassword: vi.fn(), signUp: vi.fn() } },
-  notificationsEnabled: vi.fn(() => true),
-}));
+// The routes' per-request client; exported as `supabase` so tests can reach its mocks.
+vi.mock("../../lib/supabase", () => {
+  const requestClient = { auth: { signInWithPassword: vi.fn(), signUp: vi.fn() } };
+  return {
+    supabase: requestClient,
+    createRequestClient: vi.fn(() => requestClient),
+    notificationsEnabled: vi.fn(() => true),
+  };
+});
 
 import { POST as signinPOST } from "../../pages/api/auth/signin";
 import { POST as signupPOST } from "../../pages/api/auth/signup";

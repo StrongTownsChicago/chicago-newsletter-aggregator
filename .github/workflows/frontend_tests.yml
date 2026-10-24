@@ -7,12 +7,22 @@ on:
       - "frontend/**"
       # Plural-fold cases shared with the backend (frontend/src/tests/unit/plurals.test.ts).
       - "backend/tests/fixtures/plural_fold_cases.json"
+      # The e2e run's local database: schema, seed and stack.
+      - "backend/migrations/**"
+      - "supabase/**"
+      - ".github/actions/local-supabase/**"
+      - ".github/workflows/frontend_tests.yml"
   pull_request:
     branches: [main]
     paths:
       - "frontend/**"
       # Plural-fold cases shared with the backend (frontend/src/tests/unit/plurals.test.ts).
       - "backend/tests/fixtures/plural_fold_cases.json"
+      # The e2e run's local database: schema, seed and stack.
+      - "backend/migrations/**"
+      - "supabase/**"
+      - ".github/actions/local-supabase/**"
+      - ".github/workflows/frontend_tests.yml"
 
 jobs:
   test:
@@ -47,7 +57,7 @@ jobs:
           cd frontend
           npm run test:coverage
 
-      # Placeholder Supabase env, as in playwright.analytics.config.ts: the build reads no database.
+      # Placeholder Supabase env: the build reads no database.
       - name: Build
         run: |
           cd frontend
@@ -58,13 +68,24 @@ jobs:
           PUBLIC_ENABLE_NOTIFICATIONS: "false"
           SUPABASE_SERVICE_KEY: placeholder-service-key
 
-      # Fixture data, placeholder Supabase env, and off-origin requests aborted (playwright.analytics.config.ts).
+      # Every migration plus supabase/seed.sql. No secrets in this job: nothing here may reach production.
+      - name: Start local Supabase
+        uses: ./.github/actions/local-supabase
+
+      - name: Check generated database types
+        run: |
+          cd frontend
+          npm run db:types
+          git diff --exit-code -- src/lib/database.types.ts ||
+            { echo "::error::src/lib/database.types.ts is stale: run npm run db:types and commit it."; exit 1; }
+
       - name: Install Playwright Chromium
         run: |
           cd frontend
           npx playwright install --with-deps chromium
 
-      - name: Run database-free E2E tests (analytics, accessibility)
+      # Against the local stack, reset to the seed by the global setup (playwright.config.ts).
+      - name: Run E2E tests
         run: |
           cd frontend
-          npm run test:e2e:analytics
+          npm run test:e2e

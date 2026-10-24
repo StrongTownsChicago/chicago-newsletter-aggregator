@@ -68,7 +68,7 @@ class TestEmptyDigestFlow(unittest.TestCase):
         }
 
         mock_user_table = MagicMock()
-        mock_user_table.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_user_response
+        mock_user_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_user_response
 
         # 3. Mock updates and inserts
         mock_history_table = MagicMock()

@@ -35,6 +35,8 @@ describe("ruleEditAttributes", () => {
     search_term: "bike lanes",
     ward_numbers: ["2", "40"],
     delivery_frequency: "weekly",
+    min_relevance_score: null,
+    source_ids: null,
   };
 
   it("describes a saved rule for its edit button", () => {

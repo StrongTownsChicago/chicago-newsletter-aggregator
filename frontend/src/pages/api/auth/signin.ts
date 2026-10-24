@@ -1,6 +1,6 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
-import { supabase, notificationsEnabled } from "../../../lib/supabase";
+import { createRequestClient, notificationsEnabled } from "../../../lib/supabase";
 import { buildLoginUrl, getSafeRedirectPath } from "../../../lib/server/redirects";
 import { formText } from "../../../lib/server/form-data";
 
@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
     );
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await createRequestClient().auth.signInWithPassword({
     email,
     password,
   });

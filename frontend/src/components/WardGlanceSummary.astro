@@ -20,6 +20,6 @@ const topTopics = glance ? listTopTopicLabels(file, glance, SUMMARY_TOPIC_COUNT)
   <p class="mt-2 text-sm text-gray-600" data-testid="ward-glance-summary">
     {cadence}
     {topTopics.length > 0 && <> · Most covered: {topTopics.join(' · ')}</>}
-    · <a href="#ward-glance-heading" class="text-blue-600 hover:text-blue-800 hover:underline">At a glance</a>
+    · <a href="#ward-glance-heading" class="text-blue-600 underline hover:text-blue-800">At a glance</a>
   </p>
 )}

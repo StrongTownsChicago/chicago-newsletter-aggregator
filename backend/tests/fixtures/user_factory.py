@@ -66,3 +66,37 @@ def create_test_notification(
     }
     notification.update(overrides)
     return notification
+
+
+def create_auth_user(client: Any, email: str, password: str) -> str:
+    """Create a confirmed user through the GoTrue admin API; returns its id.
+
+    `client` needs the service key. The on_auth_user_created trigger adds the
+    user_profiles row, as in production.
+    """
+    response = client.auth.admin.create_user(
+        {"email": email, "password": password, "email_confirm": True}
+    )
+    return str(response.user.id)
+
+
+def insert_rule(client: Any, user_id: str, **fields: Any) -> dict[str, Any]:
+    """Insert a notification rule for `user_id`; `fields` as for create_test_rule."""
+    row = create_test_rule(user_id=user_id, **fields)
+    stored: dict[str, Any] = (
+        client.table("notification_rules").insert(row).execute().data[0]
+    )
+    return stored
+
+
+def insert_notification(client: Any, **fields: Any) -> dict[str, Any]:
+    """Insert a notification_queue row; `fields` as for create_test_notification.
+
+    An id given as None stays None (create_test_notification would invent one).
+    """
+    row = create_test_notification(**fields)
+    row.update({name: value for name, value in fields.items() if value is None})
+    stored: dict[str, Any] = (
+        client.table("notification_queue").insert(row).execute().data[0]
+    )
+    return stored

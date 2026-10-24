@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "../supabase";
 import {
   SOURCE_WARD_DIRECTORY_SELECT,
   SOURCE_WARD_PROFILE_SELECT,
@@ -20,7 +20,7 @@ const RECEIVED_DATE_COLUMN = "received_date";
  * all are returned, most recently added first.
  */
 export async function fetchWardSources(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   wardNumber: number,
 ): Promise<WardProfileSource[]> {
   const { data, error } = await supabase
@@ -40,7 +40,7 @@ export async function fetchWardSources(
 
 /** Fetches every alder source for the ward directory, in one query. */
 export async function fetchWardDirectorySources(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
 ): Promise<WardDirectorySource[]> {
   const { data, error } = await supabase
     .from("sources")
@@ -75,7 +75,7 @@ export const EMPTY_WARD_NEWSLETTER_PAGE: WardNewsletterPage = {
  * listing selects card columns only (no newsletter bodies).
  */
 export async function fetchWardNewsletterPage(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   sourceIds: readonly number[],
   page: number,
 ): Promise<WardNewsletterPage> {

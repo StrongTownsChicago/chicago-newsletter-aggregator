@@ -2,6 +2,7 @@ export const prerender = false;
 import type { APIRoute } from "astro";
 import { jwtVerify } from "jose";
 import { getSupabaseAdmin } from "../../../lib/server/supabase-admin";
+import type { NotificationPreferences } from "../../../lib/notification-preferences";
 import { readServerSecret } from "../../../lib/server/server-env";
 
 interface UnsubscribeRequestBody {
@@ -77,7 +78,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         notification_preferences: {
           enabled: false,
           delivery_frequency: "daily",
-        },
+        } satisfies NotificationPreferences,
       })
       .eq("id", tokenUserId);
 

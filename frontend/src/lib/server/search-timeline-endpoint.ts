@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "../supabase";
 import { matchEdgeCache, putEdgeCache, type EdgeCache } from "./edge-cache";
 import {
   SEARCH_TIMELINE_QUERY_PARAM,
@@ -58,7 +58,7 @@ const HTTP_STATUS = {
 } as const;
 
 export interface SearchTimelineRequestDependencies {
-  supabase: Pick<SupabaseClient, "rpc">;
+  supabase: Pick<AppSupabaseClient, "rpc">;
   cache: EdgeCache | null;
   now: Date;
 }

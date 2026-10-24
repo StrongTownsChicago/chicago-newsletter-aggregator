@@ -9,7 +9,7 @@ Designed to aggregate newsletter content by topic and generate insight-driven su
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from models.types import NewsletterID
@@ -21,6 +21,7 @@ from models.weekly_report import (
 )
 from processing.llm_processor import TOPICS, call_llm
 from prompts.weekly_synthesis import FACTUAL_SUMMARY
+from shared.dates import CHICAGO_TIMEZONE
 from shared.db import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -268,18 +269,27 @@ def _fetch_week_range(supabase: Any, week_id: str) -> tuple[str, str] | None:
         return None
 
 
+def _chicago_midnight(day: date) -> str:
+    return datetime.combine(day, time.min, CHICAGO_TIMEZONE).isoformat()
+
+
 def _fetch_topic_newsletters(
     supabase: Any, topic: str, week_start: str, week_end: str
 ) -> list[dict[str, Any]]:
-    """Newsletters tagged with the topic and received in the week (filtered in PostgreSQL)."""
+    """Newsletters tagged with the topic and received in the week (filtered in PostgreSQL).
+
+    The week runs from Monday's midnight to the next Monday's in Chicago, so
+    all of Sunday counts; bare dates would compare as UTC midnights.
+    """
+    day_after_week = date.fromisoformat(week_end) + timedelta(days=1)
     response = (
         supabase.table("newsletters")
         .select(
             "id, subject, plain_text, received_date, source:sources(name, ward_number)"
         )
         .filter("topics", "cs", f"{{{topic}}}")  # Contains topic
-        .gte("received_date", week_start)
-        .lte("received_date", week_end)
+        .gte("received_date", _chicago_midnight(date.fromisoformat(week_start)))
+        .lt("received_date", _chicago_midnight(day_after_week))
         .execute()
     )
     return [_newsletter_from_row(dict(row)) for row in response.data]

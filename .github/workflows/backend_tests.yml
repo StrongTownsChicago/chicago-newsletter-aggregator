@@ -5,10 +5,16 @@ on:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'supabase/**'
+      - '.github/actions/local-supabase/**'
+      - '.github/workflows/backend_tests.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'supabase/**'
+      - '.github/actions/local-supabase/**'
+      - '.github/workflows/backend_tests.yml'
 
 jobs:
   quality-checks:
@@ -86,3 +92,45 @@ jobs:
           name: backend-coverage-html
           path: backend/htmlcov
           if-no-files-found: ignore
+
+  # The real-database suite, on a local Supabase stack built from the migrations.
+  # No secrets: every URL and key comes from the local stack.
+  database-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "backend/.python-version"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv sync --locked --dev
+
+      - name: Start local Supabase
+        id: supabase
+        uses: ./.github/actions/local-supabase
+
+      - name: Run Database Tests
+        env:
+          TEST_SUPABASE_URL: ${{ steps.supabase.outputs.api-url }}
+          TEST_SUPABASE_DB_URL: ${{ steps.supabase.outputs.db-url }}
+          TEST_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.anon-key }}
+          TEST_SUPABASE_SERVICE_KEY: ${{ steps.supabase.outputs.service-role-key }}
+        run: |
+          cd backend
+          uv run --locked python -m unittest discover -s tests/db_integration -t .
+
+      - name: Check Migrations Match the Production Schema
+        run: |
+          supabase db dump --local --workdir "$GITHUB_WORKSPACE" -f "$RUNNER_TEMP/schema-dump.sql"
+          cd backend
+          uv run --locked python -m tools.check_schema_snapshot "$RUNNER_TEMP/schema-dump.sql"

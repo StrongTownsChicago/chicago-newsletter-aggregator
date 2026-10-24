@@ -40,6 +40,15 @@ class TestParseDateString(unittest.TestCase):
         assert result is not None
         self.assertIn("2026-01-24", result)
 
+    def test_a_date_without_a_zone_is_chicago_time(self) -> None:
+        self.assertEqual(parse_date_string("09/15/2026"), "2026-09-15T00:00:00-05:00")
+        self.assertEqual(parse_date_string("01/15/2026"), "2026-01-15T00:00:00-06:00")
+
+    def test_a_date_with_a_zone_keeps_it(self) -> None:
+        self.assertEqual(
+            parse_date_string("2026-01-24T12:00:00+00:00"), "2026-01-24T12:00:00+00:00"
+        )
+
     def test_fuzzy_parsing(self) -> None:
         """Fuzzy parsing extracts date from text."""
         result = parse_date_string("Published on Jan 24th, 2026")

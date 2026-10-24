@@ -28,6 +28,7 @@ dev = [
     "import-linter>=2.15",
     "mypy>=1.13.0",
     "pip-audit>=2.10.0",
+    "psycopg[binary]>=3.3.6",
     "ruff>=0.14.14,<0.15",
     "tiktoken>=0.12.0",
 ]

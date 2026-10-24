@@ -11,11 +11,27 @@ vi.mock('@supabase/supabase-js', () => ({
   })),
 }));
 
-import { notificationsEnabled } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { createRequestClient, notificationsEnabled, supabase } from '../../lib/supabase';
 
 describe('supabase utilities', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  describe('clients', () => {
+    it('gives each request its own client, never the shared one', () => {
+      const first = createRequestClient();
+      expect(createRequestClient()).not.toBe(first);
+      expect(first).not.toBe(supabase);
+    });
+
+    it('never stores or refreshes a session', () => {
+      for (const [, , options] of vi.mocked(createClient).mock.calls) {
+        expect(options?.auth).toEqual({ persistSession: false, autoRefreshToken: false });
+      }
+      expect(vi.mocked(createClient).mock.calls.length).toBeGreaterThan(0);
+    });
   });
 
   describe('notificationsEnabled', () => {

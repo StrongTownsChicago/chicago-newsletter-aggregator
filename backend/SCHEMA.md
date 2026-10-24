@@ -11,7 +11,7 @@ Production is migrations `000`–`005` and `007`. **`006` has not been applied**
 - `email_source_mappings` still has the `"Allow public read access"` policy, so anyone with the anon key can read the sender patterns and notes. `006` drops it; nothing outside the backend (service key) reads this table.
 - The `newsletters` write gates still have their old names, `"Service role insert newsletters"` / `"Service role update newsletters"`. `006` renames them; behaviour is the same.
 
-After applying `006` in production, refresh `sql/schema.sql` and this section (see "Keeping the schema accurate").
+After applying `006` in production, refresh `sql/schema.sql` and this section (see "Keeping the schema accurate"), and remove `006` from `PENDING_IN_PRODUCTION` in `tools/check_schema_snapshot.py`.
 
 ## Row-Level Security
 
@@ -365,5 +365,5 @@ Counts the newsletters matching a `/search` query per month. Powers the search p
 ## Keeping the schema accurate
 
 - **Every schema change is a migration** in `migrations/`, applied to production after review. Never change the schema only in the Supabase dashboard: that is how the core tables and the migration list drifted apart before `000` existed.
-- **Checking the repo against a database** needs no production access. Start a throwaway Supabase Postgres (`docker run -d -e POSTGRES_PASSWORD=<local> -p 127.0.0.1:<port>:5432 public.ecr.aws/supabase/postgres:<production version>`), apply the migrations production has with `psql -v ON_ERROR_STOP=1 -f`, dump it with `npx supabase db dump --db-url <local url>`, and diff against `sql/schema.sql`. On 2026-10-24, `000`–`005` + `007` matched production apart from a comment inside `create_user_profile()`.
+- **Checking the repo against a database** needs no production access. The local Supabase stack (`supabase/config.toml`, same Postgres image as production) applies every migration on `npx --prefix frontend supabase start --workdir .` from the repo root; dump it with `npx --prefix frontend supabase db dump --local --workdir . -f <dump>` and run `uv run python -m tools.check_schema_snapshot <dump>` from `backend/`. It compares against `sql/schema.sql` and allows only the lines of migrations listed in its `PENDING_IN_PRODUCTION`; Backend CI runs it. On 2026-10-24, `000`–`005` + `007` matched production apart from a comment inside `create_user_profile()`.
 - **Refreshing `sql/schema.sql` from production** reads only the catalog (`npx supabase db dump`, schema-only by default), but it connects to the live database. Do it rarely, at a quiet time, and never with `--data-only`.

@@ -1,69 +1,37 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Tables } from "./database.types";
+
+/** A Supabase client typed with the database schema. */
+export type AppSupabaseClient = SupabaseClient<Database>;
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-// Create Supabase client with auth enabled
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+/** Shared anon client for public reads. Never sign in on it: a server isolate shares it across requests. */
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
   },
 });
+
+/** A client for one request's auth calls; its session dies with the request. */
+export function createRequestClient(): AppSupabaseClient {
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
 // Check if notifications are enabled via env var
 export const notificationsEnabled = () => {
   return import.meta.env.PUBLIC_ENABLE_NOTIFICATIONS === "true";
 };
 
-export interface Newsletter {
-  id: string;
-  created_at: string;
-  received_date: string;
-  subject: string;
-  from_email: string | null;
-  source_id: number;
-  plain_text: string | null;
-  raw_html: string | null;
-  summary: string | null;
-  topics: string[] | null;
-  entities: Record<string, unknown> | null;
-  sources?: Source;
-}
+// Row types come from the generated schema types (`npm run db:types`).
+export type Newsletter = Tables<"newsletters">;
+export type Source = Tables<"sources">;
 
-export interface Source {
-  id: number;
-  source_type: string;
-  name: string;
-  email_address: string | null;
-  website: string | null;
-  signup_url: string | null;
-  ward_number: string | null;
-  phone: string | null;
-  newsletter_archive_url: string | null;
-}
-
-export interface UserProfile {
-  id: string;
-  email: string;
-  created_at: string;
-  updated_at: string;
-  notification_preferences: {
-    enabled: boolean;
-    delivery_frequency: string;
-  };
-}
-
-export interface NotificationRule {
-  id: string;
-  user_id: string;
-  name: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  topics: string[];
-  search_term?: string | null;
-  source_ids?: number[] | null;
-  ward_numbers?: string[] | null; // TEXT[] to match sources.ward_number TEXT type
-  delivery_frequency: "daily" | "weekly";
-}
+export type NotificationRule = Tables<"notification_rules">;

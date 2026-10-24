@@ -88,6 +88,9 @@ function buildMonthColumn(
   if (target instanceof HTMLAnchorElement) {
     target.href = buildMonthSearchUrl(context.searchUrl, entry.month);
     if (isSelected) target.setAttribute("aria-current", "true");
+  } else {
+    // A generic div's aria-label is not announced; as an image it is read whole.
+    target.setAttribute("role", "img");
   }
   target.setAttribute("aria-label", describeMonth(entry, isPartial));
 
@@ -111,11 +114,13 @@ function buildMonthColumn(
     `mt-1 text-xs ${isSelected ? "font-semibold text-gray-900" : "text-gray-600"}`,
     formatShortMonth(entry.month),
   );
-  target.append(count, track, monthLabel);
+  target.append(track, monthLabel);
+  // Outside the link, whose label already gives the count, so the link's visible text is just the month.
+  count.setAttribute("aria-hidden", "true");
 
-  const year = element("span", "text-[0.65rem] leading-3 h-3 text-gray-400", yearLabelForBar(entry.month, index) ?? "");
+  const year = element("span", "text-[0.65rem] leading-3 h-3 text-gray-500", yearLabelForBar(entry.month, index) ?? "");
   year.setAttribute("aria-hidden", "true");
-  column.append(target, year);
+  column.append(count, target, year);
   return column;
 }
 
