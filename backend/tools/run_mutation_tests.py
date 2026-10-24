@@ -69,14 +69,17 @@ MUTATION_TARGETS = {
     ),
     "dates": MutationTarget("shared/dates.py", ("tests.unit.test_dates",)),
     "lens_matching": MutationTarget(
-        "analytics/lens_matching.py", ("tests.unit.test_analytics_lenses",)
+        "analytics/lens_matching.py",
+        ("tests.unit.test_analytics_lenses", "tests.unit.test_compute_analytics"),
     ),
     "digest_data": MutationTarget(
         "notifications/digest_data.py",
         (
             "tests.unit.test_digest_data",
             "tests.unit.test_digest_system",
+            "tests.unit.test_email_sender",
             "tests.unit.test_email_sender_digest_types",
+            "tests.unit.test_email_sender_unsubscribe",
             "tests.unit.test_prevent_empty_digests",
             "tests.unit.test_weekly_newsletter_references",
         ),
@@ -87,7 +90,9 @@ MUTATION_TARGETS = {
             "tests.unit.test_digest_html",
             "tests.unit.test_digest_html_properties",
             "tests.unit.test_digest_system",
+            "tests.unit.test_email_sender",
             "tests.unit.test_email_sender_digest_types",
+            "tests.unit.test_email_sender_unsubscribe",
             "tests.unit.test_weekly_newsletter_references",
         ),
     ),
