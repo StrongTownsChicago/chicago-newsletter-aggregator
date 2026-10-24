@@ -3,7 +3,7 @@ import type { Mock } from "vitest";
 import { POST as validateTokenPOST } from "../../pages/api/notifications/validate-unsubscribe-token";
 import { POST as getUserPreferencesPOST } from "../../pages/api/notifications/get-user-preferences";
 import { POST as unsubscribePOST } from "../../pages/api/notifications/unsubscribe";
-import { createMockContext } from "../helpers";
+import { createMockContext, readJsonResponse } from "../helpers";
 
 const { mockSupabaseAdmin } = vi.hoisted(() => {
   return {
@@ -50,7 +50,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
     expect(response.status).toBe(400);
 
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Token required");
   });
 
@@ -64,7 +64,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
 
     expect(response.status).toBe(200);
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.user_id).toBe("user-123");
   });
 
@@ -75,7 +75,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
     expect(response.status).toBe(400);
 
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Invalid or expired token");
   });
 
@@ -89,7 +89,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
 
     expect(response.status).toBe(400);
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Invalid token type");
   });
 
@@ -103,7 +103,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
 
     expect(response.status).toBe(400);
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Invalid token payload");
   });
 
@@ -114,7 +114,7 @@ describe("Validate Unsubscribe Token API", () => {
 
     const response = await validateTokenPOST(context);
     expect(response.status).toBe(400);
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Invalid request");
   });
 
@@ -124,7 +124,7 @@ describe("Validate Unsubscribe Token API", () => {
     const response = await validateTokenPOST(context);
     expect(response.status).toBe(500);
 
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.error).toBe("Server configuration error");
   });
 });
@@ -151,7 +151,7 @@ describe("Get User Preferences API", () => {
 
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid token" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Invalid token" });
   });
 
   it("returns 500 if secret key is not configured for token flow", async () => {
@@ -163,7 +163,7 @@ describe("Get User Preferences API", () => {
 
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Server error" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Server error" });
   });
 
   it("returns 403 if authenticated user tries to access another user's preferences", async () => {
@@ -174,7 +174,7 @@ describe("Get User Preferences API", () => {
 
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Unauthorized" });
   });
 
   it("returns 500 for malformed request body", async () => {
@@ -183,7 +183,7 @@ describe("Get User Preferences API", () => {
 
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Server error" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Server error" });
   });
 
   it("returns 401 if no auth and no token", async () => {
@@ -221,7 +221,7 @@ describe("Get User Preferences API", () => {
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(200);
 
-    const body = await response.json();
+    const body = await readJsonResponse(response);
     expect(body.enabled).toBe(true);
 
     // Verify admin client was used with correct user_id
@@ -261,7 +261,7 @@ describe("Get User Preferences API", () => {
 
     const response = await getUserPreferencesPOST(context);
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "User not found" });
+    expect(await readJsonResponse(response)).toEqual({ error: "User not found" });
   });
 });
 describe("Unsubscribe API", () => {
@@ -284,7 +284,7 @@ describe("Unsubscribe API", () => {
 
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Token required" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Token required" });
   });
 
   it("returns 500 if secret key is not configured", async () => {
@@ -292,7 +292,7 @@ describe("Unsubscribe API", () => {
     const context = createMockContext({ json: { token: "any-token" } });
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Server error" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Server error" });
   });
 
   it("returns 400 for invalid token type", async () => {
@@ -304,7 +304,7 @@ describe("Unsubscribe API", () => {
     const context = createMockContext({ json: { token: "valid-jwt" } });
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid token type" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Invalid token type" });
   });
 
   it("returns 400 for invalid JWT signature in unsubscribe", async () => {
@@ -313,7 +313,7 @@ describe("Unsubscribe API", () => {
     const context = createMockContext({ json: { token: "invalid-token" } });
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
+    expect(await readJsonResponse(response)).toEqual({
       error: "Invalid or expired token",
     });
   });
@@ -327,7 +327,7 @@ describe("Unsubscribe API", () => {
     const context = createMockContext({ json: { token: "valid-jwt" } });
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid token payload" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Invalid token payload" });
   });
 
   it("returns 500 for malformed request body", async () => {
@@ -336,7 +336,7 @@ describe("Unsubscribe API", () => {
 
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Server error" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Server error" });
   });
 
   it("updates user preferences to disabled with valid token", async () => {
@@ -359,7 +359,7 @@ describe("Unsubscribe API", () => {
 
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true });
+    expect(await readJsonResponse(response)).toEqual({ success: true });
 
     expect(mockUpdate).toHaveBeenCalledWith({
       notification_preferences: {
@@ -383,7 +383,7 @@ describe("Unsubscribe API", () => {
 
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "User ID mismatch" });
+    expect(await readJsonResponse(response)).toEqual({ error: "User ID mismatch" });
   });
 
   it("returns 500 if database update fails", async () => {
@@ -407,6 +407,6 @@ describe("Unsubscribe API", () => {
 
     const response = await unsubscribePOST(context);
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: "Failed to unsubscribe" });
+    expect(await readJsonResponse(response)).toEqual({ error: "Failed to unsubscribe" });
   });
 });

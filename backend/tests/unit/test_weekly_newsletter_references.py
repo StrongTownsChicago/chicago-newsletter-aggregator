@@ -3,6 +3,7 @@ Unit tests for referenced newsletters in weekly digest emails.
 """
 
 import unittest
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from notifications.digest_data import (
@@ -63,6 +64,42 @@ class TestFetchNewsletterDetails(unittest.TestCase):
         result = fetch_newsletter_details([])
         self.assertEqual(result, [])
 
+    @patch("notifications.digest_data.get_supabase_client")
+    def test_citywide_newsletters_come_after_ward_newsletters(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        query = mock_get_client.return_value.table.return_value.select.return_value
+        query.in_.return_value.execute.return_value.data = [
+            {"id": "c", "subject": "s", "received_date": "d", "source": None},
+            {
+                "id": "w",
+                "subject": "s",
+                "received_date": "d",
+                "source": {"ward_number": 50},
+            },
+            {"id": "x", "subject": "s", "received_date": "d", "source": "not a dict"},
+            {
+                "id": "v",
+                "subject": "s",
+                "received_date": "d",
+                "source": {"ward_number": 1},
+            },
+        ]
+
+        result = fetch_newsletter_details(["c", "w", "x", "v"])
+
+        self.assertEqual([nl["id"] for nl in result], ["v", "w", "c", "x"])
+        self.assertEqual([nl["ward_number"] for nl in result], [1, 50, None, None])
+
+    @patch("notifications.digest_data.get_supabase_client")
+    def test_a_failed_query_returns_no_newsletters(
+        self, mock_get_client: MagicMock
+    ) -> None:
+        mock_get_client.return_value.table.side_effect = RuntimeError("down")
+
+        with self.assertLogs("notifications.digest_data", level="WARNING"):
+            self.assertEqual(fetch_newsletter_details(["nl-1"]), [])
+
 
 class TestPrepareWeeklyReportData(unittest.TestCase):
     """Tests for prepare_weekly_report_data() with newsletter references."""
@@ -102,6 +139,78 @@ class TestPrepareWeeklyReportData(unittest.TestCase):
         self.assertEqual(result[0]["referenced_newsletters"][0]["id"], "nl-1")
 
 
+def weekly_notification(
+    topic: str, rule: dict[str, str] | None, newsletter_ids: list[str] | None = None
+) -> dict[str, Any]:
+    return {
+        "report": {
+            "topic": topic,
+            "week_id": "2026-W04",
+            "report_summary": f"{topic} summary",
+            "newsletter_ids": newsletter_ids,
+        },
+        "rule": rule,
+    }
+
+
+@patch("notifications.digest_data.fetch_newsletter_details", return_value=[])
+class TestPrepareWeeklyReportGrouping(unittest.TestCase):
+    def test_reports_are_sorted_by_topic(self, _fetch: MagicMock) -> None:
+        notifications = [
+            weekly_notification("zoning", {"name": "Z"}),
+            weekly_notification("bike_lanes", {"name": "B"}),
+        ]
+
+        result = prepare_weekly_report_data(notifications)
+
+        self.assertEqual(
+            [report["topic"] for report in result], ["bike_lanes", "zoning"]
+        )
+
+    def test_each_rule_is_listed_once_per_topic(self, _fetch: MagicMock) -> None:
+        notifications = [
+            weekly_notification("zoning", {"name": "Housing"}),
+            weekly_notification("zoning", {"name": "Housing"}),
+            weekly_notification("zoning", {"name": "Land use"}),
+        ]
+
+        result = prepare_weekly_report_data(notifications)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["matched_rules"], ["Housing", "Land use"])
+
+    def test_a_missing_rule_is_named_unknown(self, _fetch: MagicMock) -> None:
+        result = prepare_weekly_report_data(
+            [weekly_notification("zoning", None), weekly_notification("zoning", {})]
+        )
+
+        self.assertEqual(result[0]["matched_rules"], ["Unknown Rule"])
+
+    def test_counts_the_reports_newsletters(self, _fetch: MagicMock) -> None:
+        result = prepare_weekly_report_data(
+            [
+                weekly_notification("bike_lanes", {"name": "B"}, ["a", "b"]),
+                weekly_notification("zoning", {"name": "Z"}, None),
+            ]
+        )
+
+        self.assertEqual([report["newsletter_count"] for report in result], [2, 0])
+
+    def test_records_without_a_report_or_topic_are_skipped(
+        self, _fetch: MagicMock
+    ) -> None:
+        notifications: list[dict[str, Any]] = [
+            {"report": None, "rule": {"name": "R"}},
+            {"report": {"topic": ""}, "rule": {"name": "R"}},
+            weekly_notification("zoning", {"name": "Z"}),
+        ]
+
+        result = prepare_weekly_report_data(notifications)
+
+        self.assertEqual([report["topic"] for report in result], ["zoning"])
+        self.assertEqual(result[0]["week_range"], "January 19 - 25, 2026")
+
+
 class TestRenderWeeklyContentWithReferences(unittest.TestCase):
     """Tests for weekly content rendering with newsletter references."""
 
@@ -136,6 +245,8 @@ class TestRenderWeeklyContentWithReferences(unittest.TestCase):
         self.assertIn("Ward 40:", html)
         self.assertIn("Ward 40 Updates", html)
         self.assertIn("/newsletter/nl-1", html)
+        # Midnight UTC on January 20 is the evening of January 19 in Chicago.
+        self.assertIn("January 19, 2026", html)
 
     def test_text_includes_referenced_section(self) -> None:
         """Plain text output includes referenced newsletters section."""
@@ -168,6 +279,8 @@ class TestRenderWeeklyContentWithReferences(unittest.TestCase):
         self.assertIn("Ward 40:", text)
         self.assertIn("Ward 40 Updates", text)
         self.assertIn("/newsletter/nl-1", text)
+        # Midnight UTC on January 20 is the evening of January 19 in Chicago.
+        self.assertIn("January 19, 2026", text)
 
 
 if __name__ == "__main__":

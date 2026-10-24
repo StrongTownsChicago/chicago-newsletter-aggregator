@@ -2,6 +2,7 @@
 import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
 import { buildWardPath, parseWardParam } from '../lib/wards';
 import { formatTopicLabel } from '../lib/topics';
+import { formatReceivedDate } from '../lib/seo';
 
 interface Props {
   newsletter: NewsletterCardRow;
@@ -37,11 +38,7 @@ const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
     )}
     <span class="text-gray-400">•</span>
     <time datetime={newsletter.received_date}>
-      {new Date(newsletter.received_date).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      })}
+      {formatReceivedDate(newsletter.received_date) ?? newsletter.received_date}
     </time>
   </div>
 

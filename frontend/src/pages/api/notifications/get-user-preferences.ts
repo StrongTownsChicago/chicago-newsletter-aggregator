@@ -11,7 +11,10 @@ interface PreferencesRequestBody {
 }
 
 const jsonError = (error: string, status: number) =>
-  new Response(JSON.stringify({ error }), { status });
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
 /** The user id an unsubscribe token names, or the error response for a bad token. */
 async function userIdFromToken(token: string, locals: App.Locals): Promise<string | Response> {

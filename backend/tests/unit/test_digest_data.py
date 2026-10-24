@@ -3,9 +3,11 @@
 import unittest
 from typing import Any
 
+from notifications.digest_config import frontend_base_url
 from notifications.digest_data import (
     TOPIC_LABELS,
     format_topic_name,
+    format_week_range,
     prepare_newsletter_data,
 )
 from processing.llm_processor import TOPICS
@@ -157,6 +159,21 @@ class TestPrepareNewsletterData(unittest.TestCase):
         result = prepare_newsletter_data(notifications)
         self.assertEqual(result, [])
 
+    def test_valid_notifications_after_malformed_ones_are_kept(self) -> None:
+        valid = {"newsletter": create_test_newsletter(id="nl_1"), "rule": {"name": "R"}}
+        notifications: list[dict[str, Any]] = [
+            {"newsletter": None},
+            {"newsletter": {"id": None}},
+            valid,
+        ]
+
+        result = prepare_newsletter_data(notifications)
+
+        self.assertEqual(
+            [newsletter["newsletter_url"] for newsletter in result],
+            [f"{frontend_base_url()}/newsletter/nl_1"],
+        )
+
     def test_handles_invalid_date_format(self) -> None:
         """Invalid date format falls back to substring."""
         newsletter = create_test_newsletter(received_date="2026-01-24-INVALID")
@@ -179,3 +196,24 @@ class TestFormatTopicName(unittest.TestCase):
 
     def test_unknown_topic_is_humanized(self) -> None:
         self.assertEqual(format_topic_name("new_topic_id"), "New topic id")
+
+
+class TestFormatWeekRange(unittest.TestCase):
+    def test_week_within_one_month(self) -> None:
+        self.assertEqual(format_week_range("2026-W02"), "January 5 - 11, 2026")
+
+    def test_week_across_two_months(self) -> None:
+        self.assertEqual(format_week_range("2026-W05"), "January 26 - February 1, 2026")
+
+    def test_week_across_new_year_names_both_years(self) -> None:
+        self.assertEqual(
+            format_week_range("2026-W01"), "December 29, 2025 - January 4, 2026"
+        )
+        self.assertEqual(
+            format_week_range("2026-W53"), "December 28, 2026 - January 3, 2027"
+        )
+
+    def test_an_id_that_is_not_a_week_is_returned_unchanged(self) -> None:
+        for week_id in ("", "2026", "2026-W00", "2025-W53", "2026-Wx"):
+            with self.subTest(week_id=week_id):
+                self.assertEqual(format_week_range(week_id), week_id)

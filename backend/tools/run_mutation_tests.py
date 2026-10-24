@@ -7,6 +7,10 @@ tests still pass on ("survivor") marks behaviour no test pins down. Dev-only,
 not a CI step: each target takes minutes. Sessions are kept in `.mutation/`
 (gitignored), so survivors can be listed again without rerunning.
 
+Run it from a separate git worktree, not a checkout others are working in:
+while it runs, the module on disk is a mutant that other sessions would read,
+test against or commit.
+
 Usage:
     uv run --group mutation python -m tools.run_mutation_tests             # every target
     uv run --group mutation python -m tools.run_mutation_tests rule_matcher
@@ -64,6 +68,34 @@ MUTATION_TARGETS = {
         ),
     ),
     "dates": MutationTarget("shared/dates.py", ("tests.unit.test_dates",)),
+    "lens_matching": MutationTarget(
+        "analytics/lens_matching.py",
+        ("tests.unit.test_analytics_lenses", "tests.unit.test_compute_analytics"),
+    ),
+    "digest_data": MutationTarget(
+        "notifications/digest_data.py",
+        (
+            "tests.unit.test_digest_data",
+            "tests.unit.test_digest_system",
+            "tests.unit.test_email_sender",
+            "tests.unit.test_email_sender_digest_types",
+            "tests.unit.test_email_sender_unsubscribe",
+            "tests.unit.test_prevent_empty_digests",
+            "tests.unit.test_weekly_newsletter_references",
+        ),
+    ),
+    "digest_html": MutationTarget(
+        "notifications/digest_html.py",
+        (
+            "tests.unit.test_digest_html",
+            "tests.unit.test_digest_html_properties",
+            "tests.unit.test_digest_system",
+            "tests.unit.test_email_sender",
+            "tests.unit.test_email_sender_digest_types",
+            "tests.unit.test_email_sender_unsubscribe",
+            "tests.unit.test_weekly_newsletter_references",
+        ),
+    ),
 }
 
 

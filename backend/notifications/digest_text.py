@@ -1,9 +1,9 @@
 """Plain-text bodies for daily and weekly digest emails."""
 
-from datetime import datetime
 from typing import Any
 
 from notifications.digest_config import DigestType, frontend_base_url
+from shared.dates import format_received_date
 
 
 def _render_daily_content_text(prepared_newsletters: list[dict[str, Any]]) -> str:
@@ -55,12 +55,7 @@ def _render_weekly_content_text(prepared_reports: list[dict[str, Any]]) -> str:
         if report.get("referenced_newsletters"):
             content += "Referenced newsletters:\n"
             for nl in report["referenced_newsletters"]:
-                # Format date
-                try:
-                    date_obj = datetime.fromisoformat(nl["received_date"])
-                    date_str = date_obj.strftime("%B %d, %Y")
-                except (ValueError, TypeError):
-                    date_str = nl["received_date"][:10]
+                date_str = format_received_date(nl["received_date"])
 
                 # Format ward
                 ward_str = (

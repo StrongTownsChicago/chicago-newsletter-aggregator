@@ -203,8 +203,9 @@ class TestNewsletterPhrasesAndSummary(unittest.TestCase):
     def test_summary_reports_lens_and_phrase_newsletter_counts(self) -> None:
         lens = Lens("transit", "Transit", "Buses and trains.", ("bus", "Red Line"))
         matcher = LensMatcher([lens])
+        # "Red Line" is in more newsletters, so it comes before "bus".
         phrase_counts = {
-            "a": Counter({"bus": 3}),
+            "a": Counter({"red line": 3}),
             "b": Counter({"bus": 1, "red line": 1}),
             "c": Counter(),
         }
@@ -219,8 +220,8 @@ class TestNewsletterPhrasesAndSummary(unittest.TestCase):
                     "strong_towns_focus": False,
                     "newsletters": 1,
                     "phrases": [
-                        {"phrase": "bus", "newsletters": 2},
-                        {"phrase": "Red Line", "newsletters": 1},
+                        {"phrase": "Red Line", "newsletters": 2},
+                        {"phrase": "bus", "newsletters": 1},
                     ],
                 }
             ],

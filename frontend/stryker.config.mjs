@@ -7,6 +7,8 @@ export default {
   coverageAnalysis: "perTest",
   mutate: [
     "src/lib/**/*.ts",
+    "src/pages/api/**/*.ts",
+    "src/middleware.ts",
     // Constants only: no behavior to mutate.
     "!src/lib/load-messages.ts",
   ],
