@@ -8,7 +8,7 @@ const maxLines = (max) => ({
   "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
 });
 
-const COMPLEXITY_CEILING = 12; // src/client/analytics/panels/topic-detail.ts renderTopicDetailPanel
+const COMPLEXITY_CEILING = 10; // several at 10, e.g. src/lib/seo.ts buildWardDescription, src/lib/server/page-cache.ts respondWithPageCache
 const MAX_PARAMS_CEILING = 5; // the analytics chart builders in lib/analytics/charts/
 const MAX_DEPTH_CEILING = 4; // src/pages/unsubscribe.astro
 

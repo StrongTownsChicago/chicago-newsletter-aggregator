@@ -2,6 +2,7 @@
 // against its own average, the civic calendar's row order, and the headline
 // topics for the summary tiles.
 import { formatMonth } from "./core";
+import { formatPercent } from "./format";
 import { isReachFaded, type LensReachCell } from "./reach";
 
 /**
@@ -175,4 +176,13 @@ export function formatLatestReach(trend: TopicTrend): string {
 /** "28 of 37 wards". */
 export function describeTopicReach(trend: TopicTrend): string {
   return latestReachCell(trend) ? `${formatLatestReach(trend)} wards` : "";
+}
+
+/**
+ * "Mar 2026: 28 of 37 wards, +4 pts vs its average (71.7%, dashed).", or ""
+ * when the last full month has nothing to compare with the average.
+ */
+export function describeLatestVsAverage(trend: TopicTrend | undefined, latestMonth: string | undefined): string {
+  if (!trend?.latest || !latestMonth || trend.latestChange === null || trend.averageShare === null) return "";
+  return `${formatMonth(latestMonth)}: ${describeTopicReach(trend)}, ${formatPointChange(trend.latestChange)} vs its average (${formatPercent(trend.averageShare)}, dashed).`;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LensReachCell } from "../../lib/analytics/reach";
 import {
+  describeLatestVsAverage,
   describeSparkline,
   describeTopicReach,
   findAsOfMonth,
@@ -221,5 +222,30 @@ describe("latest reach", () => {
       expect(formatLatestReach(trend)).toBe("–");
       expect(describeTopicReach(trend)).toBe("");
     }
+  });
+});
+
+describe("describeLatestVsAverage", () => {
+  const trend = {
+    lens: "x",
+    points: [],
+    averageShare: 0.717,
+    swing: 0,
+    latest: cell("x", "2026-03", 28, 37),
+    latestChange: 0.04,
+  };
+
+  it("compares the last full month with the topic's average", () => {
+    expect(describeLatestVsAverage(trend, "2026-03")).toBe(
+      "Mar 2026: 28 of 37 wards, +4 pts vs its average (71.7%, dashed).",
+    );
+  });
+
+  it("is empty without a trend, a month, a change or an average", () => {
+    expect(describeLatestVsAverage(undefined, "2026-03")).toBe("");
+    expect(describeLatestVsAverage(trend, undefined)).toBe("");
+    expect(describeLatestVsAverage({ ...trend, latest: null }, "2026-03")).toBe("");
+    expect(describeLatestVsAverage({ ...trend, latestChange: null }, "2026-03")).toBe("");
+    expect(describeLatestVsAverage({ ...trend, averageShare: null }, "2026-03")).toBe("");
   });
 });

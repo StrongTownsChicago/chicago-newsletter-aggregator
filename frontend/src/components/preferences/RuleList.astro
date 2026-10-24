@@ -1,6 +1,7 @@
 ---
 /** The user's notification rules, each with Edit (opens the rule modal) and Delete, or an empty state. */
 import type { NotificationRule } from '../../lib/supabase';
+import { ruleEditAttributes } from '../../lib/rule-form';
 import { formatTopicLabel } from '../../lib/topics';
 
 interface Props {
@@ -129,12 +130,7 @@ const { notificationRules, maxRules, canCreateRule } = Astro.props;
             <div class="flex gap-2 flex-shrink-0">
               <button
                 class="edit-rule-btn inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors"
-                data-rule-id={rule.id}
-                data-rule-name={rule.name}
-                data-rule-topics={JSON.stringify(rule.topics)}
-                data-rule-ward-numbers={JSON.stringify(rule.ward_numbers || [])}
-                data-rule-search-term={rule.search_term || ''}
-                data-rule-delivery-frequency={rule.delivery_frequency || 'daily'}
+                {...ruleEditAttributes(rule)}
                 data-rule-active={rule.is_active}
               >
                 <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">

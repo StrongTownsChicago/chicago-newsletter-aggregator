@@ -112,7 +112,7 @@ describe("max-lines budgets", () => {
 // Function size ceilings in eslint.config.js, repeated here. Each sits at today's worst
 // function; lowering one means lowering it in both places, and raising one fails.
 const ADOPTED_FUNCTION_CEILINGS = {
-  complexity: 12,
+  complexity: 10,
   "max-params": 5,
   "max-depth": 4,
 } as const;
