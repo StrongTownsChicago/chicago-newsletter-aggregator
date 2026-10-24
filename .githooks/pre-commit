@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Fast checks on staged changes. Tests, astro check and the build run in
+# scripts/check.sh and CI. Enable once per clone:
+#
+#   git config core.hooksPath .githooks
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# A venv activated elsewhere must not stand in for this checkout's backend/.venv.
+unset VIRTUAL_ENV
+
+# A tool that cannot run is an environment fault, never a pass.
+if ! uv --version >/dev/null 2>&1; then
+  echo "pre-commit: cannot run uv; nothing was checked" >&2
+  exit 1
+fi
+
+backend_files=()
+frontend_files=()
+while IFS= read -r -d '' path; do
+  case "$path" in
+    backend/*.py) backend_files+=("$path") ;;
+    frontend/*.ts | frontend/*.astro | frontend/*.js | frontend/*.mjs)
+      frontend_files+=("${path#frontend/}")
+      ;;
+  esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+failed=0
+
+fail() {
+  printf 'pre-commit: %s\n' "$1" >&2
+  failed=1
+}
+
+if ((${#backend_files[@]})); then
+  echo "pre-commit: ruff on ${#backend_files[@]} staged backend file(s)"
+  # Lint the staged content, not the working tree.
+  for path in "${backend_files[@]}"; do
+    relative=${path#backend/}
+    git show ":$path" |
+      uv run --directory backend ruff check --quiet --force-exclude --stdin-filename "$relative" - ||
+      fail "ruff check: $path"
+    git show ":$path" |
+      uv run --directory backend ruff format --check --quiet --force-exclude --stdin-filename "$relative" - >/dev/null ||
+      fail "ruff format --check: $path (run: uv run ruff format)"
+  done
+
+  # mypy and the docstring budget read the working tree: mypy follows imports.
+  echo "pre-commit: mypy"
+  uv run --directory backend mypy . || fail "mypy"
+  echo "pre-commit: docstring budget"
+  uv run --directory backend python -m tools.lint.check_docstrings || fail "docstring budget"
+fi
+
+if ((${#frontend_files[@]})); then
+  if ! command -v npx >/dev/null 2>&1; then
+    echo "pre-commit: cannot run npx; frontend files were not checked" >&2
+    exit 1
+  fi
+  # ESLint reads the working-tree version of each staged file.
+  echo "pre-commit: eslint on ${#frontend_files[@]} staged frontend file(s)"
+  (cd frontend && npx eslint --max-warnings=0 --no-warn-ignored -- "${frontend_files[@]}") ||
+    fail "eslint"
+fi
+
+if ((failed)); then
+  echo "pre-commit: commit blocked; fix the above and stage the fixes" >&2
+  exit 1
+fi

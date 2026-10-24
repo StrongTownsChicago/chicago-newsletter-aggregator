@@ -144,6 +144,18 @@ npm run test:e2e -- --project=chromium  # E2E tests (Playwright)
 npm run lint
 ```
 
+#### Development checks
+
+```bash
+# From the repo root: CI's gates, in CI's order (no argument runs both)
+bash scripts/check.sh [backend|frontend]
+
+# Once per clone: fast checks on staged files before each commit
+git config core.hooksPath .githooks
+```
+
+A weekly workflow (`.github/workflows/dependency_audit.yml`) audits both lockfiles for known vulnerabilities.
+
 ### Frontend Setup
 
 ```bash

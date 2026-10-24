@@ -2,3 +2,7 @@
 # Collapsed in GitHub reviews and language stats; -diff keeps multi-megabyte
 # single-line JSON out of `git diff` and `git log -p`.
 frontend/public/analytics-data/*.json linguist-generated=true -diff
+
+# Shell scripts run on Linux CI and in Git Bash; CRLF breaks them.
+*.sh text eol=lf
+.githooks/* text eol=lf
