@@ -3,6 +3,7 @@
 import unittest
 from typing import Any
 
+from notifications.digest_config import frontend_base_url
 from notifications.digest_data import (
     TOPIC_LABELS,
     format_topic_name,
@@ -157,6 +158,21 @@ class TestPrepareNewsletterData(unittest.TestCase):
         ]
         result = prepare_newsletter_data(notifications)
         self.assertEqual(result, [])
+
+    def test_valid_notifications_after_malformed_ones_are_kept(self) -> None:
+        valid = {"newsletter": create_test_newsletter(id="nl_1"), "rule": {"name": "R"}}
+        notifications: list[dict[str, Any]] = [
+            {"newsletter": None},
+            {"newsletter": {"id": None}},
+            valid,
+        ]
+
+        result = prepare_newsletter_data(notifications)
+
+        self.assertEqual(
+            [newsletter["newsletter_url"] for newsletter in result],
+            [f"{frontend_base_url()}/newsletter/nl_1"],
+        )
 
     def test_handles_invalid_date_format(self) -> None:
         """Invalid date format falls back to substring."""
