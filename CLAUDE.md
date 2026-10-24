@@ -21,7 +21,7 @@ Chicago Alderman Newsletter Tracker: A searchable archive of newsletters from Ch
 # Run CI's gates locally, in CI's order; stops at the first failure
 bash scripts/check.sh [backend|frontend]
 
-# Enable the pre-commit hook (once per clone): ruff, mypy, docstring budget and ESLint on staged files
+# Enable the pre-commit hook (once per clone): ruff on staged backend files, mypy and the docstring budget when backend files are staged, ESLint on staged frontend files
 git config core.hooksPath .githooks
 ```
 

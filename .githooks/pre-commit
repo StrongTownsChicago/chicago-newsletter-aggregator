@@ -41,18 +41,18 @@ if ((${#backend_files[@]})); then
   for path in "${backend_files[@]}"; do
     relative=${path#backend/}
     git show ":$path" |
-      uv run --directory backend ruff check --quiet --force-exclude --stdin-filename "$relative" - ||
+      uv run --locked --directory backend ruff check --quiet --force-exclude --stdin-filename "$relative" - ||
       fail "ruff check: $path"
     git show ":$path" |
-      uv run --directory backend ruff format --check --quiet --force-exclude --stdin-filename "$relative" - >/dev/null ||
+      uv run --locked --directory backend ruff format --check --quiet --force-exclude --stdin-filename "$relative" - >/dev/null ||
       fail "ruff format --check: $path (run: uv run ruff format)"
   done
 
   # mypy and the docstring budget read the working tree: mypy follows imports.
   echo "pre-commit: mypy"
-  uv run --directory backend mypy . || fail "mypy"
+  uv run --locked --directory backend mypy . || fail "mypy"
   echo "pre-commit: docstring budget"
-  uv run --directory backend python -m tools.lint.check_docstrings || fail "docstring budget"
+  uv run --locked --directory backend python -m tools.lint.check_docstrings || fail "docstring budget"
 fi
 
 if ((${#frontend_files[@]})); then
