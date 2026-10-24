@@ -8,6 +8,10 @@ const maxLines = (max) => ({
   "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
 });
 
+const COMPLEXITY_CEILING = 19; // src/pages/api/notifications/create-rule.ts POST
+const MAX_PARAMS_CEILING = 6; // lib/analytics/charts/ward-grids.ts, lib/analytics/ward-profile.ts
+const MAX_DEPTH_CEILING = 5; // src/pages/unsubscribe.astro
+
 const computedEnvRead = {
   selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",
   message: "Read import.meta.env.NAME literally: the build drops server-only variables from computed reads.",
@@ -70,6 +74,16 @@ export default defineConfig(
   },
   // New files stay under the cap; one that outgrows it is split.
   { files: ["src/**/*.{ts,astro}", "e2e/**/*.ts"], rules: maxLines(400) },
+  // Function size ceilings at today's worst function, named beside each. Lower them
+  // freely, never raise them: src/tests/unit/lint-budgets.test.ts holds them in place.
+  {
+    files: ["src/**/*.{ts,astro}", "e2e/**/*.ts"],
+    rules: {
+      complexity: ["error", COMPLEXITY_CEILING],
+      "max-params": ["error", MAX_PARAMS_CEILING],
+      "max-depth": ["error", MAX_DEPTH_CEILING],
+    },
+  },
   // No file has its own ceiling: one over the cap is split, not exempted.
   // src/tests/unit/lint-budgets.test.ts fails if a per-file ceiling is added.
   // Mocks are deliberately loose: partial `any` doubles, async stubs that never await,

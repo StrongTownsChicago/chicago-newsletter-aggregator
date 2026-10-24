@@ -108,3 +108,61 @@ describe("max-lines budgets", () => {
     }
   }, 60_000);
 });
+
+// Function size ceilings in eslint.config.js, repeated here. Each sits at today's worst
+// function; lowering one means lowering it in both places, and raising one fails.
+const ADOPTED_FUNCTION_CEILINGS = {
+  complexity: 19,
+  "max-params": 6,
+  "max-depth": 5,
+} as const;
+
+type FunctionSizeRule = keyof typeof ADOPTED_FUNCTION_CEILINGS;
+const FUNCTION_SIZE_RULES = Object.keys(ADOPTED_FUNCTION_CEILINGS) as FunctionSizeRule[];
+
+// An eslint-disable comment, or an inline `eslint <rule>:` setting, naming one of the rules.
+const INLINE_FUNCTION_SIZE_OVERRIDE = new RegExp(
+  String.raw`(?://|/\*)\s*eslint(?:-disable(?:-next-line|-line)?)?\s[^\n]*\b(?:${FUNCTION_SIZE_RULES.join("|")})\b`,
+  "m",
+);
+
+/** The size ESLint reports in a function-size message, e.g. "a complexity of 12" or "(6)". */
+function reportedSize(message: string): number {
+  return Number(/(?:complexity of |\()(\d+)/.exec(message)?.[1]);
+}
+
+describe("function size budgets", () => {
+  it("applies each adopted ceiling to every file", async () => {
+    const eslint = new ESLint({ cwd: FRONTEND_ROOT });
+    for (const file of listCappedFiles()) {
+      const config = (await eslint.calculateConfigForFile(file)) as Linter.Config;
+      for (const rule of FUNCTION_SIZE_RULES) {
+        expect(config.rules?.[rule], `${file}: ${rule}`).toEqual([2, ADOPTED_FUNCTION_CEILINGS[rule]]);
+      }
+    }
+  }, 60_000);
+
+  it("has no inline overrides of the function size rules", () => {
+    const overridden = listCappedFiles().filter((file) =>
+      INLINE_FUNCTION_SIZE_OVERRIDE.test(readFileSync(path.join(FRONTEND_ROOT, file), "utf8")),
+    );
+    expect(overridden).toEqual([]);
+  });
+
+  it("has no slack: each ceiling equals the worst function's measured size", async () => {
+    const eslint = new ESLint({
+      cwd: FRONTEND_ROOT,
+      ruleFilter: ({ ruleId }) => (FUNCTION_SIZE_RULES as string[]).includes(ruleId),
+      overrideConfig: {
+        rules: Object.fromEntries(FUNCTION_SIZE_RULES.map((rule) => [rule, ["error", 0]])),
+      },
+    });
+    const results = await eslint.lintFiles(["src", "e2e"]);
+    const measured = Object.fromEntries(FUNCTION_SIZE_RULES.map((rule) => [rule, 0]));
+    for (const message of results.flatMap((result) => result.messages)) {
+      const rule = message.ruleId as FunctionSizeRule;
+      if (rule in measured) measured[rule] = Math.max(measured[rule], reportedSize(message.message));
+    }
+    expect(measured, "lower the ceiling in eslint.config.js and here").toEqual(ADOPTED_FUNCTION_CEILINGS);
+  }, 120_000);
+});
