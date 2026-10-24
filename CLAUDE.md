@@ -239,6 +239,10 @@ frontend/
 
 **Full schema and RLS policies:** See [backend/SCHEMA.md](backend/SCHEMA.md). `backend/migrations/` (from `000`) builds the whole schema; `backend/sql/schema.sql` is a production snapshot. Every schema change is a new migration, never a dashboard-only edit; SCHEMA.md lists which migrations production has applied.
 
+### Local Supabase (tests)
+
+`supabase/config.toml` defines a local stack (Postgres, PostgREST, GoTrue; production's Postgres image) for database-backed tests. `npx --prefix frontend supabase start --workdir .` from the repo root applies every `backend/migrations/*.sql` in filename order, then the synthetic `supabase/seed.sql` (both through `[db.seed] sql_paths`, so the migrations stay in `backend/migrations/`); `supabase db reset --local` reapplies them. The CLI is pinned as a frontend dev dependency and in `.github/actions/local-supabase/`. **Never `supabase link`** or pass `--linked`/`--project-id`: `backend/.env` and `frontend/.env` point at production. Test code that connects checks its URL and key with the local-only guard first (`backend/tests/db_integration/local_guard.py`, `frontend/e2e/support/local-supabase-guard.ts`): loopback hosts and the stack's demo JWTs only.
+
 ### Key Design Patterns
 
 **Email Source Matching** (`email_parser.py:lookup_source_by_email()`): Each pattern must match the whole sender address, case-insensitively; `%` is a wildcard anywhere in the pattern (e.g., `%@40thward.org`), and `_` is a literal character. See `email_parser.py:email_matches_pattern()`.

@@ -1,0 +1,44 @@
+name: Local Supabase
+description: >
+  Start the local Supabase stack from supabase/config.toml (every migration in
+  backend/migrations/ plus supabase/seed.sql) and export its URLs and demo keys.
+  Never links a hosted project: the job using it must have no production secrets.
+
+outputs:
+  api-url:
+    description: Local API (Kong) URL
+    value: ${{ steps.status.outputs.api-url }}
+  db-url:
+    description: Local Postgres URL
+    value: ${{ steps.status.outputs.db-url }}
+  anon-key:
+    description: Local demo anon key
+    value: ${{ steps.status.outputs.anon-key }}
+  service-role-key:
+    description: Local demo service-role key
+    value: ${{ steps.status.outputs.service-role-key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Supabase CLI
+      uses: supabase/setup-cli@v1
+      with:
+        # Keep in step with the supabase devDependency in frontend/package.json.
+        version: 2.122.0
+
+    - name: Start local Supabase
+      shell: bash
+      run: supabase start --workdir "$GITHUB_WORKSPACE"
+
+    - name: Read local Supabase settings
+      id: status
+      shell: bash
+      run: |
+        eval "$(supabase status -o env --workdir "$GITHUB_WORKSPACE")"
+        {
+          echo "api-url=$API_URL"
+          echo "db-url=$DB_URL"
+          echo "anon-key=$ANON_KEY"
+          echo "service-role-key=$SERVICE_ROLE_KEY"
+        } >> "$GITHUB_OUTPUT"
