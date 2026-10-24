@@ -84,7 +84,7 @@ class ProcessEmailsTestCase(unittest.TestCase):
         self.output = io.StringIO()
 
     def answer_existing(self, query: ExecutedQuery) -> list[dict[str, Any]]:
-        _, uid = query.args_of("eq")
+        uid = query.equal_filters["email_uid"]
         return [{"id": "existing"}] if uid in self.existing_uids else []
 
     def run_with(self, *messages: Mock) -> str:

@@ -29,14 +29,16 @@ class ExecutedQuery:
     def operation(self) -> str:
         return next((name for name, _, _ in self.calls if name in OPERATIONS), "")
 
-    def args_of(self, method: str) -> tuple[Any, ...]:
-        """Positional arguments of the first call to `method` in the chain."""
-        return next(args for name, args, _ in self.calls if name == method)
+    @property
+    def equal_filters(self) -> dict[str, Any]:
+        """Column -> value for each `eq` call in the chain."""
+        return {args[0]: args[1] for name, args, _ in self.calls if name == "eq"}
 
     @property
     def payload(self) -> Any:
         """The row an insert, update or upsert wrote."""
-        return self.args_of(self.operation)[0]
+        operation = self.operation
+        return next(args[0] for name, args, _ in self.calls if name == operation)
 
 
 class FakeQuery:
