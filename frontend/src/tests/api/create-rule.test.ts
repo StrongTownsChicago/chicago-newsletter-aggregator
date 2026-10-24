@@ -31,6 +31,7 @@ describe("POST /api/notifications/create-rule", () => {
   it("counts only the signed-in user's rules toward the limit", async () => {
     await submit(db, { name: "Rule", topics: ["transit"] });
 
+    expect(db.from.mock.calls).toEqual([["notification_rules"], ["notification_rules"]]);
     expect(db.select).toHaveBeenCalledWith("*", { count: "exact", head: true });
     expect(db.eq).toHaveBeenCalledWith("user_id", USER_ID);
   });
