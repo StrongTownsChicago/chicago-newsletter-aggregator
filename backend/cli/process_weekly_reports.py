@@ -85,7 +85,7 @@ def get_active_weekly_topics() -> list[str]:
         # Extract and deduplicate topics
         all_topics: set[str] = set()
         for rule in response.data:
-            topics_list = rule.get("topics", [])  # type: ignore
+            topics_list = rule.get("topics", [])  # type: ignore[union-attr]
             if isinstance(topics_list, list):
                 all_topics.update(topics_list)
 

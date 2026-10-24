@@ -39,7 +39,7 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
         # Group rules by user_id
         users_rules: dict[str, list[dict[str, Any]]] = {}
         for rule in response.data:
-            rule_dict = dict(rule)  # type: ignore
+            rule_dict = dict(rule)  # type: ignore[arg-type]
             user_id = str(rule_dict["user_id"])
             if user_id not in users_rules:
                 users_rules[user_id] = []
@@ -58,7 +58,7 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
             # Build set of users with notifications enabled
             enabled_users = set()
             for profile in profiles_response.data:
-                profile_dict = dict(profile)  # type: ignore
+                profile_dict = dict(profile)  # type: ignore[arg-type]
                 prefs = profile_dict.get("notification_preferences", {})
                 if isinstance(prefs, dict) and prefs.get("enabled", True):
                     enabled_users.add(str(profile_dict["id"]))
@@ -126,7 +126,7 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
         # Build topic -> report_id mapping
         topic_to_report: dict[str, str] = {}
         for report in reports_response.data:
-            report_dict = dict(report)  # type: ignore
+            report_dict = dict(report)  # type: ignore[arg-type]
             topic_to_report[str(report_dict["topic"])] = str(report_dict["id"])
 
         print(

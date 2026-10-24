@@ -90,10 +90,10 @@ def fetch_report_facts(
             return None
 
         data = response.data
-        raw_developments = data.get("key_developments", [])  # type: ignore
+        raw_developments = data.get("key_developments", [])  # type: ignore[union-attr]
 
         # Convert raw dicts to KeyDevelopment objects
-        facts = [KeyDevelopment(**dev) for dev in raw_developments]  # type: ignore
+        facts = [KeyDevelopment(**dev) for dev in raw_developments]  # type: ignore[arg-type, union-attr]
 
         # Get friendly topic name
         topic_names = {

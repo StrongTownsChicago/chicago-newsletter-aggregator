@@ -81,7 +81,7 @@ def _fetch_weekly_notifications(batch_id: str) -> dict[str, list[dict[str, Any]]
         # Group by user
         notifications_by_user: dict[str, list[dict[str, Any]]] = {}
         for notif in response.data:
-            notif_dict = dict(notif)  # type: ignore
+            notif_dict = dict(notif)  # type: ignore[arg-type]
             user_id = str(notif_dict["user_id"])
             if user_id not in notifications_by_user:
                 notifications_by_user[user_id] = []

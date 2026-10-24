@@ -54,6 +54,8 @@ select = [
     "BLE",              # blind except
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",  # size ceilings (see below)
     "FURB", "PERF",
+    "RET",              # return style
+    "PGH",              # specific codes on type: ignore and noqa
 ]
 ignore = [
     "E501",    # the formatter owns line length; what remains is long strings and URLs

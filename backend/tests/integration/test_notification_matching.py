@@ -170,11 +170,11 @@ class TestNotificationMatching(unittest.TestCase):
                 # Handles the select, eq, eq, execute chain
                 mock_rules_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = mock_rules_response
                 return mock_rules_table
-            elif table_name == "user_profiles":
+            if table_name == "user_profiles":
                 mock_users_table = MagicMock()
                 mock_users_table.select.return_value.in_.return_value.execute.return_value = mock_users_response
                 return mock_users_table
-            elif table_name == "notification_queue":
+            if table_name == "notification_queue":
                 mock_queue_table = MagicMock()
                 mock_queue_table.insert.return_value.execute.return_value = (
                     mock_queue_response

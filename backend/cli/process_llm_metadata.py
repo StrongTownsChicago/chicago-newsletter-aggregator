@@ -154,9 +154,8 @@ def reprocess_newsletter(
                     print(f"    ⚠️  Notification queuing failed: {e}")
 
             return True
-        else:
-            print("  ✗ Update failed")
-            return False
+        print("  ✗ Update failed")
+        return False
 
     except Exception as e:  # noqa: BLE001  per-newsletter boundary: log and continue
         print(f"  ✗ Processing failed: {e}")

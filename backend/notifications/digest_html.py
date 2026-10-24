@@ -155,7 +155,7 @@ def build_digest_html(
         content_section = _render_weekly_content_html(prepared_data)
 
     # Build HTML with shared template structure
-    html = f"""
+    return f"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -351,8 +351,6 @@ def build_digest_html(
 </body>
 </html>
 """
-
-    return html
 
 
 def _format_summary_paragraphs(summary: str) -> str:

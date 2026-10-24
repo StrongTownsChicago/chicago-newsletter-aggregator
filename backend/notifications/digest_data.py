@@ -132,7 +132,7 @@ def fetch_newsletter_details(newsletter_ids: list[str]) -> list[dict[str, Any]]:
 
         newsletters = []
         for nl in response.data:
-            nl_dict = dict(nl)  # type: ignore
+            nl_dict = dict(nl)  # type: ignore[arg-type]
             source_data = nl_dict.get("source")
             ward_number = (
                 source_data.get("ward_number")
@@ -270,8 +270,7 @@ def format_week_range(week_id: str) -> str:
         # Formats as "January 26 - February 1, 2026"
         if week_start.month == week_end.month:
             return f"{week_start.strftime('%B %d')} - {week_end.strftime('%d, %Y')}"
-        else:
-            return f"{week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
+        return f"{week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
 
     except (ValueError, AttributeError):
         return week_id
