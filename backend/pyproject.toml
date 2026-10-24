@@ -8,6 +8,7 @@ dependencies = [
     "cryptography>=50.0.0",
     "html2text>=2025.4.15",
     "imap-tools>=1.11.0",
+    "nh3>=0.3.7",
     "ollama>=0.6.1",
     "openai>=1.82.0",
     "pydantic>=2.12.5",

@@ -7,11 +7,13 @@ from unittest.mock import patch
 import cli.reprocess_newsletters_privacy as privacy_cli
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import sanitize_content
+from ingest.markup_sanitizer import sanitize_markup
 from tests.db_integration.local_supabase import LocalSupabaseTestCase
 from tests.fixtures.newsletter_factory import insert_newsletter, insert_source
 
 DIRTY_HTML = (
     "<html><body><p>Leaf pickup starts Monday.</p>"
+    '<img src="leaves.png" onerror="steal()">'
     '<p><a href="https://example.us1.list-manage.com/unsubscribe?u=1">Unsubscribe</a>'
     "</p></body></html>"
 )
@@ -29,8 +31,8 @@ class TestReprocessPrivacy(LocalSupabaseTestCase):
             raw_html=DIRTY_HTML,
             plain_text="Leaf pickup starts Monday.\nUnsubscribe",
         )["id"]
-        clean = sanitize_content(
-            "<p>Street sweeping.</p>", "html", PRIVACY_PATTERNS_DICT
+        clean = sanitize_markup(
+            sanitize_content("<p>Street sweeping.</p>", "html", PRIVACY_PATTERNS_DICT)
         )
         self.clean = insert_newsletter(
             self.db, source_id, raw_html=clean, plain_text="Street sweeping."
@@ -53,6 +55,7 @@ class TestReprocessPrivacy(LocalSupabaseTestCase):
     def assert_dirty_row_sanitized(self, sanitized: bool) -> None:
         (row,) = self.rows("newsletters", id=self.dirty)
         self.assertEqual("list-manage" not in row["raw_html"], sanitized)
+        self.assertEqual("onerror" not in row["raw_html"], sanitized)
         self.assertEqual("Unsubscribe" not in row["plain_text"], sanitized)
         self.assertIn("Leaf pickup starts Monday.", row["plain_text"])
 

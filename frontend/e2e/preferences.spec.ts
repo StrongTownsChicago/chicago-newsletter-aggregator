@@ -86,6 +86,16 @@ test.describe.serial('a user changing their rules', () => {
     await expect(ruleCard(page, renamedRuleName)).toContainText('Disabled');
   });
 
+  test('keeps the rule when the delete is not confirmed', async ({ page }) => {
+    const dialogShown = page.waitForEvent('dialog');
+    page.once('dialog', (dialog) => dialog.dismiss());
+    await ruleCard(page, renamedRuleName).getByRole('button', { name: 'Delete' }).click();
+
+    expect((await dialogShown).message()).toBe('Are you sure you want to delete this rule?');
+    await page.reload();
+    await expect(ruleCard(page, renamedRuleName)).toHaveCount(1);
+  });
+
   test('deletes the rule after confirming', async ({ page }) => {
     page.once('dialog', (dialog) => dialog.accept());
     await ruleCard(page, renamedRuleName).getByRole('button', { name: 'Delete' }).click();

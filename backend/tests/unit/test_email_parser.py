@@ -376,6 +376,19 @@ class TestParseNewsletter(unittest.TestCase):
         self.assertIn("Test content", result["plain_text"])
         self.assertIn("<p>", result["raw_html"])
 
+    def test_parse_removes_unsafe_markup(self) -> None:
+        """Stored HTML keeps no script, and plain text made from it has none either."""
+        mock_supabase = create_mock_supabase(return_data=[])
+        mock_message = create_mock_mail_message(
+            html='<p>Ward news</p><script>steal()</script><img src="x.png" onerror="steal()">',
+            text="",
+        )
+
+        result = parse_newsletter(mock_message, mock_supabase, PRIVACY_PATTERNS_DICT)
+
+        self.assertEqual(result["raw_html"], '<p>Ward news</p><img src="x.png">')
+        self.assertNotIn("steal", result["plain_text"])
+
     def test_parse_with_plain_text_only(self) -> None:
         """Email with only plain text preserves it."""
         mock_supabase = create_mock_supabase(return_data=[])

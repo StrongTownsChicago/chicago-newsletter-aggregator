@@ -2,7 +2,7 @@
 Reprocess Newsletter Privacy Sanitization
 
 This script allows you to re-apply the latest privacy sanitization rules (patterns and phrase redaction)
-to newsletters already stored in the database.
+and the markup allowlist (ingest/markup_sanitizer.py) to newsletters already stored in the database.
 
 Usage Examples:
 ---------------
@@ -28,6 +28,7 @@ from typing import Any, cast
 from cli.logging_setup import configure_cli_logging
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
 from ingest.email.email_parser import sanitize_content
+from ingest.markup_sanitizer import sanitize_markup
 from shared.db import fetch_all_rows, get_supabase_client
 
 
@@ -103,7 +104,9 @@ def process_single_newsletter(
 
     # Sanitize HTML
     original_html = newsletter.get("raw_html") or ""
-    sanitized_html = sanitize_content(original_html, "html", PRIVACY_PATTERNS_DICT)
+    sanitized_html = sanitize_markup(
+        sanitize_content(original_html, "html", PRIVACY_PATTERNS_DICT)
+    )
     html_changed = show_diff(original_html, sanitized_html, "HTML", quiet=quiet)
 
     # Sanitize Text

@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 from bs4.element import NavigableString
 from html2text import html2text
 
+from ingest.markup_sanitizer import sanitize_markup
+
 logger = logging.getLogger(__name__)
 
 REDACTION_MARKER = "[REDACTED]"
@@ -26,6 +28,7 @@ def sanitize_content(
     Filters out unsubscribe links, tracking URLs, and sensitive text based on
     `privacy_patterns` (keys: url_patterns, text_patterns, selectors) and the
     PRIVACY_STRIP_PHRASES env var. `content_type` is 'html' or 'text'.
+    Privacy only: pass HTML through `sanitize_markup()` before storing it.
     """
     if not content:
         return ""
@@ -388,10 +391,13 @@ def parse_newsletter(
     html_content = msg.html or ""
     plain_text = msg.text or ""
 
-    # Sanitize content for Privacy (remove unsubscribe links, etc.)
-    # We do this BEFORE converting HTML to text, so the text version is also clean
+    # Sanitize content for Privacy (remove unsubscribe links, etc.), then keep only
+    # markup that is safe to render. We do this BEFORE converting HTML to text, so
+    # the text version is also clean
     if html_content:
-        html_content = sanitize_content(html_content, "html", privacy_patterns)
+        html_content = sanitize_markup(
+            sanitize_content(html_content, "html", privacy_patterns)
+        )
 
     if plain_text:
         plain_text = sanitize_content(plain_text, "text", privacy_patterns)

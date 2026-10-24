@@ -49,10 +49,10 @@ const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
         <p id={summaryId} class="text-gray-700 line-clamp-2" data-testid="newsletter-summary">
           {newsletter.summary}
         </p>
-        <button 
+        <button
           type="button"
-          onclick={`document.getElementById('${summaryId}').classList.toggle('line-clamp-2'); this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'`}
           class="text-sm text-blue-600 hover:text-blue-800 mt-1"
+          data-summary-id={summaryId}
           data-testid="summary-toggle"
         >
           Show more
@@ -71,3 +71,9 @@ const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
     </div>
   )}
 </article>
+
+<script>
+  import { initSummaryToggles } from '../client/summary-toggles';
+
+  initSummaryToggles();
+</script>
