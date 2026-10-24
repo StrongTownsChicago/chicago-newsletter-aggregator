@@ -10,7 +10,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
-from ingest.email.email_parser import sanitize_content
+from ingest.email.email_parser import sanitize_newsletter_html
 from ingest.markup_sanitizer import (
     ALLOWED_ATTRIBUTES,
     ALLOWED_TAGS,
@@ -115,14 +115,11 @@ class TestMarkupSanitizerProperties(unittest.TestCase):
     ) -> None:
         """Reprocessing stored rows (privacy, then markup) changes nothing the second time."""
 
-        def store(html: str) -> str:
-            return sanitize_markup(
-                sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
-            )
-
         with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": strip_phrases}):
-            once = store(document)
-            self.assertEqual(store(once), once)
+            once = sanitize_newsletter_html(document, PRIVACY_PATTERNS_DICT)
+            self.assertEqual(
+                sanitize_newsletter_html(once, PRIVACY_PATTERNS_DICT), once
+            )
 
 
 if __name__ == "__main__":

@@ -51,6 +51,19 @@ def sanitize_content(
     return redact_text(result, redaction_pattern)
 
 
+def sanitize_newsletter_html(html: str, privacy_patterns: dict[str, Any]) -> str:
+    """
+    Return newsletter HTML as stored: safe to render and privacy-sanitized.
+
+    Markup is sanitized first, so privacy redaction sees the document as a
+    browser parses it (text moved out of tables, NULs dropped) and the joined
+    text can't hide a phrase; it runs again last, so the result is its output.
+    """
+    return sanitize_markup(
+        sanitize_content(sanitize_markup(html), "html", privacy_patterns)
+    )
+
+
 def _matches_any(patterns: list[str], value: str) -> bool:
     return any(re.search(pattern, value, re.IGNORECASE) for pattern in patterns)
 
@@ -391,13 +404,11 @@ def parse_newsletter(
     html_content = msg.html or ""
     plain_text = msg.text or ""
 
-    # Sanitize content for Privacy (remove unsubscribe links, etc.), then keep only
-    # markup that is safe to render. We do this BEFORE converting HTML to text, so
+    # Keep only markup that is safe to render and sanitize for privacy (remove
+    # unsubscribe links, etc.). We do this BEFORE converting HTML to text, so
     # the text version is also clean
     if html_content:
-        html_content = sanitize_markup(
-            sanitize_content(html_content, "html", privacy_patterns)
-        )
+        html_content = sanitize_newsletter_html(html_content, privacy_patterns)
 
     if plain_text:
         plain_text = sanitize_content(plain_text, "text", privacy_patterns)

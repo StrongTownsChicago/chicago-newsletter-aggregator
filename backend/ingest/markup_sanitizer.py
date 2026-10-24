@@ -8,6 +8,8 @@ no scripts, event handlers, forms, frames, <style> blocks or javascript: URLs.
 CSS classes (a full-page overlay) or clobber DOM globals by id.
 """
 
+import re
+
 import nh3
 
 # nh3's defaults (formatting, lists, tables, images, links) plus markup common
@@ -43,8 +45,9 @@ ALLOWED_ATTRIBUTES = {
 ALLOWED_URL_SCHEMES = {"http", "https", "mailto", "tel"}
 
 # Inline CSS a newsletter needs for its own layout. Positioning (position,
-# top, left, z-index, transform) is left out, so content can't be placed over
-# the site's header or controls.
+# top, left, z-index, transform) is left out, and margins may not be negative
+# (see keep_style_declaration), so content can't be placed over the site's
+# header or controls.
 ALLOWED_STYLE_PROPERTIES = {
     "background",
     "background-color",
@@ -100,12 +103,44 @@ ALLOWED_STYLE_PROPERTIES = {
     "word-wrap",
 }
 
+# A plain property name: no comments or escapes that could disguise another property.
+STYLE_PROPERTY_NAME = re.compile(r"-?[a-z][a-z-]*")
+# One to four non-negative margin lengths ("0 auto", "10px 0"), as email layouts use.
+MARGIN_VALUE = re.compile(
+    r"(?:\s*(?:auto|0|\d+(?:\.\d+)?(?:px|em|rem|%|pt))\s*){1,4}(?:!\s*important\s*)?",
+    re.IGNORECASE,
+)
+
+
+def keep_style_declaration(declaration: str) -> bool:
+    """Whether one "property: value" declaration of a style attribute may stay."""
+    name, separator, value = declaration.partition(":")
+    if not separator:
+        return not declaration.strip()
+    name = name.strip().lower()
+    if not STYLE_PROPERTY_NAME.fullmatch(name):
+        return False
+    return not name.startswith("margin") or MARGIN_VALUE.fullmatch(value) is not None
+
+
+def filter_attribute(_tag: str, attribute: str, value: str) -> str | None:
+    """nh3 attribute filter: drop style declarations that could move content over the site."""
+    if attribute != "style":
+        return value
+    return ";".join(
+        declaration
+        for declaration in value.split(";")
+        if keep_style_declaration(declaration)
+    )
+
+
 _CLEANER = nh3.Cleaner(
     tags=ALLOWED_TAGS,
     clean_content_tags=CONTENT_STRIPPED_TAGS,
     attributes=ALLOWED_ATTRIBUTES,
     url_schemes=ALLOWED_URL_SCHEMES,
     filter_style_properties=ALLOWED_STYLE_PROPERTIES,
+    attribute_filter=filter_attribute,
     strip_comments=True,
 )
 

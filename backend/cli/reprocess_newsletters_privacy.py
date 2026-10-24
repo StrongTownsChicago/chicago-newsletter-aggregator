@@ -27,8 +27,7 @@ from typing import Any, cast
 
 from cli.logging_setup import configure_cli_logging
 from config.privacy_patterns import PRIVACY_PATTERNS_DICT
-from ingest.email.email_parser import sanitize_content
-from ingest.markup_sanitizer import sanitize_markup
+from ingest.email.email_parser import sanitize_content, sanitize_newsletter_html
 from shared.db import fetch_all_rows, get_supabase_client
 
 
@@ -104,9 +103,7 @@ def process_single_newsletter(
 
     # Sanitize HTML
     original_html = newsletter.get("raw_html") or ""
-    sanitized_html = sanitize_markup(
-        sanitize_content(original_html, "html", PRIVACY_PATTERNS_DICT)
-    )
+    sanitized_html = sanitize_newsletter_html(original_html, PRIVACY_PATTERNS_DICT)
     html_changed = show_diff(original_html, sanitized_html, "HTML", quiet=quiet)
 
     # Sanitize Text

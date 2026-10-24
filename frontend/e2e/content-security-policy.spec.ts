@@ -1,5 +1,7 @@
 // The Content-Security-Policy blocks nothing the site needs on any page, and
-// blocks script that stored newsletter HTML carries.
+// blocks script that stored newsletter HTML carries. This runs on the dev
+// server: it never inlines scripts or loads Cloudflare's beacon, and serves
+// prerendered pages through the middleware rather than public/_headers.
 import { test, expect, type Page } from '@playwright/test';
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_HEADER } from '../src/lib/content-security-policy';
 import { UNSAFE_MARKUP_NEWSLETTER } from './fixtures/db/facts';

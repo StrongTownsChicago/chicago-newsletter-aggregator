@@ -1,7 +1,11 @@
 """Tests for the allowlist sanitizer applied to stored newsletter HTML."""
 
+import os
 import unittest
+from unittest.mock import patch
 
+from config.privacy_patterns import PRIVACY_PATTERNS_DICT
+from ingest.email.email_parser import sanitize_newsletter_html
 from ingest.markup_sanitizer import sanitize_markup
 
 # Payloads that run script, load a frame or submit a form, each paired with
@@ -50,6 +54,29 @@ class TestUnsafeMarkupIsRemoved(unittest.TestCase):
             '<div style="position: fixed; top: 0; z-index: 99; color: red">Hi</div>'
         )
         self.assertEqual(sanitized, '<div style="color:red">Hi</div>')
+
+    def test_negative_margins_are_dropped(self) -> None:
+        """A negative margin would pull content up over the site's header."""
+        for style in (
+            "margin-top:-2000px",
+            "margin:-10px 0",
+            "MARGIN-LEFT:-9px",
+            "margin-top:calc(-1 * 900px)",
+            "margin-top:/**/-9px",
+            "color:red;/**/margin-top:-9px",
+            r"m\argin-top:-9px",
+        ):
+            with self.subTest(style=style):
+                self.assertNotIn(
+                    "margin", sanitize_markup(f'<div style="{style}">Hi</div>')
+                )
+
+    def test_layout_margins_are_kept(self) -> None:
+        for style in ("margin:0 auto", "margin:10px 0 !important", "margin-top:1.5em"):
+            with self.subTest(style=style):
+                once = sanitize_markup(f'<div style="{style}">Hi</div>')
+                self.assertIn("margin", once)
+                self.assertEqual(sanitize_markup(once), once)
 
     def test_document_head_is_dropped_with_its_text(self) -> None:
         """Scraped archive pages are whole documents; only the body's text remains."""
@@ -104,6 +131,28 @@ class TestNewsletterMarkupIsKept(unittest.TestCase):
 
     def test_empty_input_is_empty(self) -> None:
         self.assertEqual(sanitize_markup(""), "")
+
+
+class TestStoredNewsletterHtml(unittest.TestCase):
+    """sanitize_newsletter_html: privacy redaction sees the markup a browser renders."""
+
+    # A phrase split in the source that the HTML parser joins: text moved out of
+    # a table, and a NUL dropped.
+    JOINED_BY_THE_PARSER = (
+        "<table>Jane<tr><td>x</td></tr> Doe</table>",
+        "<li>Jane</li><table><caption>x</caption>Doe</table>",
+        "<p>Ja\x00ne Doe</p>",
+    )
+
+    def test_phrases_joined_by_the_parser_are_redacted(self) -> None:
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):
+            for html in self.JOINED_BY_THE_PARSER:
+                with self.subTest(html=html):
+                    once = sanitize_newsletter_html(html, PRIVACY_PATTERNS_DICT)
+                    self.assertNotIn("Doe", once)
+                    self.assertEqual(
+                        sanitize_newsletter_html(once, PRIVACY_PATTERNS_DICT), once
+                    )
 
 
 if __name__ == "__main__":
