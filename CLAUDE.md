@@ -94,7 +94,8 @@ uv run python -m unittest discover -s tests
 # Run tests with performance timing
 uv run python -m tools.time_test_suite
 
-# Mutation testing (dev-only, not in CI; minutes per module; targets in the tool)
+# Mutation testing (dev-only, not in CI; minutes per module; targets in the tool).
+# Run it in a separate worktree: it edits the module in place while it runs.
 uv run --group mutation python -m tools.run_mutation_tests [rule_matcher ...]
 
 # Tests with coverage (floor in pyproject.toml)
