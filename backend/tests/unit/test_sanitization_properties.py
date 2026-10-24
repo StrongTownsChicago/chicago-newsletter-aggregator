@@ -56,7 +56,15 @@ BENIGN_URLS = [
     "mailto:ward40@cityofchicago.org",
 ]
 BENIGN_CLASSES = ["content", "header", "mcnTextContent"]
-STRIP_PHRASE_NAMES = ["Jane Roe", "personal@example.com", "Ted", "Ed", "Act", "Dee"]
+STRIP_PHRASE_NAMES = [
+    "Jane Roe",
+    "personal@example.com",
+    "3125551234",
+    "Ted",
+    "Ed",
+    "Act",
+    "Dee",
+]
 
 WORDS = st.text(alphabet="abcdefghijklmnopqrstuvwxyz ", min_size=1, max_size=20)
 
@@ -66,10 +74,19 @@ def matches_any(patterns: list[str], value: str) -> bool:
 
 
 def find_whole_phrase(text: str, phrases: list[str]) -> str | None:
-    """The first phrase present as whole words outside redaction markers, if any."""
-    unredacted = text.replace("[REDACTED]", "\0")
+    """
+    Return the first phrase a reader can still see in text, if any.
+
+    Read as rendered: whitespace runs count as one space, redaction markers
+    hide what they replaced, and a phrase is only part of a longer word when
+    a letter touches its first or last letter.
+    """
+    readable = re.sub(r"\s+", " ", text.replace("[REDACTED]", "|"))
     for phrase in phrases:
-        if re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", unredacted, re.IGNORECASE):
+        before = r"(?<![^\W\d_])" if phrase[0].isalpha() else ""
+        after = r"(?![^\W\d_])" if phrase[-1].isalpha() else ""
+        words = re.escape(" ".join(phrase.split()))
+        if re.search(before + words + after, readable, re.IGNORECASE):
             return phrase
     return None
 
@@ -113,6 +130,12 @@ INLINE_TEXT = st.one_of(
             "J<i>ane</i>",
             "<b>Roe</b>",
             "J&#97;ne R&#x6F;e",
+            # Neighbours that must not hide a phrase: html2text emphasis, a
+            # phone prefix, a block ending in a letter, a wrapped source line.
+            "_Jane Roe_",
+            "+13125551234",
+            "<p>Contact</p>",
+            "Jane\n   Roe",
         ]
     ),
 )
@@ -293,9 +316,11 @@ class TestHtmlSanitizationProperties(unittest.TestCase):
             sanitized = sanitize_content(document, "html", PRIVACY_PATTERNS_DICT)
 
         soup = BeautifulSoup(sanitized, "html.parser")
-        # The visible text as a reader sees it, plus each string and attribute.
+        # The visible text joined with and without spaces at tag edges, plus
+        # each string and attribute.
         values = [
             soup.get_text(""),
+            soup.get_text(" "),
             *(str(text) for text in soup.find_all(string=True)),
             *(
                 value if isinstance(value, str) else " ".join(value)
@@ -305,6 +330,11 @@ class TestHtmlSanitizationProperties(unittest.TestCase):
         ]
         for value in values:
             self.assertIsNone(find_whole_phrase(value, phrases))
+
+
+def with_neighbours(phrases: list[str]) -> str:
+    """Each phrase plain, in html2text emphasis, after a phone prefix and in brackets."""
+    return " ".join(f"{phrase} _{phrase}_ +1{phrase} ({phrase})" for phrase in phrases)
 
 
 @patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ""})
@@ -339,7 +369,7 @@ class TestTextSanitizationProperties(unittest.TestCase):
     ) -> None:
         with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": ",".join(phrases)}):
             sanitized = sanitize_content(
-                f"{document}\n{' '.join(phrases)}", "text", PRIVACY_PATTERNS_DICT
+                f"{document}\n{with_neighbours(phrases)}", "text", PRIVACY_PATTERNS_DICT
             )
 
         self.assertIsNone(find_whole_phrase(sanitized, phrases))

@@ -358,6 +358,80 @@ Keep this sentence: I will not unsubscribe from your great news.
             sanitized, "[REDACTED] started; [REDACTED]'s edits needed [REDACTED]."
         )
 
+    def test_underscores_digits_and_prefixes_do_not_hide_a_phrase(self) -> None:
+        """Only letters make a phrase part of a longer word."""
+        phrases = "Jane Doe,3125551234,jane@example.com"
+        cases = {
+            "Thanks to _Jane Doe_ for help": "Thanks to _[REDACTED]_ for help",
+            "Call +13125551234 today": "Call +1[REDACTED] today",
+            "Write jane@example.com_ now": "Write [REDACTED]_ now",
+        }
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": phrases}):
+            for text, expected in cases.items():
+                with self.subTest(text=text):
+                    self.assertEqual(
+                        sanitize_content(text, "text", PRIVACY_PATTERNS_DICT), expected
+                    )
+            html = sanitize_content(
+                '<a href="tel:+13125551234">call</a><img alt="_Jane Doe_" src="a.png">',
+                "html",
+                PRIVACY_PATTERNS_DICT,
+            )
+
+        self.assertEqual(
+            html,
+            '<a href="tel:+1[REDACTED]">call</a><img alt="_[REDACTED]_" src="a.png"/>',
+        )
+
+    def test_block_ending_in_a_letter_does_not_hide_the_next_phrase(self) -> None:
+        """Minified HTML puts blocks side by side; each block's text is its own word run."""
+        cases = {
+            "<p>Contact</p><p>Jane <b>Doe</b> today</p>": "<p>Contact</p><p>[REDACTED]<b></b> today</p>",
+            "<td>Thanks</td><td>Jane Doe</td>": "<td>Thanks</td><td>[REDACTED]</td>",
+            '<p><b>Contact</b>Jane <a href="https://x.list-manage.com/profile?u=1">Doe</a></p>': "<p><b>Contact</b>[REDACTED]</p>",
+        }
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):
+            for html, expected in cases.items():
+                with self.subTest(html=html):
+                    once = sanitize_content(html, "html", PRIVACY_PATTERNS_DICT)
+                    self.assertEqual(once, expected)
+                    self.assertEqual(
+                        sanitize_content(once, "html", PRIVACY_PATTERNS_DICT), once
+                    )
+
+    def test_name_wrapped_across_source_lines_is_redacted(self) -> None:
+        """Browsers render "Jane\\n  Doe" as "Jane Doe", so it is redacted the same."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):
+            sanitized = sanitize_content(
+                "<p>Contact Jane\n   Doe today</p>", "html", PRIVACY_PATTERNS_DICT
+            )
+
+        self.assertEqual(sanitized, "<p>Contact [REDACTED] today</p>")
+
+    def test_percent_encoded_email_in_a_link_is_redacted(self) -> None:
+        """mailto: links often percent-encode the @."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "jane@example.com"}):
+            sanitized = sanitize_content(
+                '<a href="mailto:jane%40example.com">Email</a>',
+                "html",
+                PRIVACY_PATTERNS_DICT,
+            )
+
+        self.assertEqual(sanitized, '<a href="mailto:[REDACTED]">Email</a>')
+
+    def test_preformatted_whitespace_is_kept_when_a_phrase_is_removed(self) -> None:
+        """Whitespace left by redaction collapses as the parser would, except in <pre>."""
+        with patch.dict(os.environ, {"PRIVACY_STRIP_PHRASES": "Jane Doe"}):
+            sanitized = sanitize_content(
+                "<p>Jane <i>Doe   </i></p><pre>Jane <i>Doe   </i></pre>",
+                "html",
+                PRIVACY_PATTERNS_DICT,
+            )
+
+        self.assertEqual(
+            sanitized, "<p>[REDACTED]<i> </i></p><pre>[REDACTED]<i>   </i></pre>"
+        )
+
     def test_obfuscated_privacy_urls_are_matched_as_a_browser_reads_them(self) -> None:
         """Tabs, newlines and percent-escapes inside a URL don't hide it."""
         hrefs = [

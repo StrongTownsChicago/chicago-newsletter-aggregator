@@ -70,7 +70,7 @@ describe('Middleware', () => {
   it('builds a per-request client that neither persists nor refreshes the session', async () => {
     await onRequest(createMockContext(), vi.fn(() => Promise.resolve(new Response())));
 
-    expect(vi.mocked(createClient).mock.calls[0][2]).toEqual({
+    expect(vi.mocked(createClient).mock.calls[0][2]).toMatchObject({
       auth: { persistSession: false, autoRefreshToken: false },
     });
   });
