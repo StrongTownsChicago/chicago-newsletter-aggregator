@@ -52,6 +52,17 @@ class TestFetchAllRows(unittest.TestCase):
 
         self.assertEqual(ids, list(range(2, 7)))
 
+    def test_stops_at_the_limit_without_an_extra_read(self) -> None:
+        ids, ranges = self.fetch(10, page_size=3, start=1, limit=7)
+
+        self.assertEqual(ids, list(range(1, 8)))
+        self.assertEqual(ranges, [(1, 3), (4, 6), (7, 7)])
+
+    def test_a_limit_past_the_end_returns_what_exists(self) -> None:
+        ids, _ = self.fetch(4, page_size=3, limit=10)
+
+        self.assertEqual(ids, list(range(4)))
+
     def test_an_empty_result_is_one_read(self) -> None:
         self.assertEqual(self.fetch(0, page_size=3), ([], [(0, 2)]))
 

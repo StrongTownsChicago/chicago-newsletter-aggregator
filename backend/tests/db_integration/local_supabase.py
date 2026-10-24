@@ -18,7 +18,10 @@ import supabase as supabase_package
 from postgrest.exceptions import APIError
 from supabase import Client
 
-from tests.db_integration.local_guard import abort_unless_local
+from tests.db_integration.local_guard import (
+    abort_unless_local,
+    abort_unless_local_postgres,
+)
 
 TEST_ENV = {
     "url": "TEST_SUPABASE_URL",
@@ -43,8 +46,10 @@ APP_TABLES = (
 TEST_PASSWORD = "local-test-password"
 TEST_UNSUBSCRIBE_SECRET = "local-test-unsubscribe-secret-at-least-32-bytes"
 
-#: Calls that reach a service other than the database.
+#: Calls that reach a service other than the database. A MailBox connects to
+#: the IMAP server as it is constructed.
 UNFAKED_SERVICES = (
+    "imap_tools.mailbox.MailBox.__init__",
     "resend.Emails.send",
     "processing.llm_processor.call_llm",
     "processing.weekly_report_generator.call_llm",
@@ -73,7 +78,7 @@ def ensure_stack_is_local(stack: LocalStack) -> None:
     """End the process unless every URL and key of ``stack`` is local."""
     abort_unless_local(stack.url, stack.service_key)
     abort_unless_local(stack.url, stack.anon_key)
-    abort_unless_local(stack.db_url)
+    abort_unless_local_postgres(stack.db_url)
 
 
 def create_local_client(url: str, key: str, *args: Any, **kwargs: Any) -> Client:
@@ -91,7 +96,7 @@ def response_rows(response: Any) -> list[dict[str, Any]]:
 
 def reset_database(db_url: str) -> None:
     """Empty every app table and delete every auth user (and so every profile)."""
-    abort_unless_local(db_url)
+    abort_unless_local_postgres(db_url)
     with psycopg.connect(db_url, autocommit=True) as connection:
         connection.execute(f"TRUNCATE {', '.join(APP_TABLES)} RESTART IDENTITY CASCADE")
         connection.execute("DELETE FROM auth.users")
@@ -150,7 +155,7 @@ class LocalSupabaseTestCase(unittest.TestCase):
     @classmethod
     def run_sql(cls, query: str, params: Any = None) -> list[tuple[Any, ...]]:
         """Run one statement as the database owner (bypasses RLS); returns rows."""
-        abort_unless_local(cls.stack.db_url)
+        abort_unless_local_postgres(cls.stack.db_url)
         with psycopg.connect(cls.stack.db_url, autocommit=True) as connection:
             cursor = connection.execute(query, params)
             return cursor.fetchall() if cursor.description else []

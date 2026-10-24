@@ -21,11 +21,14 @@ Usage:
 
     # Dry run (preview what would be processed)
     uv run python -m cli.process_llm_metadata --latest 10 --dry-run
+
+Without --latest, every matching newsletter's text is read from the database,
+which for --all or --missing-metadata can be the whole table.
 """
 
 import argparse
 import os
-from typing import Any, cast
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -43,8 +46,10 @@ def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str,
     """Fetch newsletters based on filter arguments, newest first."""
 
     def build_query() -> Any:
-        # Join with sources table to get ward_number
-        query = supabase.table("newsletters").select("*, sources(ward_number)")
+        # Only what processing and rule matching read; ward_number from the source
+        query = supabase.table("newsletters").select(
+            "id, subject, source_id, received_date, plain_text, sources(ward_number)"
+        )
 
         if args.newsletter_id:
             query = query.eq("id", args.newsletter_id)
@@ -59,15 +64,9 @@ def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str,
         # id breaks date ties, so pages never overlap
         return query.order("received_date", desc=True).order("id")
 
-    if args.latest and not args.all:
-        start = args.skip
-        end = args.skip + args.latest - 1
-        return cast(
-            list[dict[str, Any]], build_query().range(start, end).execute().data
-        )
-
-    # Everything after skip, read in pages past the API's row cap
-    return fetch_all_rows(build_query, start=args.skip)
+    # After skip, the latest N (or everything), in pages past the API's row cap
+    limit = args.latest if args.latest and not args.all else None
+    return fetch_all_rows(build_query, start=args.skip, limit=limit)
 
 
 def reprocess_newsletter(

@@ -24,21 +24,26 @@ API_ROW_CAP = 1000
 
 
 def fetch_all_rows(
-    build_query: Callable[[], Any], start: int = 0, page_size: int = API_ROW_CAP
+    build_query: Callable[[], Any],
+    start: int = 0,
+    limit: int | None = None,
+    page_size: int = API_ROW_CAP,
 ) -> list[dict[str, Any]]:
-    """Every row a query matches from offset `start`, read in pages past the row cap.
+    """Rows a query matches from offset `start` (at most `limit`), read in pages past the row cap.
 
     `build_query` returns a fresh query with a total order (end it on a unique
     column), so pages neither overlap nor skip rows. `page_size` must not
     exceed the cap, or a capped page would look like the last one.
     """
     rows: list[dict[str, Any]] = []
-    while True:
+    while limit is None or len(rows) < limit:
         offset = start + len(rows)
+        wanted = page_size if limit is None else min(page_size, limit - len(rows))
         page = cast(
             list[dict[str, Any]],
-            build_query().range(offset, offset + page_size - 1).execute().data,
+            build_query().range(offset, offset + wanted - 1).execute().data,
         )
         rows.extend(page)
-        if len(page) < page_size:
-            return rows
+        if len(page) < wanted:
+            break
+    return rows

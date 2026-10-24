@@ -11,7 +11,11 @@ import binascii
 import json
 import os
 import sys
+from collections.abc import Callable
 from urllib.parse import urlsplit
+
+import psycopg
+from psycopg.conninfo import conninfo_to_dict
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -35,6 +39,30 @@ def ensure_local_url(url: str) -> None:
         raise NotLocalDatabaseError(f"unparseable database URL: {error}") from error
     if host not in LOOPBACK_HOSTS:
         raise NotLocalDatabaseError(f"database host {host!r} is not local")
+
+
+#: libpq settings that read connection details (including a host) from a file.
+_REDIRECTING_POSTGRES_SETTINGS = frozenset({"service", "servicefile"})
+
+
+def ensure_local_postgres_url(url: str) -> None:
+    """Raise unless every host libpq would connect to for ``url`` is loopback.
+
+    Query parameters override the URL's host (``...@127.0.0.1/db?host=remote``),
+    so the parsed connection settings are checked, not just the URL.
+    """
+    ensure_local_url(url)
+    try:
+        settings = conninfo_to_dict(url)
+    except psycopg.ProgrammingError as error:
+        raise NotLocalDatabaseError(f"unparseable Postgres URL: {error}") from error
+    redirecting = _REDIRECTING_POSTGRES_SETTINGS & settings.keys()
+    if redirecting:
+        raise NotLocalDatabaseError(f"Postgres URL sets {sorted(redirecting)}")
+    for setting in ("host", "hostaddr"):
+        for host in str(settings.get(setting) or "").split(","):
+            if host and host.strip("[]") not in LOOPBACK_HOSTS:
+                raise NotLocalDatabaseError(f"Postgres {setting} {host!r} is not local")
 
 
 def _jwt_claims(key: str) -> dict[str, object]:
@@ -71,11 +99,22 @@ def ensure_local_supabase(url: str, key: str) -> None:
 
 
 def abort_unless_local(url: str, key: str | None = None) -> None:
-    """End the process unless ``url`` (and ``key``, if given) are local."""
+    """End the process unless the API ``url`` (and ``key``, if given) are local."""
+    _abort_on_error(
+        lambda: ensure_local_url(url)
+        if key is None
+        else ensure_local_supabase(url, key)
+    )
+
+
+def abort_unless_local_postgres(url: str) -> None:
+    """End the process unless the Postgres ``url`` connects only to loopback."""
+    _abort_on_error(lambda: ensure_local_postgres_url(url))
+
+
+def _abort_on_error(check: Callable[[], None]) -> None:
     try:
-        ensure_local_url(url)
-        if key is not None:
-            ensure_local_key(key)
+        check()
     except NotLocalDatabaseError as error:
         sys.stderr.write(f"\nRefusing to touch a non-local database: {error}\n")
         sys.stderr.flush()

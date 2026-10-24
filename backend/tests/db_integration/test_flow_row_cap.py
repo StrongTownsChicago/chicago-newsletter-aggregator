@@ -64,6 +64,7 @@ class TestRowCap(ManyNewslettersTestCase):
             (["--all", "--skip", "10"], NEWSLETTER_COUNT - 10),
             (["--source-id", str(self.source_id)], NEWSLETTER_COUNT),
             (["--latest", "5", "--skip", str(API_ROW_CAP + 10)], 5),
+            (["--latest", str(API_ROW_CAP + 20)], API_ROW_CAP + 20),
         ):
             with self.subTest(args=args):
                 newsletters = llm_cli.fetch_newsletters(

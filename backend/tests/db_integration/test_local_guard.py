@@ -9,7 +9,9 @@ from tests.db_integration.local_guard import (
     NOT_LOCAL_EXIT_STATUS,
     NotLocalDatabaseError,
     abort_unless_local,
+    abort_unless_local_postgres,
     ensure_local_key,
+    ensure_local_postgres_url,
     ensure_local_supabase,
     ensure_local_url,
 )
@@ -59,6 +61,30 @@ class TestEnsureLocalUrl(unittest.TestCase):
                 ensure_local_url(url)
 
 
+class TestEnsureLocalPostgresUrl(unittest.TestCase):
+    def test_accepts_the_local_stack(self) -> None:
+        ensure_local_postgres_url(
+            "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+        )
+        ensure_local_postgres_url(
+            "postgresql://postgres:postgres@localhost:54322/postgres?hostaddr=127.0.0.1"
+        )
+
+    def test_rejects_settings_that_override_the_host(self) -> None:
+        local = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+        for url in (
+            f"{local}?host=db.abcdefghijklmnopqrst.supabase.co",
+            f"{local}?host=127.0.0.1,db.abcdefghijklmnopqrst.supabase.co",
+            f"{local}?hostaddr=203.0.113.7",
+            f"{local}?service=production",
+            f"{local}?servicefile=/tmp/pg_service.conf",
+            "postgresql://postgres:pw@db.abcdefghijklmnopqrst.supabase.co:5432/postgres",
+            f"{local}?not_a_setting=1",
+        ):
+            with self.subTest(url=url), self.assertRaises(NotLocalDatabaseError):
+                ensure_local_postgres_url(url)
+
+
 class TestEnsureLocalKey(unittest.TestCase):
     def test_accepts_the_local_demo_key(self) -> None:
         ensure_local_key(LOCAL_SERVICE_KEY)
@@ -101,6 +127,16 @@ class TestAbortUnlessLocal(unittest.TestCase):
                 "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
             )
         exit_process.assert_not_called()
+
+    def test_ends_the_process_for_a_redirected_postgres_url(self) -> None:
+        with (
+            patch("tests.db_integration.local_guard.os._exit") as exit_process,
+            patch("sys.stderr"),
+        ):
+            abort_unless_local_postgres(
+                "postgresql://postgres:postgres@127.0.0.1:54322/postgres?host=db.x.supabase.co"
+            )
+        exit_process.assert_called_once_with(NOT_LOCAL_EXIT_STATUS)
 
     def test_ends_the_process_for_a_hosted_url_or_key(self) -> None:
         for url, key in (
