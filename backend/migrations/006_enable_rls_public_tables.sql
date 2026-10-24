@@ -2,6 +2,8 @@
 -- Description: Brings the published schema in line with the Row Level Security
 --              policies running in production, so a fresh deployment is secure.
 -- Date: 2026-10-05
+-- Status: NOT yet applied in production (schema dump of 2026-10-24 still
+--         shows changes (a) and (b) below undone).
 --
 -- Idempotent: every policy is dropped (IF EXISTS) before being recreated, and
 -- ENABLE ROW LEVEL SECURITY is a no-op on tables that already have it. Running
@@ -12,8 +14,8 @@
 -- ============================================================================
 -- * Default deny: with RLS enabled, any command that has no permissive policy
 --   is denied for anon/authenticated. The public surface is read-only because
---   there are no INSERT/UPDATE/DELETE grants on newsletters, sources, or
---   email_source_mappings.
+--   of these policies alone: anon and authenticated hold Supabase's default
+--   GRANT ALL on every public table, so RLS is the only barrier.
 -- * service_role bypasses RLS entirely (BYPASSRLS), so backend ingestion and
 --   notification jobs using SUPABASE_SERVICE_KEY are unaffected by any of this.
 -- * "Block non-service inserts/updates" on newsletters use literal FALSE.

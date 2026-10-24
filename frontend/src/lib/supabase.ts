@@ -21,9 +21,9 @@ export interface Newsletter {
   created_at: string;
   received_date: string;
   subject: string;
-  from_email: string;
-  source_id: number | null;
-  plain_text: string;
+  from_email: string | null;
+  source_id: number;
+  plain_text: string | null;
   raw_html: string | null;
   summary: string | null;
   topics: string[] | null;
@@ -40,6 +40,7 @@ export interface Source {
   signup_url: string | null;
   ward_number: string | null;
   phone: string | null;
+  newsletter_archive_url: string | null;
 }
 
 export interface UserProfile {
@@ -61,8 +62,8 @@ export interface NotificationRule {
   created_at: string;
   updated_at: string;
   topics: string[];
-  search_term?: string;
-  source_ids?: number[];
-  ward_numbers?: string[]; // TEXT[] to match sources.ward_number TEXT type
+  search_term?: string | null;
+  source_ids?: number[] | null;
+  ward_numbers?: string[] | null; // TEXT[] to match sources.ward_number TEXT type
   delivery_frequency: "daily" | "weekly";
 }
