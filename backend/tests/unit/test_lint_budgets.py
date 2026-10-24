@@ -19,11 +19,11 @@ BACKEND = Path(__file__).resolve().parents[2]
 
 # Ceiling name -> the value it was adopted at. Lower freely, never raise.
 ADOPTED = {
-    "max-complexity": 11,
+    "max-complexity": 9,
     "max-args": 5,
     "max-returns": 5,
-    "max-branches": 10,
-    "max-statements": 45,
+    "max-branches": 9,
+    "max-statements": 44,
 }
 
 # Ceiling name -> (ruff table, the rule it configures).

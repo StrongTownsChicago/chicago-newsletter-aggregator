@@ -92,13 +92,13 @@ external = ["DS"]
 # Each sits at today's worst function, named in its comment; walk them down by
 # splitting that function. tests/unit/test_lint_budgets.py holds them in place.
 [tool.ruff.lint.mccabe]
-max-complexity = 11   # cli/weekly_notification_queue.queue_weekly_notifications
+max-complexity = 9    # notifications/rule_matcher.match_newsletter_to_rules and others
 
 [tool.ruff.lint.pylint]
 max-args = 5          # processing/llm_client, notifications/email_sender.send_digest
 max-returns = 5       # processing/weekly_report_generator.generate_weekly_topic_report and others
-max-branches = 10     # cli/weekly_notification_queue.queue_weekly_notifications
-max-statements = 45   # cli/weekly_notification_queue.queue_weekly_notifications
+max-branches = 9      # processing/llm_client._call_openai and others
+max-statements = 44   # cli/try_weekly_summary.main
 
 
 [tool.ruff.lint.isort]
