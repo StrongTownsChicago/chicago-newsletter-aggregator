@@ -175,6 +175,21 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)  # Search term can't match
 
+    def test_null_topics_and_text_mean_none(self) -> None:
+        """Null columns (no LLM topics yet, no text) don't crash; a ward-only rule still matches"""
+        newsletter_data = {"topics": None, "plain_text": None, "ward_number": 40}
+
+        self.assertTrue(
+            _rule_matches_newsletter(
+                create_test_rule(topics=[], ward_numbers=[40]), newsletter_data
+            )
+        )
+        self.assertFalse(
+            _rule_matches_newsletter(
+                create_test_rule(topics=["zoning"]), newsletter_data
+            )
+        )
+
     def test_none_ward_number_handled(self) -> None:
         """Newsletter with ward_number=None doesn't crash"""
         rule = create_test_rule(ward_numbers=[1])

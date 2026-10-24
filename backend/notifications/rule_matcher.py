@@ -119,9 +119,9 @@ def _rule_matches_newsletter(
     Returns:
         True if the rule matches the newsletter
     """
-    # Extract newsletter data
-    newsletter_topics = set(newsletter_data.get("topics", []))
-    newsletter_text = newsletter_data.get("plain_text", "").lower()
+    # Extract newsletter data; both columns are nullable (no LLM topics yet, no text)
+    newsletter_topics = set(newsletter_data.get("topics") or [])
+    newsletter_text = (newsletter_data.get("plain_text") or "").lower()
     newsletter_ward = newsletter_data.get("ward_number")
 
     # Topics filter (at least one topic must match)
