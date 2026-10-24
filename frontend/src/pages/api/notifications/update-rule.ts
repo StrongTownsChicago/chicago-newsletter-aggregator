@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const formData = await request.formData();
   const ruleId = formText(formData, "rule_id");
   const name = formText(formData, "name");
-  const deliveryFrequency =
+  let deliveryFrequency =
     formText(formData, "delivery_frequency") || "daily";
   const topics = formTexts(formData, "topics");
   let searchTerm = formText(formData, "search_term")?.trim();
@@ -47,6 +47,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     wards = [];
   } else {
     // Validation: Daily rules (default)
+    deliveryFrequency = "daily"; // Ensure it's exactly 'daily' if not 'weekly'
+
     if (!searchTerm && topics.length === 0) {
       return redirect(
         "/preferences?error=Please specify at least one topic or search phrase",

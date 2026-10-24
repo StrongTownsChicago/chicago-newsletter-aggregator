@@ -159,5 +159,13 @@ describe("rule update and delete", () => {
 
       expect(db.update).toHaveBeenCalled();
     });
+
+    it("stores any frequency other than weekly as daily, as create-rule does", async () => {
+      await submit(updateRulePOST, db, { ...ruleForm, delivery_frequency: "hourly" });
+
+      expect(db.update).toHaveBeenCalledWith(
+        expect.objectContaining({ delivery_frequency: "daily" }),
+      );
+    });
   });
 });
