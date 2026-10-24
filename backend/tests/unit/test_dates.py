@@ -3,8 +3,9 @@ Unit tests for shared/dates.py
 """
 
 import unittest
+from datetime import date
 
-from shared.dates import parse_date_string
+from shared.dates import format_calendar_day, format_received_date, parse_date_string
 
 
 class TestParseDateString(unittest.TestCase):
@@ -76,6 +77,25 @@ class TestParseDateString(unittest.TestCase):
         else:
             # If it doesn't overflow, that's fine too
             assert result is not None
+
+
+class TestFormatReceivedDate(unittest.TestCase):
+    def test_days_are_not_zero_padded(self) -> None:
+        self.assertEqual(format_calendar_day(date(2026, 1, 5)), "January 5, 2026")
+
+    def test_uses_the_chicago_day(self) -> None:
+        # 9:30 PM in Chicago on January 23 is already January 24 in UTC.
+        self.assertEqual(
+            format_received_date("2026-01-24T03:30:00+00:00"), "January 23, 2026"
+        )
+        self.assertEqual(format_received_date("2026-07-04T04:59:00Z"), "July 3, 2026")
+        self.assertEqual(format_received_date("2026-07-04T05:00:00Z"), "July 4, 2026")
+
+    def test_a_timestamp_without_an_offset_keeps_its_day(self) -> None:
+        self.assertEqual(format_received_date("2026-01-05T23:00:00"), "January 5, 2026")
+
+    def test_text_that_is_not_a_timestamp_is_cut_to_ten_characters(self) -> None:
+        self.assertEqual(format_received_date("2026-01-24-INVALID"), "2026-01-24")
 
 
 if __name__ == "__main__":

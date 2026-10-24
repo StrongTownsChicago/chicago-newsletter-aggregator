@@ -4,10 +4,11 @@ Each function does all data work once, so the renderers only handle presentation
 """
 
 import logging
-from datetime import datetime
+from datetime import date, timedelta
 from typing import Any
 
 from notifications.digest_config import frontend_base_url
+from shared.dates import format_calendar_day, format_received_date
 from shared.db import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -72,14 +73,9 @@ def prepare_newsletter_data(
 
         # Format date
         received_date = newsletter.get("received_date", "")
-        if received_date:
-            try:
-                date_obj = datetime.fromisoformat(received_date)
-                date_formatted = date_obj.strftime("%B %d, %Y")
-            except (ValueError, TypeError):
-                date_formatted = received_date[:10]
-        else:
-            date_formatted = "Unknown date"
+        date_formatted = (
+            format_received_date(received_date) if received_date else "Unknown date"
+        )
 
         # Build newsletter URL
         newsletter_id = newsletter.get("id", "")
@@ -238,35 +234,22 @@ def prepare_weekly_report_data(
 
 
 def format_week_range(week_id: str) -> str:
-    """
-    Convert ISO week ID (YYYY-WXX) to readable date range.
+    """An ISO week id as its Monday-to-Sunday range, e.g. "2026-W05" -> "January 26 - February 1, 2026".
 
-    Args:
-        week_id: ISO week identifier (e.g., "2026-W05")
-
-    Returns:
-        Formatted string (e.g., "January 26 - February 1, 2026")
+    An id that isn't a real ISO week is returned unchanged.
     """
     try:
-        year_str, week_str = week_id.split("-W")
-        year = int(year_str)
-        week = int(week_str)
-
-        # Calculate week start (Monday)
-        from datetime import date, timedelta
-
-        jan_4 = date(year, 1, 4)  # Always in week 1
-        week_1_monday = jan_4 - timedelta(days=jan_4.weekday())
-        week_start = week_1_monday + timedelta(weeks=week - 1)
-        week_end = week_start + timedelta(days=6)
-
-        # Formats as "January 26 - February 1, 2026"
-        if week_start.month == week_end.month:
-            return f"{week_start.strftime('%B %d')} - {week_end.strftime('%d, %Y')}"
-        return f"{week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
-
+        year_text, week_text = week_id.split("-W")
+        week_start = date.fromisocalendar(int(year_text), int(week_text), 1)
     except (ValueError, AttributeError):
         return week_id
+    week_end = week_start + timedelta(days=6)
+
+    if week_start.year != week_end.year:
+        return f"{format_calendar_day(week_start)} - {format_calendar_day(week_end)}"
+    if week_start.month == week_end.month:
+        return f"{week_start:%B} {week_start.day} - {week_end.day}, {week_end.year}"
+    return f"{week_start:%B} {week_start.day} - {format_calendar_day(week_end)}"
 
 
 # Display labels for processing/llm_processor.py:TOPICS.

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import type { APIContext } from 'astro';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -117,4 +117,12 @@ export const createQueryRecorder = (...results: QueryResult[]) => {
   });
   const { select, insert, update, eq } = builder;
   return { from, select, insert, update, delete: builder.delete, eq };
+};
+
+// Reads a JSON API response, checking it is labelled as JSON.
+export const readJsonResponse = (
+  response: Response,
+): Promise<Record<string, unknown>> => {
+  expect(response.headers.get('Content-Type')).toBe('application/json');
+  return response.json();
 };

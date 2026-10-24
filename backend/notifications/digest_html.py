@@ -1,11 +1,11 @@
 """HTML bodies for daily and weekly digest emails."""
 
-from datetime import datetime
 from html import escape
 from typing import Any
 from urllib.parse import quote
 
 from notifications.digest_config import DigestType, frontend_base_url
+from shared.dates import format_received_date
 
 
 def _render_daily_content_html(prepared_newsletters: list[dict[str, Any]]) -> str:
@@ -86,12 +86,7 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
                 <ul style="margin: 8px 0; padding-left: 20px;">
 """
             for nl in report["referenced_newsletters"]:
-                # Format date
-                try:
-                    date_obj = datetime.fromisoformat(nl["received_date"])
-                    date_str = date_obj.strftime("%B %d, %Y")
-                except (ValueError, TypeError):
-                    date_str = nl["received_date"][:10]
+                date_str = format_received_date(nl["received_date"])
 
                 # Format ward
                 ward_str = (

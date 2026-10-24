@@ -30,7 +30,7 @@ import { jwtVerify } from "jose";
 import { POST as getUserPreferencesPOST } from "../../pages/api/notifications/get-user-preferences";
 import { POST as unsubscribePOST } from "../../pages/api/notifications/unsubscribe";
 import { POST as updatePreferencesPOST } from "../../pages/api/notifications/update-preferences";
-import { createMockContext, createQueryRecorder } from "../helpers";
+import { createMockContext, createQueryRecorder, readJsonResponse } from "../helpers";
 import { notificationsEnabled } from "../../lib/supabase";
 
 const USER_ID = "user-123";
@@ -66,7 +66,7 @@ describe("notification preference access", () => {
       const response = await readPreferences(json, { user: { id: USER_ID } });
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ enabled: false });
+      expect(await readJsonResponse(response)).toEqual({ enabled: false });
       expect(admin.from).toHaveBeenCalledWith("user_profiles");
       expect(admin.eq).toHaveBeenCalledWith("id", USER_ID);
     });
@@ -85,7 +85,7 @@ describe("notification preference access", () => {
 
       const response = await readPreferences({}, { user: { id: USER_ID } });
 
-      expect(await response.json()).toEqual({ enabled: true });
+      expect(await readJsonResponse(response)).toEqual({ enabled: true });
     });
 
     it.each([
