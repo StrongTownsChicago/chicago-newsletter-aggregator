@@ -42,6 +42,46 @@ class TestRemapTopics(unittest.TestCase):
         )
 
 
+class TestPlanMigration(unittest.TestCase):
+    def test_lists_changed_newsletters_and_topic_fates(self) -> None:
+        plan = migrate_topics.plan_migration(NEWSLETTERS)
+
+        self.assertEqual(plan.total, 4)
+        self.assertEqual(plan.unchanged, 2)
+        self.assertEqual(
+            plan.changes,
+            [
+                migrate_topics.TopicChange(
+                    newsletter_id="n1",
+                    subject_preview="Budget hearing and bike lanes",
+                    old=["budget_transparency", "fiscal_sustainability", "bike_lanes"],
+                    new=["bike_lanes", "city_budget"],
+                ),
+                migrate_topics.TopicChange(
+                    newsletter_id="n3",
+                    subject_preview="Retired topic",
+                    old=["obsolete_topic"],
+                    new=[],
+                ),
+            ],
+        )
+        self.assertEqual(dict(plan.topics_removed), {"obsolete_topic": 1})
+        self.assertEqual(
+            {topic: dict(targets) for topic, targets in plan.topics_mapped.items()},
+            {
+                "budget_transparency": {"city_budget": 1},
+                "fiscal_sustainability": {"city_budget": 1},
+            },
+        )
+
+    def test_truncates_the_subject_preview(self) -> None:
+        plan = migrate_topics.plan_migration(
+            [{"id": "n1", "subject": "x" * 80, "topics": ["obsolete_topic"]}]
+        )
+
+        self.assertEqual(plan.changes[0].subject_preview, "x" * 50)
+
+
 class MigrationTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.db = FakeSupabase({("newsletters", "select"): NEWSLETTERS})

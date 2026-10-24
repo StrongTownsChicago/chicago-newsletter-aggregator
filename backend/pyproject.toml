@@ -85,7 +85,6 @@ external = ["DS"]
 "models/types.py" = ["UP040"]
 # One-shot maintenance scripts, ratcheted separately from the product.
 "cli/calculate_token_costs.py" = ["C901", "PLR0912", "PLR0915"]
-"cli/migrate_topics.py" = ["C901", "PLR0912", "PLR0915"]
 "llm_costs/cost_report_generator.py" = ["PLR0915"]
 
 # Budget ceilings, not contracts: lower them freely, never raise them.

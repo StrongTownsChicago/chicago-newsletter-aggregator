@@ -37,13 +37,12 @@ CEILINGS = {
 
 SIZE_CODES = frozenset(code for _, code in CEILINGS.values())
 
-# Paths allowed to switch a size rule off: test factories and three one-shot
+# Paths allowed to switch a size rule off: test factories and two one-shot
 # maintenance scripts. Adding a path here is a loosening a reviewer should see.
 EXEMPT_PATHS = frozenset(
     {
         "tests/*",
         "cli/calculate_token_costs.py",
-        "cli/migrate_topics.py",
         "llm_costs/cost_report_generator.py",
     }
 )
