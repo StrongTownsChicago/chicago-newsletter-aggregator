@@ -23,7 +23,7 @@ ADOPTED = {
     "max-args": 5,
     "max-returns": 5,
     "max-branches": 14,
-    "max-statements": 61,
+    "max-statements": 55,
 }
 
 # Ceiling name -> (ruff table, the rule it configures).

@@ -20,7 +20,9 @@ Usage:
 
 import argparse
 import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -165,6 +167,90 @@ def store_weekly_report(report: WeeklyTopicReport) -> bool:
         return False
 
 
+ReportOutcome = Literal["generated", "skipped", "failed"]
+
+
+@dataclass(frozen=True)
+class ReportRunOptions:
+    """What one weekly report run generates and whether it stores."""
+
+    week_id: str
+    dry_run: bool
+    force: bool
+    model: str
+
+
+def resolve_week_id(week_id: str | None, current_week: bool) -> str:
+    """The week to report on: week_id if given, else the current or previous week."""
+    if week_id is not None:
+        return week_id
+    return get_iso_week_id() if current_week else get_previous_week_id()
+
+
+def print_run_header(options: ReportRunOptions) -> None:
+    print(f"\n{'=' * 60}")
+    print(f"Weekly Report Generation - Week {options.week_id}")
+    print(f"{'=' * 60}")
+    print(f"Mode: {'DRY RUN' if options.dry_run else 'PRODUCTION'}")
+    print(f"Force: {'Yes' if options.force else 'No'}")
+    print(f"Model: {options.model}")
+    print(f"LLM Enabled: {'Yes' if ENABLE_LLM else 'No'}")
+    print()
+
+
+def print_run_summary(stats: dict[str, int]) -> None:
+    print(f"{'=' * 60}")
+    print("Summary:")
+    print(f"  Generated: {stats['generated']}")
+    print(f"  Skipped:   {stats['skipped']}")
+    print(f"  Failed:    {stats['failed']}")
+    print(f"{'=' * 60}")
+
+
+def store_generated_report(report: WeeklyTopicReport, dry_run: bool) -> ReportOutcome:
+    """Store a generated report, or only count it on a dry run."""
+    if dry_run:
+        print("  ✓ Report generated (dry run - not storing)")
+        return "generated"
+
+    if store_weekly_report(report):
+        print("  ✓ Report stored successfully")
+        return "generated"
+    print("  ✗ Failed to store report")
+    return "failed"
+
+
+def generate_topic_report(topic: str, options: ReportRunOptions) -> ReportOutcome:
+    """
+    Generate one topic's report and store it unless this is a dry run.
+
+    An existing report is skipped unless options.force. A generation error is
+    logged to an error file and counted as failed.
+    """
+    if not options.force and report_exists(topic, options.week_id):
+        print(f"  ℹ Report already exists for {topic} / {options.week_id}, skipping")
+        return "skipped"
+
+    try:
+        report = generate_weekly_topic_report(topic, options.week_id, options.model)
+
+        if report is None:
+            print("  ℹ No report generated (no newsletters or no content)")
+            return "skipped"
+
+        return store_generated_report(report, options.dry_run)
+
+    except Exception as e:  # noqa: BLE001  per-topic boundary: log and continue
+        print(f"  ✗ Error generating report: {e}")
+        error_file = log_notification_error(
+            error_type="weekly_report_generation",
+            error_message=str(e),
+            context={"week_id": options.week_id, "topic": topic},
+        )
+        print(f"  ⚠ Error logged to: {error_file}")
+        return "failed"
+
+
 def process_weekly_reports(
     week_id: str | None = None,
     dry_run: bool = False,
@@ -179,28 +265,19 @@ def process_weekly_reports(
     Topics that already have a report are skipped unless force; dry_run generates
     without storing. Returns generated, skipped and failed counts.
     """
-    # Determine week to process
-    if week_id is None:
-        if current_week:
-            week_id = get_iso_week_id()  # Current week
-        else:
-            week_id = get_previous_week_id()  # Previous week (default)
-
-    print(f"\n{'=' * 60}")
-    print(f"Weekly Report Generation - Week {week_id}")
-    print(f"{'=' * 60}")
-    print(f"Mode: {'DRY RUN' if dry_run else 'PRODUCTION'}")
-    print(f"Force: {'Yes' if force else 'No'}")
-    print(f"Model: {model}")
-    print(f"LLM Enabled: {'Yes' if ENABLE_LLM else 'No'}")
-    print()
+    options = ReportRunOptions(
+        week_id=resolve_week_id(week_id, current_week),
+        dry_run=dry_run,
+        force=force,
+        model=model,
+    )
+    print_run_header(options)
 
     if not ENABLE_LLM:
         print("ℹ ENABLE_LLM is false. Skipping report generation.")
         print("  Existing reports will still be processed by the notification queue.")
         return {"generated": 0, "skipped": 0, "failed": 0}
 
-    # Get topics with active weekly subscribers
     print("→ Querying active weekly topics...")
     active_topics = get_active_weekly_topics()
 
@@ -213,61 +290,14 @@ def process_weekly_reports(
         print(f"  - {topic}")
     print()
 
-    # Process each topic
     stats = {"generated": 0, "skipped": 0, "failed": 0}
 
     for i, topic in enumerate(active_topics, 1):
         print(f"[{i}/{len(active_topics)}] Processing: {topic}")
-
-        # Check if report already exists
-        if not force and report_exists(topic, week_id):
-            print(f"  ℹ Report already exists for {topic} / {week_id}, skipping")
-            stats["skipped"] += 1
-            print()
-            continue
-
-        # Generate report
-        try:
-            report = generate_weekly_topic_report(topic, week_id, model)
-
-            if report is None:
-                print("  ℹ No report generated (no newsletters or no content)")
-                stats["skipped"] += 1
-                print()
-                continue
-
-            # Store report (unless dry run)
-            if dry_run:
-                print("  ✓ Report generated (dry run - not storing)")
-                stats["generated"] += 1
-            else:
-                success = store_weekly_report(report)
-                if success:
-                    print("  ✓ Report stored successfully")
-                    stats["generated"] += 1
-                else:
-                    print("  ✗ Failed to store report")
-                    stats["failed"] += 1
-
-        except Exception as e:  # noqa: BLE001  per-topic boundary: log and continue
-            print(f"  ✗ Error generating report: {e}")
-            error_file = log_notification_error(
-                error_type="weekly_report_generation",
-                error_message=str(e),
-                context={"week_id": week_id, "topic": topic},
-            )
-            print(f"  ⚠ Error logged to: {error_file}")
-            stats["failed"] += 1
-
+        stats[generate_topic_report(topic, options)] += 1
         print()
 
-    # Summary
-    print(f"{'=' * 60}")
-    print("Summary:")
-    print(f"  Generated: {stats['generated']}")
-    print(f"  Skipped:   {stats['skipped']}")
-    print(f"  Failed:    {stats['failed']}")
-    print(f"{'=' * 60}")
+    print_run_summary(stats)
 
     return stats
 
