@@ -72,6 +72,11 @@ test('keeps a source filter from the URL when searching again', async ({ page })
   await expect(page).toHaveURL(/q=zoning/);
 });
 
+test('keeps a ward from the URL selected when it has no listed source', async ({ page }) => {
+  await page.goto('/search?ward=99');
+  await expect(page.getByTestId('ward-filter')).toHaveValue('99');
+});
+
 test('groups topics by category with readable labels', async ({ page }) => {
   await page.goto('/search');
 
