@@ -1,7 +1,7 @@
 ---
 /** The user's notification rules, each with Edit (opens the rule modal) and Delete, or an empty state. */
 import type { NotificationRule } from '../../lib/supabase';
-import { humanizeIdentifier } from '../../lib/format';
+import { formatTopicLabel } from '../../lib/topics';
 
 interface Props {
   notificationRules: NotificationRule[];
@@ -100,7 +100,7 @@ const { notificationRules, maxRules, canCreateRule } = Astro.props;
                 <div class="flex flex-wrap gap-2">
                   {rule.topics.map((topic) => (
                     <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                      {humanizeIdentifier(topic)}
+                      {formatTopicLabel(topic)}
                     </span>
                   ))}
                 </div>

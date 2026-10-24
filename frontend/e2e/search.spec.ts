@@ -39,7 +39,7 @@ test('groups topics by category with readable labels', async ({ page }) => {
   await page.goto('/search');
 
   const topicFilter = page.getByTestId('topic-filter');
-  await expect(topicFilter.locator('optgroup[label="Streets"] option[value="bike_lanes"]')).toHaveText('Bike Lanes');
+  await expect(topicFilter.locator('optgroup[label="Streets"] option[value="bike_lanes"]')).toHaveText('Bike lanes');
 });
 
 test('applies new filters from the form and reflects them back', async ({ page }) => {

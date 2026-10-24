@@ -1,6 +1,7 @@
 ---
 import type { NewsletterCardRow } from '../lib/server/newsletter-queries';
 import { buildWardPath, parseWardParam } from '../lib/wards';
+import { formatTopicLabel } from '../lib/topics';
 
 interface Props {
   newsletter: NewsletterCardRow;
@@ -67,7 +68,7 @@ const wardPath = wardNumber === null ? null : buildWardPath(wardNumber);
     <div class="flex flex-wrap gap-2">
       {newsletter.topics.map((topic: string) => (
         <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-          {topic}
+          {formatTopicLabel(topic)}
         </span>
       ))}
     </div>
