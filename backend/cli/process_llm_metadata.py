@@ -35,6 +35,9 @@ from shared.db import get_supabase_client
 
 load_dotenv()
 
+# Runs larger than this ask for confirmation first.
+LARGE_RUN_THRESHOLD = 100
+
 
 def fetch_newsletters(supabase: Any, args: argparse.Namespace) -> list[dict[str, Any]]:
     """Fetch newsletters based on filter arguments."""
@@ -163,7 +166,7 @@ def reprocess_newsletter(
         return False
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Reprocess existing newsletters with updated LLM processor",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -220,9 +223,14 @@ def main() -> None:
         help="Queue notifications for matched rules after processing (default: false)",
     )
 
+    return parser
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse the command line; exits with a usage error unless a filter is given."""
+    parser = build_parser()
     args = parser.parse_args()
 
-    # Validate arguments
     if not any(
         [
             args.latest,
@@ -239,41 +247,26 @@ def main() -> None:
     if args.all and args.latest:
         parser.error("Cannot use --all with --latest (--all processes everything)")
 
-    # Check if LLM is enabled
-    enable_llm = os.getenv("ENABLE_LLM", "false").lower() == "true"
-    if not enable_llm and not args.dry_run:
-        print("⚠️  ENABLE_LLM is not set to 'true' in .env")
-        print("Set ENABLE_LLM=true to enable LLM processing")
-        return
+    return args
 
-    # Connect to database
-    print("Connecting to database...")
-    supabase = get_supabase_client()
 
-    # Fetch newsletters
-    print("Fetching newsletters...")
-    newsletters = fetch_newsletters(supabase, args)
+def confirm_large_run(newsletter_count: int) -> bool:
+    """Ask before processing more than LARGE_RUN_THRESHOLD newsletters."""
+    if newsletter_count <= LARGE_RUN_THRESHOLD:
+        return True
+    confirm = input(
+        f"\nAbout to process {newsletter_count} newsletters. Continue? (y/N): "
+    )
+    if confirm.lower() != "y":
+        print("Cancelled")
+        return False
+    return True
 
-    if not newsletters:
-        print("No newsletters found matching criteria")
-        return
 
-    print(f"\nFound {len(newsletters)} newsletter(s) to process")
-
-    if args.dry_run:
-        print("\n=== DRY RUN MODE ===")
-        print("The following newsletters would be processed:\n")
-
-    # Confirm if processing many newsletters
-    if len(newsletters) > 100 and not args.dry_run:
-        confirm = input(
-            f"\nAbout to process {len(newsletters)} newsletters. Continue? (y/N): "
-        )
-        if confirm.lower() != "y":
-            print("Cancelled")
-            return
-
-    # Process newsletters
+def reprocess_newsletters(
+    supabase: Any, newsletters: list[dict[str, Any]], args: argparse.Namespace
+) -> tuple[int, int]:
+    """Reprocess each newsletter until done or interrupted; returns (succeeded, failed)."""
     success_count = 0
     fail_count = 0
 
@@ -297,7 +290,38 @@ def main() -> None:
             print(f"  ✗ Unexpected error: {e}")
             fail_count += 1
 
-    # Summary
+    return success_count, fail_count
+
+
+def main() -> None:
+    args = parse_args()
+
+    enable_llm = os.getenv("ENABLE_LLM", "false").lower() == "true"
+    if not enable_llm and not args.dry_run:
+        print("⚠️  ENABLE_LLM is not set to 'true' in .env")
+        print("Set ENABLE_LLM=true to enable LLM processing")
+        return
+
+    print("Connecting to database...")
+    supabase = get_supabase_client()
+
+    print("Fetching newsletters...")
+    newsletters = fetch_newsletters(supabase, args)
+
+    if not newsletters:
+        print("No newsletters found matching criteria")
+        return
+
+    print(f"\nFound {len(newsletters)} newsletter(s) to process")
+
+    if args.dry_run:
+        print("\n=== DRY RUN MODE ===")
+        print("The following newsletters would be processed:\n")
+    elif not confirm_large_run(len(newsletters)):
+        return
+
+    success_count, fail_count = reprocess_newsletters(supabase, newsletters, args)
+
     print("\n" + "=" * 50)
     print("SUMMARY")
     print("=" * 50)

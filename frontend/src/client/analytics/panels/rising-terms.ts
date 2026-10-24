@@ -26,8 +26,7 @@ export function renderRisingPanel(state: DashboardState): void {
       ? renderRisingTerms(
           rising.terms,
           rising.latest_active_wards,
-          `Typical month (median, ${baselineSpan})`,
-          latest,
+          { baseline: `Typical month (median, ${baselineSpan})`, latest },
           chartWidth(chart),
         )
       : emptyMessage("No rising terms."),

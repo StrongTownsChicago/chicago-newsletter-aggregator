@@ -19,11 +19,11 @@ BACKEND = Path(__file__).resolve().parents[2]
 
 # Ceiling name -> the value it was adopted at. Lower freely, never raise.
 ADOPTED = {
-    "max-complexity": 13,
+    "max-complexity": 9,
     "max-args": 5,
     "max-returns": 5,
-    "max-branches": 14,
-    "max-statements": 61,
+    "max-branches": 9,
+    "max-statements": 44,
 }
 
 # Ceiling name -> (ruff table, the rule it configures).
@@ -37,16 +37,9 @@ CEILINGS = {
 
 SIZE_CODES = frozenset(code for _, code in CEILINGS.values())
 
-# Paths allowed to switch a size rule off: test factories and three one-shot
-# maintenance scripts. Adding a path here is a loosening a reviewer should see.
-EXEMPT_PATHS = frozenset(
-    {
-        "tests/*",
-        "cli/calculate_token_costs.py",
-        "cli/migrate_topics.py",
-        "llm_costs/cost_report_generator.py",
-    }
-)
+# Paths allowed to switch a size rule off: test factories only. Adding a path
+# here is a loosening a reviewer should see.
+EXEMPT_PATHS = frozenset({"tests/*"})
 
 # Well over every ceiling at once: 13 arguments, 26 returns, 25 branches,
 # 151 statements, complexity 26.

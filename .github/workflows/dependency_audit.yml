@@ -1,0 +1,60 @@
+name: Dependency Audit
+
+# Kept out of the per-PR workflows: a newly published advisory shouldn't fail an unrelated PR.
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/uv.lock"
+      - "frontend/package-lock.json"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "backend/.python-version"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv sync --locked --dev
+
+      - name: Audit Python dependencies
+        run: |
+          cd backend
+          uv run --locked pip-audit
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Audit npm dependencies
+        run: |
+          cd frontend
+          npm audit --omit=dev --audit-level=high

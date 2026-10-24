@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import json
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -29,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from cli.logging_setup import configure_cli_logging
-from llm_costs.cost_calculator import PricingData
+from llm_costs.cost_calculator import ModelPricing, PricingData
 from llm_costs.cost_report_generator import (
     generate_combined_text_report,
     generate_comparison_report,
@@ -38,6 +39,8 @@ from llm_costs.cost_report_generator import (
     generate_text_report,
 )
 from llm_costs.newsletter_token_analyzer import (
+    NewsletterTokenAnalysis,
+    WeeklyReportTokenAnalysis,
     analyze_newsletter_tokens,
     analyze_weekly_report_tokens,
 )
@@ -163,8 +166,7 @@ def get_topics_from_newsletters(
     return all_topics
 
 
-def main() -> None:
-    """Main CLI entry point."""
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Calculate LLM token costs for newsletter processing",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -219,12 +221,13 @@ Examples:
         action="store_true",
         help="Include weekly topic report synthesis costs (Phase 1 + Phase 2)",
     )
+    return parser
 
-    args = parser.parse_args()
 
-    # Load pricing data
+def load_pricing_data() -> PricingData:
+    """Load model pricing, exiting with status 1 if it can't be read."""
     try:
-        pricing_data = PricingData()
+        return PricingData()
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
@@ -232,29 +235,158 @@ Examples:
         print(f"Error loading pricing data: {e}")
         sys.exit(1)
 
-    # Handle --list-models
+
+def print_available_models(pricing_data: PricingData) -> None:
+    print("\nAvailable Models:")
+    print("=" * 60)
+    for provider in pricing_data.list_providers():
+        models = pricing_data.list_models(provider=provider)
+        print(f"\n{provider.upper()}:")
+        for model in models:
+            model_pricing = pricing_data.get_model_pricing(model)
+            print(
+                f"  {model:<25} ${model_pricing.input_cost_per_1m:>6.2f}/1M input, "
+                f"${model_pricing.output_cost_per_1m:>6.2f}/1M output"
+            )
+    print()
+
+
+def resolve_model_names(
+    args: argparse.Namespace, pricing_data: PricingData
+) -> list[str]:
+    """The models to price (--models, else --model), exiting on an unknown one."""
+    if args.models:
+        model_names = [m.strip() for m in args.models.split(",")]
+    else:
+        model_names = [args.model]
+
+    for model_name in model_names:
+        try:
+            pricing_data.get_model_pricing(model_name)
+        except KeyError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+    return model_names
+
+
+def analyze_newsletters(
+    newsletters: list[dict[str, Any]], model_name: str
+) -> list[NewsletterTokenAnalysis]:
+    """Token counts for each newsletter's processing calls; skips ones without text."""
+    analyses = []
+    for i, newsletter in enumerate(newsletters, 1):
+        if not newsletter.get("plain_text"):
+            print(f"  Warning: Newsletter {i} has no plain_text, skipping")
+            continue
+
+        print(f"  Analyzing newsletter {i}/{len(newsletters)}...", end=" ")
+        analyses.append(analyze_newsletter_tokens(newsletter, model_name))
+        print("OK")
+
+    print(f"  Completed {len(analyses)} newsletters")
+    return analyses
+
+
+def analyze_week(
+    week_id: str, week_newsletters: list[dict[str, Any]], model_name: str
+) -> list[WeeklyReportTokenAnalysis]:
+    """Token counts for one weekly report per topic the week's newsletters carry."""
+    print(f"\n  > Week {week_id} ({len(week_newsletters)} newsletters)")
+
+    all_topics = get_topics_from_newsletters(week_newsletters)
+    if not all_topics:
+        print(
+            "    WARNING: No topics found in newsletters (have they been processed with LLM?)"
+        )
+        print("    Skipping weekly analysis - run process_llm_metadata first")
+        return []
+
+    print(f"    Topics to analyze: {', '.join(sorted(all_topics))}")
+
+    weekly_analyses = []
+    for topic in sorted(all_topics):
+        topic_newsletters = [
+            nl for nl in week_newsletters if nl.get("topics") and topic in nl["topics"]
+        ]
+        if not topic_newsletters:
+            continue
+
+        print(f"    > {topic}: {len(topic_newsletters)} newsletters...", end=" ")
+        weekly_analyses.append(
+            analyze_weekly_report_tokens(
+                topic=topic,
+                newsletters=topic_newsletters,
+                week_id=week_id,
+                model_name=model_name,
+            )
+        )
+        print("OK")
+    return weekly_analyses
+
+
+def analyze_weekly_reports(
+    newsletters: list[dict[str, Any]], model_name: str
+) -> list[WeeklyReportTokenAnalysis]:
+    """Token counts for the weekly topic reports these newsletters would feed."""
+    print("\n  Analyzing weekly report synthesis...")
+
+    weeks = group_newsletters_by_week(newsletters)
+    print(f"  Found {len(weeks)} weeks of newsletters")
+
+    weekly_analyses = []
+    for week_id, week_newsletters in sorted(weeks.items()):
+        weekly_analyses += analyze_week(week_id, week_newsletters, model_name)
+
+    print(f"\n  Completed {len(weekly_analyses)} weekly reports")
+    return weekly_analyses
+
+
+def write_single_model_reports(
+    args: argparse.Namespace,
+    analyses: list[NewsletterTokenAnalysis],
+    weekly_analyses: list[WeeklyReportTokenAnalysis],
+    model_pricing: ModelPricing,
+) -> None:
+    """Print the text report, or write the JSON and CSV files that were asked for."""
+    if not (args.output_json or args.output_csv):
+        print("\n")
+        if weekly_analyses:
+            print(
+                generate_combined_text_report(analyses, weekly_analyses, model_pricing)
+            )
+        else:
+            print(generate_text_report(analyses, model_pricing))
+
+    # The JSON and CSV reports cover newsletter processing only, not weekly reports.
+    if args.output_json:
+        report_data = generate_json_report(analyses, model_pricing)
+        with Path(args.output_json).open("w") as f:
+            json.dump(report_data, f, indent=2)
+        print(f"\nJSON report saved to: {args.output_json}")
+
+    if args.output_csv:
+        csv_data = generate_csv_report(analyses, model_pricing)
+        with Path(args.output_csv).open("w") as f:
+            f.write(csv_data)
+        print(f"CSV report saved to: {args.output_csv}")
+
+
+def main() -> None:
+    """Main CLI entry point."""
+    parser = build_parser()
+    args = parser.parse_args()
+
+    pricing_data = load_pricing_data()
+
     if args.list_models:
-        print("\nAvailable Models:")
-        print("=" * 60)
-        for provider in pricing_data.list_providers():
-            models = pricing_data.list_models(provider=provider)
-            print(f"\n{provider.upper()}:")
-            for model in models:
-                model_pricing = pricing_data.get_model_pricing(model)
-                print(
-                    f"  {model:<25} ${model_pricing.input_cost_per_1m:>6.2f}/1M input, "
-                    f"${model_pricing.output_cost_per_1m:>6.2f}/1M output"
-                )
-        print()
+        print_available_models(pricing_data)
         sys.exit(0)
 
-    # Validate newsletter selection
     if not any([args.latest, args.newsletter_id, args.source_id]):
         print("Error: Must specify --latest, --newsletter-id, or --source-id")
         parser.print_help()
         sys.exit(1)
 
-    # Fetch newsletters
     newsletters = fetch_newsletters(
         latest=args.latest,
         newsletter_id=args.newsletter_id,
@@ -264,140 +396,31 @@ Examples:
     if not newsletters:
         sys.exit(1)
 
-    # Determine which models to analyze
-    if args.models:
-        model_names = [m.strip() for m in args.models.split(",")]
-    else:
-        model_names = [args.model]
+    model_names = resolve_model_names(args, pricing_data)
 
-    # Validate models exist in pricing data
-    for model_name in model_names:
-        try:
-            pricing_data.get_model_pricing(model_name)
-        except KeyError as e:
-            print(f"Error: {e}")
-            sys.exit(1)
-
-    # Analyze newsletters for each model
     analyses_by_model = {}
     weekly_analyses_by_model = {}
     pricing_by_model = {}
 
     for model_name in model_names:
         print(f"\nAnalyzing with model: {model_name}")
-        model_pricing = pricing_data.get_model_pricing(model_name)
-        pricing_by_model[model_name] = model_pricing
-
-        # Phase 1: Analyze individual newsletter processing (3 LLM calls each)
-        analyses = []
-        for i, newsletter in enumerate(newsletters, 1):
-            if not newsletter.get("plain_text"):
-                print(f"  Warning: Newsletter {i} has no plain_text, skipping")
-                continue
-
-            print(f"  Analyzing newsletter {i}/{len(newsletters)}...", end=" ")
-            analysis = analyze_newsletter_tokens(newsletter, model_name)
-            analyses.append(analysis)
-            print("OK")
-
-        analyses_by_model[model_name] = analyses
-        print(f"  Completed {len(analyses)} newsletters")
-
-        # Phase 2: Analyze weekly report synthesis (if requested)
-        weekly_analyses = []
+        pricing_by_model[model_name] = pricing_data.get_model_pricing(model_name)
+        analyses_by_model[model_name] = analyze_newsletters(newsletters, model_name)
         if args.include_weekly:
-            print("\n  Analyzing weekly report synthesis...")
+            weekly_analyses_by_model[model_name] = analyze_weekly_reports(
+                newsletters, model_name
+            )
 
-            # Group newsletters by week
-            weeks = group_newsletters_by_week(newsletters)
-            print(f"  Found {len(weeks)} weeks of newsletters")
-
-            for week_id, week_newsletters in sorted(weeks.items()):
-                print(f"\n  > Week {week_id} ({len(week_newsletters)} newsletters)")
-
-                # Get all topics across all newsletters in this week
-                all_topics = get_topics_from_newsletters(week_newsletters)
-
-                if not all_topics:
-                    print(
-                        "    WARNING: No topics found in newsletters (have they been processed with LLM?)"
-                    )
-                    print(
-                        "    Skipping weekly analysis - run process_llm_metadata first"
-                    )
-                    continue
-
-                print(f"    Topics to analyze: {', '.join(sorted(all_topics))}")
-
-                # For each topic, simulate weekly report generation
-                for topic in sorted(all_topics):
-                    # Filter newsletters that have this topic
-                    topic_newsletters = [
-                        nl
-                        for nl in week_newsletters
-                        if nl.get("topics") and topic in nl["topics"]
-                    ]
-
-                    if not topic_newsletters:
-                        continue
-
-                    print(
-                        f"    > {topic}: {len(topic_newsletters)} newsletters...",
-                        end=" ",
-                    )
-                    weekly_analysis = analyze_weekly_report_tokens(
-                        topic=topic,
-                        newsletters=topic_newsletters,
-                        week_id=week_id,
-                        model_name=model_name,
-                    )
-                    weekly_analyses.append(weekly_analysis)
-                    print("OK")
-
-            weekly_analyses_by_model[model_name] = weekly_analyses
-            print(f"\n  Completed {len(weekly_analyses)} weekly reports")
-
-    # Generate and output reports
     if len(model_names) == 1:
-        # Single model report
         model_name = model_names[0]
-        analyses = analyses_by_model[model_name]
-        weekly_analyses = weekly_analyses_by_model.get(model_name, [])
-        model_pricing = pricing_by_model[model_name]
-
-        # Text report (always to stdout unless only JSON/CSV requested)
-        if not (args.output_json or args.output_csv):
-            print("\n")
-            if weekly_analyses:
-                print(
-                    generate_combined_text_report(
-                        analyses, weekly_analyses, model_pricing
-                    )
-                )
-            else:
-                print(generate_text_report(analyses, model_pricing))
-
-        # JSON output
-        if args.output_json:
-            import json
-
-            report_data = generate_json_report(analyses, model_pricing)
-            # TODO: Add weekly data to JSON report
-            with Path(args.output_json).open("w") as f:
-                json.dump(report_data, f, indent=2)
-            print(f"\nJSON report saved to: {args.output_json}")
-
-        # CSV output
-        if args.output_csv:
-            csv_data = generate_csv_report(analyses, model_pricing)
-            # TODO: Add weekly data to CSV report
-            with Path(args.output_csv).open("w") as f:
-                f.write(csv_data)
-            print(f"CSV report saved to: {args.output_csv}")
-
+        write_single_model_reports(
+            args,
+            analyses_by_model[model_name],
+            weekly_analyses_by_model.get(model_name, []),
+            pricing_by_model[model_name],
+        )
     else:
-        # Comparison report
-        # TODO: Add weekly costs to comparison report
+        # The comparison report covers newsletter processing only, not weekly reports.
         print("\n")
         print(generate_comparison_report(analyses_by_model, pricing_by_model))
 

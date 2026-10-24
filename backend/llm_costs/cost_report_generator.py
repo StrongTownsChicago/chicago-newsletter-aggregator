@@ -4,12 +4,15 @@ Cost report generation and formatting.
 Generates reports in multiple formats (text, JSON, CSV) for LLM cost analysis.
 """
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from llm_costs.cost_calculator import ModelPricing, calculate_cost
 from llm_costs.newsletter_token_analyzer import (
     NewsletterTokenAnalysis,
+    OperationTokens,
     WeeklyReportTokenAnalysis,
 )
 from shared.dates import CHICAGO_TIMEZONE
@@ -282,6 +285,141 @@ def generate_comparison_report(
     return "\n".join(report)
 
 
+COMBINED_RULE_WIDTH = 65
+WEEKS_PER_MONTH = 4
+
+
+@dataclass(frozen=True)
+class TokenTotals:
+    """Input and output tokens summed over one or more LLM calls."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def __add__(self, other: "TokenTotals") -> "TokenTotals":
+        return TokenTotals(
+            self.input_tokens + other.input_tokens,
+            self.output_tokens + other.output_tokens,
+        )
+
+
+def sum_operation_tokens(operations: Iterable[OperationTokens]) -> TokenTotals:
+    """Total tokens across operations."""
+    return sum(
+        (TokenTotals(op.input_tokens, op.output_tokens) for op in operations),
+        TokenTotals(),
+    )
+
+
+def total_cost(tokens: TokenTotals, model_pricing: ModelPricing) -> float:
+    """Dollar cost of the summed tokens (priced once, not summed per call)."""
+    return calculate_cost(tokens.input_tokens, tokens.output_tokens, model_pricing)[
+        "total_cost"
+    ]
+
+
+def format_cost_row(
+    label: str, tokens: TokenTotals, model_pricing: ModelPricing
+) -> str:
+    cost = total_cost(tokens, model_pricing)
+    return f"{label:<20} {tokens.input_tokens:>12,} {tokens.output_tokens:>12,} ${cost:>9.4f}"
+
+
+def section_heading(title: str) -> list[str]:
+    rule = "-" * COMBINED_RULE_WIDTH
+    return [rule, title, rule]
+
+
+def cost_table(
+    title: str, rows: list[tuple[str, TokenTotals]], model_pricing: ModelPricing
+) -> list[str]:
+    """A titled table of cost rows followed by a subtotal of all of them."""
+    subtotal = sum((tokens for _, tokens in rows), TokenTotals())
+    return [
+        *section_heading(title),
+        f"{'Operation':<20} {'Input Tokens':>12} {'Output Tokens':>12} {'Cost':>10}",
+        "-" * COMBINED_RULE_WIDTH,
+        *(format_cost_row(label, tokens, model_pricing) for label, tokens in rows),
+        "-" * COMBINED_RULE_WIDTH,
+        format_cost_row("SUBTOTAL", subtotal, model_pricing),
+        "",
+    ]
+
+
+def combined_report_header(
+    newsletter_count: int, weekly_report_count: int, model_pricing: ModelPricing
+) -> list[str]:
+    return [
+        "=" * COMBINED_RULE_WIDTH,
+        "LLM TOKEN COST ANALYSIS (NEWSLETTER + WEEKLY REPORTS)",
+        "=" * COMBINED_RULE_WIDTH,
+        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Newsletters Analyzed: {newsletter_count}",
+        f"Weekly Reports Generated: {weekly_report_count}",
+        f"Model: {model_pricing.model} ({model_pricing.provider})",
+        f"Pricing: ${model_pricing.input_cost_per_1m:.2f}/1M input, ${model_pricing.output_cost_per_1m:.2f}/1M output",
+        "",
+    ]
+
+
+def weekly_projection_lines(
+    weekly_analyses: list[WeeklyReportTokenAnalysis],
+    weekly_cost_per_report: float,
+    newsletter_cost: float,
+) -> list[str]:
+    """Monthly weekly-report cost, assuming each month repeats the average week."""
+    weeks = max(len({a.week_id for a in weekly_analyses}), 1)
+    monthly_weekly_reports = len(weekly_analyses) / weeks * WEEKS_PER_MONTH
+    monthly_weekly_cost = weekly_cost_per_report * monthly_weekly_reports
+    return [
+        "",
+        f"~{monthly_weekly_reports:.0f} weekly reports/month: ${monthly_weekly_cost:.2f}",
+        f"100 newsletters + weekly reports: ${newsletter_cost * 100 + monthly_weekly_cost:.2f}",
+        f"1,000 newsletters + weekly reports: ${newsletter_cost * 1000 + monthly_weekly_cost:.2f}",
+    ]
+
+
+def combined_cost_summary(
+    newsletter_count: int,
+    newsletter_tokens: TokenTotals,
+    weekly_analyses: list[WeeklyReportTokenAnalysis],
+    weekly_tokens: TokenTotals,
+    model_pricing: ModelPricing,
+) -> list[str]:
+    """The cost breakdown and monthly projection sections."""
+    newsletter_total = total_cost(newsletter_tokens, model_pricing)
+    newsletter_cost = newsletter_total / newsletter_count
+    lines = [
+        *section_heading("COST BREAKDOWN"),
+        f"Per newsletter (processing only): ${newsletter_cost:.4f}",
+    ]
+
+    weekly_count = len(weekly_analyses)
+    if weekly_analyses:
+        weekly_cost_per_report = total_cost(weekly_tokens, model_pricing) / weekly_count
+        grand_cost = total_cost(newsletter_tokens + weekly_tokens, model_pricing)
+        lines += [
+            f"Per weekly report: ${weekly_cost_per_report:.4f}",
+            f"Total for {newsletter_count} newsletters + {weekly_count} reports: ${grand_cost:.4f}",
+        ]
+    else:
+        lines.append(
+            f"Total for {newsletter_count} newsletters: ${newsletter_total:.4f}"
+        )
+
+    lines += [
+        "",
+        *section_heading("MONTHLY PROJECTIONS"),
+        f"100 newsletters/month (processing only): ${newsletter_cost * 100:.2f}",
+        f"1,000 newsletters/month (processing only): ${newsletter_cost * 1000:.2f}",
+    ]
+    if weekly_analyses:
+        lines += weekly_projection_lines(
+            weekly_analyses, weekly_cost_per_report, newsletter_cost
+        )
+    return lines
+
+
 def generate_combined_text_report(
     newsletter_analyses: list[NewsletterTokenAnalysis],
     weekly_analyses: list[WeeklyReportTokenAnalysis],
@@ -295,169 +433,46 @@ def generate_combined_text_report(
     if not newsletter_analyses:
         return "No newsletters analyzed."
 
-    # Newsletter processing costs
-    topic_input = sum(a.topic_extraction.input_tokens for a in newsletter_analyses)
-    topic_output = sum(a.topic_extraction.output_tokens for a in newsletter_analyses)
-    summary_input = sum(a.summary_generation.input_tokens for a in newsletter_analyses)
-    summary_output = sum(
-        a.summary_generation.output_tokens for a in newsletter_analyses
+    topic_tokens = sum_operation_tokens(a.topic_extraction for a in newsletter_analyses)
+    summary_tokens = sum_operation_tokens(
+        a.summary_generation for a in newsletter_analyses
     )
+    phase1_tokens = sum_operation_tokens(
+        op for a in weekly_analyses for op in a.phase1_operations
+    )
+    phase2_tokens = sum_operation_tokens(a.phase2_operation for a in weekly_analyses)
+    newsletter_tokens = topic_tokens + summary_tokens
+    weekly_tokens = phase1_tokens + phase2_tokens
 
-    nl_total_input = topic_input + summary_input
-    nl_total_output = topic_output + summary_output
-
-    topic_cost = calculate_cost(topic_input, topic_output, model_pricing)
-    summary_cost = calculate_cost(summary_input, summary_output, model_pricing)
-    nl_total_cost = calculate_cost(nl_total_input, nl_total_output, model_pricing)
-
-    # Weekly report costs (if available)
-    weekly_phase1_input = 0
-    weekly_phase1_output = 0
-    weekly_phase2_input = 0
-    weekly_phase2_output = 0
-    weekly_report_count = len(weekly_analyses)
-
+    report = combined_report_header(
+        len(newsletter_analyses), len(weekly_analyses), model_pricing
+    )
+    report += cost_table(
+        "NEWSLETTER PROCESSING (2 calls per newsletter)",
+        [("Topic Extraction", topic_tokens), ("Summary Generation", summary_tokens)],
+        model_pricing,
+    )
     if weekly_analyses:
-        for analysis in weekly_analyses:
-            for phase1_op in analysis.phase1_operations:
-                weekly_phase1_input += phase1_op.input_tokens
-                weekly_phase1_output += phase1_op.output_tokens
-
-            weekly_phase2_input += analysis.phase2_operation.input_tokens
-            weekly_phase2_output += analysis.phase2_operation.output_tokens
-
-    weekly_total_input = weekly_phase1_input + weekly_phase2_input
-    weekly_total_output = weekly_phase1_output + weekly_phase2_output
-
-    weekly_phase1_cost = calculate_cost(
-        weekly_phase1_input, weekly_phase1_output, model_pricing
-    )
-    weekly_phase2_cost = calculate_cost(
-        weekly_phase2_input, weekly_phase2_output, model_pricing
-    )
-    weekly_total_cost = calculate_cost(
-        weekly_total_input, weekly_total_output, model_pricing
-    )
-
-    # Grand totals
-    grand_input = nl_total_input + weekly_total_input
-    grand_output = nl_total_output + weekly_total_output
-    grand_cost = calculate_cost(grand_input, grand_output, model_pricing)
-
-    # Format report
-    report = []
-    report.append("=" * 65)
-    report.append("LLM TOKEN COST ANALYSIS (NEWSLETTER + WEEKLY REPORTS)")
-    report.append("=" * 65)
-    report.append(
-        f"Date: {datetime.now(CHICAGO_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-    report.append(f"Newsletters Analyzed: {len(newsletter_analyses)}")
-    report.append(f"Weekly Reports Generated: {weekly_report_count}")
-    report.append(f"Model: {model_pricing.model} ({model_pricing.provider})")
-    report.append(
-        f"Pricing: ${model_pricing.input_cost_per_1m:.2f}/1M input, ${model_pricing.output_cost_per_1m:.2f}/1M output"
-    )
-    report.append("")
-
-    # Newsletter processing section
-    report.append("-" * 65)
-    report.append("NEWSLETTER PROCESSING (2 calls per newsletter)")
-    report.append("-" * 65)
-    report.append(
-        f"{'Operation':<20} {'Input Tokens':>12} {'Output Tokens':>12} {'Cost':>10}"
-    )
-    report.append("-" * 65)
-    report.append(
-        f"{'Topic Extraction':<20} {topic_input:>12,} {topic_output:>12,} ${topic_cost['total_cost']:>9.4f}"
-    )
-    report.append(
-        f"{'Summary Generation':<20} {summary_input:>12,} {summary_output:>12,} ${summary_cost['total_cost']:>9.4f}"
-    )
-    report.append("-" * 65)
-    report.append(
-        f"{'SUBTOTAL':<20} {nl_total_input:>12,} {nl_total_output:>12,} ${nl_total_cost['total_cost']:>9.4f}"
-    )
-    report.append("")
-
-    # Weekly report section
-    if weekly_analyses:
-        report.append("-" * 65)
-        report.append(f"WEEKLY REPORT SYNTHESIS ({weekly_report_count} topic reports)")
-        report.append("-" * 65)
-        report.append(
-            f"{'Operation':<20} {'Input Tokens':>12} {'Output Tokens':>12} {'Cost':>10}"
+        report += cost_table(
+            f"WEEKLY REPORT SYNTHESIS ({len(weekly_analyses)} topic reports)",
+            [
+                ("Phase 1: Extract", phase1_tokens),
+                ("Phase 2: Synthesize", phase2_tokens),
+            ],
+            model_pricing,
         )
-        report.append("-" * 65)
-        report.append(
-            f"{'Phase 1: Extract':<20} {weekly_phase1_input:>12,} {weekly_phase1_output:>12,} ${weekly_phase1_cost['total_cost']:>9.4f}"
-        )
-        report.append(
-            f"{'Phase 2: Synthesize':<20} {weekly_phase2_input:>12,} {weekly_phase2_output:>12,} ${weekly_phase2_cost['total_cost']:>9.4f}"
-        )
-        report.append("-" * 65)
-        report.append(
-            f"{'SUBTOTAL':<20} {weekly_total_input:>12,} {weekly_total_output:>12,} ${weekly_total_cost['total_cost']:>9.4f}"
-        )
-        report.append("")
-
-    # Grand total
-    report.append("-" * 65)
-    report.append("GRAND TOTAL (Newsletter + Weekly)")
-    report.append("-" * 65)
-    report.append(
-        f"{'TOTAL':<20} {grand_input:>12,} {grand_output:>12,} ${grand_cost['total_cost']:>9.4f}"
+    report += [
+        *section_heading("GRAND TOTAL (Newsletter + Weekly)"),
+        format_cost_row("TOTAL", newsletter_tokens + weekly_tokens, model_pricing),
+        "",
+    ]
+    report += combined_cost_summary(
+        len(newsletter_analyses),
+        newsletter_tokens,
+        weekly_analyses,
+        weekly_tokens,
+        model_pricing,
     )
-    report.append("")
-
-    # Cost breakdown
-    report.append("-" * 65)
-    report.append("COST BREAKDOWN")
-    report.append("-" * 65)
-    nl_cost_per = nl_total_cost["total_cost"] / len(newsletter_analyses)
-    report.append(f"Per newsletter (processing only): ${nl_cost_per:.4f}")
-
-    if weekly_analyses:
-        weekly_cost_per_report = weekly_total_cost["total_cost"] / weekly_report_count
-        report.append(f"Per weekly report: ${weekly_cost_per_report:.4f}")
-        report.append(
-            f"Total for {len(newsletter_analyses)} newsletters + {weekly_report_count} reports: ${grand_cost['total_cost']:.4f}"
-        )
-    else:
-        report.append(
-            f"Total for {len(newsletter_analyses)} newsletters: ${nl_total_cost['total_cost']:.4f}"
-        )
-
-    report.append("")
-
-    # Projections
-    report.append("-" * 65)
-    report.append("MONTHLY PROJECTIONS")
-    report.append("-" * 65)
-    report.append(f"100 newsletters/month (processing only): ${nl_cost_per * 100:.2f}")
-    report.append(
-        f"1,000 newsletters/month (processing only): ${nl_cost_per * 1000:.2f}"
-    )
-
-    if weekly_analyses:
-        # Estimate weekly reports per month (assume 4 weeks, avg topics)
-        avg_reports_per_week = weekly_report_count / max(
-            len({a.week_id for a in weekly_analyses}), 1
-        )
-        monthly_weekly_reports = avg_reports_per_week * 4
-        monthly_weekly_cost = weekly_cost_per_report * monthly_weekly_reports
-
-        report.append("")
-        report.append(
-            f"~{monthly_weekly_reports:.0f} weekly reports/month: ${monthly_weekly_cost:.2f}"
-        )
-        report.append(
-            f"100 newsletters + weekly reports: ${nl_cost_per * 100 + monthly_weekly_cost:.2f}"
-        )
-        report.append(
-            f"1,000 newsletters + weekly reports: ${nl_cost_per * 1000 + monthly_weekly_cost:.2f}"
-        )
-
-    report.append("=" * 65)
+    report.append("=" * COMBINED_RULE_WIDTH)
 
     return "\n".join(report)

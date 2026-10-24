@@ -13,6 +13,8 @@ Usage:
 
 from typing import Any
 
+from supabase import Client
+
 from cli.logging_setup import configure_cli_logging
 from shared.db import get_supabase_client
 
@@ -76,6 +78,67 @@ def get_users_with_weekly_rules() -> dict[str, list[dict[str, Any]]]:
         return {}
 
 
+def fetch_week_report_ids(supabase: Client, week_id: str) -> dict[str, str]:
+    """Topic -> report id for each report generated for week_id."""
+    reports_response = (
+        supabase.table("weekly_topic_reports")
+        .select("id, topic, week_id")
+        .eq("week_id", week_id)
+        .execute()
+    )
+
+    topic_to_report: dict[str, str] = {}
+    for report in reports_response.data:
+        report_dict = dict(report)  # type: ignore[arg-type]
+        topic_to_report[str(report_dict["topic"])] = str(report_dict["id"])
+    return topic_to_report
+
+
+def queue_user_notifications(
+    supabase: Client,
+    user_id: str,
+    rules: list[dict[str, Any]],
+    topic_to_report: dict[str, str],
+    week_id: str,
+) -> tuple[int, int]:
+    """
+    Queue one notification per rule topic that has a report; returns (queued, skipped).
+
+    Topics without a report are skipped, and so are failed inserts: the usual
+    cause is the unique constraint on a notification already queued.
+    """
+    queued = 0
+    skipped = 0
+
+    for rule in rules:
+        rule_id = str(rule["id"])
+        topics = rule.get("topics", [])
+        if not isinstance(topics, list):
+            continue
+
+        for topic in topics:
+            if topic not in topic_to_report:
+                skipped += 1
+                continue
+
+            try:
+                supabase.table("notification_queue").insert(
+                    {
+                        "user_id": user_id,
+                        "report_id": topic_to_report[topic],
+                        "rule_id": rule_id,
+                        "status": "pending",
+                        "digest_batch_id": week_id,
+                        "notification_type": "weekly",
+                    }
+                ).execute()
+                queued += 1
+            except Exception:  # noqa: BLE001  per-notification boundary: duplicates are expected
+                skipped += 1
+
+    return queued, skipped
+
+
 def queue_weekly_notifications(week_id: str) -> dict[str, int]:
     """
     Queue a pending weekly notification for each rule topic that has a report.
@@ -100,79 +163,29 @@ def queue_weekly_notifications(week_id: str) -> dict[str, int]:
 
     print(f"✓ Found {len(users_rules)} users with weekly rules\n")
 
-    # Fetch all generated reports for this week
     print(f"→ Fetching generated reports for week {week_id}...")
     try:
-        reports_response = (
-            supabase.table("weekly_topic_reports")
-            .select("id, topic, week_id")
-            .eq("week_id", week_id)
-            .execute()
-        )
-
-        # Build topic -> report_id mapping
-        topic_to_report: dict[str, str] = {}
-        for report in reports_response.data:
-            report_dict = dict(report)  # type: ignore[arg-type]
-            topic_to_report[str(report_dict["topic"])] = str(report_dict["id"])
-
+        topic_to_report = fetch_week_report_ids(supabase, week_id)
         print(
             f"✓ Found {len(topic_to_report)} reports: {', '.join(topic_to_report.keys())}\n"
         )
-
     except Exception as e:  # noqa: BLE001  database boundary: log and queue nothing
         print(f"✗ Error fetching reports: {e}")
         return {"queued": 0, "skipped": 0, "users": 0}
 
-    # Queue notifications for each user
     stats = {"queued": 0, "skipped": 0, "users": 0}
 
     for user_id, rules in users_rules.items():
-        user_queued = 0
-
-        for rule in rules:
-            rule_id = str(rule["id"])
-            topics = rule.get("topics", [])
-
-            if not isinstance(topics, list):
-                continue
-
-            # For each topic in the rule, check if report exists
-            for topic in topics:
-                if topic not in topic_to_report:
-                    # No report for this topic this week
-                    stats["skipped"] += 1
-                    continue
-
-                report_id = topic_to_report[topic]
-
-                # Queue notification
-                try:
-                    supabase.table("notification_queue").insert(
-                        {
-                            "user_id": user_id,
-                            "report_id": report_id,  # Store in dedicated report_id column
-                            "rule_id": rule_id,
-                            "status": "pending",
-                            "digest_batch_id": week_id,
-                            "notification_type": "weekly",
-                        }
-                    ).execute()
-
-                    stats["queued"] += 1
-                    user_queued += 1
-
-                except Exception:  # noqa: BLE001  per-notification boundary: duplicates are expected
-                    # Likely unique constraint violation (already queued)
-                    # This is fine - just skip
-                    stats["skipped"] += 1
-                    continue
+        user_queued, user_skipped = queue_user_notifications(
+            supabase, user_id, rules, topic_to_report, week_id
+        )
+        stats["queued"] += user_queued
+        stats["skipped"] += user_skipped
 
         if user_queued > 0:
             stats["users"] += 1
             print(f"  ✓ Queued {user_queued} notifications for user {user_id[:8]}...")
 
-    # Summary
     print(f"\n{'=' * 60}")
     print("Summary:")
     print(f"  Queued:  {stats['queued']} notifications")

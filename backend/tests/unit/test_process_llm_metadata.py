@@ -4,9 +4,15 @@ Unit tests for process_llm_metadata utility.
 Tests filtering logic, notification queuing, and dry-run behavior.
 """
 
+import io
+import os
+import sys
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from contextlib import redirect_stderr, redirect_stdout
+from typing import Any
+from unittest.mock import MagicMock, Mock, call, patch
 
+from cli import process_llm_metadata
 from cli.process_llm_metadata import fetch_newsletters, reprocess_newsletter
 
 
@@ -198,6 +204,133 @@ class TestNotificationQueuing(unittest.TestCase):
         self.assertTrue(result)
         # mock_match should not be called. Note: it's lazily imported so we check the patch
         mock_match.assert_not_called()
+
+
+class TestMain(unittest.TestCase):
+    """main(): argument checks, the LLM switch, confirmation, counting."""
+
+    def setUp(self) -> None:
+        self.client = Mock(name="supabase")
+        self.newsletters: list[dict[str, Any]] = [{"id": "a"}, {"id": "b"}]
+        self.fetch = Mock(side_effect=lambda *_: self.newsletters)
+        self.reprocess = Mock(return_value=True)
+        self.get_client = Mock(return_value=self.client)
+        for target, value in {
+            "get_supabase_client": self.get_client,
+            "fetch_newsletters": self.fetch,
+            "reprocess_newsletter": self.reprocess,
+        }.items():
+            patcher = patch.object(process_llm_metadata, target, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        env = patch.dict(os.environ, {"ENABLE_LLM": "true"})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def run_main(self, *argv: str) -> str:
+        output = io.StringIO()
+        with (
+            patch.object(sys, "argv", ["process_llm_metadata", *argv]),
+            redirect_stdout(output),
+            redirect_stderr(io.StringIO()),
+        ):
+            process_llm_metadata.main()
+        return output.getvalue()
+
+    def test_requires_a_filter(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            self.run_main()
+        self.assertEqual(raised.exception.code, 2)
+        self.get_client.assert_not_called()
+
+    def test_rejects_all_with_latest(self) -> None:
+        with self.assertRaises(SystemExit):
+            self.run_main("--all", "--latest", "5")
+        self.get_client.assert_not_called()
+
+    def test_disabled_llm_stops_before_connecting(self) -> None:
+        with patch.dict(os.environ, {"ENABLE_LLM": "false"}):
+            output = self.run_main("--latest", "5")
+
+        self.assertIn("ENABLE_LLM is not set to 'true'", output)
+        self.get_client.assert_not_called()
+
+    def test_dry_run_works_with_llm_disabled(self) -> None:
+        with patch.dict(os.environ, {"ENABLE_LLM": "false"}):
+            output = self.run_main("--latest", "5", "--dry-run")
+
+        self.assertEqual(self.reprocess.call_count, 2)
+        self.assertIn("=== DRY RUN MODE ===", output)
+        self.assertIn("Would process: 2 newsletter(s)", output)
+
+    def test_passes_options_to_each_newsletter(self) -> None:
+        self.run_main(
+            "--latest", "5", "--model", "openai:gpt-5", "--queue-notifications"
+        )
+
+        (args,) = self.fetch.call_args.args[1:]
+        self.assertIs(self.fetch.call_args.args[0], self.client)
+        self.assertEqual(args.latest, 5)
+        self.assertEqual(
+            self.reprocess.call_args_list,
+            [
+                call(self.client, {"id": "a"}, "openai:gpt-5", False, True),
+                call(self.client, {"id": "b"}, "openai:gpt-5", False, True),
+            ],
+        )
+
+    def test_counts_successes_failures_and_errors(self) -> None:
+        self.newsletters = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+        self.reprocess.side_effect = [True, False, RuntimeError("boom")]
+
+        output = self.run_main("--source-id", "3")
+
+        self.assertIn("  ✗ Unexpected error: boom", output)
+        self.assertIn("Processed: 1 successful, 2 failed", output)
+
+    def test_interrupt_stops_the_run_and_still_summarizes(self) -> None:
+        self.newsletters = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+        self.reprocess.side_effect = [True, KeyboardInterrupt, True]
+
+        output = self.run_main("--all")
+
+        self.assertEqual(self.reprocess.call_count, 2)
+        self.assertIn("Interrupted by user", output)
+        self.assertIn("Processed: 1 successful, 0 failed", output)
+
+    def test_no_matches_processes_nothing(self) -> None:
+        self.newsletters = []
+
+        output = self.run_main("--missing-metadata")
+
+        self.assertIn("No newsletters found matching criteria", output)
+        self.reprocess.assert_not_called()
+
+    @patch("builtins.input", return_value="n")
+    def test_large_run_can_be_cancelled(self, prompt: MagicMock) -> None:
+        self.newsletters = [{"id": str(index)} for index in range(101)]
+
+        output = self.run_main("--all")
+
+        prompt.assert_called_once()
+        self.assertIn("Cancelled", output)
+        self.reprocess.assert_not_called()
+
+    @patch("builtins.input", return_value="Y")
+    def test_large_run_continues_when_confirmed(self, _prompt: MagicMock) -> None:
+        self.newsletters = [{"id": str(index)} for index in range(101)]
+
+        self.run_main("--all")
+
+        self.assertEqual(self.reprocess.call_count, 101)
+
+    @patch("builtins.input")
+    def test_large_dry_run_does_not_ask(self, prompt: MagicMock) -> None:
+        self.newsletters = [{"id": str(index)} for index in range(101)]
+
+        self.run_main("--all", "--dry-run")
+
+        prompt.assert_not_called()
 
 
 if __name__ == "__main__":

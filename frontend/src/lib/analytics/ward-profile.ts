@@ -6,8 +6,8 @@ import {
   groupBy,
   median,
   monthOf,
+  type AnalyticsDataset,
   type NewsletterFact,
-  type SourceCoverage,
 } from "./core";
 import { buildCoverageGrid, summarizeWardCoverage, type CoverageCell } from "./coverage";
 import {
@@ -110,12 +110,17 @@ export function computeCityMedianPerTrackedMonth(allFacts: NewsletterFact[], mon
   return median(perWard);
 }
 
+/** The months with a readable newsletter from the ward, and whether shares over them are shown. */
+interface TopicShareBasis {
+  checkedMonths: string[];
+  sharesShown: boolean;
+}
+
 function summarizeTopics(
   topicCells: WardTopicMonthCell[],
   cityFacts: NewsletterFact[],
   lensIds: string[],
-  checkedMonths: string[],
-  sharesShown: boolean,
+  { checkedMonths, sharesShown }: TopicShareBasis,
 ): WardTopicSummary[] {
   const cityReach = computeLensWardReach(cityFacts, lensIds, checkedMonths);
   const checked = new Set(checkedMonths);
@@ -139,13 +144,12 @@ function summarizeTopics(
 
 /**
  * Build one ward's profile for a date window.
- * `allFacts` is the whole archive (not filtered), `months.window` the months of
+ * The newsletters are the whole archive (not filtered), `months.window` the months of
  * the selected window, and `months.archive` every month from the first to the
  * latest newsletter in the archive.
  */
 export function buildWardProfile(
-  allFacts: NewsletterFact[],
-  sources: SourceCoverage[],
+  { newsletters: allFacts, sources }: Pick<AnalyticsDataset, "newsletters" | "sources">,
   ward: string,
   { window: windowMonths, archive: archiveMonths }: { window: string[]; archive: string[] },
   lensIds: string[],
@@ -191,7 +195,7 @@ export function buildWardProfile(
     ),
     cityMedianPerTrackedMonth: computeCityMedianPerTrackedMonth(allFacts, windowMonths),
     topicCells,
-    topics: summarizeTopics(topicCells, cityFacts, lensIds, checkedMonths, sharesShown),
+    topics: summarizeTopics(topicCells, cityFacts, lensIds, { checkedMonths, sharesShown }),
     sharesShown,
   };
 }

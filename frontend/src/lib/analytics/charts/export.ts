@@ -174,6 +174,29 @@ function boxWithin(element: Element, container: HTMLElement): Box {
   };
 }
 
+/** How to draw one visible element: as an SVG, a legend swatch or a line of text. */
+function exportItemFor(element: Element, box: Box): ExportItem {
+  if (element instanceof SVGSVGElement) return { kind: "svg", element, box };
+  const style = getComputedStyle(element);
+  if (element.hasAttribute(EXPORT_SWATCH_ATTRIBUTE)) {
+    return {
+      kind: "swatch",
+      color: style.backgroundColor,
+      outline: element.getAttribute(EXPORT_SWATCH_ATTRIBUTE) ?? "",
+      round: isRound(style, box),
+      box,
+    };
+  }
+  return {
+    kind: "text",
+    text: element.textContent?.trim() ?? "",
+    font: canvasFontOf(style),
+    color: style.color,
+    lineHeight: lineHeightOf(style),
+    box,
+  };
+}
+
 /** Elements to draw, in document order: top-level SVGs, legend swatches and marked text. */
 function collectExportItems(container: HTMLElement): ExportItem[] {
   const selector = `svg, [${EXPORT_SWATCH_ATTRIBUTE}], [${EXPORT_TEXT_ATTRIBUTE}]`;
@@ -182,27 +205,7 @@ function collectExportItems(container: HTMLElement): ExportItem[] {
     if (element.parentElement?.closest("svg")) continue;
     const box = boxWithin(element, container);
     if (box.width === 0 || box.height === 0) continue;
-    const style = getComputedStyle(element);
-    if (element instanceof SVGSVGElement) {
-      items.push({ kind: "svg", element, box });
-    } else if (element.hasAttribute(EXPORT_SWATCH_ATTRIBUTE)) {
-      items.push({
-        kind: "swatch",
-        color: style.backgroundColor,
-        outline: element.getAttribute(EXPORT_SWATCH_ATTRIBUTE) ?? "",
-        round: isRound(style, box),
-        box,
-      });
-    } else {
-      items.push({
-        kind: "text",
-        text: element.textContent?.trim() ?? "",
-        font: canvasFontOf(style),
-        color: style.color,
-        lineHeight: lineHeightOf(style),
-        box,
-      });
-    }
+    items.push(exportItemFor(element, box));
   }
   return items;
 }
