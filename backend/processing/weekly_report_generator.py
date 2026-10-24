@@ -125,11 +125,10 @@ def extract_facts_from_newsletters(
 
     # Process each newsletter individually
     for i, newsletter in enumerate(newsletters, 1):
+        logger.info(f"    Processing newsletter {i}/{len(newsletters)}...")
         developments = extract_facts_from_single_newsletter(topic, newsletter, model)
         all_developments.extend(developments)
-        logger.info(
-            f"    Processing newsletter {i}/{len(newsletters)}... ✓ {len(developments)} developments"
-        )
+        logger.info(f"    ✓ {len(developments)} developments")
 
     logger.info(f"  ✓ Extracted {len(all_developments)} total developments")
     return all_developments
