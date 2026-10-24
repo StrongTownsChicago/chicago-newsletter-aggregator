@@ -38,9 +38,7 @@ if (!token) {
 
       if (profileResponse.ok) {
         const { enabled } = await profileResponse.json();
-        if (!enabled) {
-          alreadyUnsubscribed = true;
-        }
+        alreadyUnsubscribed = !enabled;
       }
 
       // If POST request (one-click) or GET with explicit confirmation, disable notifications
@@ -51,11 +49,8 @@ if (!token) {
           body: JSON.stringify({ token, user_id })
         });
 
-        if (unsubscribeResponse.ok) {
-          success = true;
-        } else {
-          error = 'Failed to unsubscribe. Please try again later.';
-        }
+        success = unsubscribeResponse.ok;
+        error = success ? null : 'Failed to unsubscribe. Please try again later.';
       }
     }
   } catch (err) {

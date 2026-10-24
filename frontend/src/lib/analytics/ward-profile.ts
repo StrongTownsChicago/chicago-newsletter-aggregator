@@ -139,16 +139,15 @@ function summarizeTopics(
 
 /**
  * Build one ward's profile for a date window.
- * `allFacts` is the whole archive (not filtered), `windowMonths` the months of
- * the selected window, and `archiveMonths` every month from the first to the
+ * `allFacts` is the whole archive (not filtered), `months.window` the months of
+ * the selected window, and `months.archive` every month from the first to the
  * latest newsletter in the archive.
  */
 export function buildWardProfile(
   allFacts: NewsletterFact[],
   sources: SourceCoverage[],
   ward: string,
-  windowMonths: string[],
-  archiveMonths: string[],
+  { window: windowMonths, archive: archiveMonths }: { window: string[]; archive: string[] },
   lensIds: string[],
 ): WardProfile {
   const [coverage] = summarizeWardCoverage(sources, [ward]);

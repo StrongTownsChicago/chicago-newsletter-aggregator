@@ -3,6 +3,29 @@
 import type { StarterRule } from "../lib/onboarding";
 import { findRuleFormError } from "../lib/rule-form";
 
+/** A saved rule, as its edit button's data attributes describe it. */
+interface EditableRule {
+  id: string;
+  name: string;
+  topics: string[];
+  wardNumbers: string[];
+  searchTerm: string;
+  frequency: string;
+  isActive: boolean;
+}
+
+function readEditableRule(dataset: DOMStringMap): EditableRule {
+  return {
+    id: dataset.ruleId || "",
+    name: dataset.ruleName || "",
+    topics: JSON.parse(dataset.ruleTopics || "[]") as string[],
+    wardNumbers: JSON.parse(dataset.ruleWardNumbers || "[]") as string[],
+    searchTerm: dataset.ruleSearchTerm || "",
+    frequency: dataset.ruleDeliveryFrequency || "daily",
+    isActive: dataset.ruleActive === "true",
+  };
+}
+
 export function initRuleModal(): void {
   const modal = document.getElementById("ruleModal");
   const modalTitle = document.getElementById("modalTitle");
@@ -23,16 +46,15 @@ export function initRuleModal(): void {
   const toggleWardsBtn = document.getElementById("toggleWardsBtn");
   const wardSelectionContainer = document.getElementById("wardSelectionContainer");
 
+  /** Show or hide the ward picker and label its toggle to match. */
+  function setWardPickerExpanded(expanded: boolean): void {
+    wardSelectionContainer?.classList.toggle("hidden", !expanded);
+    if (toggleWardsBtn) toggleWardsBtn.textContent = expanded ? "Hide Wards" : "Show Wards";
+  }
+
   // Toggle Ward Section
   toggleWardsBtn?.addEventListener("click", () => {
-    const isHidden = wardSelectionContainer?.classList.contains("hidden");
-    if (isHidden) {
-      wardSelectionContainer?.classList.remove("hidden");
-      toggleWardsBtn.textContent = "Hide Wards";
-    } else {
-      wardSelectionContainer?.classList.add("hidden");
-      toggleWardsBtn.textContent = "Show Wards";
-    }
+    setWardPickerExpanded(wardSelectionContainer?.classList.contains("hidden") ?? false);
   });
 
   /** The hidden delivery_frequency field, added to the form on first use. */
@@ -59,39 +81,33 @@ export function initRuleModal(): void {
     from?.forEach((cb) => (cb.checked = false));
   }
 
+  /** Show the options for the frequency; the ward filter is daily-only. */
+  function showSectionsFor(frequency: "daily" | "weekly"): void {
+    const weekly = frequency === "weekly";
+    dailyOptionsSection?.classList.toggle("hidden", weekly);
+    weeklyOptionsSection?.classList.toggle("hidden", !weekly);
+    wardFilterSection?.classList.toggle("hidden", weekly);
+  }
+
   // Toggle sections based on notification type
   function toggleNotificationTypeSections(): void {
     const selectedType = document.querySelector<HTMLInputElement>('input[name="notification_type"]:checked');
-    const wardCheckboxes = document.querySelectorAll<HTMLInputElement>('input[name="wards"]');
+    const frequency = selectedType?.value === "weekly" ? "weekly" : "daily";
 
     // Get topic checkboxes from both sections
     const dailyTopicCheckboxes = dailyOptionsSection?.querySelectorAll<HTMLInputElement>('input[name="topics"]');
     const weeklyTopicCheckboxes = weeklyOptionsSection?.querySelectorAll<HTMLInputElement>('input[name="topics"]');
 
-    if (selectedType && selectedType.value === "weekly") {
+    if (frequency === "weekly") {
       moveTopicSelection(dailyTopicCheckboxes, weeklyTopicCheckboxes);
-
-      // Show weekly options, hide daily options and ward filter
-      dailyOptionsSection?.classList.add("hidden");
-      weeklyOptionsSection?.classList.remove("hidden");
-      wardFilterSection?.classList.add("hidden");
-
-      // Clear ward selections
-      wardCheckboxes.forEach((cb) => (cb.checked = false));
-      wardSelectionContainer?.classList.add("hidden");
-      if (toggleWardsBtn) toggleWardsBtn.textContent = "Show Wards";
-
-      setDeliveryFrequency("weekly");
+      // Weekly summaries are citywide: clear ward selections
+      document.querySelectorAll<HTMLInputElement>('input[name="wards"]').forEach((cb) => (cb.checked = false));
+      setWardPickerExpanded(false);
     } else {
       moveTopicSelection(weeklyTopicCheckboxes, dailyTopicCheckboxes);
-
-      // Show daily options, hide weekly options, show ward filter
-      dailyOptionsSection?.classList.remove("hidden");
-      weeklyOptionsSection?.classList.add("hidden");
-      wardFilterSection?.classList.remove("hidden");
-
-      setDeliveryFrequency("daily");
     }
+    showSectionsFor(frequency);
+    setDeliveryFrequency(frequency);
   }
 
   notificationTypeRadios.forEach((radio) => {
@@ -114,8 +130,7 @@ export function initRuleModal(): void {
     notificationTypeRadios[0].checked = true;
 
     // Reset wards UI
-    wardSelectionContainer?.classList.add("hidden");
-    if (toggleWardsBtn) toggleWardsBtn.textContent = "Show Wards";
+    setWardPickerExpanded(false);
 
     toggleNotificationTypeSections();
     modal?.classList.remove("hidden");
@@ -145,62 +160,51 @@ export function initRuleModal(): void {
     openStarterRuleModal(JSON.parse(starterRuleData) as StarterRule);
   }
 
+  /** Check the rule's wards, opening the picker when any is selected. */
+  function selectWards(wardNumbers: string[]): void {
+    let anySelected = false;
+    ruleForm.querySelectorAll<HTMLInputElement>('input[name="wards"]').forEach((checkbox) => {
+      checkbox.checked = wardNumbers.includes(checkbox.value);
+      anySelected ||= checkbox.checked;
+    });
+    setWardPickerExpanded(anySelected);
+  }
+
   // Open modal for editing rule
+  function openEditRuleModal(rule: EditableRule): void {
+    modalTitle!.textContent = "Edit Notification Rule";
+    if (modalSubtitle) modalSubtitle.textContent = defaultModalSubtitle;
+    ruleForm.action = "/api/notifications/update-rule";
+    ruleIdInput.value = rule.id;
+    ruleNameInput.value = rule.name;
+    searchTermInput.value = rule.searchTerm;
+    isActiveInput.checked = rule.isActive;
+
+    // Set notification type based on frequency
+    notificationTypeRadios.forEach((radio) => {
+      if (radio.value === rule.frequency) radio.checked = true;
+    });
+
+    // Trigger toggle to show correct sections
+    toggleNotificationTypeSections();
+
+    // Check the appropriate topic checkboxes in the VISIBLE section only
+    const visibleSection = rule.frequency === "weekly" ? weeklyOptionsSection : dailyOptionsSection;
+    visibleSection?.querySelectorAll<HTMLInputElement>('input[name="topics"]').forEach((checkbox) => {
+      checkbox.checked = rule.topics.includes(checkbox.value);
+    });
+
+    // Weekly rules have no wards (the picker is hidden)
+    if (rule.frequency === "daily") {
+      selectWards(rule.wardNumbers);
+    }
+
+    modal?.classList.remove("hidden");
+  }
+
   editRuleBtns.forEach((btn) => {
     btn.addEventListener("click", (e) => {
-      const target = e.currentTarget as HTMLButtonElement;
-      const ruleId = target.dataset.ruleId;
-      const ruleName = target.dataset.ruleName;
-      const ruleTopics = JSON.parse(target.dataset.ruleTopics || "[]") as string[];
-      const ruleWards = JSON.parse(target.dataset.ruleWardNumbers || "[]") as string[];
-      const ruleSearchTerm = target.dataset.ruleSearchTerm;
-      const ruleFrequency = target.dataset.ruleDeliveryFrequency || "daily";
-      const ruleActive = target.dataset.ruleActive === "true";
-
-      modalTitle!.textContent = "Edit Notification Rule";
-      if (modalSubtitle) modalSubtitle.textContent = defaultModalSubtitle;
-      ruleForm.action = "/api/notifications/update-rule";
-      ruleIdInput.value = ruleId || "";
-      ruleNameInput.value = ruleName || "";
-      searchTermInput.value = ruleSearchTerm || "";
-      isActiveInput.checked = ruleActive;
-
-      // Set notification type based on frequency
-      notificationTypeRadios.forEach((radio) => {
-        if (radio.value === ruleFrequency) radio.checked = true;
-      });
-
-      // Trigger toggle to show correct sections
-      toggleNotificationTypeSections();
-
-      // Check the appropriate topic checkboxes in the VISIBLE section only
-      const visibleSection = ruleFrequency === "weekly" ? weeklyOptionsSection : dailyOptionsSection;
-      visibleSection?.querySelectorAll<HTMLInputElement>('input[name="topics"]').forEach((checkbox) => {
-        checkbox.checked = ruleTopics.includes(checkbox.value);
-      });
-
-      // For weekly rules, don't populate ward checkboxes (they're hidden)
-      // For daily rules, populate ward checkboxes
-      if (ruleFrequency === "daily") {
-        const wardCheckboxes = ruleForm.querySelectorAll<HTMLInputElement>('input[name="wards"]');
-        let hasSelectedWards = false;
-        wardCheckboxes.forEach((checkbox) => {
-          const isChecked = ruleWards.includes(checkbox.value);
-          checkbox.checked = isChecked;
-          if (isChecked) hasSelectedWards = true;
-        });
-
-        // Expand ward section if wards are selected
-        if (hasSelectedWards) {
-          wardSelectionContainer?.classList.remove("hidden");
-          if (toggleWardsBtn) toggleWardsBtn.textContent = "Hide Wards";
-        } else {
-          wardSelectionContainer?.classList.add("hidden");
-          if (toggleWardsBtn) toggleWardsBtn.textContent = "Show Wards";
-        }
-      }
-
-      modal?.classList.remove("hidden");
+      openEditRuleModal(readEditableRule((e.currentTarget as HTMLButtonElement).dataset));
     });
   });
 

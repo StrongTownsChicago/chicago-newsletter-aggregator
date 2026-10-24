@@ -8,9 +8,9 @@ const maxLines = (max) => ({
   "max-lines": ["error", { max, skipBlankLines: true, skipComments: true }],
 });
 
-const COMPLEXITY_CEILING = 19; // src/pages/api/notifications/create-rule.ts POST
-const MAX_PARAMS_CEILING = 6; // lib/analytics/charts/ward-grids.ts, lib/analytics/ward-profile.ts
-const MAX_DEPTH_CEILING = 5; // src/pages/unsubscribe.astro
+const COMPLEXITY_CEILING = 12; // src/client/analytics/panels/topic-detail.ts renderTopicDetailPanel
+const MAX_PARAMS_CEILING = 5; // the analytics chart builders in lib/analytics/charts/
+const MAX_DEPTH_CEILING = 4; // src/pages/unsubscribe.astro
 
 const computedEnvRead = {
   selector: "MemberExpression[computed=true] > MemberExpression.object[object.type='MetaProperty'][property.name='env']",

@@ -1,7 +1,8 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
-import { formText, formTexts } from "../../../lib/server/form-data";
+import { formText } from "../../../lib/server/form-data";
+import { readRuleFields } from "../../../lib/server/rule-fields";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -17,59 +18,20 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const formData = await request.formData();
   const ruleId = formText(formData, "rule_id");
   const name = formText(formData, "name");
-  const deliveryFrequency =
-    formText(formData, "delivery_frequency") || "daily";
-  const topics = formTexts(formData, "topics");
-  let searchTerm = formText(formData, "search_term")?.trim();
-  let wards = formTexts(formData, "wards")
-    .map((w) => w.trim())
-    .filter((w) => w.length > 0);
-  const isActive = formData.get("is_active") === "on";
 
   if (!ruleId || !name) {
     return redirect("/preferences?error=Rule ID and name are required");
   }
 
-  // Validation: Weekly rules
-  if (deliveryFrequency === "weekly") {
-    if (topics.length === 0) {
-      return redirect(
-        "/preferences?error=At least one topic is required for weekly summaries",
-      );
-    }
-    if (wards.length > 0) {
-      return redirect(
-        "/preferences?error=Ward filters cannot be applied to weekly summaries. Weekly summaries cover citywide activity.",
-      );
-    }
-    // Weekly rules cannot have search terms or ward filters
-    searchTerm = undefined;
-    wards = [];
-  } else {
-    // Validation: Daily rules (default)
-    if (!searchTerm && topics.length === 0) {
-      return redirect(
-        "/preferences?error=Please specify at least one topic or search phrase",
-      );
-    }
-    if (searchTerm && searchTerm.length > 100) {
-      return redirect(
-        "/preferences?error=Search phrase must be under 100 characters",
-      );
-    }
+  const { fields, error: fieldsError } = readRuleFields(formData);
+  if (fieldsError) {
+    return redirect(`/preferences?error=${fieldsError}`);
   }
 
-  // Update rule (RLS ensures user can only update their own rules)
+  // RLS ensures user can only update their own rules
   const { error } = await locals.supabase
     .from("notification_rules")
-    .update({
-      name,
-      topics,
-      search_term: searchTerm || null,
-      ward_numbers: wards.length > 0 ? wards : null,
-      is_active: isActive,
-      delivery_frequency: deliveryFrequency,
-    })
+    .update({ name, ...fields })
     .eq("id", ruleId)
     .eq("user_id", user.id);
 
