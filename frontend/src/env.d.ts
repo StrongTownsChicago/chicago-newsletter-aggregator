@@ -16,7 +16,7 @@ interface ImportMetaEnv {
 
 declare namespace App {
   interface Locals {
-    supabase: import("@supabase/supabase-js").SupabaseClient;
+    supabase: import("./lib/supabase").AppSupabaseClient;
     session: import("@supabase/supabase-js").Session | null;
     user: import("@supabase/supabase-js").User | null;
     /** Cloudflare runtime from the adapter; absent outside Workers (tests). */

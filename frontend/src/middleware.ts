@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import type { APIContext, MiddlewareNext } from "astro";
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./lib/database.types";
 import { isNonProductionHost } from "./lib/seo";
 import { getDefaultEdgeCache } from "./lib/server/edge-cache";
 import { respondWithPageCache, resolvePageCacheVersion } from "./lib/server/page-cache";
@@ -14,7 +15,7 @@ const pageCacheVersion = resolvePageCacheVersion(import.meta.env.BUILD_ID);
 /** Restores the visitor's session into locals, then renders the page. */
 async function renderWithSession(context: APIContext, next: MiddlewareNext): Promise<Response> {
   // Create a Supabase client for this request
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false, // Server-side doesn't persist
       autoRefreshToken: false,

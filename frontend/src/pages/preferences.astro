@@ -5,7 +5,7 @@ import Layout from '../layouts/Layout.astro';
 import RuleList from '../components/preferences/RuleList.astro';
 import RuleModal from '../components/preferences/RuleModal.astro';
 import { notificationsEnabled } from '../lib/supabase';
-import type { UserProfile, NotificationRule } from '../lib/supabase';
+import { areNotificationsEnabled } from '../lib/notification-preferences';
 import { shouldShowWelcome } from '../lib/onboarding';
 
 // Redirect if notifications are disabled
@@ -64,8 +64,7 @@ const availableWards = Array.from(new Set(
     .sort((a, b) => parseInt(a as string) - parseInt(b as string))
 ));
 
-const userProfile = profile as UserProfile | null;
-const notificationRules = (rules as NotificationRule[]) || [];
+const notificationRules = rules ?? [];
 
 const maxRules = 5;
 const canCreateRule = notificationRules.length < maxRules;
@@ -151,7 +150,7 @@ const isWelcome = shouldShowWelcome(Astro.url.searchParams, notificationRules.le
                 type="checkbox"
                 id="enabled"
                 name="enabled"
-                checked={userProfile?.notification_preferences?.enabled ?? true}
+                checked={areNotificationsEnabled(profile?.notification_preferences)}
                 class="sr-only peer"
               />
               <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>

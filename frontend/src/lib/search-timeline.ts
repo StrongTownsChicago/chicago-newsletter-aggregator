@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppSupabaseClient } from "./supabase";
 import { CHICAGO_TIME_ZONE } from "./chicago-dates";
 import { SEARCH_PARAM_NAMES } from "./search-filters";
 
@@ -228,7 +228,7 @@ export function isStatementTimeoutError(error: { code?: string }): boolean {
  * database error.
  */
 export async function fetchSearchTimeline(
-  supabase: Pick<SupabaseClient, "rpc">,
+  supabase: Pick<AppSupabaseClient, "rpc">,
   query: string,
   now: Date,
 ): Promise<SearchTimelineResult> {
@@ -236,7 +236,7 @@ export async function fetchSearchTimeline(
     search_query: query,
   });
   const { error } = response;
-  // Untyped client: parseTimelineRpcRows validates the rows.
+  // Typed by the schema, but still checked: parseTimelineRpcRows drops a malformed row rather than failing.
   const data: unknown = response.data;
 
   if (error) {

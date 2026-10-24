@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../database.types";
 import { readServerSecret } from "./server-env";
 
 // SERVER-SIDE ONLY: Do not import this in .astro files or client-side components
@@ -22,7 +23,7 @@ export function getSupabaseAdmin(
     throw new Error("Missing Supabase URL or Service Role Key");
   }
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "astro check",
-    "test:mutation": "stryker run"
+    "test:mutation": "stryker run",
+    "db:types": "supabase gen types typescript --local --schema public --workdir .. > src/lib/database.types.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.8",

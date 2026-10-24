@@ -1,6 +1,7 @@
 export const prerender = false;
 import type { APIRoute } from "astro";
 import { notificationsEnabled } from "../../../lib/supabase";
+import type { NotificationPreferences } from "../../../lib/notification-preferences";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (!notificationsEnabled()) {
@@ -23,7 +24,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       notification_preferences: {
         enabled,
         delivery_frequency: "daily", // Fixed for MVP
-      },
+      } satisfies NotificationPreferences,
     })
     .eq("id", user.id);
 
