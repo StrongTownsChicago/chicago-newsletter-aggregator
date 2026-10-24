@@ -42,21 +42,30 @@ const searchParams = fc
 
 const PROPERTY_RUNS = { numRuns: 300 };
 
-function expectValidState({ filters, sort, page }: SearchState): void {
-  expect(filters.query).toBe(filters.query.trim());
+function expectValidIds({ filters, page }: SearchState): void {
   if (filters.ward !== null) expect(filters.ward).toMatch(/^[1-9]\d*$/);
   for (const id of [filters.sourceId, page]) {
     if (id !== null) expect(Number.isSafeInteger(id) && id >= 1).toBe(true);
   }
   if (filters.ward !== null) expect(Number.isSafeInteger(Number(filters.ward))).toBe(true);
-  if (filters.sourceType !== null) expect(filters.sourceType).toMatch(/^[a-z_]+$/);
-  if (filters.topic !== null) expect(ALL_TOPICS).toContain(filters.topic);
-  for (const date of [filters.fromDate, filters.toDate]) {
+}
+
+function expectValidDates({ fromDate, toDate }: SearchState["filters"]): void {
+  for (const date of [fromDate, toDate]) {
     if (date !== null) expect(parseIsoDate(date)).toBe(date);
   }
-  if (filters.fromDate !== null && filters.toDate !== null) {
-    expect(filters.fromDate <= filters.toDate).toBe(true);
+  if (fromDate !== null && toDate !== null) {
+    expect(fromDate <= toDate).toBe(true);
   }
+}
+
+function expectValidState(state: SearchState): void {
+  const { filters, sort } = state;
+  expect(filters.query).toBe(filters.query.trim());
+  expectValidIds(state);
+  if (filters.sourceType !== null) expect(filters.sourceType).toMatch(/^[a-z_]+$/);
+  if (filters.topic !== null) expect(ALL_TOPICS).toContain(filters.topic);
+  expectValidDates(filters);
   expect(SEARCH_SORTS).toContain(sort);
 }
 

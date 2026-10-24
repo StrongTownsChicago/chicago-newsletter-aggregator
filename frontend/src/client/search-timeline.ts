@@ -61,6 +61,16 @@ const barColor = (isSelected: boolean, isPartial: boolean): string => {
   return "bg-blue-600 group-hover:bg-blue-700";
 };
 
+const countClass = (hasMatches: boolean, isSelected: boolean): string => {
+  if (!hasMatches) return "text-gray-400";
+  return isSelected ? "font-semibold text-gray-900" : "text-gray-700";
+};
+
+const describeMonth = (entry: TimelineMonth, isPartial: boolean): string =>
+  `${formatTimelineMonth(entry.month)}${isPartial ? " so far" : ""}: ` +
+  `${pluralize(entry.newsletterCount, "newsletter", "newsletters")}, ` +
+  `${pluralize(entry.wardCount, "ward", "wards")}`;
+
 function buildMonthColumn(
   entry: TimelineMonth,
   index: number,
@@ -79,16 +89,11 @@ function buildMonthColumn(
     target.href = buildMonthSearchUrl(context.searchUrl, entry.month);
     if (isSelected) target.setAttribute("aria-current", "true");
   }
-  target.setAttribute(
-    "aria-label",
-    `${formatTimelineMonth(entry.month)}${isPartial ? " so far" : ""}: ` +
-      `${pluralize(entry.newsletterCount, "newsletter", "newsletters")}, ` +
-      `${pluralize(entry.wardCount, "ward", "wards")}`,
-  );
+  target.setAttribute("aria-label", describeMonth(entry, isPartial));
 
   const count = element(
     "span",
-    `text-xs tabular-nums ${hasMatches ? (isSelected ? "font-semibold text-gray-900" : "text-gray-700") : "text-gray-400"}`,
+    `text-xs tabular-nums ${countClass(hasMatches, isSelected)}`,
     entry.newsletterCount.toLocaleString("en-US"),
   );
   const track = element("span", "flex items-end justify-center w-full h-20 mt-0.5");

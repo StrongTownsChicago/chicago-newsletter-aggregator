@@ -33,9 +33,8 @@ export function renderCoveragePanel(state: DashboardState, filters: AnalyticsFil
       chart,
       wards.length && months.length
         ? renderCoverageGrid(
-            cells,
+            { cells, wardsNeverArchived },
             { wards, months },
-            wardsNeverArchived,
             searchScopeForFilters(filters),
             chartWidth(chart),
           )

@@ -1,5 +1,5 @@
 // Civic calendar panel: every topic's ward reach by month, and the topic trend table.
-import { formatMonth, type AnalyticsFilters } from "../../../lib/analytics/core";
+import { formatMonth } from "../../../lib/analytics/core";
 import { formatPercent } from "../../../lib/analytics/format";
 import { isReachFaded, type LensReachCell } from "../../../lib/analytics/reach";
 import {
@@ -15,7 +15,7 @@ import {
 } from "../../../lib/analytics/topic-trends";
 import { EXPORT_TEXT_ATTRIBUTE } from "../../../lib/analytics/charts/export";
 import { renderCivicCalendar, renderSparkline } from "../../../lib/analytics/charts/topic-reach";
-import { lensLabel, type DashboardState, type TopicOverview } from "../dashboard-state";
+import { lensLabel, type DashboardRender, type DashboardState } from "../dashboard-state";
 import {
   chartWidth,
   emptyMessage,
@@ -82,13 +82,7 @@ function buildTopicTrendTable(
   return tableElement;
 }
 
-export function renderCivicCalendarPanel(
-  state: DashboardState,
-  filters: AnalyticsFilters,
-  overview: TopicOverview,
-  months: string[],
-  selectTopic: (lensId: string) => void,
-): void {
+export function renderCivicCalendarPanel({ state, filters, overview, months, selectTopic }: DashboardRender): void {
   const { section, chart, caption, table } = panel("civic-calendar");
   const { cells, fullMonths, threshold } = overview;
   const trends = orderBySwing(overview.trends);

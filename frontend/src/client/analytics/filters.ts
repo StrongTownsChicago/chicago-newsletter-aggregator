@@ -24,11 +24,16 @@ export function readFilters(form: HTMLFormElement): AnalyticsFilters {
   };
 }
 
+/** The choices the filter bar offers. */
+export interface FilterOptions {
+  wards: string[];
+  months: string[];
+  lenses: LensDefinition[];
+}
+
 export function populateFilterOptions(
   form: HTMLFormElement,
-  wards: string[],
-  months: string[],
-  lenses: LensDefinition[],
+  { wards, months, lenses }: FilterOptions,
   defaultFromMonth: string | null,
 ): void {
   requireElement<HTMLSelectElement>('select[name="lens"]', form).append(

@@ -1,4 +1,6 @@
-// Client-side checks for the notification rule form on /preferences.
+// The notification rule form on /preferences: client-side checks, and the
+// data attributes an edit button carries to fill the form with a saved rule.
+import type { NotificationRule } from "./supabase";
 
 export interface RuleFormInput {
   /** "weekly" or "daily"; anything else is treated as daily. */
@@ -21,4 +23,16 @@ export function findRuleFormError({ frequency, searchTerm, topicCount }: RuleFor
   return hasTopics || searchTerm
     ? null
     : "Please select at least one topic or enter a search phrase for daily digest.";
+}
+
+/** A saved rule's edit-button data attributes, read back by client/rule-modal.ts. */
+export function ruleEditAttributes(rule: NotificationRule): Record<string, string> {
+  return {
+    "data-rule-id": rule.id,
+    "data-rule-name": rule.name,
+    "data-rule-topics": JSON.stringify(rule.topics),
+    "data-rule-ward-numbers": JSON.stringify(rule.ward_numbers || []),
+    "data-rule-search-term": rule.search_term || "",
+    "data-rule-delivery-frequency": rule.delivery_frequency || "daily",
+  };
 }
