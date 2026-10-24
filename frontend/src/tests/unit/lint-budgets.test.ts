@@ -113,7 +113,7 @@ describe("max-lines budgets", () => {
 // function; lowering one means lowering it in both places, and raising one fails.
 const ADOPTED_FUNCTION_CEILINGS = {
   complexity: 10,
-  "max-params": 5,
+  "max-params": 4,
   "max-depth": 4,
 } as const;
 

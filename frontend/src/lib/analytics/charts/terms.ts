@@ -112,8 +112,7 @@ export function renderTermWards(
 export function renderRisingTerms(
   terms: RisingTerm[],
   activeWards: number,
-  baselineLabel: string,
-  latestLabel: string,
+  { baseline: baselineLabel, latest: latestLabel }: { baseline: string; latest: string },
   width: number,
 ): Element {
   const marginLeft = longestLabelMargin(terms.map((item) => item.term));

@@ -9,7 +9,7 @@ const maxLines = (max) => ({
 });
 
 const COMPLEXITY_CEILING = 10; // several at 10, e.g. src/lib/seo.ts buildWardDescription, src/lib/server/page-cache.ts respondWithPageCache
-const MAX_PARAMS_CEILING = 5; // the analytics chart builders in lib/analytics/charts/
+const MAX_PARAMS_CEILING = 4; // many at 4, e.g. the chart builders in lib/analytics/charts/
 const MAX_DEPTH_CEILING = 4; // src/pages/unsubscribe.astro
 
 const computedEnvRead = {

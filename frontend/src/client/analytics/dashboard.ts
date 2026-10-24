@@ -52,8 +52,7 @@ const RESIZE_DEBOUNCE_MS = 200;
 
 const PANEL_RENDERERS: Record<DashboardPanelId, (render: DashboardRender) => void> = {
   "term-explorer": ({ state, filters }) => renderTermExplorer(state, filters),
-  "civic-calendar": ({ state, filters, overview, months, selectTopic }) =>
-    renderCivicCalendarPanel(state, filters, overview, months, selectTopic),
+  "civic-calendar": renderCivicCalendarPanel,
   "topic-detail": renderTopicDetailPanel,
   "ward-profile": renderWardProfilePanel,
   "rising-terms": ({ state }) => renderRisingPanel(state),
@@ -161,9 +160,7 @@ export function startAnalyticsDashboard(data: AnalyticsDataset): void {
   const { form, termInput } = controls;
   populateFilterOptions(
     form,
-    state.urlContext.wards,
-    state.dataMonths,
-    data.lenses.lenses,
+    { wards: state.urlContext.wards, months: state.dataMonths, lenses: data.lenses.lenses },
     state.urlContext.defaultFromMonth,
   );
   wireWardPickerDismissal(requireElement<HTMLDetailsElement>("#ward-picker"));

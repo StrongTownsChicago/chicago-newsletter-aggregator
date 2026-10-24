@@ -101,8 +101,7 @@ function renderMentionGrid<T extends Pick<LensWardCell, "month" | "status" | "me
 /** Ward × month grid for one lens: which wards' newsletters mentioned it each month. */
 export function renderLensWardGrid(
   cells: LensWardCell[],
-  wards: string[],
-  months: string[],
+  { wards, months }: { wards: string[]; months: string[] },
   lensLabel: string,
   width: number,
 ): Element {
@@ -129,8 +128,7 @@ export function renderLensWardGrid(
  */
 export function renderWardTopicGrid(
   cells: WardTopicMonthCell[],
-  lenses: { id: string; label: string }[],
-  months: string[],
+  { lenses, months }: { lenses: { id: string; label: string }[]; months: string[] },
   { ward, selectedLens }: { ward: string; selectedLens: string | null },
   width: number,
 ): Element {
@@ -197,9 +195,8 @@ export function renderWardTopicGrid(
  * can also mean the ward simply joined later.
  */
 export function renderCoverageGrid(
-  cells: CoverageCell[],
+  { cells, wardsNeverArchived }: { cells: CoverageCell[]; wardsNeverArchived: string[] },
   { wards, months }: { wards: string[]; months: string[] },
-  wardsNeverArchived: string[],
   searchScope: SearchLinkParams,
   width: number,
 ): Element {

@@ -36,8 +36,7 @@ function renderTrend(section: HTMLElement, caption: HTMLElement, overview: Topic
     shares.length
       ? renderReachTrend(
           points,
-          overview.fullMonths,
-          tightShareDomain(shares),
+          { months: overview.fullMonths, domain: tightShareDomain(shares) },
           trend?.averageShare ?? null,
           chartWidth(trendChart),
         )
@@ -57,7 +56,7 @@ function renderWardGrid(
   replaceContent(
     wardChart,
     wards.length && months.length
-      ? renderLensWardGrid(wardCells, wards, months, lensLabel(state, lens), chartWidth(wardChart))
+      ? renderLensWardGrid(wardCells, { wards, months }, lensLabel(state, lens), chartWidth(wardChart))
       : emptyMessage("Nothing in these dates."),
   );
   return wardCells;

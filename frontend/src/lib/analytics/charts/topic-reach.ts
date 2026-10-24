@@ -30,8 +30,7 @@ const TREND_HEIGHT = 200;
 /** One topic's monthly ward reach on a tight y scale, with its average as a dashed rule. */
 export function renderReachTrend(
   points: LensReachCell[],
-  months: string[],
-  domain: [number, number],
+  { months, domain }: { months: string[]; domain: [number, number] },
   averageShare: number | null,
   width: number,
 ): Element {

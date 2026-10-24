@@ -108,8 +108,7 @@ export function buildRender(state: DashboardState, filters: AnalyticsFilters, se
       ward === null
         ? null
         : buildWardProfile(
-            state.data.newsletters,
-            state.data.sources,
+            state.data,
             ward,
             { window: months, archive: state.dataMonths },
             state.urlContext.lensIds,
