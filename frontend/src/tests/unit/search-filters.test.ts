@@ -1,25 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_SEARCH_SORT,
+  EMPTY_SEARCH_FILTERS as EMPTY_FILTERS,
   SEARCH_PATH,
   applySearchFilters,
   applySearchSort,
   buildSearchBaseUrl,
+  buildSearchUrlWithoutFilters,
   getPageRange,
+  listActiveSearchFilters,
   parseSearchParams,
   requiresSourceJoin,
 } from '../../lib/search-filters';
 import type { FilterableQuery, SearchFilters, SortableQuery } from '../../lib/search-filters';
-
-const EMPTY_FILTERS: SearchFilters = {
-  query: '',
-  ward: null,
-  sourceId: null,
-  sourceType: null,
-  topic: null,
-  fromDate: null,
-  toDate: null,
-};
 
 const parse = (queryString: string) => parseSearchParams(new URLSearchParams(queryString));
 
@@ -286,5 +279,59 @@ describe('applySearchSort', () => {
 
   it('sorts oldest first', () => {
     expect(sortCalls('oldest')).toEqual([['order', 'received_date', { ascending: true }]]);
+  });
+});
+
+describe('listActiveSearchFilters', () => {
+  const SOURCE_NAMES = new Map([[51, 'Chicago Transit Authority']]);
+
+  it('is empty when only keywords are set', () => {
+    expect(listActiveSearchFilters({ ...EMPTY_FILTERS, query: 'zoning' }, 'newest', SOURCE_NAMES)).toEqual([]);
+  });
+
+  it('labels each filter and links to the search without it', () => {
+    const filters: SearchFilters = {
+      query: 'bike lanes',
+      ward: '40',
+      sourceId: 51,
+      sourceType: 'agency',
+      topic: 'bike_lanes',
+      fromDate: '2026-01-01',
+      toDate: '2026-06-30',
+    };
+
+    const active = listActiveSearchFilters(filters, 'oldest', SOURCE_NAMES);
+
+    expect(active.map(({ key, label }) => [key, label])).toEqual([
+      ['topic', 'Bike lanes'],
+      ['ward', 'Ward 40'],
+      ['sourceId', 'Chicago Transit Authority'],
+      ['sourceType', 'Agency'],
+      ['fromDate', 'From January 1, 2026'],
+      ['toDate', 'To June 30, 2026'],
+    ]);
+    for (const { key, removeUrl } of active) {
+      expect(parse(removeUrl.split('?')[1])).toEqual({
+        filters: { ...filters, [key]: null },
+        sort: 'oldest',
+        page: 1,
+      });
+    }
+  });
+
+  it('falls back to the source id when the source name is unknown', () => {
+    const [sourceFilter] = listActiveSearchFilters({ ...EMPTY_FILTERS, sourceId: 7 }, 'newest', new Map());
+    expect(sourceFilter.label).toBe('Source 7');
+  });
+});
+
+describe('buildSearchUrlWithoutFilters', () => {
+  it('keeps the keywords and sort and drops every filter', () => {
+    const filters: SearchFilters = { ...EMPTY_FILTERS, query: 'zoning', ward: '1', topic: 'bike_lanes' };
+    expect(buildSearchUrlWithoutFilters(filters, 'oldest')).toBe(`${SEARCH_PATH}?q=zoning&sort=oldest`);
+  });
+
+  it('returns the bare search path without keywords', () => {
+    expect(buildSearchUrlWithoutFilters({ ...EMPTY_FILTERS, ward: '1' }, DEFAULT_SEARCH_SORT)).toBe(SEARCH_PATH);
   });
 });

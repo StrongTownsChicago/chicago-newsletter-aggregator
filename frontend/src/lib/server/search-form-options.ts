@@ -1,16 +1,15 @@
 import type { Source } from "../supabase";
 
 /**
- * Derives the search form's dropdown options from a single fetch of the
- * sources table (see `SEARCH_SOURCE_COLUMNS`).
+ * Derives the search form's ward options and source labels from a single
+ * fetch of the sources table (see `SEARCH_SOURCE_COLUMNS`).
  */
 
-/** Source columns needed to build the search form dropdowns. */
+/** Source columns needed for the search form. */
 export const SEARCH_SOURCE_COLUMNS = [
   "id",
   "name",
   "ward_number",
-  "source_type",
 ] as const satisfies readonly (keyof Source)[];
 
 export type SearchSourceRow = Pick<
@@ -18,37 +17,33 @@ export type SearchSourceRow = Pick<
   (typeof SEARCH_SOURCE_COLUMNS)[number]
 >;
 
-export interface SourceOption {
-  id: number;
+export interface WardOption {
+  ward: string;
+  /** "Ward 40 – Andre Vasquez"; several offices in one ward are joined. */
   label: string;
 }
 
-const wardSortKey = (wardNumber: string | null): number =>
-  wardNumber ? Number.parseInt(wardNumber, 10) : Number.POSITIVE_INFINITY;
+const wardSortKey = (wardNumber: string): number => Number.parseInt(wardNumber, 10);
 
-const compareSources = (a: SearchSourceRow, b: SearchSourceRow): number =>
-  wardSortKey(a.ward_number) - wardSortKey(b.ward_number) ||
-  a.name.localeCompare(b.name);
-
-const formatSourceLabel = ({ name, ward_number }: SearchSourceRow): string =>
-  ward_number ? `Ward ${ward_number} – ${name}` : name;
-
-/** Source dropdown options: ward offices in ward order, then other sources by name. */
-export function buildSourceOptions(sources: SearchSourceRow[]): SourceOption[] {
-  return [...sources]
-    .sort(compareSources)
-    .map((source) => ({ id: source.id, label: formatSourceLabel(source) }));
+/**
+ * Ward dropdown options in numeric order, each labelled with the names of the
+ * ward's sources so one dropdown serves both "my ward" and "my alderman".
+ */
+export function buildWardOptions(sources: SearchSourceRow[]): WardOption[] {
+  const namesByWard = new Map<string, string[]>();
+  for (const { ward_number, name } of sources) {
+    if (!ward_number) continue;
+    namesByWard.set(ward_number, [...(namesByWard.get(ward_number) ?? []), name]);
+  }
+  return [...namesByWard]
+    .sort(([a], [b]) => wardSortKey(a) - wardSortKey(b))
+    .map(([ward, names]) => ({
+      ward,
+      label: `Ward ${ward} – ${[...names].sort((a, b) => a.localeCompare(b)).join(", ")}`,
+    }));
 }
 
-/** Distinct ward numbers of sources that have one, in numeric order. */
-export function extractWardNumbers(sources: SearchSourceRow[]): string[] {
-  const wards = sources
-    .map((source) => source.ward_number)
-    .filter((ward): ward is string => Boolean(ward));
-  return [...new Set(wards)].sort((a, b) => wardSortKey(a) - wardSortKey(b));
-}
-
-/** Distinct source types, alphabetically. */
-export function extractSourceTypes(sources: SearchSourceRow[]): string[] {
-  return [...new Set(sources.map((source) => source.source_type))].sort();
+/** Source names by id, for labelling a source filter carried in the URL. */
+export function buildSourceNames(sources: SearchSourceRow[]): Map<number, string> {
+  return new Map(sources.map(({ id, name }) => [id, name]));
 }

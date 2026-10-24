@@ -38,7 +38,7 @@ const { isWelcome, availableWards } = Astro.props;
             name="name"
             required
             placeholder="e.g., Housing and Zoning Updates"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-base"
           />
         </div>
 
@@ -121,7 +121,7 @@ const { isWelcome, availableWards } = Astro.props;
                   name="search_term"
                   placeholder="e.g., CTA, housing, zoning"
                   maxlength="100"
-                  class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                  class="w-full pl-10 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 text-base"
                 />
               </div>
               <p class="text-xs text-gray-500 mt-1">
@@ -150,7 +150,7 @@ const { isWelcome, availableWards } = Astro.props;
                             type="checkbox"
                             name="topics"
                             value={topic}
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-600 border-gray-300 rounded"
                           />
                           <span class="ml-3 text-sm text-gray-700 font-medium">{formatTopicLabel(topic)}</span>
                         </label>
@@ -249,7 +249,7 @@ const { isWelcome, availableWards } = Astro.props;
                   <span class="text-gray-700 peer-checked:text-blue-600 peer-checked:font-bold">
                     {ward}
                   </span>
-                  <div class="absolute inset-0 border-2 border-transparent peer-checked:border-blue-500 rounded pointer-events-none"></div>
+                  <div class="absolute inset-0 border-2 border-transparent peer-checked:border-blue-600 rounded pointer-events-none"></div>
                 </label>
               ))}
             </div>
@@ -263,7 +263,7 @@ const { isWelcome, availableWards } = Astro.props;
               id="isActive"
               name="is_active"
               checked
-              class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-0.5"
+              class="h-5 w-5 text-blue-600 focus:ring-blue-600 border-gray-300 rounded mt-0.5"
             />
             <div>
               <span class="text-sm font-semibold text-gray-900 block">Enable this rule</span>

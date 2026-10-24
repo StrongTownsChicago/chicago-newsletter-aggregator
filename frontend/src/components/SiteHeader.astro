@@ -18,20 +18,23 @@ const currentPath = Astro.url.pathname;
 const SiteNameHeading = currentPath === HOME_PATH ? 'h1' : 'p';
 ---
 
-<header class="bg-white border-b border-gray-200" data-testid="site-header">
-  <div class="container mx-auto max-w-6xl px-4 pt-4">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="min-w-0">
-        <SiteNameHeading class="text-lg sm:text-xl font-bold text-gray-900">
-          <a
-            href={HOME_PATH}
-            class="hover:text-blue-600 transition-colors"
-            data-testid="site-name"
-          >
-            {SITE_NAME}
-          </a>
-        </SiteNameHeading>
-        <p class="text-sm text-gray-600" data-testid="site-tagline">{SITE_TAGLINE}</p>
+<header class="bg-white border-b border-gray-200 border-t-4 border-t-blue-500" data-testid="site-header">
+  <div class="container mx-auto max-w-6xl px-4 pt-3 sm:pt-4">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div class="flex min-w-0 items-center gap-2 sm:gap-3">
+        <img src="/logo.svg" alt="" width="36" height="36" class="h-7 w-7 shrink-0 sm:h-9 sm:w-9" />
+        <div class="min-w-0">
+          <SiteNameHeading class="text-base sm:text-xl font-bold text-gray-900">
+            <a
+              href={HOME_PATH}
+              class="hover:text-blue-600 transition-colors"
+              data-testid="site-name"
+            >
+              {SITE_NAME}
+            </a>
+          </SiteNameHeading>
+          <p class="hidden sm:block text-sm text-gray-600" data-testid="site-tagline">{SITE_TAGLINE}</p>
+        </div>
       </div>
       <div class="flex items-center gap-4">
         <AuthButton />
@@ -51,8 +54,8 @@ const SiteNameHeading = currentPath === HOME_PATH ? 'h1' : 'p';
       </div>
     </div>
 
-    <nav aria-label="Primary" class="mt-3" data-testid="site-nav">
-      <ul class="flex flex-wrap gap-x-6">
+    <nav aria-label="Primary" class="mt-2 sm:mt-3" data-testid="site-nav">
+      <ul class="flex flex-wrap gap-x-5 sm:gap-x-6">
         {navItems.map((item) => {
           const isActive = isNavItemActive(item, currentPath);
           return (

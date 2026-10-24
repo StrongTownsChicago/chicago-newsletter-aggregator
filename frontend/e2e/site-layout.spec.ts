@@ -71,3 +71,19 @@ test('newsletter detail page renders exactly one site h1 and it is the subject',
   await expect(siteHeadings).toHaveText(subject ?? '');
   await expect(page.getByRole('main').getByTestId('newsletter-detail-title')).toHaveText(subject ?? '');
 });
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 375, height: 800 } });
+
+  test('keeps the header compact: one-line site name, no tagline', async ({ page }) => {
+    await page.goto('/search');
+    const header = page.getByRole('banner');
+
+    await expect(header.getByTestId('site-tagline')).toBeHidden();
+    const nameBox = await header.getByTestId('site-name').boundingBox();
+    expect(nameBox?.height).toBeLessThan(30);
+    const headerBox = await header.boundingBox();
+    expect(headerBox?.height).toBeLessThan(160);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  });
+});
