@@ -23,3 +23,13 @@ backend/data/
 # Coverage output
 .coverage
 htmlcov/
+
+# Hypothesis example database (property-based tests)
+.hypothesis/
+
+# Mutation testing sessions (backend/tools/run_mutation_tests.py)
+backend/.mutation/
+
+# StrykerJS mutation testing output (frontend: npm run test:mutation)
+frontend/reports/
+frontend/.stryker-tmp/

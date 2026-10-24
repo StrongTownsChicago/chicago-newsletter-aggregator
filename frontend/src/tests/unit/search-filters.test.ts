@@ -118,7 +118,12 @@ describe('parseSearchParams', () => {
   });
 
   describe('source and ward', () => {
-    it.each(['0', '-3', 'abc', '2.5'])('ignores invalid source id %j', (value) => {
+    it('accepts source id 1', () => {
+      expect(parse('source=1').filters.sourceId).toBe(1);
+    });
+
+    // Number() would accept 1e3, 0x10 and +5; only plain digits are ids.
+    it.each(['0', '-3', 'abc', '2.5', '1e3', '0x10', '%2B5', 'x5', '5x'])('ignores invalid source id %j', (value) => {
       expect(parse(`source=${value}`).filters.sourceId).toBeNull();
     });
 
@@ -132,6 +137,7 @@ describe('parseSearchParams', () => {
 
     it('ignores malformed source types', () => {
       expect(parse('source_type=Alder%20Man').filters.sourceType).toBeNull();
+      expect(parse('source_type=alderman-x').filters.sourceType).toBeNull();
     });
   });
 

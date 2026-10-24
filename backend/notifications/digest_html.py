@@ -1,7 +1,9 @@
 """HTML bodies for daily and weekly digest emails."""
 
 from datetime import datetime
+from html import escape
 from typing import Any
+from urllib.parse import quote
 
 from notifications.digest_config import DigestType, frontend_base_url
 
@@ -12,15 +14,15 @@ def _render_daily_content_html(prepared_newsletters: list[dict[str, Any]]) -> st
     for newsletter in prepared_newsletters:
         content += f"""
         <div class="newsletter">
-            <h2 class="newsletter-title">{newsletter["title"]}</h2>
+            <h2 class="newsletter-title">{escape(newsletter["title"])}</h2>
             <div class="newsletter-meta">
-                From <strong>{newsletter["source_name"]}</strong>{newsletter["ward_text"]} • {newsletter["date_formatted"]}
+                From <strong>{escape(newsletter["source_name"])}</strong>{escape(newsletter["ward_text"])} • {escape(newsletter["date_formatted"])}
             </div>
 """
 
         # Add matched rules indicator
         if newsletter["matched_rules"]:
-            rules_text = ", ".join(newsletter["matched_rules"])
+            rules_text = escape(", ".join(newsletter["matched_rules"]))
             content += f"""
             <div class="matched-rules">
                 <strong>✓ Matched your rules:</strong> {rules_text}
@@ -29,7 +31,7 @@ def _render_daily_content_html(prepared_newsletters: list[dict[str, Any]]) -> st
 
         if newsletter["summary"]:
             content += f"""
-            <div class="newsletter-summary">{newsletter["summary"]}</div>
+            <div class="newsletter-summary">{escape(newsletter["summary"])}</div>
 """
 
         if newsletter["topics"]:
@@ -38,14 +40,14 @@ def _render_daily_content_html(prepared_newsletters: list[dict[str, Any]]) -> st
 """
             for topic in newsletter["topics"][:5]:  # Limit to 5 topics
                 content += f"""
-                <span class="topic">{topic}</span>
+                <span class="topic">{escape(topic)}</span>
 """
             content += """
             </div>
 """
 
         content += f"""
-            <a href="{newsletter["newsletter_url"]}" class="read-more">Read full newsletter →</a>
+            <a href="{escape(newsletter["newsletter_url"])}" class="read-more">Read full newsletter →</a>
         </div>
 """
     return content
@@ -58,13 +60,13 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
 
     for report in prepared_reports:
         # Build search URL for this topic
-        topic_url = f"{base_url}/search?topic={report['topic']}"
+        topic_url = f"{base_url}/search?topic={quote(report['topic'])}"
 
         content += f"""
         <div class="topic-report">
-            <h2 class="topic-title">{report["topic_display"]}</h2>
+            <h2 class="topic-title">{escape(report["topic_display"])}</h2>
             <p class="topic-meta">
-                Week of {report["week_range"]} &bull; Based on {report["newsletter_count"]} newsletters
+                Week of {escape(report["week_range"])} &bull; Based on {report["newsletter_count"]} newsletters
             </p>
 
             <div class="summary">
@@ -72,7 +74,7 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
             </div>
 
             <div class="matched-rules">
-                ✓ Matched your rule: {", ".join(report["matched_rules"])}
+                ✓ Matched your rule: {escape(", ".join(report["matched_rules"]))}
             </div>
 """
 
@@ -101,10 +103,10 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
 
                 content += f"""
                     <li style="margin: 4px 0;">
-                        <a href="{nl_url}" style="color: #2563eb; text-decoration: none;">
-                            {ward_str}: {nl["subject"]}
+                        <a href="{escape(nl_url)}" style="color: #2563eb; text-decoration: none;">
+                            {escape(ward_str)}: {escape(nl["subject"])}
                         </a>
-                        <span style="color: #6b7280; font-size: 13px;"> &bull; {date_str}</span>
+                        <span style="color: #6b7280; font-size: 13px;"> &bull; {escape(date_str)}</span>
                     </li>
 """
 
@@ -115,8 +117,8 @@ def _render_weekly_content_html(prepared_reports: list[dict[str, Any]]) -> str:
 
         content += f"""
             <p style="margin-top: 15px;">
-                <a href="{topic_url}" class="view-link">
-                    View all newsletters on {report["topic_display"]} →
+                <a href="{escape(topic_url)}" class="view-link">
+                    View all newsletters on {escape(report["topic_display"])} →
                 </a>
             </p>
         </div>
@@ -332,9 +334,9 @@ def build_digest_html(
 
         <div class="footer">
             <p>
-                <a href="{preferences_url}">Manage your notification preferences</a>
+                <a href="{escape(preferences_url)}">Manage your notification preferences</a>
                 •
-                <a href="{unsubscribe_url}">Unsubscribe</a>
+                <a href="{escape(unsubscribe_url)}">Unsubscribe</a>
             </p>
             <p style="margin-top: 15px; color: #9ca3af; font-size: 12px;">
                 <a href="https://www.strongtownschicago.org/chicago-alderman-newsletters">Chicago Alderman Newsletter Tracker</a> • Built for <a href="https://strongtownschicago.org">Strong Towns Chicago</a>
@@ -363,4 +365,4 @@ def _format_summary_paragraphs(summary: str) -> str:
     paragraphs = [p.strip() for p in summary.split("\n\n") if p.strip()]
 
     # Wrap each in <p> tags
-    return "\n".join(f"<p>{p}</p>" for p in paragraphs)
+    return "\n".join(f"<p>{escape(p)}</p>" for p in paragraphs)

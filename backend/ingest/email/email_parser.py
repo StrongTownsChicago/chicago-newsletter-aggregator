@@ -2,11 +2,19 @@ import logging
 import os
 import re
 from typing import Any, cast
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 from html2text import html2text
 
 logger = logging.getLogger(__name__)
+
+REDACTION_MARKER = "[REDACTED]"
+# Joins text nodes for matching: a private-use character, so never newsletter text.
+NODE_SEPARATOR = "\ue000"
+# A letter beside a phrase means the phrase is part of a longer word.
+LETTER = r"[^\W\d_]"
 
 
 def sanitize_content(
@@ -22,20 +30,22 @@ def sanitize_content(
     if not content:
         return ""
 
+    redaction_pattern = build_redaction_pattern(read_strip_phrases())
     url_patterns = privacy_patterns.get("url_patterns", [])
     text_patterns = privacy_patterns.get("text_patterns", [])
     selectors = privacy_patterns.get("selectors", [])
 
     if content_type == "html":
-        result = _sanitize_html(content, url_patterns, text_patterns, selectors)
-    elif content_type == "text":
+        return _sanitize_html(
+            content, url_patterns, text_patterns, selectors, redaction_pattern
+        )
+    if content_type == "text":
         result = _sanitize_text(content, url_patterns, text_patterns)
     else:
         result = content
 
-    # 3. Strip sensitive phrases (names, emails, etc.) from environment variable
-    phrases_to_strip = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
-    return _redact_phrases(result, [p.strip() for p in phrases_to_strip if p.strip()])
+    # 3. Redact sensitive phrases (names, emails, etc.)
+    return redact_text(result, redaction_pattern)
 
 
 def _matches_any(patterns: list[str], value: str) -> bool:
@@ -47,6 +57,7 @@ def _sanitize_html(
     url_patterns: list[str],
     text_patterns: list[str],
     selectors: list[str],
+    redaction_pattern: re.Pattern[str] | None,
 ) -> str:
     try:
         soup = BeautifulSoup(content, "html.parser")
@@ -58,17 +69,22 @@ def _sanitize_html(
 
         # 2. Remove <a> tags by URL or Link Text
         for a in soup.find_all("a", href=True):
-            url_matched = _matches_any(url_patterns, cast(str, a["href"]))
+            url_matched = _matches_any(
+                url_patterns, normalize_url_for_matching(cast(str, a["href"]))
+            )
             if _matches_any(text_patterns, a.get_text(" ", strip=True)):
                 a.decompose()
             elif url_matched:
                 a.unwrap()
 
+        # 3. Redact sensitive phrases in text and attribute values, not in markup
+        if redaction_pattern:
+            redact_html(soup, redaction_pattern)
         return str(soup)
 
     except Exception as e:  # noqa: BLE001  sanitizer failure falls back to the original content
         logger.warning(f"  ⚠️  HTML Sanitization failed: {e}")
-        return content
+        return redact_text(content, redaction_pattern)
 
 
 def _is_standalone_keyword(line: str, text_patterns: list[str]) -> bool:
@@ -86,16 +102,192 @@ def _sanitize_text(
     return "\n".join(
         line
         for line in content.splitlines()
-        if not _matches_any(url_patterns, line)
+        if not _matches_any(url_patterns, normalize_url_for_matching(line))
         and not _is_standalone_keyword(line, text_patterns)
     )
 
 
-def _redact_phrases(content: str, phrases: list[str]) -> str:
-    for phrase in phrases:
-        # Escaped so regex characters in a phrase match literally
-        content = re.sub(re.escape(phrase), "[REDACTED]", content, flags=re.IGNORECASE)
-    return content
+def redact_text(content: str, pattern: re.Pattern[str] | None) -> str:
+    """Replace every phrase pattern matches with the redaction marker."""
+    return pattern.sub(REDACTION_MARKER, content) if pattern else content
+
+
+def normalize_url_for_matching(url: str) -> str:
+    """
+    Return the URL a browser would follow, for matching against privacy patterns.
+
+    Browsers drop ASCII tabs and newlines anywhere in a URL and surrounding
+    whitespace, and percent-escapes reach the server decoded, so
+    "list-man<TAB>age.com/un%73ubscribe" is still an unsubscribe link.
+    """
+    return unquote(re.sub(r"[\t\n\r]", "", url).strip())
+
+
+def read_strip_phrases() -> list[str]:
+    """Return the phrases to redact, from the PRIVACY_STRIP_PHRASES env var."""
+    phrases = os.environ.get("PRIVACY_STRIP_PHRASES", "").split(",")
+    return [phrase.strip() for phrase in phrases if phrase.strip()]
+
+
+def build_redaction_pattern(phrases: list[str]) -> re.Pattern[str] | None:
+    """
+    Compile one case-insensitive pattern matching any phrase to redact.
+
+    The marker itself is the first alternative (group "marker"), so already
+    redacted text is replaced with itself: a phrase such as "Ted" never
+    rewrites the "TED" in an earlier marker, and sanitizing stored content
+    again changes nothing. Longer phrases come first, so "Jane Roe" is
+    redacted whole before "Jane".
+    """
+    if not phrases:
+        return None
+    alternatives = [
+        f"(?P<marker>{re.escape(REDACTION_MARKER)})",
+        *(phrase_regex(phrase) for phrase in sorted(phrases, key=len, reverse=True)),
+    ]
+    return re.compile("|".join(alternatives), re.IGNORECASE)
+
+
+def phrase_regex(phrase: str) -> str:
+    """
+    Return the regex for one phrase.
+
+    A letter right before or after the phrase means it is part of a longer
+    word, so "Ted" matches "Ted", "Ted's" and "_Ted_" but not "started".
+    Digits and underscores don't count: "3125551234" still matches
+    "+13125551234". Whitespace matches any run of whitespace, as a browser
+    renders a name wrapped across source lines, and NODE_SEPARATOR may appear
+    anywhere, so a phrase split by tags ("Jane <b>Doe</b>") still matches.
+    """
+    separators = re.escape(NODE_SEPARATOR) + "*"
+    whitespace = rf"[\s{re.escape(NODE_SEPARATOR)}]+"
+    body = whitespace.join(
+        separators.join(re.escape(character) for character in word)
+        for word in phrase.split()
+    )
+    before = rf"(?<!{LETTER})" if re.match(LETTER, phrase) else ""
+    after = rf"(?!{LETTER})" if re.match(LETTER, phrase[-1]) else ""
+    return before + body + after
+
+
+def redact_html(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
+    """Redact text, comments and attribute values in place; tag and attribute names stay intact.
+
+    Only changed values are reassigned, so a phrase list that matches nothing
+    leaves the output as it was without one.
+    """
+    redact_visible_text(soup, pattern)
+    for string in soup.find_all(string=True):
+        # Comments, CDATA and script or style text are not visible text, so each
+        # is redacted on its own.
+        if type(string) is NavigableString:
+            continue
+        redacted = pattern.sub(REDACTION_MARKER, string)
+        if redacted != string:
+            # Same class, so comments and CDATA stay comments and CDATA.
+            string.replace_with(type(string)(redacted))
+    for tag in soup.find_all(True):
+        for name, value in list(tag.attrs.items()):
+            # Multi-valued attributes (class, rel) are redacted as written, so a
+            # phrase spanning two tokens ("Jane Doe") still matches.
+            original = value if isinstance(value, str) else " ".join(value)
+            redacted = redact_attribute_value(original, pattern)
+            if redacted != original:
+                tag[name] = redacted
+
+
+def redact_attribute_value(value: str, pattern: re.Pattern[str]) -> str:
+    """Redact an attribute value, also as percent-decoded ("mailto:jane%40doe.com")."""
+    redacted = pattern.sub(REDACTION_MARKER, value)
+    if redacted != value:
+        return redacted
+    decoded = unquote(value)
+    redacted_decoded = pattern.sub(REDACTION_MARKER, decoded)
+    return redacted_decoded if redacted_decoded != decoded else value
+
+
+def redact_visible_text(soup: BeautifulSoup, pattern: re.Pattern[str]) -> None:
+    """
+    Redact phrases in the document's visible text, even when split across tags.
+
+    The text nodes are matched as one string in document order, joined by
+    NODE_SEPARATOR: a phrase may span it ("Jane <b>Doe</b>", or text left
+    either side of a removed link), and it ends a word, so a block ending in
+    a letter ("<p>Contact</p><p>Jane Doe</p>") doesn't hide the next phrase.
+    Each match leaves the marker in the node where it starts and removes the
+    rest from the nodes it spans.
+    """
+    nodes = [
+        node for node in soup.find_all(string=True) if type(node) is NavigableString
+    ]
+    text = NODE_SEPARATOR.join(nodes)
+    match_spans = [
+        match.span()
+        for match in pattern.finditer(text)
+        if match.group("marker") is None
+    ]
+    if not match_spans:
+        return
+
+    first_span = 0
+    node_start = 0
+    for node in nodes:
+        node_end = node_start + len(node)
+        # Nodes and spans are both in document order, so skipped spans never return.
+        while (
+            first_span < len(match_spans) and match_spans[first_span][1] <= node_start
+        ):
+            first_span += 1
+        redacted = redact_node_text(text, node_start, node_end, match_spans, first_span)
+        if redacted != node:
+            node.replace_with(
+                NavigableString(collapse_like_parser(redacted, node, soup))
+            )
+        node_start = node_end + len(NODE_SEPARATOR)
+
+
+def collapse_like_parser(text: str, node: NavigableString, soup: BeautifulSoup) -> str:
+    """
+    Collapse whitespace-only text the way BeautifulSoup does when it parses.
+
+    Redaction can leave a node with only spaces; the next parse would turn
+    them into one space or newline, so a second sanitize would change the
+    output. Whitespace stays as written inside <pre> and <textarea>.
+    """
+    if not text or any(character not in soup.ASCII_SPACES for character in text):
+        return text
+    preserving_tags = soup.builder.preserve_whitespace_tags
+    if any(parent.name in preserving_tags for parent in node.parents):
+        return text
+    return "\n" if "\n" in text else " "
+
+
+def redact_node_text(
+    text: str,
+    start: int,
+    end: int,
+    match_spans: list[tuple[int, int]],
+    first_span: int,
+) -> str:
+    """Return text[start:end] with the parts covered by match_spans redacted.
+
+    Spans before first_span end before start; spans are scanned only while
+    they begin before end.
+    """
+    pieces: list[str] = []
+    position = start
+    for match_start, match_end in (
+        match_spans[index] for index in range(first_span, len(match_spans))
+    ):
+        if match_start >= end:
+            break
+        pieces.append(text[position : max(position, match_start)])
+        # The marker goes where the match starts; later nodes only lose their part.
+        if match_start >= start:
+            pieces.append(REDACTION_MARKER)
+        position = max(position, min(end, match_end))
+    pieces.append(text[position:end])
+    return "".join(pieces)
 
 
 SQL_ANY_CHARACTERS_WILDCARD = "%"

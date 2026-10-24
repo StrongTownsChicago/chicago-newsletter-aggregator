@@ -180,6 +180,21 @@ class TestRuleMatchesNewsletter(unittest.TestCase):
 
         self.assertFalse(result)  # Search term can't match
 
+    def test_null_topics_and_text_mean_none(self) -> None:
+        """Null columns (no LLM topics yet, no text) don't crash; a ward-only rule still matches"""
+        newsletter_data = {"topics": None, "plain_text": None, "ward_number": 40}
+
+        self.assertTrue(
+            _rule_matches_newsletter(
+                create_test_rule(topics=[], ward_numbers=[40]), newsletter_data
+            )
+        )
+        self.assertFalse(
+            _rule_matches_newsletter(
+                create_test_rule(topics=["zoning"]), newsletter_data
+            )
+        )
+
     def test_none_ward_number_handled(self) -> None:
         """Newsletter with ward_number=None doesn't crash"""
         rule = create_test_rule(ward_numbers=[1])
@@ -295,6 +310,46 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         self.assertEqual(len(result), 0)  # User filtered out
 
     @patch("notifications.rule_matcher.get_supabase_client")
+    def test_disabled_user_does_not_stop_later_rules(
+        self, mock_get_supabase: MagicMock
+    ) -> None:
+        """A disabled user's rule is skipped, and rules after it are still matched"""
+        disabled = create_test_user(user_id="user1", notifications_enabled=False)
+        enabled = create_test_user(user_id="user2", notifications_enabled=True)
+        mock_supabase = create_mock_supabase()
+        mock_supabase.execute.side_effect = [
+            Mock(
+                data=[
+                    create_test_rule(user_id="user1", topics=["bike_lanes"]),
+                    create_test_rule(user_id="user2", topics=["bike_lanes"]),
+                ]
+            ),
+            Mock(data=[disabled, enabled]),
+        ]
+        mock_get_supabase.return_value = mock_supabase
+
+        result = match_newsletter_to_rules("newsletter_id", {"topics": ["bike_lanes"]})
+
+        self.assertEqual([match["user_id"] for match in result], ["user2"])
+
+    @patch("notifications.rule_matcher.get_supabase_client")
+    def test_user_without_enabled_preference_is_notified(
+        self, mock_get_supabase: MagicMock
+    ) -> None:
+        """Notifications default to enabled when preferences don't say"""
+        user = create_test_user(user_id="user1", notification_preferences={})
+        mock_supabase = create_mock_supabase()
+        mock_supabase.execute.side_effect = [
+            Mock(data=[create_test_rule(user_id="user1", topics=["bike_lanes"])]),
+            Mock(data=[user]),
+        ]
+        mock_get_supabase.return_value = mock_supabase
+
+        result = match_newsletter_to_rules("newsletter_id", {"topics": ["bike_lanes"]})
+
+        self.assertEqual(len(result), 1)
+
+    @patch("notifications.rule_matcher.get_supabase_client")
     def test_filters_inactive_rules(self, mock_get_supabase: MagicMock) -> None:
         """Only is_active=true rules considered"""
         # Rule with is_active=False should not be returned by query
@@ -308,6 +363,8 @@ class TestMatchNewsletterToRules(unittest.TestCase):
         result = match_newsletter_to_rules("newsletter_id", newsletter_data)
 
         self.assertEqual(len(result), 0)
+        mock_supabase.eq.assert_any_call("is_active", True)
+        mock_supabase.eq.assert_any_call("delivery_frequency", "daily")
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")

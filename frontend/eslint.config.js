@@ -21,7 +21,7 @@ const supabaseAdminMessage =
   "supabase-admin carries the service key: import it only from src/pages/api/** server routes.";
 
 export default defineConfig(
-  { ignores: ["dist/**", ".astro/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**"] },
+  { ignores: ["dist/**", ".astro/**", ".wrangler/**", "coverage/**", "playwright-report/**", "test-results/**", "reports/**", ".stryker-tmp/**"] },
   ...tseslint.configs.recommended,
   ...eslintPluginAstro.configs.recommended,
   // Type-aware rules cover .ts only: astro-eslint-parser can't use projectService and

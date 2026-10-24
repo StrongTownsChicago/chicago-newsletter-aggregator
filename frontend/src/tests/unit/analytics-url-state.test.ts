@@ -69,8 +69,18 @@ describe("parseDashboardUrlState", () => {
     expect(parse("from=2026-02&to=2026-01").filters).toMatchObject({ fromMonth: "2026-02", toMonth: null });
   });
 
-  it("ignores over-long terms", () => {
+  it("keeps a term up to the length limit and ignores longer ones", () => {
+    expect(parse(`term=${"a".repeat(MAX_TERM_QUERY_LENGTH)}`).term).toBe("a".repeat(MAX_TERM_QUERY_LENGTH));
     expect(parse(`term=${"a".repeat(MAX_TERM_QUERY_LENGTH + 1)}`).term).toBe("");
+  });
+
+  it("trims spaces around listed wards", () => {
+    expect(parse("wards=1,%202%20").filters.wards).toEqual(["1", "2"]);
+  });
+
+  it("reads the parameter names in links already shared", () => {
+    expect(parse("window=all").filters.fromMonth).toBeNull();
+    expect(parse("ward=4").filters.wards).toEqual(["4"]);
   });
 
   it("ignores inherited object keys", () => {
@@ -117,6 +127,8 @@ describe("serializeDashboardUrlState", () => {
 describe("chooseHistoryMode", () => {
   it("pushes the first change and changes after a pause", () => {
     expect(chooseHistoryMode(5000, null)).toBe("push");
+    // performance.now() starts at 0, so a change in the page's first second has a small timestamp.
+    expect(chooseHistoryMode(HISTORY_COALESCE_MS - 1, null)).toBe("push");
     expect(chooseHistoryMode(5000 + HISTORY_COALESCE_MS, 5000)).toBe("push");
   });
 
@@ -139,6 +151,8 @@ describe("reconcileDateWindow", () => {
   it("leaves a valid or open window alone", () => {
     const valid = { ...filters, fromMonth: "2026-01", toMonth: "2026-03" };
     expect(reconcileDateWindow(valid, "from")).toBe(valid);
+    const singleMonth = { ...filters, fromMonth: "2026-02", toMonth: "2026-02" };
+    expect(reconcileDateWindow(singleMonth, "from")).toBe(singleMonth);
     const open = { ...filters, fromMonth: null };
     expect(reconcileDateWindow(open, "to")).toBe(open);
   });

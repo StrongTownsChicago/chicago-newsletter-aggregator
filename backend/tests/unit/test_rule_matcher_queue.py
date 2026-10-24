@@ -141,6 +141,29 @@ class TestQueueNotifications(unittest.TestCase):
 
     @patch("notifications.rule_matcher.get_supabase_client")
     @patch("notifications.rule_matcher.log_notification_error")
+    @patch("builtins.print")
+    def test_either_duplicate_wording_is_not_logged_as_a_failure(
+        self,
+        mock_print: MagicMock,
+        mock_log: MagicMock,
+        mock_get_supabase: MagicMock,
+    ) -> None:
+        """An error naming only "duplicate" or only "unique" is still a duplicate"""
+        for message in ("duplicate key value", "violates unique constraint"):
+            with self.subTest(message=message):
+                mock_supabase = create_mock_supabase()
+                mock_supabase.execute.side_effect = Exception(message)
+                mock_get_supabase.return_value = mock_supabase
+
+                queue_notifications(
+                    "newsletter_id",
+                    [{"user_id": "user1", "rule_id": "rule1", "rule_name": "Rule 1"}],
+                )
+
+                mock_log.assert_not_called()
+
+    @patch("notifications.rule_matcher.get_supabase_client")
+    @patch("notifications.rule_matcher.log_notification_error")
     @patch("notifications.rule_matcher.datetime")
     def test_partial_failure_continues(
         self,

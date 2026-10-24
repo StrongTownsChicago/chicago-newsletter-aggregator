@@ -24,11 +24,15 @@ dependencies = [
 [dependency-groups]
 dev = [
     "coverage>=7.13.1",
+    "hypothesis>=6.170.9",
     "import-linter>=2.15",
     "mypy>=1.13.0",
     "pip-audit>=2.10.0",
     "ruff>=0.14.14,<0.15",
     "tiktoken>=0.12.0",
+]
+mutation = [
+    "cosmic-ray>=8.7.0",
 ]
 
 [tool.ruff]

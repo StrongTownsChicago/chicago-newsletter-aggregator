@@ -89,8 +89,12 @@ class TestSelectBroadCompleteMonths(unittest.TestCase):
             item("c", "2", date(2026, 8, 1)),
             item("d", "1", date(2026, 9, 1)),
             item("e", "2", date(2026, 9, 1)),
+            item("h", "3", date(2026, 9, 1)),
             item("f", "1", date(2026, 10, 1)),
             item("g", "2", date(2026, 10, 1)),
+            # After as_of_month (a mis-dated newsletter): never complete.
+            item("i", "1", date(2026, 11, 1)),
+            item("j", "2", date(2026, 11, 1)),
         ]
         self.assertEqual(
             select_broad_complete_months(items, "2026-10", min_sending_wards=2),
@@ -103,6 +107,7 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(
             list_months_ending("2026-02", 3), ["2025-12", "2026-01", "2026-02"]
         )
+        self.assertEqual(list_months_ending("2026-02", 2), ["2026-01", "2026-02"])
 
     def test_topic_labels_keep_display_order(self) -> None:
         topics = [

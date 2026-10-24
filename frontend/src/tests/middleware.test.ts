@@ -67,6 +67,29 @@ describe('Middleware', () => {
     });
   });
 
+  it('builds a per-request client that neither persists nor refreshes the session', async () => {
+    await onRequest(createMockContext(), vi.fn(() => Promise.resolve(new Response())));
+
+    expect(vi.mocked(createClient).mock.calls[0][2]).toMatchObject({
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  });
+
+  it.each(['sb-access-token', 'sb-refresh-token'])(
+    'does not restore a session from %s alone',
+    async (cookieName) => {
+      const context = createMockContext();
+      vi.mocked(context.cookies.get).mockImplementation((key: string) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        key === cookieName ? ({ value: 'token-123' } as any) : undefined,
+      );
+
+      await onRequest(context, vi.fn(() => Promise.resolve(new Response())));
+
+      expect(mockSupabase.auth.setSession).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not read cookies while prerendering a page at build time', async () => {
     const context = { ...createMockContext(), isPrerendered: true } as APIContext;
     const next = vi.fn(() => Promise.resolve(new Response()));
