@@ -200,9 +200,10 @@ def _process_user_digest(
     if not preferences.get("enabled", True):
         print("  ⚠️  Notifications disabled for user, skipping")
         run.stats["skipped"] += 1
-        _mark_notifications_failed(
-            run.supabase, notifications, "User notifications disabled"
-        )
+        if not run.dry_run:
+            _mark_notifications_failed(
+                run.supabase, notifications, "User notifications disabled"
+            )
         return False
 
     if run.dry_run:
