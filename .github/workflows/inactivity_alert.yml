@@ -2,13 +2,13 @@ name: Inactivity Alert
 
 # GitHub disables a public repository's scheduled workflows (email ingestion,
 # digests) after 60 days without repository activity, without warning. This
-# opens an issue once main has gone 40 days without a commit, leaving three
-# weekly runs before the cutoff, so someone can push a commit to reset it.
+# opens an issue once main has gone 40 days without a commit, at least two
+# weeks before the cutoff, so someone can push a commit to reset it.
 
 on:
   schedule:
-    # Run weekly on Monday at 15:00 UTC
-    - cron: "0 15 * * 1"
+    # Run weekly on Monday at 15:17 UTC (off the hour, when GitHub drops the most scheduled runs)
+    - cron: "17 15 * * 1"
   workflow_dispatch:
     inputs:
       alert_now:
@@ -44,10 +44,11 @@ jobs:
             exit 0
           fi
 
-          open_alerts=$(gh issue list --state open --limit 500 --json title --jq '.[].title' |
-            grep --count --line-regexp --fixed-strings -- "$ALERT_TITLE" || true)
-          if [ "$open_alerts" -gt 0 ]; then
-            echo "An alert issue is already open."
+          # An alert left open from an earlier quiet period must not silence this one.
+          titles_since_commit=$(gh issue list --state open --limit 500 --json title,createdAt \
+            --jq ".[] | select(.createdAt > \"$last_commit_date\") | .title")
+          if grep --quiet --line-regexp --fixed-strings -- "$ALERT_TITLE" <<< "$titles_since_commit"; then
+            echo "An alert issue for this quiet period is already open."
             exit 0
           fi
 
