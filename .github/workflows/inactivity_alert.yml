@@ -1,0 +1,59 @@
+name: Inactivity Alert
+
+# GitHub disables a public repository's scheduled workflows (email ingestion,
+# digests) after 60 days without repository activity, without warning. This
+# opens an issue once main has gone 40 days without a commit, at least two
+# weeks before the cutoff, so someone can push a commit to reset it.
+
+on:
+  schedule:
+    # Run weekly on Monday at 15:17 UTC (off the hour, when GitHub drops the most scheduled runs)
+    - cron: "17 15 * * 1"
+  workflow_dispatch:
+    inputs:
+      alert_now:
+        description: "Open the alert regardless of the last commit's age (to test notifications)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-activity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Open an issue if main has gone quiet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ALERT_NOW: ${{ inputs.alert_now }}
+          ALERT_ASSIGNEE: matt-hendrick
+          ALERT_AFTER_DAYS: 40
+          ALERT_TITLE: "Scheduled workflows will be disabled soon: no commits to main"
+        run: |
+          default_branch=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          last_commit_date=$(gh api "repos/$GH_REPO/commits/$default_branch" --jq .commit.committer.date)
+          days_since_commit=$(( ($(date -u +%s) - $(date -u -d "$last_commit_date" +%s)) / 86400 ))
+          echo "Last commit to $default_branch: $last_commit_date ($days_since_commit days ago)"
+
+          if [ "$days_since_commit" -lt "$ALERT_AFTER_DAYS" ] && [ "$ALERT_NOW" != "true" ]; then
+            exit 0
+          fi
+
+          # An alert left open from an earlier quiet period must not silence this one.
+          titles_since_commit=$(gh issue list --state open --limit 500 --json title,createdAt \
+            --jq ".[] | select(.createdAt > \"$last_commit_date\") | .title")
+          if grep --quiet --line-regexp --fixed-strings -- "$ALERT_TITLE" <<< "$titles_since_commit"; then
+            echo "An alert issue for this quiet period is already open."
+            exit 0
+          fi
+
+          gh issue create --title "$ALERT_TITLE" --assignee "$ALERT_ASSIGNEE" --body "@$ALERT_ASSIGNEE The last commit to \`$default_branch\` was $days_since_commit days ago ($last_commit_date).
+
+          GitHub disables this repository's scheduled workflows (email ingestion, notification digests) after 60 days without activity. Merge any commit to \`$default_branch\` to reset the timer, then close this issue.
+
+          If they are already disabled, re-enable each one from the Actions tab: $GITHUB_SERVER_URL/$GH_REPO/actions"

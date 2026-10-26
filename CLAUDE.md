@@ -180,6 +180,7 @@ ollama pull gpt-oss:20b
 - Frontend CI (`.github/workflows/frontend_tests.yml`) - Runs the frontend gates of `scripts/check.sh` (lint, typecheck, unit tests with coverage, build, generated database types, E2E on the local stack) on frontend changes
 - Email ingestion (`.github/workflows/email_ingestion.yml`) - Polls Gmail, stores newsletters, generates summaries and topics (`ENABLE_LLM` and `LLM_MODEL` repository secrets), queues notifications
 - Notification sending (`.github/workflows/send_notifications.yml`) - Sends daily digest emails
+- Inactivity alert (`.github/workflows/inactivity_alert.yml`) - GitHub silently disables scheduled workflows after 60 days without repository activity; this opens an issue when `main` has gone quiet, so a commit can reset the timer
 
 All workflows support manual triggering via Actions tab. See workflow files for schedules and configuration details.
 
