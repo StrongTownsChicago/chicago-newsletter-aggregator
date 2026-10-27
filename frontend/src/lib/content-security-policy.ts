@@ -7,7 +7,9 @@
  * from inlining small scripts, and from Cloudflare Web Analytics, whose beacon
  * Cloudflare Pages adds to every page in production. Styles allow 'unsafe-inline' for newsletters'
  * inline style attributes, and images may come from any host because
- * newsletters embed their own. The middleware sets it on server-rendered
+ * newsletters embed their own. Any site may frame our pages, since other sites
+ * embed them; session cookies are SameSite=Lax, so a framed page is always
+ * signed out and has no account actions to hijack. The middleware sets it on server-rendered
  * pages; public/_headers repeats it for static files (a test keeps the two equal).
  */
 const CLOUDFLARE_WEB_ANALYTICS_ORIGIN = "https://static.cloudflareinsights.com";
@@ -23,7 +25,7 @@ const DIRECTIVES: Record<string, string[]> = {
   "frame-src": ["'none'"],
   "base-uri": ["'self'"],
   "form-action": ["'self'"],
-  "frame-ancestors": ["'none'"],
+  "frame-ancestors": ["*"],
 };
 
 export const CONTENT_SECURITY_POLICY = Object.entries(DIRECTIVES)

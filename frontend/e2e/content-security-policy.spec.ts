@@ -36,6 +36,17 @@ for (const { name, path, user, prepare } of SCANNED_PAGES) {
   });
 }
 
+test('another site can embed a page in a frame', async ({ page, baseURL }) => {
+  const embeddingSite = 'https://embedding-site.example/';
+  await page.route(embeddingSite, (route) =>
+    route.fulfill({ contentType: 'text/html', body: `<iframe src="${baseURL}/" title="Embedded site"></iframe>` }),
+  );
+
+  await page.goto(embeddingSite);
+
+  await expect(page.frameLocator('iframe').getByRole('heading', { level: 1 })).toBeVisible();
+});
+
 test('script in stored newsletter HTML does not run', async ({ page }) => {
   const readViolations = await recordViolations(page);
 
