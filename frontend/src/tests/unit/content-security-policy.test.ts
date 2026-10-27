@@ -49,9 +49,9 @@ describe("Content-Security-Policy", () => {
     }
   });
 
-  it("keeps the site out of frames and frames out of the site", () => {
+  it("lets other sites embed the site but embeds no frames itself", () => {
+    expect(directives.get("frame-ancestors")).toEqual(["*"]);
     expect(directives.get("frame-src")).toEqual(["'none'"]);
-    expect(directives.get("frame-ancestors")).toEqual(["'none'"]);
   });
 
   // A page's own handlers would be blocked like a newsletter's: wire them in a <script>.
