@@ -2,6 +2,8 @@
 // blocks script that stored newsletter HTML carries. This runs on the dev
 // server: it never inlines scripts or loads Cloudflare's beacon, and serves
 // prerendered pages through the middleware rather than public/_headers.
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_HEADER } from '../src/lib/content-security-policy';
 import { UNSAFE_MARKUP_NEWSLETTER } from './fixtures/db/facts';
@@ -36,15 +38,29 @@ for (const { name, path, user, prepare } of SCANNED_PAGES) {
   });
 }
 
+/** Serves a page framing `frameUrl` from its own loopback port: another origin to the dev server. */
+async function startEmbeddingSite(frameUrl: string): Promise<{ server: Server; url: string }> {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end(`<!doctype html><iframe src="${frameUrl}" title="Embedded site"></iframe>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return { server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/` };
+}
+
+// The embedding page comes from a real server, not page.route: Chrome treats a
+// fulfilled response as a public site and blocks its frames to loopback addresses.
 test('another site can embed a page in a frame', async ({ page, baseURL }) => {
-  const embeddingSite = 'https://embedding-site.example/';
-  await page.route(embeddingSite, (route) =>
-    route.fulfill({ contentType: 'text/html', body: `<iframe src="${baseURL}/" title="Embedded site"></iframe>` }),
-  );
+  const embeddingSite = await startEmbeddingSite(`${baseURL}/`);
+  try {
+    await page.route(embeddingSite.url, (route) => route.continue());
 
-  await page.goto(embeddingSite);
+    await page.goto(embeddingSite.url);
 
-  await expect(page.frameLocator('iframe').getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.frameLocator('iframe').getByRole('heading', { level: 1 })).toBeVisible();
+  } finally {
+    embeddingSite.server.close();
+  }
 });
 
 test('script in stored newsletter HTML does not run', async ({ page }) => {
